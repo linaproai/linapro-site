@@ -1,307 +1,269 @@
+/**
+ * Any CSS included here will be global. The classic template
+ * bundles Infima by default. Infima is a CSS framework designed to
+ * work well for content-centric websites.
+ */
+
+.navbar__logo img {
+  border-radius: 5px;
+}
+.logo-container {
+  text-align: center;
+}
+
+.logo-container .logo {
+  width: 400px;
+  margin-top: 10px;
+}
+
+.logo-container .logo-badges img {
+  padding: 0 2px 0 2px;
+}
+
 :root {
-  --ifm-color-primary: #2563eb;
-  --ifm-color-primary-dark: #1e56d0;
-  --ifm-color-primary-darker: #1a4ebd;
-  --ifm-color-primary-darkest: #183f92;
-  --ifm-color-primary-light: #4076ee;
-  --ifm-color-primary-lighter: #5a89f1;
-  --ifm-color-primary-lightest: #90b2f7;
-  --ifm-background-color: #f3f7fc;
-  --ifm-background-surface-color: #ffffff;
-  --ifm-navbar-background-color: rgba(255, 255, 255, 0.84);
-  --ifm-footer-background-color: #eef4ff;
-  --ifm-font-family-base: 'IBM Plex Sans', 'Noto Sans SC', sans-serif;
-  --ifm-heading-font-family: 'Sora', 'IBM Plex Sans', 'Noto Sans SC', sans-serif;
-  --ifm-font-family-monospace: 'IBM Plex Mono', monospace;
-  --ifm-code-font-size: 92%;
-  --ifm-global-radius: 18px;
-  --ifm-heading-color: #12233f;
-  --ifm-font-color-base: #49617e;
-  --ifm-color-content-secondary: #647a94;
-  --ifm-color-emphasis-200: #dfe8f5;
-  --ifm-color-emphasis-300: #d2dff1;
-  --ifm-color-emphasis-700: #324760;
-  --ifm-color-emphasis-800: #1d2f47;
-  --ifm-code-background: rgba(37, 99, 235, 0.06);
-  --ifm-menu-color-background-active: rgba(37, 99, 235, 0.08);
-  --ifm-link-hover-decoration: none;
-  --ifm-toc-border-color: rgba(37, 99, 235, 0.12);
-  --linapro-font-mono: 'IBM Plex Mono', monospace;
-  --linapro-bg: #f3f7fc;
-  --linapro-bg-secondary: #eef4ff;
-  --linapro-panel: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(244, 248, 255, 0.98));
-  --linapro-panel-strong: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(239, 245, 255, 0.98));
-  --linapro-line-soft: rgba(37, 99, 235, 0.1);
-  --linapro-line-strong: rgba(37, 99, 235, 0.16);
-  --linapro-signal: #0ea5e9;
-  --linapro-signal-strong: #0284c7;
-  --linapro-blue: #2563eb;
-  --linapro-blue-deep: #1d4ed8;
-  --linapro-gold: #c67d4a;
-  --linapro-ink-deep: #12233f;
-  --linapro-ink-soft: #49617e;
-  --linapro-ink-muted: #6f84a0;
-  --linapro-grid: rgba(37, 99, 235, 0.06);
-  --linapro-card-shadow: 0 22px 60px rgba(31, 78, 150, 0.08);
-  --linapro-grid-fade: rgba(243, 247, 252, 0.3);
-  --linapro-grid-fade-strong: rgba(238, 244, 255, 0.7);
-  --linapro-overlay: rgba(255, 255, 255, 0.76);
-  --linapro-overlay-strong: rgba(247, 250, 255, 0.88);
-  --linapro-command-surface: rgba(247, 250, 255, 0.95);
-  --linapro-shell-strong: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(241, 246, 255, 0.98));
-  --linapro-sidebar-bg: rgba(255, 255, 255, 0.54);
-  --docusaurus-highlighted-code-line-bg: rgba(37, 99, 235, 0.08);
+  --ifm-color-primary: #2f80ed;
+  --ifm-color-primary-dark: #135ec0;
+  --ifm-color-primary-darker: #105ec5;
+  --ifm-color-primary-darkest: #145cb9;
+  --ifm-color-primary-light: #1d6cd3;
+  --ifm-color-primary-lighter: #2776dd;
+  --ifm-color-primary-lightest: #3380e6;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+  --ifm-font-size-base: 16px;
+  --ifm-font-family-base: 'Inter', -apple-system, BlinkMacSystemFont, Segoe UI,
+    Helvetica, Arial, sans-serif;
+  --ifm-font-color-subtle: #777e90;
+  --ifm-button-font-weight: 500;
+  --ifm-background-surface-color: #f9f9f9;
+  --ifm-breadcrumb-spacing: 2px;
+  --ifm-footer-background-color: #f9f9f9;
+  --ifm-spacing-horizontal: 2rem;
 }
 
+/* For readability concerns, you should choose a lighter palette in dark mode. */
 [data-theme='dark'] {
-  --ifm-color-primary: #7fb0ff;
-  --ifm-color-primary-dark: #68a2ff;
-  --ifm-color-primary-darker: #5d9aff;
-  --ifm-color-primary-darkest: #3a80ff;
-  --ifm-color-primary-light: #96beff;
-  --ifm-color-primary-lighter: #a6c8ff;
-  --ifm-color-primary-lightest: #cde0ff;
-  --ifm-background-color: #0c1422;
-  --ifm-background-surface-color: #131e30;
-  --ifm-navbar-background-color: rgba(12, 20, 34, 0.82);
-  --ifm-footer-background-color: #0b1320;
-  --ifm-heading-color: #eef4ff;
-  --ifm-font-color-base: #c0cde0;
-  --ifm-color-content-secondary: #93a5be;
-  --ifm-color-emphasis-200: #1a2941;
-  --ifm-color-emphasis-300: #20324d;
-  --ifm-color-emphasis-700: #d8e4f5;
-  --ifm-color-emphasis-800: #eef4ff;
-  --ifm-code-background: rgba(127, 176, 255, 0.1);
-  --ifm-menu-color-background-active: rgba(127, 176, 255, 0.12);
-  --ifm-toc-border-color: rgba(127, 176, 255, 0.16);
-  --linapro-bg: #0c1422;
-  --linapro-bg-secondary: #101a2d;
-  --linapro-panel: linear-gradient(180deg, rgba(20, 31, 48, 0.96), rgba(11, 18, 29, 0.98));
-  --linapro-panel-strong: linear-gradient(180deg, rgba(22, 35, 54, 0.98), rgba(8, 14, 24, 0.98));
-  --linapro-line-soft: rgba(127, 176, 255, 0.12);
-  --linapro-line-strong: rgba(127, 176, 255, 0.22);
-  --linapro-signal: #7dd3fc;
-  --linapro-signal-strong: #38bdf8;
-  --linapro-blue: #7fb0ff;
-  --linapro-blue-deep: #a9c8ff;
-  --linapro-gold: #e0a067;
-  --linapro-ink-deep: #eef4ff;
-  --linapro-ink-soft: #c0cde0;
-  --linapro-ink-muted: #91a5bf;
-  --linapro-grid: rgba(127, 176, 255, 0.08);
-  --linapro-card-shadow: 0 26px 70px rgba(0, 0, 0, 0.34);
-  --linapro-grid-fade: rgba(12, 20, 34, 0.4);
-  --linapro-grid-fade-strong: rgba(12, 20, 34, 0.76);
-  --linapro-overlay: rgba(19, 30, 48, 0.76);
-  --linapro-overlay-strong: rgba(14, 22, 36, 0.84);
-  --linapro-command-surface: rgba(15, 23, 37, 0.92);
-  --linapro-shell-strong: linear-gradient(180deg, rgba(17, 26, 42, 0.98), rgba(10, 17, 28, 0.98));
-  --linapro-sidebar-bg: rgba(14, 22, 35, 0.5);
-  --docusaurus-highlighted-code-line-bg: rgba(127, 176, 255, 0.12);
+  --ifm-color-primary: #5999ee;
+  --ifm-color-primary-dark: #3b78c7;
+  --ifm-color-primary-darker: #3368ad;
+  --ifm-color-primary-darkest: #33609b;
+  --ifm-color-primary-light: #75a1db;
+  --ifm-color-primary-lighter: #8daeda;
+  --ifm-color-primary-lightest: #91b4e2;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
 }
 
-html {
-  scroll-behavior: smooth;
-}
-
-body {
-  position: relative;
-  background:
-    radial-gradient(circle at top left, rgba(37, 99, 235, 0.11), transparent 24%),
-    radial-gradient(circle at top right, rgba(14, 165, 233, 0.1), transparent 22%),
-    linear-gradient(180deg, var(--linapro-bg), var(--linapro-bg-secondary));
-  color: var(--linapro-ink-soft);
-}
-
-body::before {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  background:
-    linear-gradient(180deg, transparent, var(--linapro-grid-fade)),
-    repeating-linear-gradient(
-      90deg,
-      transparent 0,
-      transparent 63px,
-      var(--linapro-grid) 64px,
-      var(--linapro-grid) 65px
-    ),
-    repeating-linear-gradient(
-      180deg,
-      transparent 0,
-      transparent 63px,
-      var(--linapro-grid) 64px,
-      var(--linapro-grid) 65px
-    );
-  mask-image: radial-gradient(circle at center, black, rgba(0, 0, 0, 0.38));
-  content: '';
-  pointer-events: none;
-}
-
-#__docusaurus {
-  position: relative;
-  z-index: 1;
-}
-
-.navbar {
-  border-bottom: 1px solid var(--linapro-line-soft);
+[data-theme='dark'] .footer {
   background: var(--ifm-navbar-background-color);
-  backdrop-filter: blur(18px);
-  box-shadow: 0 14px 40px rgba(31, 78, 150, 0.08);
 }
 
-.navbar__brand {
-  gap: 0.7rem;
-  font-weight: 700;
+[data-theme='dark'] code {
+  background-color: rgba(94, 108, 122, 0.15);
+  color: #c75975;
 }
 
-.navbar__title {
-  font-family: var(--ifm-heading-font-family);
-  font-size: 1.04rem;
-  letter-spacing: 0.04em;
+body .button {
+  display: inline-block;
+  border-radius: 5px;
+  padding: 14px 22px;
+  color: #fff;
+  border: none;
+  outline: none;
+  text-decoration: none;
+  font-size: 16px;
+  line-height: 1.5;
+  font-weight: 500;
+  text-align: center;
+  vertical-align: top;
+  cursor: pointer;
+  overflow: hidden;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  letter-spacing: normal !important;
+  position: relative;
+  white-space: nowrap;
+  transform: translate3d(0, 0, 0);
+  transition: 0.3s;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  user-select: none !important;
 }
 
-.navbar__item,
-.navbar__link {
-  font-weight: 600;
+body .button--secondary {
+  border: 1px solid rgba(0, 0, 0, 0.11);
+  padding-top: 13px;
+  padding-bottom: 13px;
+  background: #fff;
+  color: #161616;
 }
 
-.navbar__link {
-  border-radius: 999px;
-  transition: background-color 160ms ease, color 160ms ease;
+@import './output.css';
+
+.markdown {
+  --ifm-h2-vertical-rhythm-top: 1;
 }
 
-.navbar__link:hover,
-.navbar__link--active {
-  background: rgba(37, 99, 235, 0.08);
-}
-
-.footer {
-  border-top: 1px solid var(--linapro-line-soft);
-  background:
-    radial-gradient(circle at top left, rgba(37, 99, 235, 0.1), transparent 20%),
-    radial-gradient(circle at top right, rgba(14, 165, 233, 0.08), transparent 22%),
-    var(--ifm-footer-background-color);
-}
-
-.footer__title,
-.footer__link-item,
-.footer__copyright {
-  color: var(--linapro-ink-deep);
-}
-
-.footer__copyright {
-  color: var(--linapro-ink-muted);
-}
-
-.markdown > h1,
-.markdown > h2,
-.markdown > h3,
-.theme-blog-post-page article h1,
-.theme-blog-post-page article h2,
-.hero {
-  letter-spacing: -0.03em;
-}
-
-.markdown h1,
-.markdown h2,
-.markdown h3,
-.markdown h4,
-.markdown h5 {
-  color: var(--linapro-ink-deep);
-}
-
-.markdown p,
-.markdown li,
-.pagination-nav__label,
-.pagination-nav__sublabel {
-  color: var(--linapro-ink-soft);
-  line-height: 1.85;
-}
-
-.markdown a {
-  font-weight: 600;
-}
-
-.markdown code,
-.theme-code-block,
-.theme-admonition,
-.table-of-contents,
-.card,
-.pagination-nav__link,
-.clean-btn,
-.menu__list-item-collapsible,
-.theme-doc-sidebar-item-link,
-.menu__link {
-  border-radius: 16px;
-}
-
-.theme-code-block,
-.theme-admonition,
-.table-of-contents,
-.card,
-.pagination-nav__link {
-  border: 1px solid var(--linapro-line-soft);
-  box-shadow: var(--linapro-card-shadow);
-}
-
-.theme-code-block {
-  background: var(--linapro-panel-strong);
-}
-
-.theme-admonition,
-.pagination-nav__link,
-.card,
-.table-of-contents {
-  background: var(--linapro-panel);
-}
-
-.table-of-contents {
-  border-color: var(--linapro-line-soft);
-}
-
-.theme-doc-sidebar-container {
-  border-right-color: var(--linapro-line-soft) !important;
-  background: var(--linapro-sidebar-bg);
-  backdrop-filter: blur(18px);
-}
-
-.theme-doc-sidebar-item-link,
-.theme-doc-sidebar-menu .menu__link {
-  transition: background-color 160ms ease, color 160ms ease;
-}
-
-.theme-doc-sidebar-menu .menu__link:hover,
-.theme-doc-sidebar-menu .menu__link--active,
-.theme-doc-sidebar-item-link:hover {
-  background: rgba(37, 99, 235, 0.08);
-}
-
-.breadcrumbs__link {
-  border-radius: 999px;
-}
-
-.breadcrumbs__item--active .breadcrumbs__link {
-  background: rgba(37, 99, 235, 0.08);
-}
-
-.pagination-nav__link:hover,
-.card:hover {
-  border-color: var(--linapro-line-strong);
-}
-
-.blog-wrapper article,
-article.margin-bottom--xl {
-  background: transparent;
+.markdown > *:first-child {
+  margin-top: 20px;
 }
 
 code {
-  font-family: var(--ifm-font-family-monospace);
+  padding: 0.2em 0.4em;
+  background-color: rgba(27, 31, 35, 0.03);
+  border-radius: 3px;
+  border: 0px;
+  color: #c7254e;
+  font-size: 90%;
 }
 
-@media (max-width: 996px) {
-  .navbar__item.navbar__link {
-    border-radius: 12px;
+pre {
+  font-size: 90%;
+}
+
+/* GitHub */
+.header-github-link:hover {
+  opacity: 0.6;
+}
+
+.header-github-link:before {
+  content: '';
+  width: 24px;
+  height: 24px;
+  display: flex;
+  background: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12'/%3E%3C/svg%3E")
+    no-repeat;
+}
+
+html[data-theme='dark'] .header-github-link:before {
+  background: url("data:image/svg+xml,%3Csvg viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill='white' d='M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12'/%3E%3C/svg%3E")
+    no-repeat;
+}
+
+/* TODO: 加这个可以防止toml表头换行，但不知道有没有副作用，需要深入研究
+ https://github.com/PrismJS/prism/issues/2443 */
+.token.table.class-name {
+  display: initial;
+}
+
+.menu__link {
+  font-size: 98%;
+}
+table th,
+table td {
+  padding: 0.88rem;
+  font-size: 96%;
+}
+
+.markdown li > p {
+  margin: 0 0 6px 0;
+}
+
+.screen-reader-only {
+  border: 0;
+  clip: rect(0 0 0 0);
+  clip-path: polygon(0 0, 0 0, 0 0);
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  width: 1px;
+  white-space: nowrap;
+}
+
+.showcase-reset {
+  padding: 8px 20px 8px 20px !important;
+  font-size: 14px !important;
+}
+
+.showcase-title-mobile,
+.showcase-description-mobile {
+  display: none;
+}
+
+/* too avoid too many navbar items when in short window size */
+@media only screen and (max-width: 1360px) {
+  .navbar__items {
+    white-space: nowrap;
   }
+
+  .navbar__items--right a {
+    display: none;
+  }
+}
+
+@media only screen and (max-width: 680px) {
+  .showcase-title,
+  .showcase-description {
+    display: none;
+  }
+
+  .showcase-title-mobile,
+  .showcase-description-mobile {
+    display: block;
+  }
+}
+
+@media only screen and (max-width: 420px) {
+  .showcase-result-cases {
+    display: none;
+  }
+}
+
+@media only screen and (max-width: 500px) {
+  .petercat-lui-assistant {
+    display: none;
+  }
+}
+
+.beian a {
+  font-size: 88%;
+  color: var(--ifm-font-color-base);
+}
+
+@import './ad.css';
+
+.footer__links {
+  margin-bottom: 0;
+  text-align: center;
+}
+
+.footer__title {
+  font: normal var(--ifm-h4-font-size) / var(--ifm-heading-line-height)
+    var(--ifm-font-family-base);
+  margin-bottom: 0;
+}
+
+.footer__col {
+  margin-bottom: 0;
+}
+
+pre {
+  tab-size: 4;
+  -moz-tab-size: 4;
+  -o-tab-size: 4;
+}
+
+/* 添加显眼的 NEW 标签 */
+.navbar-new-link {
+  position: relative;
+}
+
+.navbar-new-link::after {
+  content: 'NEW';
+  position: absolute;
+  top: 0px;
+  right: -8px;
+  padding: 0.5px 5px;
+  font-size: 10px;
+  color: #fff;
+  background-color: #f32213b4;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+/* 外链箭头图标 */
+.navbar-new-link svg {
+  display: none;
 }

@@ -1,36 +1,46 @@
 {
-  "name": "@linapro/lina-site",
-  "version": "0.1.0",
+  "name": "gf-site",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "docusaurus": "docusaurus",
-    "start": "docusaurus start",
-    "build": "docusaurus build",
+    "start": "cross-env NODE_OPTIONS=--max-old-space-size=8192 docusaurus start --locale zh-Hans",
+    "start-en": "cross-env NODE_OPTIONS=--max-old-space-size=8192 docusaurus start --locale en",
+    "build": "cross-env NODE_OPTIONS=--max-old-space-size=8192 docusaurus build",
     "swizzle": "docusaurus swizzle",
     "deploy": "docusaurus deploy",
     "clear": "docusaurus clear",
     "serve": "docusaurus serve",
     "write-translations": "docusaurus write-translations",
     "write-heading-ids": "docusaurus write-heading-ids",
+    "version": "node version.js",
     "typecheck": "tsc"
   },
   "dependencies": {
-    "@docusaurus/core": "3.10.0",
-    "@docusaurus/faster": "3.10.0",
-    "@docusaurus/preset-classic": "3.10.0",
-    "@easyops-cn/docusaurus-search-local": "^0.51.0",
+    "@docusaurus/core": "3.6.3",
+    "@docusaurus/faster": "3.6.3",
+    "@docusaurus/plugin-content-docs": "3.6.3",
+    "@docusaurus/plugin-ideal-image": "3.6.3",
+    "@docusaurus/preset-classic": "3.6.3",
+    "@docusaurus/theme-classic": "3.6.3",
+    "@docusaurus/theme-mermaid": "3.6.3",
+    "@giscus/react": "^3.0.0",
     "@mdx-js/react": "^3.0.0",
+    "@node-rs/jieba": "^1.9.2",
+    "@petercatai/assistant": "^1.0.16",
     "clsx": "^2.0.0",
-    "prism-react-renderer": "^2.3.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "docusaurus-plugin-image-zoom": "^2.0.0",
+    "prism-react-renderer": "^2.4.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
   },
   "devDependencies": {
-    "@docusaurus/module-type-aliases": "3.10.0",
-    "@docusaurus/tsconfig": "3.10.0",
-    "@docusaurus/types": "3.10.0",
-    "@types/react": "^19.0.0",
-    "typescript": "~6.0.2"
+    "@docusaurus/module-type-aliases": "3.6.3",
+    "@docusaurus/tsconfig": "3.6.3",
+    "@docusaurus/types": "3.6.3",
+    "cross-env": "^7.0.3",
+    "sharp": "^0.33.5",
+    "typescript": "~5.6.3"
   },
   "browserslist": {
     "production": [
@@ -45,7 +55,6 @@
     ]
   },
   "engines": {
-    "node": ">=20.0"
-  },
-  "packageManager": "pnpm@10.32.1"
+    "node": ">=18.0"
+  }
 }

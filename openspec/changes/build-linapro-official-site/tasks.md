@@ -40,3 +40,4 @@
 
 - [x] **FB-1**: 根目录文件迁移到 `apps/lina-site` 后，workspace 入口与站点应用 manifest 混淆，导致根目录无法构建
 - [x] **FB-2**: 为官网仓库增加 `make dev` 启动入口，并将公开文档中的本地启动口径改为官网站点开发流程
+- [x] **FB-3**: Docusaurus 构建引用了未声明依赖和旧站点残留模块，导致 `apps/lina-site` 无法编译
