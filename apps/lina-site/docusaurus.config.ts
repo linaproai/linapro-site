@@ -27,7 +27,6 @@ const config: Config = {
   organizationName: 'linaproai',
   projectName: 'linapro',
   onBrokenLinks: 'warn',
-  onBrokenMarkdownLinks: 'warn',
   // 多语言配置
   i18n: {
     defaultLocale: 'en',
@@ -52,10 +51,16 @@ const config: Config = {
   },
   // https://www.docusaurus.cn/blog/releases/3.6#docusaurus-faster
   future: {
-    experimental_faster: true,
+    v4: {
+      removeLegacyPostBuildHeadAttribute: true,
+    },
+    faster: true,
   },
   // 启用 Markdown 中的 Mermaid 支持
   markdown: {
+    hooks: {
+      onBrokenMarkdownLinks: 'warn',
+    },
     mermaid: true,
   },
   // 配置 Mermaid 主题
