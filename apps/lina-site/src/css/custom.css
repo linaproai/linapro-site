@@ -11,6 +11,57 @@
   text-align: center;
 }
 
+/* Alternating homepage section backgrounds, inspired by verdaccio.org */
+.home-section {
+  padding: 64px 0;
+}
+
+.home-section--hero {
+  background: #ffffff;
+  padding-top: 48px;
+  padding-bottom: 80px;
+}
+
+.home-section--features {
+  background: #f5f7fa;
+}
+
+[data-theme='dark'] .home-section--hero {
+  background: var(--ifm-background-color);
+}
+
+[data-theme='dark'] .home-section--features {
+  background: #1a1d21;
+}
+
+/* Lift feature cards off the gray section background */
+.home-section--features .card {
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04),
+              0 4px 16px rgba(16, 24, 40, 0.04);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.home-section--features .card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 4px rgba(16, 24, 40, 0.06),
+              0 12px 28px rgba(16, 24, 40, 0.08);
+}
+
+[data-theme='dark'] .home-section--features .card {
+  background: #242830;
+  border-color: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3),
+              0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* Section heading & lead copy spacing */
+.home-section--features h1 {
+  margin-top: 0;
+}
+
 .logo-container .logo {
   width: 400px;
   margin-top: 10px;
@@ -37,7 +88,11 @@
   --ifm-button-font-weight: 500;
   --ifm-background-surface-color: #f9f9f9;
   --ifm-breadcrumb-spacing: 2px;
-  --ifm-footer-background-color: #f9f9f9;
+  --ifm-footer-background-color: #1e2a3a;
+  --ifm-footer-color: rgba(255, 255, 255, 0.8);
+  --ifm-footer-link-color: rgba(255, 255, 255, 0.7);
+  --ifm-footer-link-hover-color: #ffffff;
+  --ifm-footer-title-color: #ffffff;
   --ifm-spacing-horizontal: 2rem;
 }
 
@@ -54,7 +109,7 @@
 }
 
 [data-theme='dark'] .footer {
-  background: var(--ifm-navbar-background-color);
+  background: #12171e;
 }
 
 [data-theme='dark'] code {
@@ -219,7 +274,11 @@ table td {
 
 .beian a {
   font-size: 88%;
-  color: var(--ifm-font-color-base);
+  color: var(--ifm-footer-link-color);
+}
+
+.beian a:hover {
+  color: var(--ifm-footer-link-hover-color);
 }
 
 @import './ad.css';

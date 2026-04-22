@@ -6,7 +6,7 @@ import Layout from '@theme/Layout';
 function HomepageHeader() {
     const githubImage = useBaseUrl('/img/github.svg');
     return (
-        <header>
+        <header className="home-section home-section--hero">
             <div className="container logo-container">
                 <div>
                     <img src='/img/logo_full.png' className='logo' />
@@ -89,8 +89,8 @@ function HomepageHeader() {
 
 function Features() {
     return (
-        <section>
-            <div className="container mt-20">
+        <section className="home-section home-section--features">
+            <div className="container">
                 <h1 className="text-center largest font-bold">
                     框架特点
                 </h1>
@@ -245,7 +245,6 @@ export default function Home(): JSX.Element {
         <Layout>
             <HomepageHeader />
             <Features />
-            <div className="mt-20"></div>
         </Layout>
     );
 }
