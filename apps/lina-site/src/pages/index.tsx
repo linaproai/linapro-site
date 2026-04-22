@@ -231,70 +231,7 @@ function Features() {
     );
 }
 
-function Users() {
-    return (
-        <section>
-            <div className="container mt-20">
-                <h1 className="text-center largest font-bold">
-                    用户列表
-                </h1>
-                <div className="text-center mb-10">
-                    在这里列举了部分知名用户，如果您的企业或者产品正在使用<code>GoFrame</code>，欢迎联系我们。
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-5">
-                    <div className="card p-5 box-border text-center">
-                        <a href="https://www.tencent.com/" target="_blank">腾讯科技</a>
-                    </div>
-                    <div className="card p-5 box-border text-center">
-                        <a href="https://www.antfin.com/" target="_blank">蚂蚁金服</a>
-                    </div>
-                    <div className="card p-5 box-border text-center">
-                        <a href="https://www.zte.com.cn/china/" target="_blank">中兴通讯</a>
-                    </div>
-                    <div className="card p-5 box-border text-center">
-                        <a href="https://www.vivo.com/" target="_blank">VIVO</a>
-                    </div>
-                    <div className="card p-5 box-border text-center">
-                        <a href="https://igg.com/" target="_blank">IGG</a>
-                    </div>
-                    <div className="card p-5 box-border text-center">
-                        <a href="https://www.ximalaya.com/" target="_blank">喜马拉雅</a>
-                    </div>
-                    <div className="card p-5 box-border text-center">
-                        <a href="https://www.37.com/" target="_blank">三七互娱</a>
-                    </div>
-                    <div className="card p-5 box-border text-center">
-                        <a href="https://www.medlinker.com/" target="_blank">医联科技</a>
-                    </div>
-                    <div className="card p-5 box-border text-center">
-                        <a href="https://www.zybang.com/" target="_blank">作业帮</a>
-                    </div>
-                    <div className="card p-5 box-border text-center">
-                        <a href="https://www.leyoujia.com/" target="_blank">乐有家</a>
-                    </div>
-                </div>
-            </div>
-        </section>
-    );
-}
 
-function Contributors() {
-    return (
-        <section>
-            <div className="container mt-20">
-                <h1 className="text-center largest font-bold">
-                    贡献者列表
-                </h1>
-                <div className="text-center mb-5">
-                    💖感谢所有参与<code>GoFrame</code>开源建设的贡献者💖
-                </div>
-                <div className="contributors text-center">
-
-                </div>
-            </div>
-        </section>
-    )
-}
 
 function isMobileDevice() {
     if (typeof navigator !== 'undefined') {
@@ -308,8 +245,6 @@ export default function Home(): JSX.Element {
         <Layout>
             <HomepageHeader />
             <Features />
-            <Users />
-            <Contributors />
             <div className="mt-20"></div>
         </Layout>
     );

@@ -21,25 +21,32 @@ const config: Config = {
   tagline:
     'A powerful framework for faster, easier, and more efficient project development',
   favicon: '/favicon.ico',
-  url: 'https://goframe.org/',
+  url: 'https://linapro.ai/',
   baseUrl: '/',
   trailingSlash: false,
-  organizationName: 'gogf',
-  projectName: 'gf',
+  organizationName: 'linaproai',
+  projectName: 'linapro',
   onBrokenLinks: 'warn',
   onBrokenMarkdownLinks: 'warn',
   // 多语言配置
   i18n: {
-    defaultLocale: 'zh-Hans',
-    locales: ['zh-Hans', 'en'],
+    defaultLocale: 'en',
+    locales: ['en','zh-Hans'],
     path: 'i18n',
     localeConfigs: {
-      en: {
+      'en': {
         label: 'English',
         direction: 'ltr',
         htmlLang: 'en-US',
         calendar: 'gregory',
         path: 'en',
+      },
+      'zh-Hans': {
+        label: '简体中文',
+        direction: 'ltr',
+        htmlLang: 'zh-CN',
+        calendar: 'gregory',
+        path: 'zh-Hans',
       },
     },
   },
@@ -166,7 +173,7 @@ const config: Config = {
       maxHeadingLevel: 3,
     },
     footer: {
-      copyright: `Copyright ${new Date().getFullYear()} GoFrame OpenSource Team`,
+      copyright: `Copyright ${new Date().getFullYear()} LinaPro`,
     },
     // 代码块配置
     prism: {
