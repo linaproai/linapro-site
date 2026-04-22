@@ -1,0 +1,57 @@
+---
+id: openspec-workflow
+title: OpenSpec Workflow
+description: LinaPro uses OpenSpec to keep AI, humans, code, and tests aligned across iterations.
+---
+
+# OpenSpec Workflow
+
+LinaPro treats the development workflow as part of the framework.
+
+## The loop
+
+```text
+Explore -> Propose -> Implement -> Review -> Archive
+```
+
+## What each phase does
+
+### Explore
+
+Use exploration to understand the problem space, inspect the codebase, map boundaries, and expose unknowns before implementation starts.
+
+### Propose
+
+Create a change with:
+
+- `proposal.md`
+- `design.md`
+- `tasks.md`
+- capability specs
+
+This turns fuzzy intent into a concrete contract.
+
+### Implement
+
+Execute against approved tasks instead of improvising across the codebase.
+
+### Review
+
+Check behavior, boundaries, regressions, and spec alignment before completion.
+
+### Archive
+
+Move the completed change into baseline knowledge so future work starts from an updated truth source.
+
+## Why this matters for AI-native delivery
+
+Without a durable artifact trail, AI systems lose context and teams end up repeating alignment work every few sessions.
+
+OpenSpec gives LinaPro a structure where:
+
+- decisions become durable artifacts
+- requirements stay testable
+- design intent remains inspectable
+- future AI-assisted changes start from a shared baseline
+
+That is why LinaPro is more than a runtime stack. The workflow is part of the product.

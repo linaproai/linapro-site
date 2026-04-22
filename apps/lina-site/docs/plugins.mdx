@@ -1,0 +1,55 @@
+---
+id: plugins
+title: Plugins
+description: LinaPro plugins extend the framework through explicit host boundaries instead of hidden branches.
+---
+
+# Plugins
+
+Plugins are the primary extension model in LinaPro.
+
+## Two plugin modes
+
+### Source plugins
+
+Source plugins live in the repository and are wired into the host explicitly. They are the preferred path for first-party modules that evolve together with the framework.
+
+### Dynamic WASM plugins
+
+Dynamic plugins are designed for governed runtime delivery. They can be uploaded, installed, enabled, disabled, and replaced without recompiling the host.
+
+## Official source plugins
+
+Current official plugins include:
+
+- `org-management`
+- `content-notice`
+- `monitor-online`
+- `monitor-server`
+- `monitor-operlog`
+- `monitor-loginlog`
+
+These modules keep the host focused on core platform capability while still providing a practical default product surface.
+
+## Boundary rules
+
+LinaPro deliberately avoids scattered `if pluginEnabled` branches.
+
+Instead:
+
+- the host owns stable top-level catalogs and governance seams
+- plugins mount into published host locations
+- plugin-owned routes, pages, tables, and cron jobs remain in the plugin directory
+- enable, disable, install, and uninstall operations flow through the plugin lifecycle
+
+## Building a plugin
+
+For a source plugin, the usual flow is:
+
+1. create `apps/lina-plugins/<plugin-id>/`
+2. follow the `plugin-demo-source` structure
+3. declare metadata, menus, and assets in `plugin.yaml`
+4. keep plugin backend logic inside the plugin directory
+5. register the plugin explicitly in the source-plugin registry
+
+For runtime-managed delivery, use the dynamic WASM sample as the reference.

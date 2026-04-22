@@ -1,0 +1,57 @@
+---
+id: architecture
+title: Architecture
+description: LinaPro combines a host, workspace, plugin runtime, and OpenSpec workflow into one delivery model.
+---
+
+# Architecture
+
+LinaPro is built around four layers that reinforce each other rather than overlap.
+
+## 1. Core host service
+
+The host is the stable backend substrate. It owns:
+
+- API contracts
+- service governance
+- authentication and RBAC
+- plugin lifecycle orchestration
+- shared platform seams that plugins can depend on
+
+The host is intentionally not the place where every business module lives.
+
+## 2. Management workspace
+
+The default workspace is a production-ready Vue 3 operator UI. It consumes host APIs, renders core modules, and hosts plugin-aware pages.
+
+This is the reference operational surface for LinaPro, not the definition of the framework itself.
+
+## 3. Plugin runtime
+
+LinaPro keeps the host lean by moving optional business capability into plugins.
+
+- **Source plugins** are built into the host through explicit registration.
+- **Dynamic WASM plugins** support governed runtime delivery scenarios.
+
+This makes modules composable, replaceable, and easier to evolve independently.
+
+## 4. OpenSpec workflow
+
+The workflow sits above the codebase:
+
+```text
+Explore -> Propose -> Implement -> Review -> Archive
+```
+
+Each iteration records intent, design, and execution in artifacts that AI and humans can both reason about.
+
+## Design principles
+
+- **Host stability**: keep the foundation generic and durable.
+- **Module-level loose coupling**: business modules collaborate through seams, not hidden dependencies.
+- **Explicit governance**: permissions, lifecycle events, and review gates are first-class.
+- **Spec-driven iteration**: changes are explained before they are merged.
+
+## Runtime shape
+
+At runtime, the workspace consumes the host through HTTP and related contracts, while plugins extend host behavior through declared boundaries. The workflow does not run inside the request path; it governs how the system evolves over time.

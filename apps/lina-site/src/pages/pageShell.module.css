@@ -1,0 +1,243 @@
+.shell {
+  position: relative;
+  min-height: calc(100vh - var(--ifm-navbar-height));
+  overflow: hidden;
+  padding: 2rem 0 5rem;
+}
+
+.shell::before,
+.shell::after {
+  position: absolute;
+  inset: 0;
+  content: '';
+  pointer-events: none;
+}
+
+.shell::before {
+  background:
+    radial-gradient(circle at 10% 0%, rgba(85, 230, 213, 0.14), transparent 26%),
+    radial-gradient(circle at 92% 6%, rgba(124, 167, 255, 0.14), transparent 22%);
+}
+
+.shell::after {
+  opacity: 0.5;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0,
+      transparent 95px,
+      var(--linapro-grid) 96px,
+      var(--linapro-grid) 97px
+    ),
+    repeating-linear-gradient(
+      180deg,
+      transparent 0,
+      transparent 95px,
+      var(--linapro-grid) 96px,
+      var(--linapro-grid) 97px
+    );
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.9), transparent 88%);
+}
+
+.inner {
+  position: relative;
+  z-index: 1;
+  width: min(1040px, calc(100vw - 1.5rem));
+  margin: 0 auto;
+}
+
+.eyebrow,
+.status {
+  font-family: var(--linapro-font-mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.eyebrow {
+  margin-bottom: 0.85rem;
+  color: var(--linapro-signal);
+  font-size: 0.76rem;
+}
+
+.hero {
+  display: grid;
+  gap: 1rem;
+  padding: 2rem 0 2.5rem;
+  grid-template-columns: minmax(0, 1.16fr) minmax(280px, 0.84fr);
+}
+
+.hero > div,
+.panel,
+.card {
+  animation: fadeUp 0.7s ease both;
+}
+
+.panel {
+  animation-delay: 0.08s;
+}
+
+.hero h1 {
+  margin-bottom: 0.85rem;
+  color: var(--linapro-ink-deep);
+  font-size: clamp(2.8rem, 6vw, 4.9rem);
+  line-height: 0.92;
+  letter-spacing: -0.04em;
+  text-transform: uppercase;
+}
+
+.hero p,
+.card p,
+.infoLine {
+  color: var(--linapro-ink-soft);
+  line-height: 1.85;
+}
+
+.panel,
+.card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--linapro-line-strong);
+  border-radius: 1.5rem;
+  background: var(--linapro-panel);
+  box-shadow: var(--linapro-card-shadow);
+}
+
+.panel {
+  padding: 1.35rem;
+}
+
+.panel::before,
+.card::before {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, var(--linapro-signal), transparent 72%);
+  content: '';
+}
+
+.panel h2,
+.grid h2 {
+  margin-bottom: 0.85rem;
+  color: var(--linapro-ink-deep);
+  font-size: 1.18rem;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(85, 230, 213, 0.2);
+  border-radius: 999px;
+  padding: 0.38rem 0.75rem;
+  background: rgba(85, 230, 213, 0.08);
+  color: var(--linapro-signal);
+  font-size: 0.74rem;
+}
+
+.grid {
+  display: grid;
+  gap: 1rem;
+  padding-top: 0.4rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.card {
+  padding: 1.3rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem;
+  margin-top: 1.5rem;
+}
+
+.primaryButton,
+.secondaryButton {
+  border-radius: 1rem;
+  padding: 0.9rem 1.2rem;
+  font-weight: 700;
+}
+
+.primaryButton {
+  border: 1px solid rgba(85, 230, 213, 0.2);
+  background: linear-gradient(135deg, var(--linapro-signal), var(--linapro-blue));
+  color: #081116;
+}
+
+.primaryButton:hover {
+  color: #081116;
+  transform: translateY(-1px);
+}
+
+.secondaryButton {
+  border: 1px solid var(--linapro-line-strong);
+  background: var(--linapro-overlay);
+  color: var(--linapro-ink-deep);
+}
+
+.secondaryButton:hover {
+  color: var(--linapro-ink-deep);
+  border-color: rgba(124, 167, 255, 0.34);
+  transform: translateY(-1px);
+}
+
+.infoLine {
+  padding: 0.85rem 0;
+  border-top: 1px solid var(--linapro-line-soft);
+}
+
+.infoLine:first-of-type {
+  border-top: 0;
+}
+
+.card:hover,
+.panel:hover {
+  transform: translateY(-3px);
+  transition: transform 180ms ease, border-color 180ms ease;
+  border-color: rgba(124, 167, 255, 0.32);
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 996px) {
+  .hero,
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .inner {
+    width: min(1040px, calc(100vw - 1.25rem));
+  }
+
+  .hero h1 {
+    font-size: clamp(2.4rem, 14vw, 3.4rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero > div,
+  .panel,
+  .card,
+  .card:hover,
+  .panel:hover,
+  .primaryButton:hover,
+  .secondaryButton:hover {
+    animation: none;
+    transform: none;
+    transition: none;
+  }
+}

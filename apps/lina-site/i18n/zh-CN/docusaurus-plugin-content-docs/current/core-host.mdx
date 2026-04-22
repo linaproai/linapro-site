@@ -1,0 +1,51 @@
+---
+id: core-host
+title: 核心宿主
+description: LinaPro 的 GoFrame 宿主服务。
+---
+
+# 核心宿主
+
+`apps/lina-core` 是 LinaPro 的 GoFrame 宿主服务。
+
+## 宿主负责什么
+
+- 系统管理与平台治理相关的宿主侧 RESTful API
+- 数据库迁移和种子数据
+- 运行时配置
+- 插件加载与生命周期协调
+- 核心任务调度基础设施
+
+## 为什么宿主边界重要
+
+LinaPro 不把宿主当成承载一切业务的大容器。
+
+宿主应该保留：
+
+- 稳定的跨模块平台能力
+- 其他层要依赖的契约
+- 必须保持权威性的治理原语
+
+可选业务模块尽量通过插件交付。
+
+## 关键目录
+
+```text
+api/                API DTO 与路由契约
+internal/cmd/       服务启动与路由接线
+internal/controller/ HTTP 控制器
+internal/service/   业务服务与 Cron 编排
+manifest/config/    运行时配置
+manifest/sql/       模式、种子与初始化 SQL
+pkg/                共享稳定包
+```
+
+## 以任务调度为例
+
+任务调度是典型应留在宿主的能力，因为它属于治理基础设施：
+
+- handler 注册表
+- 持久化任务生命周期
+- 执行分发
+- 清理策略
+- shell 执行保护

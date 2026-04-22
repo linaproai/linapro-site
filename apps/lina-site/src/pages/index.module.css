@@ -1,0 +1,580 @@
+.page {
+  position: relative;
+  overflow: hidden;
+  padding: 1.4rem 0 6rem;
+}
+
+.page::before,
+.page::after {
+  position: absolute;
+  inset: 0;
+  content: '';
+  pointer-events: none;
+}
+
+.page::before {
+  background:
+    radial-gradient(circle at 10% 8%, rgba(59, 130, 246, 0.15), transparent 26%),
+    radial-gradient(circle at 88% 4%, rgba(14, 165, 233, 0.13), transparent 24%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(244, 248, 255, 0));
+}
+
+.page::after {
+  opacity: 0.72;
+  background:
+    linear-gradient(180deg, transparent, rgba(227, 236, 251, 0.7)),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0,
+      transparent 87px,
+      var(--linapro-grid) 88px,
+      var(--linapro-grid) 89px
+    ),
+    repeating-linear-gradient(
+      180deg,
+      transparent 0,
+      transparent 87px,
+      var(--linapro-grid) 88px,
+      var(--linapro-grid) 89px
+    );
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.95), rgba(0, 0, 0, 0.22));
+}
+
+.container,
+.hero,
+.section,
+.ctaSection {
+  position: relative;
+  z-index: 1;
+}
+
+.container {
+  width: min(1180px, calc(100vw - 2rem));
+  margin: 0 auto;
+}
+
+.hero {
+  display: grid;
+  gap: 1.25rem;
+  align-items: start;
+  padding: 2.4rem 0 3.4rem;
+  grid-template-columns: minmax(0, 1.12fr) minmax(340px, 0.88fr);
+}
+
+.heroCopy,
+.heroPanel,
+.section,
+.ctaSection {
+  animation: fadeUp 0.7s ease both;
+}
+
+.heroPanel {
+  animation-delay: 0.08s;
+}
+
+.heroEyebrow,
+.sectionEyebrow,
+.panelLabel,
+.panelBranch,
+.commandTitle,
+.surfaceLabel,
+.inlineLink,
+.layerIndex,
+.layerMeta {
+  font-family: var(--linapro-font-mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.heroEyebrow {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(59, 130, 246, 0.14);
+  border-radius: 999px;
+  padding: 0.45rem 0.85rem;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--linapro-blue-deep);
+  font-size: 0.76rem;
+}
+
+.wordmark {
+  width: min(286px, 62vw);
+  margin-top: 1rem;
+}
+
+.heroTitle {
+  max-width: 11ch;
+  margin: 1rem 0 1rem;
+  color: var(--linapro-ink-deep);
+  font-size: clamp(3.4rem, 7vw, 6.2rem);
+  line-height: 0.9;
+  letter-spacing: -0.05em;
+}
+
+.heroDescription,
+.sectionIntro,
+.featureCard p,
+.repoCard p,
+.repoLead p,
+.layerCard p,
+.surfaceCard p,
+.treeItem p,
+.leadCallout p {
+  color: var(--linapro-ink-soft);
+  font-size: 1.02rem;
+  line-height: 1.85;
+}
+
+.heroDescription {
+  max-width: 62ch;
+}
+
+.badgeRow,
+.actionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.badgeRow {
+  margin-top: 1.3rem;
+}
+
+.badge {
+  border: 1px solid rgba(59, 130, 246, 0.12);
+  border-radius: 999px;
+  padding: 0.55rem 0.85rem;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--linapro-blue-deep);
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.actionRow {
+  margin-top: 1.55rem;
+}
+
+.primaryButton,
+.secondaryButton {
+  border-radius: 999px;
+  padding: 0.92rem 1.28rem;
+  font-weight: 700;
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.primaryButton {
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  background: linear-gradient(135deg, #2563eb, #0ea5e9);
+  color: #fff;
+  box-shadow: 0 18px 40px rgba(37, 99, 235, 0.2);
+}
+
+.primaryButton:hover {
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.secondaryButton {
+  border: 1px solid var(--linapro-line-strong);
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--linapro-ink-deep);
+  box-shadow: 0 14px 28px rgba(31, 78, 150, 0.08);
+}
+
+.secondaryButton:hover {
+  color: var(--linapro-ink-deep);
+  border-color: rgba(37, 99, 235, 0.24);
+  transform: translateY(-1px);
+}
+
+.metricGrid {
+  display: grid;
+  gap: 0.9rem;
+  margin-top: 1.8rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.metricCard,
+.heroPanel,
+.featureCard,
+.repoLead,
+.repoCard,
+.layerCard,
+.surfaceCard,
+.ctaSection,
+.leadCallout {
+  border: 1px solid var(--linapro-line-strong);
+  border-radius: 1.7rem;
+  background: var(--linapro-panel);
+  box-shadow: var(--linapro-card-shadow);
+}
+
+.metricCard {
+  padding: 1rem 1.05rem;
+}
+
+.metricCard strong {
+  display: block;
+  color: var(--linapro-blue-deep);
+  font-size: 1.55rem;
+  line-height: 1;
+}
+
+.metricCard span {
+  display: block;
+  margin-top: 0.55rem;
+  color: var(--linapro-ink-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.heroPanel,
+.featureCard,
+.repoCard,
+.layerCard,
+.surfaceCard,
+.ctaSection,
+.repoLead {
+  position: relative;
+  overflow: hidden;
+}
+
+.heroPanel::before,
+.featureCard::before,
+.repoCard::before,
+.layerCard::before,
+.surfaceCard::before,
+.ctaSection::before,
+.repoLead::before {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(37, 99, 235, 0.46), transparent 76%);
+  content: '';
+}
+
+.heroPanel {
+  padding: 1.35rem;
+}
+
+.panelHeader,
+.commandLine {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.panelHeader {
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--linapro-line-soft);
+}
+
+.panelLabel,
+.panelBranch,
+.commandTitle,
+.surfaceLabel,
+.inlineLink,
+.layerIndex,
+.layerMeta {
+  font-size: 0.72rem;
+}
+
+.panelLabel {
+  color: var(--linapro-blue-deep);
+}
+
+.panelBranch {
+  color: var(--linapro-ink-muted);
+}
+
+.panelTitle {
+  margin: 1rem 0 0;
+  color: var(--linapro-ink-deep);
+  font-size: clamp(1.7rem, 2.4vw, 2.35rem);
+  line-height: 1.04;
+}
+
+.treeList,
+.commandList {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.treeList {
+  margin-top: 1.2rem;
+}
+
+.treeItem {
+  padding-top: 0.95rem;
+  border-top: 1px solid var(--linapro-line-soft);
+}
+
+.pathChip {
+  display: inline-flex;
+  margin-bottom: 0.55rem;
+  border-radius: 999px;
+  padding: 0.25rem 0.6rem;
+  background: rgba(37, 99, 235, 0.08);
+  color: var(--linapro-blue-deep);
+  font-family: var(--linapro-font-mono);
+  font-size: 0.8rem;
+}
+
+.commandBlock {
+  margin-top: 1.35rem;
+  border: 1px solid var(--linapro-line-soft);
+  border-radius: 1.3rem;
+  padding: 1rem;
+  background: rgba(244, 248, 255, 0.84);
+}
+
+.commandTitle {
+  margin-bottom: 0.7rem;
+  color: var(--linapro-ink-muted);
+}
+
+.commandLine {
+  border-top: 1px solid rgba(37, 99, 235, 0.08);
+  padding: 0.7rem 0;
+  justify-content: flex-start;
+}
+
+.commandLine:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.commandLine:last-child {
+  padding-bottom: 0;
+}
+
+.commandLine span,
+.commandLine code {
+  font-family: var(--linapro-font-mono);
+  color: var(--linapro-blue-deep);
+}
+
+.commandLine span {
+  width: 1rem;
+}
+
+.section {
+  padding-top: 2.7rem;
+}
+
+.sectionHeader {
+  max-width: 54rem;
+  margin-bottom: 1.45rem;
+}
+
+.sectionEyebrow {
+  margin-bottom: 0.9rem;
+  color: var(--linapro-blue-deep);
+  font-size: 0.76rem;
+}
+
+.sectionTitle {
+  margin-bottom: 0.8rem;
+  color: var(--linapro-ink-deep);
+  font-size: clamp(2.1rem, 4vw, 3.5rem);
+  line-height: 0.97;
+  letter-spacing: -0.04em;
+}
+
+.featureGrid,
+.repoGrid,
+.layerGrid,
+.surfaceGrid {
+  display: grid;
+  gap: 1rem;
+}
+
+.featureGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.featureCard,
+.repoCard,
+.layerCard,
+.surfaceCard {
+  padding: 1.35rem;
+}
+
+.featureCard h3,
+.repoCard h3,
+.layerCard h3,
+.surfaceCard h3,
+.repoLead strong {
+  color: var(--linapro-ink-deep);
+}
+
+.featureCard h3,
+.repoCard h3,
+.layerCard h3 {
+  margin: 0.85rem 0 0.7rem;
+  font-size: 1.22rem;
+  line-height: 1.3;
+}
+
+.repoLayout {
+  display: grid;
+  gap: 1rem;
+  align-items: start;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+}
+
+.repoLead {
+  padding: 1.4rem;
+}
+
+.leadCallout {
+  margin-top: 1.3rem;
+  padding: 1rem 1.05rem;
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.leadCallout strong {
+  display: block;
+  margin-bottom: 0.45rem;
+  font-size: 1rem;
+}
+
+.repoGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.layerGrid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.layerIndex,
+.layerMeta,
+.inlineLink,
+.surfaceLabel {
+  color: var(--linapro-blue-deep);
+}
+
+.layerIndex {
+  display: inline-flex;
+  margin-bottom: 0.9rem;
+}
+
+.layerMeta {
+  margin-bottom: 0.85rem;
+}
+
+.surfaceGrid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.surfaceLabel {
+  display: inline-flex;
+  margin-bottom: 0.85rem;
+}
+
+.inlineLink {
+  display: inline-flex;
+  margin-top: auto;
+  padding-top: 1.1rem;
+  font-weight: 700;
+}
+
+.inlineLink:hover {
+  color: var(--linapro-blue-deep);
+}
+
+.ctaSection {
+  margin-top: 2.8rem;
+  padding: 1.6rem;
+  background:
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.12), transparent 24%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(244, 248, 255, 0.98));
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 1100px) {
+  .hero,
+  .repoLayout,
+  .layerGrid,
+  .surfaceGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .hero,
+  .repoLayout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 996px) {
+  .featureGrid,
+  .repoGrid,
+  .metricGrid,
+  .layerGrid,
+  .surfaceGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .heroTitle {
+    max-width: 13ch;
+  }
+}
+
+@media (max-width: 640px) {
+  .container {
+    width: min(1180px, calc(100vw - 1.25rem));
+  }
+
+  .hero {
+    padding-top: 2rem;
+  }
+
+  .heroTitle {
+    font-size: clamp(2.7rem, 12vw, 4rem);
+  }
+
+  .featureGrid,
+  .repoGrid,
+  .metricGrid,
+  .layerGrid,
+  .surfaceGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .heroPanel,
+  .featureCard,
+  .repoLead,
+  .repoCard,
+  .layerCard,
+  .surfaceCard,
+  .ctaSection {
+    border-radius: 1.35rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .heroCopy,
+  .heroPanel,
+  .section,
+  .ctaSection,
+  .primaryButton,
+  .secondaryButton {
+    animation: none;
+    transition: none;
+    transform: none;
+  }
+}

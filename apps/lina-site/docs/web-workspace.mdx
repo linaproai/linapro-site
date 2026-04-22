@@ -1,0 +1,44 @@
+---
+id: web-workspace
+title: Web Workspace
+description: The default Vue 3 management workspace of LinaPro.
+---
+
+# Web Workspace
+
+`apps/lina-vben/apps/web-antd` is the default management workspace of LinaPro.
+
+## Its role
+
+The workspace:
+
+- consumes host APIs under `/api/v1`
+- renders built-in management capabilities
+- hosts plugin-aware pages and routes
+- acts as the default operator console for system governance
+
+## What ships in the default workspace
+
+The built-in workspace already covers common platform scenarios:
+
+- user, role, and menu management
+- dictionary, parameter, and file management
+- job management, job groups, and execution logs
+- plugin management
+- API docs and system information
+
+## Why it matters
+
+LinaPro is not only a backend runtime. It ships a ready-to-use operational surface that matches the host model, permission system, and extension boundaries.
+
+That alignment is important because it removes a common integration burden: teams do not need to pair a backend framework with an unrelated admin UI framework just to get moving.
+
+## Key directories
+
+```text
+src/api/            host API clients
+src/adapter/        form and table adapters
+src/router/         route definitions
+src/runtime/        runtime capability loading
+src/views/          page implementations
+```

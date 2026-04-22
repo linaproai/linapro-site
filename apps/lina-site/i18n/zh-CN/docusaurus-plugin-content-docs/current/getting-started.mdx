@@ -1,0 +1,44 @@
+---
+id: getting-started
+title: 快速开始
+description: 用于启动 LinaPro 官网站点的本地开发路径。
+---
+
+# 快速开始
+
+这个仓库承载 LinaPro 官方网站。本地启动流程保持尽量简单：在需要时安装 workspace 依赖，然后启动 Docusaurus 开发服务器。
+
+:::note 前置条件
+请确保本地已经安装 `pnpm`。`make dev` 会在依赖缺失时自动执行安装。
+:::
+
+## 标准启动流程
+
+```bash
+make dev
+```
+
+## 这些命令分别做什么
+
+- `make dev`
+  以开发模式启动 LinaPro 官方网站。
+
+## 默认本地地址
+
+- 官方网站：`http://localhost:3000`
+
+## 常用后续命令
+
+```bash
+pnpm typecheck
+pnpm build
+```
+
+## 建议检查项
+
+启动完成后，至少确认：
+
+- 首页可以正常访问
+- 文档、博客、About、登录页和注册页可访问
+- 语言切换行为符合预期
+- 本地搜索和静态资源加载正常

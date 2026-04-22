@@ -1,6 +1,9 @@
 # LinaPro Git Target
 # ================
 
+.PHONY: up
+
+
 ## up: 自动生成commit message并推送 [tool|t=claude|codex] [model|m=模型名]
 up:
 	@set -e; \
