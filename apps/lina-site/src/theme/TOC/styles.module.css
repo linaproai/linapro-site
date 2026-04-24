@@ -14,9 +14,3 @@ div[class*='tableOfContents'] {
   overflow-y: auto;
   max-height: calc(100vh - var(--ifm-navbar-height) - 15rem);
 }
-
-/* 广告位样式 */
-.tocAdBanner {
-  /* margin-top: 1rem; */
-  position: relative;
-}

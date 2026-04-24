@@ -280,8 +280,6 @@ table td {
   color: var(--ifm-footer-link-hover-color);
 }
 
-@import './ad.css';
-
 .footer__links {
   margin-bottom: 0;
   text-align: center;

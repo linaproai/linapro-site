@@ -190,12 +190,6 @@ const config: Config = {
       // 默认支持的语言 "markup","jsx","tsx","swift","kotlin","objectivec","js-extras","reason","rust","graphql","yaml","go","cpp","markdown","python","json"
     },
   } satisfies Preset.ThemeConfig,
-  scripts: [
-    {
-      src: 'https://hm.baidu.com/hm.js?38f38a0626fd7805722db06243cd0fa7',
-      async: true,
-    },
-  ],
 };
 
 export default config;
