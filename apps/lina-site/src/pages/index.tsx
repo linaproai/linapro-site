@@ -9,45 +9,32 @@ function HomepageHeader() {
         <header className="home-section home-section--hero">
             <div className="container logo-container">
                 <div>
-                    <img src='/img/logo_full.png' className='logo' />
+                    <img src='/img/linapro-logo.png' className='logo' />
                     <div className="logo-badges">
-                        <a href="https://pkg.go.dev/github.com/gogf/gf/v2" target="_blank">
-                            <img src="https://godoc.org/github.com/gogf/gf?status.svg" alt="Go Doc" />
-                        </a>
-                        <a href="https://travis-ci.com/github/gogf/gf" target="_blank">
-                            <img src="https://api.travis-ci.com/gogf/gf.svg?branch=master" alt="Build Status" />
-                        </a>
-                        <a href="https://goreportcard.com/report/github.com/gogf/gf" target="_blank">
-                            <img src="https://goreportcard.com/badge/github.com/gogf/gf" alt="Go Report" />
-                        </a>
-                        <a href="https://codecov.io/gh/gogf/gf/branch/master" target="_blank">
-                            <img src="https://codecov.io/gh/gogf/gf/branch/master/graph/badge.svg" alt="Code Coverage" />
-                        </a>
-                        <a href="https://github.com/gogf/gf" target="_blank">
+                        <a href="https://github.com/linaproai/linapro" target="_blank">
                             <img src="https://img.shields.io/badge/production-ready-blue.svg" alt="Production Ready" />
                         </a>
-                        <a href="https://github.com/gogf/gf" target="_blank">
-                            <img src="https://img.shields.io/github/license/gogf/gf.svg?style=flat" alt="License" />
+                        <a href="https://github.com/linaproai/linapro" target="_blank">
+                            <img src="https://img.shields.io/github/license/linaproai/linapro.svg?style=flat" alt="License" />
                         </a>
-                        <br />
-                        <a href="https://github.com/gogf/gf/releases" target="_blank">
-                            <img src="https://img.shields.io/github/v/release/gogf/gf" alt="Release" />
+                        <a href="https://github.com/linaproai/linapro/releases" target="_blank">
+                            <img src="https://img.shields.io/github/v/release/linaproai/linapro" alt="Release" />
                         </a>
-                        <a href="https://github.com/gogf/gf/pulls" target="_blank">
-                            <img src="https://img.shields.io/github/issues-pr/gogf/gf" alt="GitHub pull requests" />
+                        <a href="https://github.com/linaproai/linapro/pulls" target="_blank">
+                            <img src="https://img.shields.io/github/issues-pr/linaproai/linapro" alt="GitHub pull requests" />
                         </a>
-                        <a href="https://github.com/gogf/gf/pulls?q=is%3Apr+is%3Aclosed" target="_blank">
-                            <img src="https://img.shields.io/github/issues-pr-closed/gogf/gf"
+                        <a href="https://github.com/linaproai/linapro/pulls?q=is%3Apr+is%3Aclosed" target="_blank">
+                            <img src="https://img.shields.io/github/issues-pr-closed/linaproai/linapro"
                                 alt="GitHub closed pull requests" />
                         </a>
-                        <a href="https://github.com/gogf/gf/issues" target="_blank">
-                            <img src="https://img.shields.io/github/issues/gogf/gf" alt="GitHub issues" />
+                        <a href="https://github.com/linaproai/linapro/issues" target="_blank">
+                            <img src="https://img.shields.io/github/issues/linaproai/linapro" alt="GitHub issues" />
                         </a>
-                        <a href="https://github.com/gogf/gf/issues?q=is%3Aissue+is%3Aclosed" target="_blank">
-                            <img src="https://img.shields.io/github/issues-closed/gogf/gf" alt="GitHub closed issues" />
+                        <a href="https://github.com/linaproai/linapro/issues?q=is%3Aissue+is%3Aclosed" target="_blank">
+                            <img src="https://img.shields.io/github/issues-closed/linaproai/linapro" alt="GitHub closed issues" />
                         </a>
-                        <img src="https://img.shields.io/github/stars/gogf/gf?style=flat" alt="Stars" />
-                        <img src="https://img.shields.io/github/forks/gogf/gf?style=flat" alt="Forks" />
+                        <img src="https://img.shields.io/github/stars/linaproai/linapro?style=flat" alt="Stars" />
+                        <img src="https://img.shields.io/github/forks/linaproai/linapro?style=flat" alt="Forks" />
                     </div>
                 </div>
 
@@ -71,7 +58,7 @@ function HomepageHeader() {
 
                     <div className="flex md:justify-start justify-center">
                         <Link className="button button--secondary button--md hover:bg-gray-200"
-                            to="https://github.com/gogf/gf" style={{
+                            to="https://github.com/linaproai/linapro" style={{
                                 width: '200px',
                                 paddingLeft: '50px',
                                 backgroundImage: `url(${githubImage})`,

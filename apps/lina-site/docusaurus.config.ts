@@ -143,7 +143,7 @@ const config: Config = {
       title: '',
       logo: {
         alt: 'LinaPro Logo',
-        src: '/img/linapro-mark.svg',
+        src: '/img/logo-banner.png',
       },
       items: [
         {
