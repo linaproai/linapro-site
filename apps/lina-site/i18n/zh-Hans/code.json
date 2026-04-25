@@ -52,11 +52,11 @@
     "description": "Layer 4 description"
   },
   "home.layers.title": {
-    "message": "四层架构，环环相扣",
+    "message": "松耦合架构设计",
     "description": "Layers section title"
   },
   "home.layers.lead": {
-    "message": "每一层都独立设计、严守松耦合原则；业务模块可按需启用或下线，不会牵动整个技术栈。",
+    "message": "每一层都独立设计、严守松耦合原则；业务模块可按需组合、启用或下线，不会牵动整个技术栈。",
     "description": "Layers section lead"
   },
   "home.workflow.explore.title": {
