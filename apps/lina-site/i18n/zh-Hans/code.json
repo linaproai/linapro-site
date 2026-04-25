@@ -8,7 +8,7 @@
     "description": "Hero h1"
   },
   "home.hero.lead": {
-    "message": "LinaPro是一款AI原生的全栈开发框架——AI 承担分析、设计与实现的主体工作，人类把握方向并在关键节点保障质量。提供通用核心宿主服务、生产级管理工作台、双模式插件运行时与规范驱动的AI研发工作流，四层紧密协作，让交付质量随产品规模持续保持。",
+    "message": "LinaPro 是一款AI原生的全栈开发框架：AI 负责主要的分析、设计与实现，人类设定方向并在关键节点把关，让团队用 AI 快速交付生产级应用，同时保持架构、权限、测试与扩展边界可治理。",
     "description": "Hero lead paragraph"
   },
   "home.hero.cta.start": {
@@ -160,7 +160,7 @@
     "description": "Strengths section title"
   },
   "home.strengths.lead": {
-    "message": "一款让 AI 生产力随迭代复利增长，让产品快速演进的开发框架。",
+    "message": "一款让 AI 生产力随迭代复利增长，让交付质量在产品规模扩大后依然可验证、可演进。 ",
     "description": "Strengths section lead"
   },
   "home.module.user": {

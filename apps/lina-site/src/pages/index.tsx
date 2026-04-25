@@ -22,26 +22,6 @@ function HomepageHeader() {
                             description: 'Alt text for the LinaPro logo in the hero',
                         })}
                     />
-                    <div className="logo-badges">
-                        <a href={REPO_URL} target="_blank" rel="noreferrer">
-                            <img
-                                src="https://img.shields.io/badge/production-ready-blue.svg"
-                                alt="Production Ready"
-                            />
-                        </a>
-                        <a href={REPO_URL} target="_blank" rel="noreferrer">
-                            <img
-                                src="https://img.shields.io/github/license/linaproai/linapro.svg?style=flat"
-                                alt="License"
-                            />
-                        </a>
-                        <a href={`${REPO_URL}/releases`} target="_blank" rel="noreferrer">
-                            <img
-                                src="https://img.shields.io/github/v/release/linaproai/linapro"
-                                alt="Latest release"
-                            />
-                        </a>
-                    </div>
                 </div>
 
                 <h1 className="hero-title">
