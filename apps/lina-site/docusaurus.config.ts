@@ -203,7 +203,7 @@ const config: Config = {
           position: 'left',
           // type: 'docSidebar',
           // sidebarId: 'quickSidebar',
-          to: '/preface',
+          to: '/quickstart',
         },
 
         // 右边导航栏

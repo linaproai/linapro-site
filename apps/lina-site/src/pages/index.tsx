@@ -4,7 +4,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 import Layout from '@theme/Layout';
 
 const REPO_URL = 'https://github.com/linaproai/linapro';
-const DOCS_URL = '/preface';
+const DOCS_URL = '/quickstart';
 
 function HomepageHeader() {
     const githubImage = useBaseUrl('/img/github.svg');

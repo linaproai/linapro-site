@@ -1,10 +1,10 @@
 ---
-name: openspec-feedback
+name: linasite-feedback
 description: >-
   Track, fix, verify, and test any bugs, improvements, or gaps reported against an OpenSpec change.
   MUST use this skill whenever user reports problems, defects, issues, bugs, or gaps related to
   existing implementations, even if they don't explicitly say "feedback" or mention OpenSpec.
-compatibility: Requires openspec CLI, openspec-e2e skill, openspec-review skill.
+compatibility: Requires openspec CLI, linasite-e2e skill, linasite-review skill.
 ---
 
 # Feedback: Structured Fix, Verification & Test Coverage Loop
@@ -162,7 +162,7 @@ For each task:
 
 **c. Implement** — Minimal, focused fix following existing patterns
 
-**d. Write/update E2E tests** — Follow `openspec-e2e` conventions
+**d. Write/update E2E tests** — Follow `linasite-e2e` conventions
 
 **e. Assess Impact Scope (MANDATORY)**
 
@@ -199,7 +199,7 @@ If regression fails:
 - Fix inline if related to current change
 - Add as new FB task if separate issue
 
-**g. Run review** — Invoke `openspec-review` skill after completion
+**g. Run review** — Invoke `linasite-review` skill after completion
 
 ---
 

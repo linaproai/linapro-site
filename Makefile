@@ -8,7 +8,7 @@ SITE_DIR := apps/lina-site
 SITE_NAME := LinaPro official site
 SITE_DEFAULT_HOST ?= 127.0.0.1
 SITE_DEFAULT_PORT ?= 3000
-SITE_DEFAULT_LOCALE ?= en
+SITE_DEFAULT_LOCALE ?= zh-Hans
 
 ## dev: 启动官网本地开发服务
 dev:
