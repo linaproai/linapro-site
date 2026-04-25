@@ -1,8 +1,5 @@
 
-.PHONY: dev
 
-# 引用复杂指令子文件
-include hack/makefiles/up.mk
 
 SITE_DIR := apps/lina-site
 SITE_NAME := LinaPro official site
@@ -11,6 +8,7 @@ SITE_DEFAULT_PORT ?= 3000
 SITE_DEFAULT_LOCALE ?= zh-Hans
 
 ## dev: 启动官网本地开发服务
+.PHONY: dev
 dev:
 	@set -e; \
 	SITE_DIR="$(SITE_DIR)"; \
