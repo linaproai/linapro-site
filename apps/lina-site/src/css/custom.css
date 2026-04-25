@@ -620,7 +620,7 @@ table td {
 }
 
 /* too avoid too many navbar items when in short window size */
-@media only screen and (max-width: 1360px) {
+@media only screen and (max-width: 500px) {
   .navbar__items {
     white-space: nowrap;
   }
