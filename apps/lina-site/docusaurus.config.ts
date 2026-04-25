@@ -231,7 +231,7 @@ const config: Config = {
       maxHeadingLevel: 3,
     },
     footer: {
-      copyright: `Copyright ${new Date().getFullYear()} LinaPro`,
+      copyright: `Copyright ${new Date().getFullYear()} LinaPro.AI`,
     },
     // 代码块配置
     prism: {
