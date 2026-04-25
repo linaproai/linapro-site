@@ -32,7 +32,8 @@ function HomepageHeader() {
 
                 <p className="hero-lead">
                     <Translate id="home.hero.lead" description="Hero lead paragraph">
-                        AI handles analysis, design, and implementation. Humans set direction and safeguard quality at the gates that matter. Four interlocking layers keep delivery quality steady as the product scales.
+                        AI handles analysis, design, and implementation. Humans set direction and make the critical decisions. 
+                        LinaPro helps teams ship production-grade applications faster while keeping architecture, permissions, testing, and extension boundaries governable.
                     </Translate>
                 </p>
 
@@ -132,7 +133,7 @@ function Layers() {
             <div className="container">
                 <h2 className="section-title">
                     <Translate id="home.layers.title" description="Layers section title">
-                        Built on four interlocking layers
+                        Loosely Coupled Architecture
                     </Translate>
                 </h2>
                 <p className="section-lead">
