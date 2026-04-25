@@ -4,11 +4,11 @@
     "description": "Alt text for the LinaPro logo in the hero"
   },
   "home.hero.title": {
-    "message": "面向可持续交付的 AI 原生全栈框架",
+    "message": "面向可持续交付的 AI 驱动全栈框架",
     "description": "Hero h1"
   },
   "home.hero.lead": {
-    "message": "LinaPro 是一款 AI 原生的全栈开发框架：让 AI 深度参与从需求分析、架构设计到代码实现的全流程，人类负责方向设定与关键决策，帮助团队用 AI 快速交付生产级应用，同时保持架构、权限、测试与扩展边界可治理。",
+    "message": "LinaPro 是一款 AI 驱动的全栈开发框架，由通用核心宿主服务、默认管理工作台、双模式插件运行时与规范驱动的 AI 原生研发工作流组成。AI 深度参与需求分析、架构设计与代码实现，人类负责方向设定与关键决策，帮助团队快速交付生产级应用，同时保持架构、权限、测试与扩展边界可治理。",
     "description": "Hero lead paragraph"
   },
   "home.hero.cta.start": {
@@ -44,7 +44,7 @@
     "description": "Layer 3 description"
   },
   "home.layer.openspec.title": {
-    "message": "AI 研发工作流",
+    "message": "AI 原生研发工作流",
     "description": "Layer 4 title"
   },
   "home.layer.openspec.desc": {
@@ -104,11 +104,11 @@
     "description": "Workflow section title"
   },
   "home.workflow.lead": {
-    "message": "每一次迭代都跑在同一条闭环流水线上，以增量规范与强制 E2E 测试为锚点；AI 始终在已验证的基础之上向前推进，从源头杜绝架构漂移与测试空洞。",
+    "message": "以增量规范和强制 E2E 测试串起研发闭环，让 AI 始终在已验证的基线之上持续推进。",
     "description": "Workflow section lead"
   },
   "home.strength.workflow.title": {
-    "message": "AI 原生闭环研发流",
+    "message": "AI 原生研发工作流",
     "description": "Strength 1 title"
   },
   "home.strength.workflow.desc": {
@@ -232,7 +232,7 @@
     "description": "Modules section title"
   },
   "home.modules.lead": {
-    "message": "既可直接在现成模块上构建业务，也可借助插件机制扩展或整体替换任意一块，全程不必触碰核心宿主；所有模块原生接入 RBAC，权限变更实时生效，无需重新登录。",
+    "message": "内置模块可直接构建业务，也可通过插件扩展或替换，并统一接入实时生效的 RBAC 权限体系。",
     "description": "Modules section lead"
   },
   "home.modules.builtin.heading": {
@@ -256,7 +256,7 @@
     "description": "QuickStart footnote"
   },
   "home.cta.title": {
-    "message": "准备好交付 AI 原生软件了吗？",
+    "message": "准备好交付 AI 驱动的软件了吗？",
     "description": "Final CTA title"
   },
   "home.cta.lead": {

@@ -26,14 +26,14 @@ function HomepageHeader() {
 
                 <h1 className="hero-title">
                     <Translate id="home.hero.title" description="Hero h1">
-                        AI-native full-stack framework engineered for sustainable delivery
+                        AI-driven full-stack framework engineered for sustainable delivery
                     </Translate>
                 </h1>
 
                 <p className="hero-lead">
                     <Translate id="home.hero.lead" description="Hero lead paragraph">
-                        AI handles analysis, design, and implementation. Humans set direction and make the critical decisions. 
-                        LinaPro helps teams ship production-grade applications faster while keeping architecture, permissions, testing, and extension boundaries governable.
+                        LinaPro brings AI into the full delivery workflow: AI handles analysis, design, and implementation while humans set direction and make the critical decisions.
+                        Teams ship production-grade applications faster while keeping architecture, permissions, testing, and extension boundaries governable.
                     </Translate>
                 </p>
 
@@ -116,7 +116,7 @@ const layers = [
         moduleKey: 'openspec/',
         title: (
             <Translate id="home.layer.openspec.title" description="Layer 4 title">
-                AI R&D Workflow
+                AI-native R&D Workflow
             </Translate>
         ),
         desc: (
@@ -307,7 +307,7 @@ const strengths = [
         Icon: IconSparkles,
         title: (
             <Translate id="home.strength.workflow.title" description="Strength 1 title">
-                AI-native closed-loop R&D
+                AI-native R&D workflow
             </Translate>
         ),
         desc: (
@@ -550,7 +550,7 @@ function FinalCta() {
             <div className="container text-center">
                 <h2 className="section-title">
                     <Translate id="home.cta.title" description="Final CTA title">
-                        Ready to ship AI-native software?
+                        Ready to ship AI-driven software?
                     </Translate>
                 </h2>
                 <p className="section-lead">
