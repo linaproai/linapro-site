@@ -1,9 +1,11 @@
 ---
 name: linasite-review
 description: >-
-  Code and specification review for OpenSpec workflow. Triggers automatically after /opsx:apply
-  task completion, after /opsx:feedback task completion, and before /opsx:archive. Use when
-  user requests code review, spec compliance check, or when explicitly invoked via /linasite-review.
+  Code, documentation, and specification review for the OpenSpec workflow and LinaPro site.
+  Triggers automatically after /opsx:apply task completion, after /opsx:feedback task completion,
+  and before /opsx:archive. Use when user requests code review, spec compliance check,
+  documentation review, multilingual consistency review, or when explicitly invoked via
+  /linasite-review.
 compatibility: Requires OpenSpec CLI, GoFrame v2 skill, linasite-e2e skill.
 ---
 
@@ -23,7 +25,8 @@ Structured code and specification review for the OpenSpec development workflow.
 - Before executing `/opsx:archive`
 
 **Manual trigger:**
-- User explicitly requests: "review this code", "check spec compliance", "/linasite-review"
+- User explicitly requests: "review this code", "check spec compliance", "review docs copy",
+  "check translation consistency", "/linasite-review"
 
 ---
 
@@ -56,7 +59,8 @@ Determine what needs to be reviewed:
    rg --files <path>
    ```
 4. If the task ran generators such as `make ctrl`, `make dao`, codegen scripts, or produced new test files, explicitly include the generated untracked files in review scope even if they do not appear in `git diff`.
-5. `git diff` may be used only as a secondary narrowing aid after status collection. It is **never sufficient by itself** for review scope definition.
+5. If the scope includes site docs, blog posts, localized pages, or UI copy, add the corresponding locale counterpart files to review scope even when those files are unchanged in `git status`.
+6. `git diff` may be used only as a secondary narrowing aid after status collection. It is **never sufficient by itself** for review scope definition.
 
 Run `openspec status --change "<name>" --json` to understand the current change state.
 
@@ -83,7 +87,30 @@ Check against `CLAUDE.md` API design specifications.
 
 Check against `CLAUDE.md` architecture design specifications and code development specifications.
 
-### 6. SQL Review
+### 6. Site Documentation and i18n Review
+
+**Trigger**: New or modified user-facing content under `apps/lina-site/docs/`, `apps/lina-site/blog/`,
+`apps/lina-site/i18n/`, `apps/lina-site/src/pages/`, `apps/lina-site/src/components/`, or other
+site copy files.
+
+Check against `CLAUDE.md`, `AGENTS.md`, and the repository language rules. At minimum:
+
+1. Identify all locale counterparts for each changed content file.
+   - Chinese source manuscript: `apps/lina-site/i18n/zh-Hans/`
+   - Default-locale docs/blog source: `apps/lina-site/docs/`, `apps/lina-site/blog/`
+   - Locale UI strings: `apps/lina-site/i18n/<locale>/docusaurus-theme-classic/` and `code.json`
+2. Compare content for **semantic consistency**, not literal word matching. Review:
+   - front matter, title, description, slug, sidebar labels
+   - headings, steps, tables, code snippets, Mermaid diagrams
+   - links, images, alt text, admonitions, CTA copy
+3. Treat Chinese as the source manuscript. If any non-Chinese locale diverges materially from the
+   Chinese version, sync that locale from the Chinese content instead of preserving the drift.
+4. If Chinese source content is missing while another locale was edited, report a **Critical** issue.
+   Do not approve the review until the Chinese source is added or the mismatch is explicitly resolved.
+5. If the mismatch is straightforward to fix, update the non-Chinese locale files during review and
+   record the sync in the review report with concrete file paths.
+
+### 7. SQL Review
 
 **Trigger**: New or modified files under `apps/lina-core/manifest/sql/`、`apps/lina-core/manifest/sql/mock-data/`、`apps/lina-plugins/**/manifest/sql/` or SQL snippets embedded in related delivery docs
 
@@ -94,14 +121,14 @@ Check against `CLAUDE.md` SQL file management specifications, at minimum coverin
 4. **Seed write style compliance** — delivered SQL must reject `INSERT ... ON DUPLICATE KEY UPDATE` and reject explicit writes to `AUTO_INCREMENT` `id` columns in seed/mock/install data
 5. Whether schema/data changes still match the current change scope and deployment path
 
-### 7. E2E Test Review
+### 8. E2E Test Review
 
 **Trigger**: New or modified E2E test files in `hack/tests/e2e/` directory
 
 1. Invoke `linasite-e2e` skill for test conventions
 2. Check against `CLAUDE.md` E2E test specifications
 
-### 8. Generate Review Report
+### 9. Generate Review Report
 
 ```markdown
 ## OpenSpec Review Report
@@ -119,6 +146,9 @@ Check against `CLAUDE.md` SQL file management specifications, at minimum coverin
 
 ### Project Spec Review
 ✓ Compliant with CLAUDE.md / ⚠ N violations found
+
+### Documentation & i18n Review
+✓ No site content changes / ✓ Multi-language content aligned / ⚠ N inconsistencies found
 
 ### SQL Review
 ✓ No SQL changes / ✓ SQL changes compliant / ⚠ N SQL issues found
@@ -160,6 +190,10 @@ Check against `CLAUDE.md` SQL file management specifications, at minimum coverin
 - **CLAUDE.md is the single source of truth** — All spec references point to it
 - Only check categories relevant to changed files
 - Scope identification MUST include untracked files and expanded untracked directories; never rely on `git diff` alone
+- For site docs and copy review, always inspect the changed file together with its locale counterparts
+- Multi-language semantic drift is a review issue even if the site still builds
+- `apps/lina-site/i18n/zh-Hans/` is the source manuscript for site docs and copy; sync other locales from it
+- When locale mismatches are straightforward to fix, update the non-Chinese files before finalizing the review
 - Don't block on warnings — only critical issues block archive
 - Include file paths and line numbers in issue reports
 - Offer to fix issues automatically when straightforward
