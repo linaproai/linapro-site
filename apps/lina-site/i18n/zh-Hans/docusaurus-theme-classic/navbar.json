@@ -1,0 +1,10 @@
+{
+  "logo.alt": {
+    "message": "LinaPro Logo",
+    "description": "The alt text of navbar logo"
+  },
+  "item.label.快速开始": {
+    "message": "快速开始",
+    "description": "Navbar item with label 快速开始"
+  }
+}
