@@ -8,12 +8,13 @@ const DOCS_URL = '/quickstart';
 
 function HomepageHeader() {
     const githubImage = useBaseUrl('/img/github.svg');
+    const logoImage = useBaseUrl('/img/linapro-logo.png');
     return (
         <header className="home-section home-section--hero">
             <div className="container logo-container">
                 <div>
                     <img
-                        src="/img/linapro-logo.png"
+                        src={logoImage}
                         className="logo"
                         alt={translate({
                             id: 'home.hero.logoAlt',
