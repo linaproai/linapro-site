@@ -12,7 +12,7 @@ function isZhLocale() {
 function geti18nTitle() {
   return isZhLocale()
     ? 'LinaPro - AI 驱动的全栈开发框架'
-    : 'LinaPro - AI-driven full-stack development framework';
+    : 'LinaPro - AI-native full-stack development framework';
 }
 
 function geti18nTagline() {

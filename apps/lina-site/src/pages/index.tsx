@@ -46,13 +46,13 @@ function HomepageHeader() {
 
                 <h1 className="hero-title">
                     <Translate id="home.hero.title" description="Hero h1">
-                        AI-driven full-stack framework, engineered for sustainable delivery
+                        AI-native full-stack framework engineered for sustainable delivery
                     </Translate>
                 </h1>
 
                 <p className="hero-lead">
                     <Translate id="home.hero.lead" description="Hero lead paragraph">
-                        LinaPro is an AI-driven full-stack development framework where AI handles the bulk of analysis, design, and implementation, while humans set direction and own quality at the gates that matter. A core host service, a production-ready management workspace, a dual-mode plugin runtime, and a specification-driven AI R&D workflow lock together so delivery quality keeps pace as the product grows.
+                        AI handles analysis, design, and implementation. Humans set direction and safeguard quality at the gates that matter. Four interlocking layers keep delivery quality steady as the product scales.
                     </Translate>
                 </p>
 
@@ -98,7 +98,7 @@ const layers = [
         ),
         desc: (
             <Translate id="home.layer.core.desc" description="Layer 1 description">
-                Universal Go backend runtime — API contracts, service governance, authentication, permissions, plugin lifecycle.
+                A general-purpose Go backend runtime that handles API contracts, service governance, auth, permissions, and the plugin lifecycle out of the box.
             </Translate>
         ),
     },
@@ -112,7 +112,7 @@ const layers = [
         ),
         desc: (
             <Translate id="home.layer.vben.desc" description="Layer 2 description">
-                Production-ready Vue 3 frontend workspace — the reference UI for every built-in capability, ready to extend or replace.
+                A production-ready Vue 3 workspace that ships as the reference UI for every built-in capability — extend it, or swap it out entirely.
             </Translate>
         ),
     },
@@ -126,7 +126,7 @@ const layers = [
         ),
         desc: (
             <Translate id="home.layer.plugins.desc" description="Layer 3 description">
-                Hot-loadable source and WASM dynamic plugins, sandboxed with namespaced database and filesystem access — extend or replace anything without touching the host.
+                Hot-loadable source plugins and WASM runtime plugins, each sandboxed with namespaced database and filesystem access — extend or replace anything without touching the host.
             </Translate>
         ),
     },
@@ -140,7 +140,7 @@ const layers = [
         ),
         desc: (
             <Translate id="home.layer.openspec.desc" description="Layer 4 description">
-                Specification-first workflow that keeps AI, humans, and the codebase aligned across every iteration.
+                A spec-first workflow that keeps AI, humans, and the codebase in lockstep across every iteration.
             </Translate>
         ),
     },
@@ -157,7 +157,7 @@ function Layers() {
                 </h2>
                 <p className="section-lead">
                     <Translate id="home.layers.lead" description="Layers section lead">
-                        Each layer is designed independently under a strict loose-coupling principle, so business modules can be enabled or disabled on demand without dragging the rest of the stack along.
+                        Every layer is designed independently around a strict loose-coupling principle, so business modules can be turned on or off on demand without dragging the rest of the stack along for the ride.
                     </Translate>
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-8">
@@ -185,7 +185,7 @@ const workflowSteps = [
         ),
         desc: (
             <Translate id="home.workflow.explore.desc" description="Workflow stage 1 desc">
-                Investigate the problem space and surface options before committing.
+                Map out the problem space and weigh the options before committing to one.
             </Translate>
         ),
     },
@@ -198,7 +198,7 @@ const workflowSteps = [
         ),
         desc: (
             <Translate id="home.workflow.propose.desc" description="Workflow stage 2 desc">
-                Capture intent as an incremental specification anchored to acceptance criteria.
+                Turn intent into an incremental spec, anchored to clear acceptance criteria.
             </Translate>
         ),
     },
@@ -211,7 +211,7 @@ const workflowSteps = [
         ),
         desc: (
             <Translate id="home.workflow.implement.desc" description="Workflow stage 3 desc">
-                AI executes against the spec and writes the corresponding E2E tests.
+                AI builds against the spec and writes the matching E2E tests alongside it.
             </Translate>
         ),
     },
@@ -224,7 +224,7 @@ const workflowSteps = [
         ),
         desc: (
             <Translate id="home.workflow.review.desc" description="Workflow stage 4 desc">
-                Humans review the spec, the code, and the tests at the gate that matters.
+                Humans sign off on the spec, the code, and the tests at the gates that matter.
             </Translate>
         ),
     },
@@ -237,7 +237,7 @@ const workflowSteps = [
         ),
         desc: (
             <Translate id="home.workflow.archive.desc" description="Workflow stage 5 desc">
-                The verified spec joins the baseline — the next iteration builds on solid ground.
+                The verified spec joins the baseline, so the next iteration starts on solid ground.
             </Translate>
         ),
     },
@@ -249,12 +249,12 @@ function Workflow() {
             <div className="container">
                 <h2 className="section-title">
                     <Translate id="home.workflow.title" description="Workflow section title">
-                        A specification-driven AI R&D loop
+                        Spec-driven AI development loop
                     </Translate>
                 </h2>
                 <p className="section-lead">
                     <Translate id="home.workflow.lead" description="Workflow section lead">
-                        Every iteration follows a closed pipeline anchored to incremental specification files and mandatory E2E tests. AI always builds on a verified foundation — no architectural drift, no test voids.
+                        Every iteration runs through a closed pipeline anchored to incremental spec files and mandatory E2E tests. AI always builds on a verified foundation — no architectural drift, no gaps in coverage.
                     </Translate>
                 </p>
                 <div className="workflow-steps">
@@ -331,7 +331,7 @@ const strengths = [
         ),
         desc: (
             <Translate id="home.strength.workflow.desc" description="Strength 1 desc">
-                Explore → Propose → Implement → Review → Archive. AI always advances from a verified specification baseline, eliminating drift before it starts.
+                Explore → Propose → Implement → Review → Archive. AI always moves forward from a verified spec baseline, so drift never gets a foothold.
             </Translate>
         ),
     },
@@ -345,7 +345,7 @@ const strengths = [
         ),
         desc: (
             <Translate id="home.strength.coupling.desc" description="Strength 2 desc">
-                Every business module is independent and collaborates through interfaces, never hard dependencies — composable, replaceable, on-demand.
+                Every business module stands on its own and talks to others through interfaces, never hard dependencies — composable, swappable, and enabled on demand.
             </Translate>
         ),
     },
@@ -359,7 +359,7 @@ const strengths = [
         ),
         desc: (
             <Translate id="home.strength.plugins.desc" description="Strength 3 desc">
-                Compile-time source plugins and runtime WASM dynamic plugins run in isolated sandboxes with namespaced database and filesystem access.
+                Compile-time source plugins and runtime WASM plugins both run in isolated sandboxes, each with its own namespaced database and filesystem access.
             </Translate>
         ),
     },
@@ -373,7 +373,7 @@ const strengths = [
         ),
         desc: (
             <Translate id="home.strength.governance.desc" description="Strength 4 desc">
-                JWT auth + declarative RBAC permissions as struct tags — auditable by design. Millisecond-propagation, sensitive-field masking, force-logout, IP & device fingerprints.
+                JWT auth plus declarative RBAC, with permissions expressed as struct tags — auditable by design. Millisecond permission propagation, sensitive-field masking, force-logout, and IP and device fingerprinting all included.
             </Translate>
         ),
     },
@@ -382,12 +382,12 @@ const strengths = [
         Icon: IconNetwork,
         title: (
             <Translate id="home.strength.distributed.title" description="Strength 5 title">
-                Distribution-ready by design
+                Distributed by design
             </Translate>
         ),
         desc: (
             <Translate id="home.strength.distributed.desc" description="Strength 5 desc">
-                Permission topology sync, distributed locking, and key-value cache are cluster-aware. Scale from single node to multi-node with no architectural changes.
+                Permission topology sync, distributed locks, and the KV cache are all cluster-aware. Scale from a single node to a full cluster without rearchitecting a thing.
             </Translate>
         ),
     },
@@ -401,7 +401,7 @@ const strengths = [
         ),
         desc: (
             <Translate id="home.strength.builtin.desc" description="Strength 6 desc">
-                Built-in core services, official plugins, and a rich management workspace — focus on business from day one instead of building infrastructure.
+                Core services, official plugins, and a feature-rich management workspace, all in the box — focus on the business from day one instead of building infrastructure.
             </Translate>
         ),
     },
@@ -418,7 +418,7 @@ function Strengths() {
                 </h2>
                 <p className="section-lead">
                     <Translate id="home.strengths.lead" description="Strengths section lead">
-                        A framework engineered so AI productivity compounds with every iteration instead of decaying under its own weight.
+                        A framework engineered so AI productivity compounds with every iteration — instead of buckling under its own weight.
                     </Translate>
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-8">
@@ -465,12 +465,12 @@ function Modules() {
             <div className="container">
                 <h2 className="section-title">
                     <Translate id="home.modules.title" description="Modules section title">
-                        A workspace that ships ready to use
+                        A workspace ready to use on day one
                     </Translate>
                 </h2>
                 <p className="section-lead">
                     <Translate id="home.modules.lead" description="Modules section lead">
-                        Build directly on top, extend any module via the plugin system, or replace one entirely — all without touching the core host. Every module is wired into RBAC; permission changes take effect without re-login.
+                        Build straight on top, extend any module through the plugin system, or replace one outright — all without touching the core host. Every module is wired into RBAC, and permission changes take effect on the spot, no re-login required.
                     </Translate>
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
@@ -519,7 +519,7 @@ const quickStartBlocks = [
     },
     {
         id: 'init',
-        label: 'INITIALISE',
+        label: 'INITIALIZE',
         body: 'make init confirm=init\nmake mock confirm=mock   # optional demo data',
     },
     {
@@ -540,7 +540,7 @@ function QuickStart() {
                 </h2>
                 <p className="section-lead">
                     <Translate id="home.quickstart.lead" description="QuickStart section lead">
-                        macOS, Linux, and Windows installers; a single Make entrypoint for every common task; a default workspace ready to log into.
+                        One-line installers for macOS, Linux, and Windows; a single Make entrypoint for every common task; and a default workspace ready to log into.
                     </Translate>
                 </p>
                 <div className="quickstart-blocks">
@@ -574,7 +574,7 @@ function FinalCta() {
                 </h2>
                 <p className="section-lead">
                     <Translate id="home.cta.lead" description="Final CTA lead">
-                        Read the docs, dive into the source, or jump straight into the workspace — LinaPro is open and ready.
+                        Read the docs, dig into the source, or jump straight into the workspace — LinaPro is open and waiting.
                     </Translate>
                 </p>
                 <div className="cta-buttons">
