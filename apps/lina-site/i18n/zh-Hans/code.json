@@ -4,15 +4,15 @@
     "description": "Alt text for the LinaPro logo in the hero"
   },
   "home.hero.title": {
-    "message": "面向可持续交付的 AI 驱动全栈开发框架",
+    "message": "面向可持续交付的 AI 原生全栈框架",
     "description": "Hero h1"
   },
   "home.hero.lead": {
-    "message": "LinaPro 是一款 AI 驱动的全栈开发框架——AI 承担分析、设计与实现的主体工作，人类把握方向并在关键节点保障质量。通用核心宿主服务、生产级管理工作台、双模式插件运行时与规范驱动的 AI 研发工作流四层紧密协作，让交付质量随产品规模持续保持。",
+    "message": "LinaPro是一款AI原生的全栈开发框架——AI 承担分析、设计与实现的主体工作，人类把握方向并在关键节点保障质量。提供通用核心宿主服务、生产级管理工作台、双模式插件运行时与规范驱动的AI研发工作流，四层紧密协作，让交付质量随产品规模持续保持。",
     "description": "Hero lead paragraph"
   },
   "home.hero.cta.start": {
-    "message": "立即开始 →",
+    "message": "快速开始 →",
     "description": "Hero primary CTA"
   },
   "home.hero.cta.github": {
@@ -24,7 +24,7 @@
     "description": "Layer 1 title"
   },
   "home.layer.core.desc": {
-    "message": "通用 Go 后端运行时——API 契约、服务治理、认证鉴权、权限管理、插件生命周期等通用能力。",
+    "message": "通用 Go 后端运行时，统一承载 API 契约、服务治理、认证鉴权、权限管理与插件生命周期等通用能力。",
     "description": "Layer 1 description"
   },
   "home.layer.vben.title": {
@@ -32,7 +32,7 @@
     "description": "Layer 2 title"
   },
   "home.layer.vben.desc": {
-    "message": "基于 Vue 3 的生产就绪前端工作台——所有内置能力的参考 UI 实现，可直接扩展或替换。",
+    "message": "生产就绪的 Vue 3 工作台，覆盖每一项内置能力的参考 UI 实现；可直接扩展，也可整体替换。",
     "description": "Layer 2 description"
   },
   "home.layer.plugins.title": {
@@ -40,7 +40,7 @@
     "description": "Layer 3 title"
   },
   "home.layer.plugins.desc": {
-    "message": "可热加载的源码与 WASM 动态插件，运行在沙箱中并按命名空间隔离数据库与文件——无需修改宿主即可扩展或覆盖任意能力。",
+    "message": "源码插件无限扩展与WASM动态热加载，内置沙箱安全权限控制，资源严格隔离；无需触碰宿主，即可扩展或覆盖任意能力。",
     "description": "Layer 3 description"
   },
   "home.layer.openspec.title": {
@@ -48,15 +48,15 @@
     "description": "Layer 4 title"
   },
   "home.layer.openspec.desc": {
-    "message": "规范优先的结构化工作流，让 AI、人类与代码库在每次迭代中保持对齐。",
+    "message": "规范优先的结构化工作流，让 AI、人类与代码库在每一次迭代中始终步调一致。",
     "description": "Layer 4 description"
   },
   "home.layers.title": {
-    "message": "四层紧密协作的架构",
+    "message": "四层架构，环环相扣",
     "description": "Layers section title"
   },
   "home.layers.lead": {
-    "message": "每一层均遵循松耦合原则独立设计，业务模块可按需启用或禁用，不会牵动整个技术栈。",
+    "message": "每一层都独立设计、严守松耦合原则；业务模块可按需启用或下线，不会牵动整个技术栈。",
     "description": "Layers section lead"
   },
   "home.workflow.explore.title": {
@@ -64,7 +64,7 @@
     "description": "Workflow stage 1"
   },
   "home.workflow.explore.desc": {
-    "message": "在动手之前充分研究问题域，浮现可能的方案。",
+    "message": "动手之前先把问题域摸清楚，把可选路径一一摆上台面。",
     "description": "Workflow stage 1 desc"
   },
   "home.workflow.propose.title": {
@@ -72,7 +72,7 @@
     "description": "Workflow stage 2"
   },
   "home.workflow.propose.desc": {
-    "message": "把意图沉淀为锚定验收条件的增量规范文件。",
+    "message": "把意图沉淀为增量规范文件，并锚定明确的验收条件。",
     "description": "Workflow stage 2 desc"
   },
   "home.workflow.implement.title": {
@@ -80,7 +80,7 @@
     "description": "Workflow stage 3"
   },
   "home.workflow.implement.desc": {
-    "message": "AI 依据规范完成实现，并补齐对应的 E2E 测试。",
+    "message": "AI 依据规范完成实现，并同步补齐对应的 E2E 测试。",
     "description": "Workflow stage 3 desc"
   },
   "home.workflow.review.title": {
@@ -88,7 +88,7 @@
     "description": "Workflow stage 4"
   },
   "home.workflow.review.desc": {
-    "message": "人类在关键节点对规范、代码与测试进行审查把关。",
+    "message": "人类在关键节点对规范、代码与测试逐项审查、严格把关。",
     "description": "Workflow stage 4 desc"
   },
   "home.workflow.archive.title": {
@@ -96,7 +96,7 @@
     "description": "Workflow stage 5"
   },
   "home.workflow.archive.desc": {
-    "message": "已验证的规范并入基线——下一次迭代在坚实的基础上推进。",
+    "message": "通过验证的规范并入基线，下一次迭代便从坚实的地基起步。",
     "description": "Workflow stage 5 desc"
   },
   "home.workflow.title": {
@@ -104,7 +104,7 @@
     "description": "Workflow section title"
   },
   "home.workflow.lead": {
-    "message": "每次迭代遵循闭环流水线，锚定增量规范文件与强制 E2E 测试。AI 始终基于已验证基础向前推进——杜绝架构漂移与测试空洞。",
+    "message": "每一次迭代都跑在同一条闭环流水线上，以增量规范与强制 E2E 测试为锚点；AI 始终在已验证的基础之上向前推进，从源头杜绝架构漂移与测试空洞。",
     "description": "Workflow section lead"
   },
   "home.strength.workflow.title": {
@@ -112,7 +112,7 @@
     "description": "Strength 1 title"
   },
   "home.strength.workflow.desc": {
-    "message": "探索 → 提案 → 实现 → 审查 → 归档。AI 始终基于已验证的规范基线向前推进，从源头消除架构漂移。",
+    "message": "探索 → 提案 → 实现 → 审查 → 归档。AI 始终站在已验证的规范基线之上向前推进，让架构漂移无处生根。",
     "description": "Strength 1 desc"
   },
   "home.strength.coupling.title": {
@@ -120,7 +120,7 @@
     "description": "Strength 2 title"
   },
   "home.strength.coupling.desc": {
-    "message": "所有业务模块独立设计，通过接口而非硬依赖协作——可组合、可替换、按需启用。",
+    "message": "业务模块各自独立、靠接口而非硬依赖协作，可自由组合、可整体替换、可按需启停。",
     "description": "Strength 2 desc"
   },
   "home.strength.plugins.title": {
@@ -128,7 +128,7 @@
     "description": "Strength 3 title"
   },
   "home.strength.plugins.desc": {
-    "message": "编译期源码插件与运行时 WASM 动态插件运行在隔离沙箱中，数据库与文件访问按命名空间隔离。",
+    "message": "编译期源码插件与运行时 WASM 插件并行支持，统一在隔离沙箱中运行，数据库与文件访问按命名空间天然隔离。",
     "description": "Strength 3 desc"
   },
   "home.strength.governance.title": {
@@ -136,7 +136,7 @@
     "description": "Strength 4 title"
   },
   "home.strength.governance.desc": {
-    "message": "JWT 认证 + 声明式 RBAC（权限以 API 标签声明，天然可审计）。权限毫秒级生效、敏感字段自动脱敏、强制下线、IP 与设备指纹审计。",
+    "message": "JWT 认证搭配声明式 RBAC，权限直接写在结构体标签里，天生可审计；毫秒级生效、敏感字段自动脱敏、强制下线、IP 与设备指纹审计一应俱全。",
     "description": "Strength 4 desc"
   },
   "home.strength.distributed.title": {
@@ -144,7 +144,7 @@
     "description": "Strength 5 title"
   },
   "home.strength.distributed.desc": {
-    "message": "权限拓扑同步、分布式锁、键值缓存均集群感知。从单节点到多节点无需架构改造即可水平扩展。",
+    "message": "权限拓扑同步、分布式锁、键值缓存均原生集群感知；从单节点到完整集群，无需任何架构改造即可平滑扩展。",
     "description": "Strength 5 desc"
   },
   "home.strength.builtin.title": {
@@ -152,7 +152,7 @@
     "description": "Strength 6 title"
   },
   "home.strength.builtin.desc": {
-    "message": "内置核心服务、官方插件与丰富的管理工作台模块——首日即可专注业务，无需自建基础设施。",
+    "message": "核心服务、官方插件与功能完备的管理工作台一并奉上；不必从零搭建基础设施，第一天就能专注业务本身。",
     "description": "Strength 6 desc"
   },
   "home.strengths.title": {
@@ -160,7 +160,7 @@
     "description": "Strengths section title"
   },
   "home.strengths.lead": {
-    "message": "一款让 AI 生产力随每次迭代复利增长、而非衰减的开发框架。",
+    "message": "一款让 AI 生产力随迭代复利增长，让产品快速演进的开发框架。",
     "description": "Strengths section lead"
   },
   "home.module.user": {
@@ -232,7 +232,7 @@
     "description": "Modules section title"
   },
   "home.modules.lead": {
-    "message": "可直接在此基础上构建业务，也可通过插件机制扩展或替换任意模块——无需触碰核心宿主。所有模块均与 RBAC 完整集成，权限变更实时生效无需重新登录。",
+    "message": "既可直接在现成模块上构建业务，也可借助插件机制扩展或整体替换任意一块，全程不必触碰核心宿主；所有模块原生接入 RBAC，权限变更实时生效，无需重新登录。",
     "description": "Modules section lead"
   },
   "home.modules.builtin.heading": {
@@ -244,11 +244,11 @@
     "description": "Plugin modules heading"
   },
   "home.quickstart.title": {
-    "message": "三条命令即刻起步",
+    "message": "三条命令，立即上手",
     "description": "QuickStart section title"
   },
   "home.quickstart.lead": {
-    "message": "一键安装脚本覆盖 macOS / Linux / Windows，统一的 Make 入口承载所有常用任务，登录即用的默认管理工作台。",
+    "message": "一键安装脚本覆盖 macOS / Linux / Windows，常用任务统一收敛到 Make 入口，默认管理工作台登录即用。",
     "description": "QuickStart section lead"
   },
   "home.quickstart.footnote": {
@@ -260,7 +260,7 @@
     "description": "Final CTA title"
   },
   "home.cta.lead": {
-    "message": "阅读文档、深入源码，或直接进入工作台——LinaPro 已开放，即刻可用。",
+    "message": "翻阅文档、深入源码，或直接登录工作台——LinaPro 已开放，开箱即用。",
     "description": "Final CTA lead"
   },
   "home.cta.docs": {
