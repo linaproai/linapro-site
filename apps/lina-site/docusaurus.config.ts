@@ -5,21 +5,39 @@ import type * as Preset from '@docusaurus/preset-classic';
 import type { Config } from '@docusaurus/types';
 import { themes as prismThemes } from 'prism-react-renderer';
 
+function isZhLocale() {
+  return process.env.DOCUSAURUS_CURRENT_LOCALE === 'zh-Hans';
+}
+
 function geti18nTitle() {
-  switch (process.env.DOCUSAURUS_CURRENT_LOCALE) {
-    case 'en':
-      return 'GoFrame - A powerful framework for faster, easier, and more efficient project development';
-    default:
-      return 'GoFrame官网 - 类似PHP-Laravel,Java-SpringBoot的Go语言开发框架';
-  }
+  return isZhLocale()
+    ? 'LinaPro - AI 驱动的全栈开发框架'
+    : 'LinaPro - AI-driven full-stack development framework';
+}
+
+function geti18nTagline() {
+  return isZhLocale()
+    ? '面向可持续交付的 AI 驱动全栈开发框架——AI 主导执行，人类把握方向'
+    : 'AI-driven full-stack development framework engineered for sustainable delivery — AI leads execution, humans steer direction.';
+}
+
+function geti18nDescription() {
+  return isZhLocale()
+    ? 'LinaPro 是一款 AI 驱动的全栈开发框架，由通用核心宿主服务（lina-core）、Vue 3 管理工作台（lina-vben）、双模式插件运行时（lina-plugins）与规范驱动的 AI 研发工作流（openspec）四层紧密协作组成，让 AI 在生产级软件交付中的效率随产品迭代持续保持。'
+    : 'LinaPro is an AI-driven full-stack development framework: a Go core host service (lina-core), a Vue 3 management workspace (lina-vben), a dual-mode source/WASM plugin runtime (lina-plugins), and a specification-driven AI R&D workflow (openspec) — engineered so AI productivity compounds with every iteration of production software.';
+}
+
+function geti18nKeywords() {
+  return isZhLocale()
+    ? 'LinaPro,AI 全栈开发框架,AI 驱动开发,Go 后端框架,Vue 3 管理后台,RBAC 权限,WASM 插件,源码插件,规范驱动开发,OpenSpec,AI 研发工作流,lina-core,lina-vben,lina-plugins'
+    : 'LinaPro,AI-driven development,full-stack framework,Go framework,Vue 3 admin,WASM plugins,RBAC,specification-driven,OpenSpec,AI R&D workflow,lina-core,lina-vben,lina-plugins,enterprise governance';
 }
 
 // https://docusaurus.io/docs/api/plugins/@docusaurus/plugin-content-docs#markdown-front-matter
 // https://docusaurus.io/zh-CN/docs/api/docusaurus-config
 const config: Config = {
   title: geti18nTitle(),
-  tagline:
-    'A powerful framework for faster, easier, and more efficient project development',
+  tagline: geti18nTagline(),
   favicon: '/favicon.ico',
   url: 'https://linapro.ai/',
   baseUrl: '/',
@@ -81,7 +99,7 @@ const config: Config = {
             },
           },
           // 编辑当前页面的配置
-          editUrl: 'https://github.com/gogf/gf-site/blob/main/',
+          editUrl: 'https://github.com/linaproai/linapro/blob/main/apps/lina-site/',
           // 显示更新时间和作者
           showLastUpdateTime: true,
           showLastUpdateAuthor: true,
@@ -115,13 +133,47 @@ const config: Config = {
     metadata: [
       {
         name: 'keywords',
-        content:
-          'keywords',
+        content: geti18nKeywords(),
       },
       {
         name: 'description',
-        content:
-          'description',
+        content: geti18nDescription(),
+      },
+      {
+        property: 'og:title',
+        content: geti18nTitle(),
+      },
+      {
+        property: 'og:description',
+        content: geti18nDescription(),
+      },
+      {
+        property: 'og:type',
+        content: 'website',
+      },
+      {
+        property: 'og:url',
+        content: 'https://linapro.ai/',
+      },
+      {
+        property: 'og:image',
+        content: 'https://linapro.ai/img/linapro-logo.png',
+      },
+      {
+        name: 'twitter:card',
+        content: 'summary_large_image',
+      },
+      {
+        name: 'twitter:title',
+        content: geti18nTitle(),
+      },
+      {
+        name: 'twitter:description',
+        content: geti18nDescription(),
+      },
+      {
+        name: 'twitter:image',
+        content: 'https://linapro.ai/img/linapro-logo.png',
       },
     ],
     colorMode: {
@@ -147,7 +199,7 @@ const config: Config = {
       },
       items: [
         {
-          label: '快速开始',
+          label: 'Get Started',
           position: 'left',
           // type: 'docSidebar',
           // sidebarId: 'quickSidebar',
@@ -165,10 +217,10 @@ const config: Config = {
           position: 'right' as const,
         },
         {
-          href: 'https://github.com/gogf/gf',
+          href: 'https://github.com/linaproai/linapro',
           position: 'right' as const,
           className: 'header-github-link',
-          activeBaseRegex: `ai`,
+          'aria-label': 'GitHub repository',
         },
       ],
     },

@@ -1,4 +1,3 @@
-import {Fragment} from 'react';
 import Link from '@docusaurus/Link';
 import Translate, {translate} from '@docusaurus/Translate';
 import useBaseUrl from '@docusaurus/useBaseUrl';
@@ -591,7 +590,7 @@ function FinalCta() {
                             paddingLeft: '50px',
                             backgroundImage: `url(${githubImage})`,
                             backgroundRepeat: 'no-repeat',
-                            backgroundPosition: '45px center',
+                            backgroundPosition: '22px center',
                         }}
                     >
                         <Translate id="home.cta.github" description="Final CTA github button">
