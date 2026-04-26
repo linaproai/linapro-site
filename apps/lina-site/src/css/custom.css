@@ -174,10 +174,10 @@
 
 /* Layers section --------------------------------------------------- */
 .home-section--layers {
-  background: #f5f7fa;
+  background: #ffffff;
 }
 [data-theme='dark'] .home-section--layers {
-  background: #1a1d21;
+  background: #1c2128;
 }
 .home-section--layers .card {
   background: #ffffff;
@@ -233,10 +233,10 @@
 
 /* Workflow section ------------------------------------------------- */
 .home-section--workflow {
-  background: #ffffff;
+  background: #f5f7fa;
 }
 [data-theme='dark'] .home-section--workflow {
-  background: #1c2128;
+  background: #1a1d21;
 }
 .workflow-steps {
   display: flex;

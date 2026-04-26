@@ -394,7 +394,7 @@ function Strengths() {
             <div className="container">
                 <h2 className="section-title">
                     <Translate id="home.strengths.title" description="Strengths section title">
-                        Why teams choose LinaPro
+                        Framework Highlights
                     </Translate>
                 </h2>
                 <p className="section-lead">
@@ -589,9 +589,9 @@ export default function Home(): JSX.Element {
     return (
         <Layout>
             <HomepageHeader />
+            <Strengths />
             <Layers />
             <Workflow />
-            <Strengths />
             <Modules />
             <QuickStart />
             <FinalCta />
