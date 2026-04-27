@@ -12,7 +12,7 @@ function isZhLocale() {
 function geti18nTitle() {
   return isZhLocale()
     ? 'LinaPro - AI 驱动的全栈开发框架'
-    : 'LinaPro - AI-driven full-stack development framework';
+    : 'LinaPro - AI-driven full-stack framework engineered for sustainable delivery';
 }
 
 function geti18nTagline() {
@@ -23,8 +23,8 @@ function geti18nTagline() {
 
 function geti18nDescription() {
   return isZhLocale()
-    ? 'LinaPro 是一款 AI 驱动的全栈开发框架，由通用核心宿主服务（lina-core）、Vue 3 管理工作台（lina-vben）、双模式插件运行时（lina-plugins）与规范驱动的 AI 研发工作流（openspec）四层紧密协作组成，让 AI 在生产级软件交付中的效率随产品迭代持续保持。'
-    : 'LinaPro is an AI-driven full-stack development framework: a Go core host service (lina-core), a Vue 3 management workspace (lina-vben), a dual-mode source/WASM plugin runtime (lina-plugins), and a specification-driven AI R&D workflow (openspec) — engineered so AI productivity compounds with every iteration of production software.';
+    ? 'LinaPro 把 AI 作为核心生产力：AI 主导分析、设计与实现，团队把握方向与关键决策，把"AI 越用越快"延续到产品的整个生命周期。框架自带核心宿主服务、管理工作台、可插拔插件运行时与规范驱动的 AI 原生研发工作流，帮助团队快速交付生产级应用，同时保持产品可持续迭代与治理。'
+    : 'LinaPro brings AI into the full delivery workflow: AI handles analysis, design, and implementation while humans set direction and make the critical decisions. Teams ship production-grade applications faster while keeping architecture, permissions, testing, and extension boundaries governable.';
 }
 
 function geti18nKeywords() {
