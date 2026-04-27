@@ -1,6 +1,7 @@
 import Link from '@docusaurus/Link';
 import Translate, {translate} from '@docusaurus/Translate';
 import useBaseUrl from '@docusaurus/useBaseUrl';
+import CodeBlock from '@theme/CodeBlock';
 import Layout from '@theme/Layout';
 
 const REPO_URL = 'https://github.com/linaproai/linapro';
@@ -418,26 +419,39 @@ function Strengths() {
     );
 }
 
-const builtinModules = [
-    {key: 'user', label: <Translate id="home.module.user" description="Built-in module: User Management">User Management</Translate>},
-    {key: 'role', label: <Translate id="home.module.role" description="Built-in module: Role Management">Role Management</Translate>},
-    {key: 'menu', label: <Translate id="home.module.menu" description="Built-in module: Menu Management">Menu Management</Translate>},
-    {key: 'dictionary', label: <Translate id="home.module.dictionary" description="Built-in module: Data Dictionary">Data Dictionary</Translate>},
-    {key: 'parameters', label: <Translate id="home.module.parameters" description="Built-in module: Parameter Settings">Parameter Settings</Translate>},
-    {key: 'files', label: <Translate id="home.module.files" description="Built-in module: File Management">File Management</Translate>},
-    {key: 'jobs', label: <Translate id="home.module.jobs" description="Built-in module: Job Scheduling">Job Scheduling</Translate>},
-    {key: 'plugins', label: <Translate id="home.module.plugins" description="Built-in module: Plugin Management">Plugin Management</Translate>},
-    {key: 'apidocs', label: <Translate id="home.module.apidocs" description="Built-in module: API Docs">API Docs</Translate>},
-    {key: 'sysinfo', label: <Translate id="home.module.sysinfo" description="Built-in module: System Info">System Info</Translate>},
-];
-
-const pluginModules = [
-    {key: 'org-center', label: <Translate id="home.plugin.org" description="Plugin: org-center">Department & Position</Translate>},
-    {key: 'content-notice', label: <Translate id="home.plugin.notice" description="Plugin: content-notice">Notice Management</Translate>},
-    {key: 'monitor-online', label: <Translate id="home.plugin.online" description="Plugin: monitor-online">Online Sessions</Translate>},
-    {key: 'monitor-server', label: <Translate id="home.plugin.server" description="Plugin: monitor-server">Server Monitor</Translate>},
-    {key: 'monitor-operlog', label: <Translate id="home.plugin.operlog" description="Plugin: monitor-operlog">Operation Audit</Translate>},
-    {key: 'monitor-loginlog', label: <Translate id="home.plugin.loginlog" description="Plugin: monitor-loginlog">Login Audit</Translate>},
+const previewSlots = [
+    {
+        id: 'overview',
+        caption: (
+            <Translate id="home.modules.preview.overview" description="Screenshot slot: workspace overview">
+                Workspace overview
+            </Translate>
+        ),
+    },
+    {
+        id: 'rbac',
+        caption: (
+            <Translate id="home.modules.preview.rbac" description="Screenshot slot: users & roles">
+                Users & role permissions
+            </Translate>
+        ),
+    },
+    {
+        id: 'modules',
+        caption: (
+            <Translate id="home.modules.preview.modules" description="Screenshot slot: business modules">
+                Business modules
+            </Translate>
+        ),
+    },
+    {
+        id: 'monitor',
+        caption: (
+            <Translate id="home.modules.preview.monitor" description="Screenshot slot: monitoring & audit">
+                Monitoring & audit
+            </Translate>
+        ),
+    },
 ];
 
 function Modules() {
@@ -454,38 +468,14 @@ function Modules() {
                         Build straight on top, extend any module through the plugin system, or replace one outright — all without touching the core host. Every module is wired into RBAC, and permission changes take effect on the spot, no re-login required.
                     </Translate>
                 </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
-                    <div className="modules-column">
-                        <h3>
-                            <Translate id="home.modules.builtin.heading" description="Built-in modules heading">
-                                Ships with
-                            </Translate>{' '}
-                            <code>lina-vben</code>
-                        </h3>
-                        <ul className="modules-list">
-                            {builtinModules.map((m) => (
-                                <li key={m.key} className="modules-list-item">
-                                    <code>{m.key}</code>
-                                    <span>{m.label}</span>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                    <div className="modules-column">
-                        <h3>
-                            <Translate id="home.modules.plugins.heading" description="Plugin modules heading">
-                                Via official plugins
-                            </Translate>
-                        </h3>
-                        <ul className="modules-list">
-                            {pluginModules.map((m) => (
-                                <li key={m.key} className="modules-list-item">
-                                    <code>{m.key}</code>
-                                    <span>{m.label}</span>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
+                <div className="modules-preview-grid">
+                    {previewSlots.map((slot) => (
+                        <div key={slot.id} className="modules-preview-card">
+                            <div className="modules-preview-placeholder">
+                                {slot.caption}
+                            </div>
+                        </div>
+                    ))}
                 </div>
             </div>
         </section>
@@ -528,7 +518,9 @@ function QuickStart() {
                     {quickStartBlocks.map((b) => (
                         <div key={b.id} className="quickstart-block">
                             <div className="quickstart-block-label">{b.label}</div>
-                            <pre>{b.body}</pre>
+                            <CodeBlock language="bash" className="quickstart-codeblock">
+                                {b.body}
+                            </CodeBlock>
                         </div>
                     ))}
                 </div>

@@ -160,72 +160,8 @@
     "description": "Strengths section title"
   },
   "home.strengths.lead": {
-    "message": "让 AI 生产力随迭代复利增长，让交付质量在产品规模扩大后依然可验证、可演进。 ",
+    "message": "让 AI 生产力随迭代复利增长，让交付质量在产品规模扩大后依然可验证、可演进。",
     "description": "Strengths section lead"
-  },
-  "home.module.user": {
-    "message": "用户管理",
-    "description": "Built-in module: User Management"
-  },
-  "home.module.role": {
-    "message": "角色管理",
-    "description": "Built-in module: Role Management"
-  },
-  "home.module.menu": {
-    "message": "菜单管理",
-    "description": "Built-in module: Menu Management"
-  },
-  "home.module.dictionary": {
-    "message": "字典管理",
-    "description": "Built-in module: Data Dictionary"
-  },
-  "home.module.parameters": {
-    "message": "参数设置",
-    "description": "Built-in module: Parameter Settings"
-  },
-  "home.module.files": {
-    "message": "文件管理",
-    "description": "Built-in module: File Management"
-  },
-  "home.module.jobs": {
-    "message": "任务调度",
-    "description": "Built-in module: Job Scheduling"
-  },
-  "home.module.plugins": {
-    "message": "插件管理",
-    "description": "Built-in module: Plugin Management"
-  },
-  "home.module.apidocs": {
-    "message": "接口文档",
-    "description": "Built-in module: API Docs"
-  },
-  "home.module.sysinfo": {
-    "message": "系统信息",
-    "description": "Built-in module: System Info"
-  },
-  "home.plugin.org": {
-    "message": "部门与岗位",
-    "description": "Plugin: org-center"
-  },
-  "home.plugin.notice": {
-    "message": "通知公告",
-    "description": "Plugin: content-notice"
-  },
-  "home.plugin.online": {
-    "message": "在线用户",
-    "description": "Plugin: monitor-online"
-  },
-  "home.plugin.server": {
-    "message": "服务监控",
-    "description": "Plugin: monitor-server"
-  },
-  "home.plugin.operlog": {
-    "message": "操作日志",
-    "description": "Plugin: monitor-operlog"
-  },
-  "home.plugin.loginlog": {
-    "message": "登录日志",
-    "description": "Plugin: monitor-loginlog"
   },
   "home.modules.title": {
     "message": "开箱即用的管理工作台",
@@ -235,13 +171,21 @@
     "message": "内置模块可直接构建业务，也可通过插件扩展或替换，并统一接入实时生效的 RBAC 权限体系。",
     "description": "Modules section lead"
   },
-  "home.modules.builtin.heading": {
-    "message": "内置于",
-    "description": "Built-in modules heading"
+  "home.modules.preview.overview": {
+    "message": "工作台概览",
+    "description": "Screenshot slot: workspace overview"
   },
-  "home.modules.plugins.heading": {
-    "message": "由官方插件提供",
-    "description": "Plugin modules heading"
+  "home.modules.preview.rbac": {
+    "message": "用户与角色权限",
+    "description": "Screenshot slot: users & roles"
+  },
+  "home.modules.preview.modules": {
+    "message": "业务模块管理",
+    "description": "Screenshot slot: business modules"
+  },
+  "home.modules.preview.monitor": {
+    "message": "监控与审计",
+    "description": "Screenshot slot: monitoring & audit"
   },
   "home.quickstart.title": {
     "message": "三条命令，立即上手",

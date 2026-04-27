@@ -196,6 +196,7 @@
   background: #242830;
   border-color: rgba(255, 255, 255, 0.06);
 }
+
 .layer-card {
   position: relative;
 }
@@ -334,6 +335,84 @@
 [data-theme='dark'] .home-section--modules {
   background: #1c2128;
 }
+
+/* 2×2 screenshot placeholder grid — replace each placeholder by dropping
+   an <img> into .modules-preview-card later. */
+.modules-preview-grid {
+  margin: 32px auto 0;
+  max-width: 1080px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+@media (max-width: 720px) {
+  .modules-preview-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+.modules-preview-card {
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  border: 1px dashed rgba(47, 128, 237, 0.32);
+  background:
+    repeating-linear-gradient(
+      45deg,
+      rgba(47, 128, 237, 0.04) 0,
+      rgba(47, 128, 237, 0.04) 12px,
+      transparent 12px,
+      transparent 24px
+    ),
+    linear-gradient(180deg, #f7f9ff 0%, #eef3fc 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+[data-theme='dark'] .modules-preview-card {
+  border-color: rgba(89, 153, 238, 0.28);
+  background:
+    repeating-linear-gradient(
+      45deg,
+      rgba(89, 153, 238, 0.05) 0,
+      rgba(89, 153, 238, 0.05) 12px,
+      transparent 12px,
+      transparent 24px
+    ),
+    linear-gradient(180deg, #1f242e 0%, #1a1f28 100%);
+}
+.modules-preview-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.modules-preview-placeholder {
+  color: var(--ifm-font-color-subtle);
+  font-size: 0.95rem;
+  letter-spacing: 0.4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.modules-preview-placeholder::before {
+  content: '';
+  display: block;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background-color: rgba(47, 128, 237, 0.14);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%232f80ed' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='4' width='18' height='14' rx='2'/><circle cx='9' cy='10' r='2'/><path d='M21 15l-5-5L4 18'/></svg>");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 24px 24px;
+}
+[data-theme='dark'] .modules-preview-placeholder::before {
+  background-color: rgba(89, 153, 238, 0.18);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235999ee' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='4' width='18' height='14' rx='2'/><circle cx='9' cy='10' r='2'/><path d='M21 15l-5-5L4 18'/></svg>");
+}
 .modules-column h3 {
   font-size: 1.1rem;
   margin: 0 0 18px 0;
@@ -425,6 +504,35 @@
   line-height: 1.6;
   white-space: pre;
   overflow-x: auto;
+}
+/* CodeBlock embedded inside a QuickStart card — drop the second border/bg
+   so the dark card is the only visual container, and the copy button stays. */
+.quickstart-block .quickstart-codeblock {
+  margin: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  border-radius: 0;
+}
+.quickstart-block .quickstart-codeblock pre,
+.quickstart-block .quickstart-codeblock code {
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+.quickstart-block .quickstart-codeblock .token.comment {
+  color: rgba(230, 239, 255, 0.55);
+  font-style: italic;
+}
+/* Docusaurus default puts the copy button at the top-right of the code
+   area, which leaves it hanging off the bottom of single-line blocks.
+   Center it vertically against the actual code area. */
+.quickstart-block .theme-code-block [class*='buttonGroup'] {
+  top: 50%;
+  bottom: auto;
+  transform: translateY(-50%);
 }
 .quickstart-footnote {
   margin-top: 22px;
