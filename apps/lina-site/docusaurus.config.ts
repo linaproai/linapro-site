@@ -11,26 +11,26 @@ function isZhLocale() {
 
 function geti18nTitle() {
   return isZhLocale()
-    ? 'LinaPro - AI 驱动的全栈开发框架'
-    : 'LinaPro - AI-driven full-stack framework engineered for sustainable delivery';
+    ? 'LinaPro - 面向可持续交付的 AI 原生全栈框架'
+    : 'LinaPro - AI-native full-stack framework for sustainable delivery';
 }
 
 function geti18nTagline() {
   return isZhLocale()
-    ? '面向可持续交付的 AI 驱动全栈开发框架——AI 主导执行，人类把握方向'
-    : 'AI-driven full-stack development framework engineered for sustainable delivery — AI leads execution, humans steer direction.';
+    ? '面向可持续交付的 AI 原生全栈框架'
+    : 'AI-native full-stack framework for sustainable delivery';
 }
 
 function geti18nDescription() {
   return isZhLocale()
-    ? 'LinaPro 把 AI 作为核心生产力：AI 主导分析、设计与实现，团队把握方向与关键决策，把"AI 越用越快"延续到产品的整个生命周期。框架自带核心宿主服务、管理工作台、可插拔插件运行时与规范驱动的 AI 原生研发工作流，帮助团队快速交付生产级应用，同时保持产品可持续迭代与治理。'
-    : 'LinaPro brings AI into the full delivery workflow: AI handles analysis, design, and implementation while humans set direction and make the critical decisions. Teams ship production-grade applications faster while keeping architecture, permissions, testing, and extension boundaries governable.';
+    ? 'LinaPro 把 AI 作为核心生产力：AI 主导分析、设计与实现，团队把握方向与关键决策，把"AI 越用越快"延续到产品的整个生命周期。框架自带核心宿主服务、管理工作台、插件运行时与规范驱动的 AI 原生研发工作流，帮助团队快速交付生产级应用，同时保持架构、测试与治理的可持续演进。'
+    : 'LinaPro makes AI a core engine of delivery: AI leads analysis, design, and implementation while teams set direction and make the critical calls. With a core host service, admin workspace, plugin runtime, and spec-driven AI-native R&D workflow built in, teams can ship production-grade applications quickly while keeping architecture, testing, and governance ready to evolve.';
 }
 
 function geti18nKeywords() {
   return isZhLocale()
-    ? 'LinaPro,AI 全栈开发框架,AI 驱动开发,Go 后端框架,Vue 3 管理后台,RBAC 权限,WASM 插件,源码插件,规范驱动开发,OpenSpec,AI 研发工作流,lina-core,lina-vben,lina-plugins'
-    : 'LinaPro,AI-driven development,full-stack framework,Go framework,Vue 3 admin,WASM plugins,RBAC,specification-driven,OpenSpec,AI R&D workflow,lina-core,lina-vben,lina-plugins,enterprise governance';
+    ? 'LinaPro,AI 原生全栈框架,可持续交付,AI 驱动开发,Go 后端框架,Vue 3 管理后台,RBAC 权限,WASM 插件,源码插件,规范驱动开发,OpenSpec,AI 原生研发工作流,lina-core,lina-vben,lina-plugins'
+    : 'LinaPro,AI-native full-stack framework,sustainable delivery,AI-driven development,Go framework,Vue 3 admin,WASM plugins,RBAC,specification-driven,OpenSpec,AI-native R&D workflow,lina-core,lina-vben,lina-plugins,enterprise governance';
 }
 
 // https://docusaurus.io/docs/api/plugins/@docusaurus/plugin-content-docs#markdown-front-matter

@@ -4,11 +4,11 @@
     "description": "Alt text for the LinaPro logo in the hero"
   },
   "home.hero.title": {
-    "message": "AI 驱动的全栈开发框架",
+    "message": "面向可持续交付的 AI 原生全栈框架",
     "description": "Hero h1"
   },
   "home.hero.lead": {
-    "message": "LinaPro 把 AI 作为核心生产力：AI 主导分析、设计与实现，团队把握方向与关键决策，把\"AI 越用越快\"延续到产品的整个生命周期。框架自带核心宿主服务、管理工作台、可插拔插件运行时与规范驱动的 AI 原生研发工作流，帮助团队快速交付生产级应用，同时保持产品可持续迭代与治理。",
+    "message": "LinaPro 把 AI 作为核心生产力：AI 主导分析、设计与实现，团队把握方向与关键决策，把\"AI 越用越快\"延续到产品的整个生命周期。框架自带核心宿主服务、管理工作台、插件运行时与规范驱动的 AI 原生研发工作流，帮助团队快速交付生产级应用，同时保持架构、测试与治理的可持续演进。",
     "description": "Hero lead paragraph"
   },
   "home.hero.cta.start": {
@@ -152,7 +152,7 @@
     "description": "Strength 6 title"
   },
   "home.strength.builtin.desc": {
-    "message": "核心服务、官方插件与功能完备的管理工作台一并奉上；不必从零搭建基础设施，第一天就能专注业务本身。",
+    "message": "核心服务、官方插件与功能完备的管理工作台开箱即用；不必从零搭建基础设施，第一天就能专注业务本身。",
     "description": "Strength 6 desc"
   },
   "home.strengths.title": {

@@ -27,14 +27,14 @@ function HomepageHeader() {
 
                 <h1 className="hero-title">
                     <Translate id="home.hero.title" description="Hero h1">
-                        AI-driven full-stack framework engineered for sustainable delivery
+                        AI-native full-stack framework for sustainable delivery
                     </Translate>
                 </h1>
 
                 <p className="hero-lead">
                     <Translate id="home.hero.lead" description="Hero lead paragraph">
-                        LinaPro brings AI into the full delivery workflow: AI handles analysis, design, and implementation while humans set direction and make the critical decisions.
-                        Teams ship production-grade applications faster while keeping architecture, permissions, testing, and extension boundaries governable.
+                        LinaPro makes AI a core engine of delivery: AI leads analysis, design, and implementation while teams set direction and make the critical calls.
+                        With a core host service, admin workspace, plugin runtime, and spec-driven AI-native R&D workflow built in, teams can ship production-grade applications quickly while keeping architecture, testing, and governance ready to evolve.
                     </Translate>
                 </p>
 
