@@ -133,7 +133,7 @@ function Layers() {
             <div className="container">
                 <h2 className="section-title">
                     <Translate id="home.layers.title" description="Layers section title">
-                        Composable Full-stack Platform Architecture
+                        Composable Full-stack Architecture
                     </Translate>
                 </h2>
                 <p className="section-lead">
