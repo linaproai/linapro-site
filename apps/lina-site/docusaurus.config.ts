@@ -11,8 +11,8 @@ function isZhLocale() {
 
 function geti18nTitle() {
   return isZhLocale()
-    ? 'LinaPro - 面向可持续交付的 AI 原生全栈框架'
-    : 'LinaPro - AI-native full-stack framework for sustainable delivery';
+    ? 'LinaPro.AI - 面向可持续交付的 AI 原生全栈框架'
+    : 'LinaPro.AI - AI-native full-stack framework for sustainable delivery';
 }
 
 function geti18nTagline() {

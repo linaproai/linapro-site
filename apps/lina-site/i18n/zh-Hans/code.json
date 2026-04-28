@@ -52,7 +52,7 @@
     "description": "Layer 4 description"
   },
   "home.layers.title": {
-    "message": "松耦合架构设计",
+    "message": "可组合的全栈平台架构",
     "description": "Layers section title"
   },
   "home.layers.lead": {
@@ -112,15 +112,23 @@
     "description": "Strength 1 title"
   },
   "home.strength.workflow.desc": {
-    "message": "探索 → 提案 → 实现 → 审查 → 归档。AI 始终站在已验证的规范基线之上向前推进，让架构漂移无处生根。",
+    "message": "从探索、提案、实现到审查归档，AI 始终基于已验证规范推进，需求、代码与测试持续对齐，减少架构漂移。",
     "description": "Strength 1 desc"
+  },
+  "home.strength.contract.title": {
+    "message": "全栈契约一体化",
+    "description": "Strength contract title"
+  },
+  "home.strength.contract.desc": {
+    "message": "服务 API、OpenAPI 文档、权限元数据与 Vue 工作台共享同一模型，宿主和插件接口自动汇入接口文档并可在线调试。",
+    "description": "Strength contract desc"
   },
   "home.strength.coupling.title": {
     "message": "模块级松耦合设计",
     "description": "Strength 2 title"
   },
   "home.strength.coupling.desc": {
-    "message": "业务模块各自独立、靠接口而非硬依赖协作，可自由组合、可整体替换、可按需启停。",
+    "message": "业务模块以接口协作、独立演进，可按需启用、替换或下线，不把局部变化扩散成全栈改造，长期保持清晰边界。",
     "description": "Strength 2 desc"
   },
   "home.strength.plugins.title": {
@@ -128,15 +136,23 @@
     "description": "Strength 3 title"
   },
   "home.strength.plugins.desc": {
-    "message": "编译期源码插件与运行时 WASM 插件并行支持，统一在隔离沙箱中运行，数据库与文件访问按命名空间天然隔离。",
+    "message": "源码插件适合深度扩展，WASM 插件支持运行时热加载；两类插件都在隔离沙箱中运行，资源按命名空间管理。",
     "description": "Strength 3 desc"
+  },
+  "home.strength.i18n.title": {
+    "message": "框架级国际化治理",
+    "description": "Strength localization title"
+  },
+  "home.strength.i18n.desc": {
+    "message": "宿主、源码插件、动态插件与接口文档共用翻译资源，新增语言以资源文件为准，并内置缺失检查、来源诊断与缓存。",
+    "description": "Strength localization desc"
   },
   "home.strength.governance.title": {
     "message": "企业级治理开箱即用",
     "description": "Strength 4 title"
   },
   "home.strength.governance.desc": {
-    "message": "JWT 认证搭配声明式 RBAC，权限直接写在结构体标签里，天生可审计；毫秒级生效、敏感字段自动脱敏、强制下线、IP 与设备指纹审计一应俱全。",
+    "message": "JWT、声明式 RBAC、权限标签、字段脱敏、强制下线、IP 与设备指纹审计直接内置，权限变更可秒级生效。",
     "description": "Strength 4 desc"
   },
   "home.strength.distributed.title": {
@@ -146,6 +162,14 @@
   "home.strength.distributed.desc": {
     "message": "权限拓扑同步、分布式锁、键值缓存均原生集群感知；从单节点到完整集群，无需任何架构改造即可平滑扩展。",
     "description": "Strength 5 desc"
+  },
+  "home.strength.upgrade.title": {
+    "message": "可追踪的升级治理",
+    "description": "Strength upgrade title"
+  },
+  "home.strength.upgrade.desc": {
+    "message": "框架与源码插件升级走显式流程，升级前校验风险，升级中同步结构、菜单、权限与治理资源，避免隐性版本漂移。",
+    "description": "Strength upgrade desc"
   },
   "home.strength.builtin.title": {
     "message": "生产就绪开箱即用",

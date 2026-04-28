@@ -27,14 +27,13 @@ function HomepageHeader() {
 
                 <h1 className="hero-title">
                     <Translate id="home.hero.title" description="Hero h1">
-                        AI-native full-stack framework for sustainable delivery
+                        AI-Native Full-Stack Framework
                     </Translate>
                 </h1>
 
                 <p className="hero-lead">
                     <Translate id="home.hero.lead" description="Hero lead paragraph">
-                        LinaPro makes AI a core engine of delivery: AI leads analysis, design, and implementation while teams set direction and make the critical calls.
-                        With a core host service, admin workspace, plugin runtime, and spec-driven AI-native R&D workflow built in, teams can ship production-grade applications quickly while keeping architecture, testing, and governance ready to evolve.
+                        LinaPro helps teams build production-grade full-stack applications with AI, while keeping architecture, testing, and governance under control.
                     </Translate>
                 </p>
 
@@ -134,12 +133,12 @@ function Layers() {
             <div className="container">
                 <h2 className="section-title">
                     <Translate id="home.layers.title" description="Layers section title">
-                        Loosely Coupled Architecture
+                        Composable Full-stack Platform Architecture
                     </Translate>
                 </h2>
                 <p className="section-lead">
                     <Translate id="home.layers.lead" description="Layers section lead">
-                        Every layer is designed independently around a strict loose-coupling principle, so business modules can be turned on or off on demand without dragging the rest of the stack along for the ride.
+                        A composable full-stack architecture where each layer can evolve independently.
                     </Translate>
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mt-8">
@@ -236,7 +235,7 @@ function Workflow() {
                 </h2>
                 <p className="section-lead">
                     <Translate id="home.workflow.lead" description="Workflow section lead">
-                        Every iteration runs through a closed pipeline anchored to incremental spec files and mandatory E2E tests. AI always builds on a verified foundation — no architectural drift, no gaps in coverage.
+                        A spec-driven development loop that keeps AI output aligned with requirements, code, and tests.
                     </Translate>
                 </p>
                 <div className="workflow-steps">
@@ -261,6 +260,16 @@ const IconSparkles = () => (
     </svg>
 );
 
+const IconContract = () => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M6 3h8l4 4v14H6z" />
+        <path d="M14 3v5h5" />
+        <path d="M9 12h6" />
+        <path d="M9 16h3" />
+        <path d="M4 8H2v11a2 2 0 0 0 2 2h2" />
+    </svg>
+);
+
 const IconBlocks = () => (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
         <rect x="3" y="3" width="7" height="7" rx="1" />
@@ -276,6 +285,15 @@ const IconPlug = () => (
         <path d="M15 2v6" />
         <path d="M5 8h14v3a5 5 0 0 1-5 5h-4a5 5 0 0 1-5-5z" />
         <path d="M12 16v6" />
+    </svg>
+);
+
+const IconGlobe = () => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M3 12h18" />
+        <path d="M12 3c2.3 2.4 3.5 5.4 3.5 9S14.3 18.6 12 21" />
+        <path d="M12 3c-2.3 2.4-3.5 5.4-3.5 9S9.7 18.6 12 21" />
     </svg>
 );
 
@@ -295,6 +313,14 @@ const IconNetwork = () => (
     </svg>
 );
 
+const IconHistory = () => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 5v5h5" />
+        <path d="M4.8 14a8 8 0 1 0 2-8.2L4 10" />
+        <path d="M12 8v4l3 2" />
+    </svg>
+);
+
 const IconCheckCircle = () => (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="9" />
@@ -308,12 +334,12 @@ const strengths = [
         Icon: IconSparkles,
         title: (
             <Translate id="home.strength.workflow.title" description="Strength 1 title">
-                AI-native R&D workflow
+                AI-native R&D Workflow
             </Translate>
         ),
         desc: (
             <Translate id="home.strength.workflow.desc" description="Strength 1 desc">
-                Explore → Propose → Implement → Review → Archive. AI always moves forward from a verified spec baseline, so drift never gets a foothold.
+                AI moves from exploration through proposal, implementation, review, and archiving against verified specs, keeping requirements, code, and tests aligned as the system evolves.
             </Translate>
         ),
     },
@@ -322,12 +348,12 @@ const strengths = [
         Icon: IconBlocks,
         title: (
             <Translate id="home.strength.coupling.title" description="Strength 2 title">
-                Module-level loose coupling
+                Module-level Loose Coupling
             </Translate>
         ),
         desc: (
             <Translate id="home.strength.coupling.desc" description="Strength 2 desc">
-                Every business module stands on its own and talks to others through interfaces, never hard dependencies — composable, swappable, and enabled on demand.
+                Business modules depend on interfaces instead of hard dependencies, so each one can be enabled, replaced, retired, or evolved without full-stack rewrites.
             </Translate>
         ),
     },
@@ -336,12 +362,40 @@ const strengths = [
         Icon: IconPlug,
         title: (
             <Translate id="home.strength.plugins.title" description="Strength 3 title">
-                Dual-mode pluggable runtime
+                Dual-mode Pluggable Runtime
             </Translate>
         ),
         desc: (
             <Translate id="home.strength.plugins.desc" description="Strength 3 desc">
-                Compile-time source plugins and runtime WASM plugins both run in isolated sandboxes, each with its own namespaced database and filesystem access.
+                Source plugins handle deep extensions, while WASM plugins hot-load at runtime; both run in isolated sandboxes with namespaced resources for safer operations.
+            </Translate>
+        ),
+    },
+    {
+        id: 'contract',
+        Icon: IconContract,
+        title: (
+            <Translate id="home.strength.contract.title" description="Strength contract title">
+                Unified Full-stack Contracts
+            </Translate>
+        ),
+        desc: (
+            <Translate id="home.strength.contract.desc" description="Strength contract desc">
+                Service APIs, OpenAPI docs, permission metadata, and the Vue workspace share one model, so host and plugin APIs stay documented and testable.
+            </Translate>
+        ),
+    },
+    {
+        id: 'i18n',
+        Icon: IconGlobe,
+        title: (
+            <Translate id="home.strength.i18n.title" description="Strength localization title">
+                Framework-level I18n Governance
+            </Translate>
+        ),
+        desc: (
+            <Translate id="home.strength.i18n.desc" description="Strength localization desc">
+                The host, source plugins, dynamic plugins, and API docs share translation resources, with file-based language packs, missing-key checks, source diagnostics, and runtime caching.
             </Translate>
         ),
     },
@@ -350,12 +404,12 @@ const strengths = [
         Icon: IconShield,
         title: (
             <Translate id="home.strength.governance.title" description="Strength 4 title">
-                Enterprise-grade governance
+                Enterprise Governance Out of the Box
             </Translate>
         ),
         desc: (
             <Translate id="home.strength.governance.desc" description="Strength 4 desc">
-                JWT auth plus declarative RBAC, with permissions expressed as struct tags — auditable by design. Millisecond permission propagation, sensitive-field masking, force-logout, and IP and device fingerprinting all included.
+                JWT, declarative RBAC, permission tags, field masking, forced logout, and IP/device auditing are built in, with permission changes applied in seconds.
             </Translate>
         ),
     },
@@ -364,12 +418,26 @@ const strengths = [
         Icon: IconNetwork,
         title: (
             <Translate id="home.strength.distributed.title" description="Strength 5 title">
-                Distributed by design
+                Native Distributed Architecture
             </Translate>
         ),
         desc: (
             <Translate id="home.strength.distributed.desc" description="Strength 5 desc">
-                Permission topology sync, distributed locks, and the KV cache are all cluster-aware. Scale from a single node to a full cluster without rearchitecting a thing.
+                Permission topology sync, distributed locks, and the key-value cache are cluster-aware from the start, letting one node grow into a full cluster.
+            </Translate>
+        ),
+    },
+    {
+        id: 'upgrade',
+        Icon: IconHistory,
+        title: (
+            <Translate id="home.strength.upgrade.title" description="Strength upgrade title">
+                Traceable Upgrade Governance
+            </Translate>
+        ),
+        desc: (
+            <Translate id="home.strength.upgrade.desc" description="Strength upgrade desc">
+                Framework and source plugin upgrades follow a clear flow: validate risk first, then sync schemas, menus, permissions, and governance resources to prevent drift.
             </Translate>
         ),
     },
@@ -378,12 +446,12 @@ const strengths = [
         Icon: IconCheckCircle,
         title: (
             <Translate id="home.strength.builtin.title" description="Strength 6 title">
-                Production-ready out of the box
+                Production-ready Out of the Box
             </Translate>
         ),
         desc: (
             <Translate id="home.strength.builtin.desc" description="Strength 6 desc">
-                Core services, official plugins, and a feature-rich management workspace, all in the box — focus on the business from day one instead of building infrastructure.
+                Core services, official plugins, and a full management workspace ship together, with infrastructure already wired so teams can focus on business immediately.
             </Translate>
         ),
     },
@@ -400,7 +468,7 @@ function Strengths() {
                 </h2>
                 <p className="section-lead">
                     <Translate id="home.strengths.lead" description="Strengths section lead">
-                        A framework engineered so AI productivity compounds with every iteration — instead of buckling under its own weight.
+                        Compound AI productivity with every iteration, while keeping delivery quality verifiable and adaptable at scale.
                     </Translate>
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mt-8">
@@ -465,7 +533,7 @@ function Modules() {
                 </h2>
                 <p className="section-lead">
                     <Translate id="home.modules.lead" description="Modules section lead">
-                        Build straight on top, extend any module through the plugin system, or replace one outright — all without touching the core host. Every module is wired into RBAC, and permission changes take effect on the spot, no re-login required.
+                        Start with a ready-to-use management workspace, then extend or replace modules as your product grows.
                     </Translate>
                 </p>
                 <div className="modules-preview-grid">
@@ -511,7 +579,7 @@ function QuickStart() {
                 </h2>
                 <p className="section-lead">
                     <Translate id="home.quickstart.lead" description="QuickStart section lead">
-                        One-line installers for macOS, Linux, and Windows; a single Make entrypoint for every common task; and a default workspace ready to log into.
+                        Install, initialize, and run the default workspace in minutes.
                     </Translate>
                 </p>
                 <div className="quickstart-blocks">
@@ -542,12 +610,12 @@ function FinalCta() {
             <div className="container text-center">
                 <h2 className="section-title">
                     <Translate id="home.cta.title" description="Final CTA title">
-                        Ready to ship AI-driven software?
+                        Ready to ship AI-native software?
                     </Translate>
                 </h2>
                 <p className="section-lead">
                     <Translate id="home.cta.lead" description="Final CTA lead">
-                        Read the docs, dig into the source, or jump straight into the workspace — LinaPro is open and waiting.
+                        Explore the docs, review the source, or start building with LinaPro today.
                     </Translate>
                 </p>
                 <div className="cta-buttons">
