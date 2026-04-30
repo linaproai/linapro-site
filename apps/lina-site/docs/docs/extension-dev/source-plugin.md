@@ -33,29 +33,29 @@ keywords:
 
 ```text
 apps/lina-plugins/<plugin-id>/
-  plugin.yaml               插件清单（元数据、菜单声明）
-  plugin_embed.go           嵌入式资源注册入口
-  backend/
-    api/                    插件 API DTO 与路由契约
-    internal/
-      controller/           HTTP 控制器
-      service/              业务逻辑层（唯一允许的服务实现位置）
-      dao/                  数据访问层（gf gen dao 生成）
-      model/
-        do/                 数据操作对象（gf gen dao 生成）
-        entity/             数据库实体（gf gen dao 生成）
-    hack/config.yaml        插件 codegen 配置
-    plugin.go               插件后端注册入口
-  frontend/
-    pages/                  插件前端页面（Vue 单文件组件）
-  manifest/
-    sql/                    安装 SQL（CREATE TABLE 等）
-    sql/mock-data/          演示数据（可选）
-    sql/uninstall/          卸载 SQL（DROP TABLE 等）
-    i18n/                   插件运行时语言包（可选）
-    i18n/<locale>/apidoc/   插件接口文档语言包（可选）
-  README.md
-  README.zh_CN.md
+├── plugin.yaml                     插件清单（元数据、菜单声明）
+├── plugin_embed.go                 嵌入式资源注册入口
+├── backend/
+│   ├── api/                        插件 API DTO 与路由契约
+│   ├── internal/
+│   │   ├── controller/             HTTP 控制器
+│   │   ├── service/                业务逻辑层（唯一允许的服务实现位置）
+│   │   ├── dao/                    数据访问层（gf gen dao 生成）
+│   │   └── model/
+│   │       ├── do/                 数据操作对象（gf gen dao 生成）
+│   │       └── entity/             数据库实体（gf gen dao 生成）
+│   ├── hack/config.yaml            插件代码生成配置
+│   └── plugin.go                   插件后端注册入口
+├── frontend/
+│   └── pages/                      插件前端页面（Vue 单文件组件）
+├── manifest/
+│   ├── sql/                        安装 SQL（CREATE TABLE 等）
+│   │   ├── mock-data/              演示数据（可选）
+│   │   └── uninstall/              卸载 SQL（DROP TABLE 等）
+│   └── i18n/                       插件运行时语言包（可选）
+│       └── <locale>/apidoc/        插件接口文档语言包（可选）
+├── README.md
+└── README.zh_CN.md
 ```
 
 :::tip
@@ -65,6 +65,10 @@ apps/lina-plugins/<plugin-id>/
 ## 创建第一个源码插件
 
 以创建`content-article`（文章管理）插件为例，完整开发流程如下：
+
+:::info 注意
+以下均是`AI Coding`工具自动开发插件的实施步骤，开发者仅做参考学习即可。
+:::
 
 ### 第一步：创建目录
 
@@ -158,10 +162,7 @@ type ArticleListReq struct {
 }
 
 type ArticleCreateReq struct {
-    g.Meta  `path:"/plugin/content-article/article" method:"post"
-              tags:"文章管理" summary:"创建文章"
-              middleware:"AuthMiddleware,PermMiddleware"
-              perm:"content-article:article:create"`
+    g.Meta  `path:"/plugin/content-article/article" method:"post" tags:"文章管理" summary:"创建文章" middleware:"AuthMiddleware,PermMiddleware" perm:"content-article:article:create"`
     Title   string `json:"title"   v:"required|length:1,255" dc:"文章标题"`
     Content string `json:"content" v:"required"              dc:"文章内容"`
 }
