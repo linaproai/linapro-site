@@ -31,7 +31,7 @@ keywords:
 
 **`API JSON`端点：**
 
-```
+```text
 http://localhost:8080/api.json
 ```
 
@@ -61,7 +61,7 @@ flowchart LR
 
 ## API 定义方式
 
-宿主和源码插件使用`GoFrame`的`g.Meta`结构体标签定义接口契约，所有接口元数据（路径、方法、权限、描述、参数）都集中在`Go`代码中声明：
+宿主和源码插件使用`g.Meta`结构体标签定义接口契约，所有接口元数据（路径、方法、权限、描述、参数）都集中在`Go`代码中声明：
 
 ```go
 // 示例：文章列表接口定义
@@ -91,9 +91,7 @@ type ArticleListRes struct {
 
 ```go
 type ArticleCreateReq struct {
-    g.Meta `path:"/article" method:"post" tags:"文章管理" summary:"创建文章"
-            middleware:"AuthMiddleware,PermMiddleware"
-            perm:"content-article:article:create"`
+    g.Meta `path:"/article" method:"post" tags:"文章管理" summary:"创建文章" middleware:"AuthMiddleware,PermMiddleware" perm:"content-article:article:create"`
     // 请求体字段...
 }
 ```
@@ -149,19 +147,19 @@ manifest/i18n/
 
 将接口文档导入到外部工具的步骤：
 
-**Apifox：**
+### Apifox
 
 1. 新建项目，选择「导入数据」
 2. 选择`OpenAPI/Swagger`格式，输入文档`URL`：`http://localhost:8080/api.json`
 3. 点击确认，接口自动导入
 
-**Postman：**
+### Postman
 
-1. 点击「Import」
-2. 选择「Link」，输入`http://localhost:8080/api.json`
+1. 点击「`Import`」
+2. 选择「`Link`」，输入`http://localhost:8080/api.json`
 3. 确认导入，自动创建接口集合
 
-**curl（直接下载）：**
+### curl（直接下载）
 
 ```bash
 curl -o api.json http://localhost:8080/api.json

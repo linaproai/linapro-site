@@ -1,6 +1,6 @@
 ---
 slug: '/quick/first-experience'
-title: '框架初体验'
+title: '小试牛刀'
 sidebar_position: 3
 hide_title: true
 description: '本文通过一个完整的文章管理 CRUD 源码插件开发示例，演示 LinaPro AI 原生开发流程的全貌，包括使用 OpenSpec 工作流进行需求探索、生成提案、AI 全程实现代码、启动服务验证功能，以及归档变更的完整步骤，帮助开发者体验 AI 原生框架的核心开发模式。'

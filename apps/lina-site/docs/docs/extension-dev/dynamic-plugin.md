@@ -31,19 +31,21 @@ keywords:
 
 ## 目录结构
 
+动态插件和源码插件的目录结构是一致的，唯一不同的是动态插件的`main.go`实现了`WASM`插件协议：
+
 ```text
 apps/lina-plugins/<plugin-id>/
-  main.go                   插件 WASM 入口（func main）
-  plugin_embed.go           嵌入式资源注册
-  plugin.yaml               插件清单（含宿主服务权限声明）
-  backend/
-    internal/
-      service/              业务逻辑（通过桥接接口访问宿主能力）
-  frontend/
-    pages/                  插件前端页面（独立静态资源）
-  manifest/
-    sql/                    安装 SQL（可选，动态插件通常不创建数据表）
-    sql/uninstall/          卸载 SQL（可选）
+├── main.go                     # 插件 WASM 入口（func main）
+├── plugin_embed.go             # 嵌入式资源注册
+├── plugin.yaml                 # 插件清单（含宿主服务权限声明）
+├── backend/
+│   └── internal/
+│       └── service/            # 业务逻辑（通过桥接接口访问宿主能力）
+├── frontend/
+│   └── pages/                  # 插件前端页面（独立静态资源）
+└── manifest/
+    └── sql/                    # 安装 SQL（可选，动态插件通常不创建数据表）
+        └── uninstall/          # 卸载 SQL（可选）
 ```
 
 ## 插件清单（宿主服务声明）
@@ -51,10 +53,15 @@ apps/lina-plugins/<plugin-id>/
 动态插件必须在`plugin.yaml`中声明所需的宿主服务，宿主在安装和启用时验证权限：
 
 ```yaml
+# 插件唯一标识（kebab-case），全局唯一
 id: my-dynamic-plugin
+# 插件显示名称
 name: 动态插件示例
+# 语义化版本号（semver 格式）
 version: v0.1.0
+# 插件类型：dynamic 表示 WASM 动态插件
 type: dynamic
+# 插件功能简介
 description: 一个演示动态插件能力的示例插件
 
 # 申请宿主服务权限
@@ -65,13 +72,14 @@ services:
   - network   # 受限 HTTP 网络请求
   - data      # 数据库访问（限制在插件命名空间内）
 
+# 插件菜单声明
 menus:
-  - key: plugin:my-dynamic-plugin:main
-    name: 动态插件示例
-    path: my-dynamic-plugin-main
-    component: system/plugin/dynamic-page
-    type: M
-    sort: 1
+  - key: plugin:my-dynamic-plugin:main   # 菜单唯一标识，格式：plugin:<插件ID>:<功能>
+    name: 动态插件示例                     # 菜单显示名称
+    path: my-dynamic-plugin-main          # 前端路由路径，全局唯一
+    component: system/plugin/dynamic-page # 动态插件页面固定使用此组件
+    type: M                               # 菜单类型：M=菜单项，C=目录，B=按钮
+    sort: 1                               # 排序权重，数值越小越靠前
 ```
 
 宿主服务权限说明：
@@ -87,12 +95,7 @@ menus:
 
 ### 环境准备
 
-构建`WASM`插件需要`Go 1.22+`和`TinyGo`（推荐使用宿主提供的构建工具）：
-
-```bash
-# 安装 TinyGo（构建更小的 WASM 产物）
-# 参见 https://tinygo.org/getting-started/install/
-```
+构建`WASM`插件使用标准`Go`工具链（`Go 1.22+`），通过`GOOS=wasip1 GOARCH=wasm`编译目标，无需安装`TinyGo`等额外工具，宿主提供的`hack/tools/build-wasm`构建工具已封装好所有编译参数。
 
 ### 构建命令
 

@@ -197,20 +197,3 @@ plugin:
 2. `logger.path`：设置日志文件目录，避免日志丢失
 3. `scheduler.defaultTimezone`：根据业务实际所在时区调整
 4. `plugin.autoEnable`：按需列出生产环境需要自动启用的插件
-
-## 多环境配置
-
-`GoFrame`框架支持通过`GF_GFCLI_BUILD_COND_FILE`环境变量或目录约定实现多环境配置，常见做法是在`manifest/config/`目录下维护多个配置文件，通过构建时或启动时选择加载：
-
-```text
-manifest/config/
-  config.yaml           # 开发环境配置（含默认值）
-  config.prod.yaml      # 生产环境配置（覆盖敏感配置）
-```
-
-也可以通过环境变量覆盖配置文件中的特定项：
-
-```bash
-# 通过环境变量覆盖 JWT 密钥（生产环境推荐）
-GF_DATABASE_DEFAULT_LINK="mysql:..." go run main.go
-```

@@ -33,27 +33,27 @@ keywords:
 
 ```text
 apps/lina-plugins/<plugin-id>/
-├── plugin.yaml                     插件清单（元数据、菜单声明）
-├── plugin_embed.go                 嵌入式资源注册入口
+├── plugin.yaml                     # 插件清单（元数据、菜单声明）
+├── plugin_embed.go                 # 嵌入式资源注册入口
 ├── backend/
-│   ├── api/                        插件 API DTO 与路由契约
+│   ├── api/                        # 插件 API DTO 与路由契约
 │   ├── internal/
-│   │   ├── controller/             HTTP 控制器
-│   │   ├── service/                业务逻辑层（唯一允许的服务实现位置）
-│   │   ├── dao/                    数据访问层（gf gen dao 生成）
+│   │   ├── controller/             # HTTP 控制器
+│   │   ├── service/                # 业务逻辑层（唯一允许的服务实现位置）
+│   │   ├── dao/                    # 数据访问层（gf gen dao 生成）
 │   │   └── model/
-│   │       ├── do/                 数据操作对象（gf gen dao 生成）
-│   │       └── entity/             数据库实体（gf gen dao 生成）
-│   ├── hack/config.yaml            插件代码生成配置
-│   └── plugin.go                   插件后端注册入口
+│   │       ├── do/                 # 数据操作对象（gf gen dao 生成）
+│   │       └── entity/             # 数据库实体（gf gen dao 生成）
+│   ├── hack/config.yaml            # 插件代码生成配置
+│   └── plugin.go                   # 插件后端注册入口
 ├── frontend/
-│   └── pages/                      插件前端页面（Vue 单文件组件）
+│   └── pages/                      # 插件前端页面（Vue 单文件组件）
 ├── manifest/
-│   ├── sql/                        安装 SQL（CREATE TABLE 等）
-│   │   ├── mock-data/              演示数据（可选）
-│   │   └── uninstall/              卸载 SQL（DROP TABLE 等）
-│   └── i18n/                       插件运行时语言包（可选）
-│       └── <locale>/apidoc/        插件接口文档语言包（可选）
+│   ├── sql/                        # 安装 SQL（CREATE TABLE 等）
+│   │   ├── mock-data/              # 演示数据（可选）
+│   │   └── uninstall/              # 卸载 SQL（DROP TABLE 等）
+│   └── i18n/                       # 插件运行时语言包（可选）
+│       └── <locale>/apidoc/        # 插件接口文档语言包（可选）
 ├── README.md
 └── README.zh_CN.md
 ```
@@ -81,29 +81,37 @@ mkdir -p apps/lina-plugins/content-article/{backend/api,backend/internal/{contro
 `plugin.yaml`是插件的元数据和菜单声明：
 
 ```yaml
+# 插件唯一标识（kebab-case），全局唯一，用作数据库表前缀和文件命名空间
 id: content-article
+# 插件显示名称
 name: 文章管理
+# 语义化版本号（semver 格式），升级时宿主会比对此字段
 version: v0.1.0
+# 插件类型：source 表示源码插件，随宿主编译部署
 type: source
+# 插件功能简介
 description: 提供文章内容的增删改查管理功能
+# 插件作者
 author: linapro
+# 插件许可证
 license: Apache-2.0
 
+# 插件菜单声明，宿主在启用插件时自动注册
 menus:
-  - key: plugin:content-article:list
-    name: 文章管理
-    path: content-article-list
-    component: system/plugin/dynamic-page
-    perms: content-article:article:view
-    icon: ant-design:file-text-outlined
-    type: M
-    sort: 1
-    remark: 文章管理菜单
+  - key: plugin:content-article:list   # 菜单唯一标识，格式：plugin:<插件ID>:<功能>
+    name: 文章管理                      # 菜单显示名称（支持 i18n Key）
+    path: content-article-list             # 前端路由路径，全局唯一
+    component: system/plugin/dynamic-page  # 插件页面固定使用此组件，由宿主动态加载
+    perms: content-article:article:view # 访问该菜单所需的权限标识
+    icon: ant-design:file-text-outlined # 菜单图标，使用 Ant Design 图标名
+    type: M                             # 菜单类型：M=菜单项，C=目录，B=按钮
+    sort: 1                             # 排序权重，数值越小越靠前
+    remark: 文章管理菜单                  # 菜单备注说明（可选）
   - key: plugin:content-article:create
-    parent_key: plugin:content-article:list
+    parent_key: plugin:content-article:list  # 父菜单 key，挂载在列表菜单下
     name: 创建文章
-    perms: content-article:article:create
-    type: B
+    perms: content-article:article:create    # 按钮级权限标识
+    type: B                                  # B=按钮权限，不在侧边栏显示
     sort: 1
   - key: plugin:content-article:update
     parent_key: plugin:content-article:list
@@ -153,10 +161,7 @@ package article
 import "github.com/gogf/gf/v2/frame/g"
 
 type ArticleListReq struct {
-    g.Meta   `path:"/plugin/content-article/article" method:"get"
-               tags:"文章管理" summary:"文章列表"
-               middleware:"AuthMiddleware,PermMiddleware"
-               perm:"content-article:article:view"`
+    g.Meta   `path:"/plugin/content-article/article" method:"get" tags:"文章管理" summary:"文章列表" middleware:"AuthMiddleware,PermMiddleware" perm:"content-article:article:view"`
     Page     int    `json:"page"     v:"min:1"          dc:"页码"`
     PageSize int    `json:"pageSize" v:"min:1,max:100"  dc:"每页数量"`
 }
