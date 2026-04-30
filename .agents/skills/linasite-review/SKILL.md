@@ -96,18 +96,21 @@ site copy files.
 Check against `CLAUDE.md`, `AGENTS.md`, and the repository language rules. At minimum:
 
 1. Identify all locale counterparts for each changed content file.
-   - Chinese source manuscript: `apps/lina-site/i18n/zh-Hans/`
-   - Default-locale docs/blog source: `apps/lina-site/docs/`, `apps/lina-site/blog/`
-   - Locale UI strings: `apps/lina-site/i18n/<locale>/docusaurus-theme-classic/` and `code.json`
+   - Chinese docs/blog source manuscript: `apps/lina-site/docs/`, `apps/lina-site/blog/`
+   - Chinese UI string source: `apps/lina-site/i18n/zh-Hans/`
+   - Non-Chinese locale content: `apps/lina-site/i18n/<locale>/`
 2. Compare content for **semantic consistency**, not literal word matching. Review:
    - front matter, title, description, slug, sidebar labels
    - headings, steps, tables, code snippets, Mermaid diagrams
    - links, images, alt text, admonitions, CTA copy
-3. Treat Chinese as the source manuscript. If any non-Chinese locale diverges materially from the
+3. Verify that every file under `apps/lina-site/i18n/` preserves the same counterpart file structure
+   and content meaning as the Chinese source. English locale content must read as idiomatic English,
+   not as a word-for-word translation, while staying semantically aligned with Chinese.
+4. Treat Chinese as the source manuscript. If any non-Chinese locale diverges materially from the
    Chinese version, sync that locale from the Chinese content instead of preserving the drift.
-4. If Chinese source content is missing while another locale was edited, report a **Critical** issue.
+5. If Chinese source content is missing while another locale was edited, report a **Critical** issue.
    Do not approve the review until the Chinese source is added or the mismatch is explicitly resolved.
-5. If the mismatch is straightforward to fix, update the non-Chinese locale files during review and
+6. If the mismatch is straightforward to fix, update the non-Chinese locale files during review and
    record the sync in the review report with concrete file paths.
 
 ### 7. SQL Review
@@ -191,8 +194,9 @@ Check against `CLAUDE.md` SQL file management specifications, at minimum coverin
 - Only check categories relevant to changed files
 - Scope identification MUST include untracked files and expanded untracked directories; never rely on `git diff` alone
 - For site docs and copy review, always inspect the changed file together with its locale counterparts
+- `apps/lina-site/i18n/` file structure and content meaning must stay aligned with the Chinese source; English must be idiomatic, natural English
 - Multi-language semantic drift is a review issue even if the site still builds
-- `apps/lina-site/i18n/zh-Hans/` is the source manuscript for site docs and copy; sync other locales from it
+- Chinese source content lives in `apps/lina-site/docs/` and `apps/lina-site/blog/` for docs/blog, and `apps/lina-site/i18n/zh-Hans/` for localized UI strings; sync other locales from those Chinese sources
 - When locale mismatches are straightforward to fix, update the non-Chinese files before finalizing the review
 - Don't block on warnings — only critical issues block archive
 - Include file paths and line numbers in issue reports

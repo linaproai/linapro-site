@@ -16,10 +16,13 @@ dev:
 	HOST="$(strip $(or $(host),$(HOST),$(SITE_DEFAULT_HOST)))"; \
 	PORT="$(strip $(or $(port),$(PORT),$(SITE_DEFAULT_PORT)))"; \
 	LOCALE="$(strip $(or $(locale),$(LOCALE),$(SITE_DEFAULT_LOCALE)))"; \
-	START_SCRIPT="start"; \
-	if [ "$$LOCALE" = "en" ]; then \
+	if [ "$$LOCALE" = "zh-Hans" ]; then \
+		START_SCRIPT="start-zh"; \
+		SITE_PATH="/zh/"; \
+	elif [ "$$LOCALE" = "en" ]; then \
 		START_SCRIPT="start-en"; \
-	elif [ "$$LOCALE" != "zh-Hans" ]; then \
+		SITE_PATH="/"; \
+	else \
 		echo "Error: unsupported locale '$$LOCALE' (supported: zh-Hans, en)"; \
 		exit 1; \
 	fi; \
@@ -55,7 +58,7 @@ dev:
 		echo "Installing $$SITE_NAME dependencies with $$PACKAGE_MANAGER..."; \
 		eval "$$INSTALL_CMD"; \
 	fi; \
-	echo "Starting $$SITE_NAME at http://$$HOST:$$PORT (locale=$$LOCALE, package-manager=$$PACKAGE_MANAGER)"; \
+	echo "Starting $$SITE_NAME at http://$$HOST:$$PORT$$SITE_PATH (locale=$$LOCALE, package-manager=$$PACKAGE_MANAGER)"; \
 	eval "$$START_CMD"
 
 ## image: 将 docs/blog/i18n 中被引用的本地内容图片转换为 WebP，并更新引用、删除安全的原图 [IMAGE_FLAGS=--dry-run|--include-static] [WEBP_INCLUDE_STATIC=1|0] [WEBP_LOSSLESS=1|0] [WEBP_QUALITY=1-100]

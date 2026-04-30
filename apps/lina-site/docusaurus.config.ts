@@ -171,14 +171,14 @@ const config: Config = {
         },
         {
           type: 'docSidebar',
-          sidebarId: 'mainSidebar',
-          label: 'Development Manual',
+          sidebarId: 'docsSidebar',
+          label: 'Documentation',
           position: 'left',
         },
         {
           type: 'docSidebar',
           sidebarId: 'communitySidebar',
-          label: 'Open Source Community',
+          label: 'Community',
           position: 'left',
         },
 
