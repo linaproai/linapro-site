@@ -2,6 +2,7 @@
 slug: '/community/contribution'
 title: '贡献指南'
 sidebar_position: 2
+hide_title: true
 description: '本文说明参与 LinaPro 开源贡献的常见方式，包括反馈可复现问题、改进官网文档、通过 OpenSpec 提出框架变更、提交带有针对性测试的代码，以及让变更持续符合仓库架构、插件边界和中英文文档同步流程。'
 keywords:
   - LinaPro

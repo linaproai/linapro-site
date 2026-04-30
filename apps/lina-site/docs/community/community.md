@@ -2,6 +2,7 @@
 slug: '/community'
 title: '开源社区'
 sidebar_position: 0
+hide_title: true
 description: '本文汇总 LinaPro 开源社区的核心入口，包括项目源码仓库、问题反馈路径、实时交流渠道、贡献方式和支持项目信息，帮助开发者参与框架讨论、反馈使用问题、改进文档、贡献代码，并持续关注 AI 原生全栈框架生态。'
 keywords:
   - LinaPro
