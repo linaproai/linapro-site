@@ -4,40 +4,20 @@ import type { Options as IdealImageOptions } from '@docusaurus/plugin-ideal-imag
 import type * as Preset from '@docusaurus/preset-classic';
 import type { Config } from '@docusaurus/types';
 import { themes as prismThemes } from 'prism-react-renderer';
+import {
+  DEFAULT_LOCALE,
+  SITE_LOCALE_CONFIGS,
+  SITE_LOCALES,
+  getCurrentSiteSeo,
+} from './siteI18n';
 
-function isZhLocale() {
-  return process.env.DOCUSAURUS_CURRENT_LOCALE === 'zh-Hans';
-}
-
-function geti18nTitle() {
-  return isZhLocale()
-    ? 'LinaPro.AI - 面向可持续交付的 AI 原生全栈框架'
-    : 'LinaPro.AI - AI-native full-stack framework for sustainable delivery';
-}
-
-function geti18nTagline() {
-  return isZhLocale()
-    ? '面向可持续交付的 AI 原生全栈框架'
-    : 'AI-native full-stack framework for sustainable delivery';
-}
-
-function geti18nDescription() {
-  return isZhLocale()
-    ? 'LinaPro 把 AI 作为核心生产力：AI 主导分析、设计与实现，团队把握方向与关键决策，把"AI 越用越快"延续到产品的整个生命周期。框架自带核心宿主服务、管理工作台、插件运行时与规范驱动的 AI 原生研发工作流，帮助团队快速交付生产级应用，同时保持架构、测试与治理的可持续演进。'
-    : 'LinaPro makes AI a core engine of delivery: AI leads analysis, design, and implementation while teams set direction and make the critical calls. With a core host service, admin workspace, plugin runtime, and spec-driven AI-native R&D workflow built in, teams can ship production-grade applications quickly while keeping architecture, testing, and governance ready to evolve.';
-}
-
-function geti18nKeywords() {
-  return isZhLocale()
-    ? 'LinaPro,AI 原生全栈框架,可持续交付,AI 驱动开发,Go 后端框架,Vue 3 管理后台,RBAC 权限,WASM 插件,源码插件,规范驱动开发,OpenSpec,AI 原生研发工作流,lina-core,lina-vben,lina-plugins'
-    : 'LinaPro,AI-native full-stack framework,sustainable delivery,AI-driven development,Go framework,Vue 3 admin,WASM plugins,RBAC,specification-driven,OpenSpec,AI-native R&D workflow,lina-core,lina-vben,lina-plugins,enterprise governance';
-}
+const siteSeo = getCurrentSiteSeo();
 
 // https://docusaurus.io/docs/api/plugins/@docusaurus/plugin-content-docs#markdown-front-matter
 // https://docusaurus.io/zh-CN/docs/api/docusaurus-config
 const config: Config = {
-  title: geti18nTitle(),
-  tagline: geti18nTagline(),
+  title: siteSeo.title,
+  tagline: siteSeo.tagline,
   favicon: '/favicon.ico',
   url: 'https://linapro.ai/',
   baseUrl: '/',
@@ -47,26 +27,10 @@ const config: Config = {
   onBrokenLinks: 'warn',
   // 多语言配置
   i18n: {
-    defaultLocale: 'en',
-    locales: ['en','zh-Hans'],
+    defaultLocale: DEFAULT_LOCALE,
+    locales: [...SITE_LOCALES],
     path: 'i18n',
-    localeConfigs: {
-      'en': {
-        label: 'English',
-        direction: 'ltr',
-        htmlLang: 'en-US',
-        calendar: 'gregory',
-        path: 'en',
-      },
-      'zh-Hans': {
-        label: '简体中文',
-        direction: 'ltr',
-        htmlLang: 'zh-CN',
-        calendar: 'gregory',
-        path: 'zh-Hans',
-        baseUrl: '/zh/',
-      },
-    },
+    localeConfigs: SITE_LOCALE_CONFIGS,
   },
   // https://www.docusaurus.cn/blog/releases/3.6#docusaurus-faster
   future: {
@@ -134,19 +98,19 @@ const config: Config = {
     metadata: [
       {
         name: 'keywords',
-        content: geti18nKeywords(),
+        content: siteSeo.keywords,
       },
       {
         name: 'description',
-        content: geti18nDescription(),
+        content: siteSeo.description,
       },
       {
         property: 'og:title',
-        content: geti18nTitle(),
+        content: siteSeo.title,
       },
       {
         property: 'og:description',
-        content: geti18nDescription(),
+        content: siteSeo.description,
       },
       {
         property: 'og:type',
@@ -166,11 +130,11 @@ const config: Config = {
       },
       {
         name: 'twitter:title',
-        content: geti18nTitle(),
+        content: siteSeo.title,
       },
       {
         name: 'twitter:description',
-        content: geti18nDescription(),
+        content: siteSeo.description,
       },
       {
         name: 'twitter:image',
@@ -200,11 +164,22 @@ const config: Config = {
       },
       items: [
         {
+          type: 'docSidebar',
+          sidebarId: 'quickSidebar',
           label: 'Get Started',
           position: 'left',
-          // type: 'docSidebar',
-          // sidebarId: 'quickSidebar',
-          to: '/quickstart',
+        },
+        {
+          type: 'docSidebar',
+          sidebarId: 'mainSidebar',
+          label: 'Development Manual',
+          position: 'left',
+        },
+        {
+          type: 'docSidebar',
+          sidebarId: 'communitySidebar',
+          label: 'Open Source Community',
+          position: 'left',
         },
 
         // 右边导航栏

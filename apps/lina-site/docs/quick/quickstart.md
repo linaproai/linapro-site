@@ -1,89 +1,113 @@
 ---
 slug: '/quickstart'
-title: 'Quick Start'
-sidebar_position: 0
+title: '快速开始'
+sidebar_position: 1
+description: '本页面向第一次体验 LinaPro 的开发者，按最短路径说明如何安装框架源码、初始化数据库、加载可选演示数据、启动 Go 后端与 Vue 管理工作台、使用默认账号登录，并完成核心 API、插件运行时与管理界面的基础检查。'
+keywords:
+  - LinaPro
+  - 快速开始
+  - AI 原生全栈框架
+  - 本地开发
+  - 安装脚本
+  - make init
+  - make mock
+  - make dev
+  - Go 后端
+  - Vue 3 工作台
+  - lina-core
+  - lina-vben
+  - 插件运行时
+  - OpenAPI 文档
+  - RBAC
+  - 演示数据
 ---
 
-Get LinaPro running locally in three commands. When you finish this page the core host service, the management workspace, and the plugin runtime are all up — ready for you to build on, extend, or replace any part.
+通过三条命令把`LinaPro`跑起来。读完本页后，核心宿主服务、管理工作台和插件运行时都会在本地就绪，可以继续开发、扩展或验证功能。
 
-## Prerequisites
+## 准备工作
 
-LinaPro runs on macOS, Linux, and Windows. Before you start, make sure the following are on `PATH`:
+`LinaPro`支持`macOS`、`Linux`、`Windows`。开始之前，请确认以下工具已在`PATH`中：
 
-- **Go** — the core host service (`lina-core`) compiles from source.
-- **Node.js** with `pnpm` or `yarn` — for the Vue 3 management workspace (`lina-vben`).
-- **Make** — single entrypoint for every common task.
-- **Git** — used by the installer and the OpenSpec workflow.
+- `Go 1.21+`：用于核心宿主服务。
+- `Node.js 18+`与`pnpm 9+`：用于`Vue 3`管理工作台。
+- `Make`：本地常用任务的统一入口。
+- `Git`：源码获取与`OpenSpec`工作流都会用到。
+- `MySQL 8.0+`：用于持久化运行状态。
 
-A relational database is required for persistent state. The seeded SQLite file produced by `make mock` is enough for the very first boot; switch to MySQL or PostgreSQL when you're ready.
+默认项目使用关系型数据库。第一次本地体验时，建议直接准备一个本地`MySQL`实例，启动路径最稳定。
 
-## 1. Install
+## 1. 安装
 
-Run the official installer in the directory where you want the project created:
+在你希望创建项目的目录下，执行官方安装脚本：
 
 ```bash
 curl -fsSL https://linapro.ai/install.sh | bash
 ```
 
-The installer fetches the LinaPro CLI, generates a starter project, and prints the path it dropped you into. `cd` there before continuing.
+`Windows PowerShell`环境使用下面的命令：
 
-## 2. Initialise
+```powershell
+irm https://linapro.ai/install.ps1 | iex
+```
 
-Generate runtime config, apply database migrations, and — optionally — seed demo data:
+安装脚本会下载仓库源码归档，默认创建`./linapro`目录，并执行环境体检。脚本不会自动安装依赖，也不会自动启动服务。继续之前请先`cd`到生成的项目目录。
+
+## 2. 初始化
+
+生成运行时配置、执行数据库迁移，并按需写入示例数据：
 
 ```bash
 make init confirm=init
-make mock confirm=mock   # optional — loads demo users, roles, and menus
+make mock confirm=mock   # 可选——写入示例用户、角色、菜单
 ```
 
-The `confirm=` argument is a guardrail: commands that touch persistent state refuse to run unless you opt in explicitly. Re-running `make init` is safe — it is idempotent.
+`confirm=`是一个安全闸：所有会改动持久化状态的命令，必须显式声明意图才会执行。只有在明确要重建本地数据库时，才使用`make init confirm=init rebuild=true`。
 
-## 3. Develop
+## 3. 开发调试
 
-Bring up the full stack — core host, management workspace, and plugin runtime — with a single command:
+一条命令拉起后端宿主和前端工作台：
 
 ```bash
 make dev
 ```
 
-Once it settles you'll have:
+启动完成后，你会得到：
 
-| Service                              | URL                     |
-| ------------------------------------ | ----------------------- |
-| Management workspace (`lina-vben`)   | http://localhost:5666   |
-| Core API (`lina-core`)               | http://localhost:8080   |
+| 服务                              | 地址                     |
+| --------------------------------- | ------------------------ |
+| 管理工作台（`lina-vben`）         | http://localhost:5666    |
+| 核心`API`（`lina-core`）          | http://localhost:8080    |
 
-Sign in to the workspace with the default account:
+使用默认账号登录工作台：
 
-- **Username:** `admin`
-- **Password:** `admin123`
+- **用户名：** `admin`
+- **密码：** `admin123`
 
 :::warning
-Change the default password before exposing the workspace to a network. **System → User Management** in the workspace is the place to do it.
+在把工作台暴露到网络之前，请先修改默认密码。可在工作台 **系统管理 → 用户管理** 下完成。
 :::
 
-## Verify your setup
+## 验证环境
 
-A quick smoke test before you start building:
+正式动手之前，建议跑一次冒烟测试：
 
-1. Open `http://localhost:5666` and sign in with the default account.
-2. Navigate to **System → Plugin Management** — the official plugins (department, notice, monitor-*) should be listed.
-3. Hit `http://localhost:8080/api` to confirm the OpenAPI docs are served.
+1. 访问`http://localhost:5666`，使用默认账号登录。
+2. 进入 **扩展中心 → 插件管理**，确认官方插件已经可见。
+3. 访问`http://localhost:8080/api`，确认`OpenAPI`文档已经提供。
 
-If any of these fail, jump to [Troubleshooting](#troubleshooting).
+如果其中任何一步失败，请跳转到 [故障排查](#故障排查)。
 
-## What's next
+## 下一步
 
-You're now on the same stack production teams use. Pick the path that matches what you're building:
+你现在已经跑在生产团队同款的技术栈上。按照你要构建的方向继续阅读：
 
-- **Architecture** — the four layers (`lina-core`, `lina-vben`, `lina-plugins`, `openspec`) and how they interlock.
-- **Built-in modules** — User, Role, Menu, Dictionary, Parameter Settings, File, Job Scheduling, Plugin, API Docs, System Info — all RBAC-wired out of the box.
-- **Plugins** — write a source plugin for compile-time integration or a WASM plugin for hot-reload distribution. Both run in a sandbox with namespaced database and filesystem access.
-- **OpenSpec workflow** — the AI R&D loop (`explore → propose → implement → review → archive`). Every change starts as a spec and lands with E2E tests.
+- 阅读[工作台导览](/quick/workspace-tour)，了解内置管理模块。
+- 进入[开发手册](/docs)，继续查看架构、插件、测试与部署内容。
+- 访问[开源社区](/community)，获取帮助或参与贡献。
 
-## Troubleshooting
+## 故障排查
 
-- **`make: command not found`** — install Make via your package manager (`brew install make`, `apt install make`, etc.).
-- **Port 5666 or 8080 already in use** — stop the process holding the port, or change the port in the generated project config and re-run `make dev`.
-- **Database connection errors** — open the generated config, point the `database` block at your MySQL / PostgreSQL / SQLite instance, then re-run `make init confirm=init`.
-- **Anything else** — open an issue on [GitHub](https://github.com/linaproai/linapro/issues); the team monitors it daily.
+- **`make: command not found`**：用系统包管理器安装`Make`，例如`brew install make`或`apt install make`。
+- **`5666`或`8080`端口被占用**：停掉占用端口的进程，或在生成的项目配置中调整端口后重新执行`make dev`。
+- **数据库连接失败**：打开生成的配置文件，把`database`段指向你的本地`MySQL`实例，然后重新执行`make init confirm=init`。
+- **其他问题**：欢迎在[GitHub](https://github.com/linaproai/linapro/issues)提交`issue`，团队会持续跟进。

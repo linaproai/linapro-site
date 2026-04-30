@@ -6,5 +6,13 @@
   "item.label.Get Started": {
     "message": "快速开始",
     "description": "Navbar item with label Get Started"
+  },
+  "item.label.Development Manual": {
+    "message": "开发手册",
+    "description": "Navbar item with label Development Manual"
+  },
+  "item.label.Open Source Community": {
+    "message": "开源社区",
+    "description": "Navbar item with label Open Source Community"
   }
 }

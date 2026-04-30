@@ -3,8 +3,36 @@
     "message": "v0.1.x(Latest)",
     "description": "The label for version current"
   },
-  "sidebar.mainSidebar.category.quick": {
-    "message": "quick",
-    "description": "The label for category 'quick' in sidebar 'mainSidebar'"
+  "sidebar.mainSidebar.category.Core Concepts": {
+    "message": "核心概念",
+    "description": "The label for category 'Core Concepts' in sidebar 'mainSidebar'"
+  },
+  "sidebar.mainSidebar.category.Architecture": {
+    "message": "架构设计",
+    "description": "The label for category 'Architecture' in sidebar 'mainSidebar'"
+  },
+  "sidebar.mainSidebar.category.Plugin Development": {
+    "message": "插件开发",
+    "description": "The label for category 'Plugin Development' in sidebar 'mainSidebar'"
+  },
+  "sidebar.mainSidebar.category.Testing and Deployment": {
+    "message": "测试与部署",
+    "description": "The label for category 'Testing and Deployment' in sidebar 'mainSidebar'"
+  },
+  "sidebar.quickSidebar.category.First Experience": {
+    "message": "快速体验",
+    "description": "The label for category 'First Experience' in sidebar 'quickSidebar'"
+  },
+  "sidebar.communitySidebar.category.Community Channels": {
+    "message": "社区交流",
+    "description": "The label for category 'Community Channels' in sidebar 'communitySidebar'"
+  },
+  "sidebar.communitySidebar.category.Contribution": {
+    "message": "参与贡献",
+    "description": "The label for category 'Contribution' in sidebar 'communitySidebar'"
+  },
+  "sidebar.communitySidebar.category.Support": {
+    "message": "支持我们",
+    "description": "The label for category 'Support' in sidebar 'communitySidebar'"
   }
 }
