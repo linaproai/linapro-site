@@ -27,7 +27,7 @@ keywords:
 
 ## 架构总览
 
-`LinaPro`采用四层分离的架构模型，每一层都遵循松耦合原则独立设计，层与层之间通过定义良好的接口协作，而不是硬依赖内部实现。
+`LinaPro`采用四层分离的架构模型，每一层都遵循松耦合原则独立设计，层与层之间通过定义良好的接口协作，而不是硬依赖内部实现。关键的层级组件包括：
 
 ```mermaid
 graph TB
@@ -137,7 +137,7 @@ graph TB
 
 `lina-vben`消费宿主的`API`和插件的`API`，但不定义它们的行为。工作台的`UI`变化不应该影响后端行为，后端的`API`变化通过接口契约文档传达给工作台。
 
-## 数据流
+## 数据交互
 
 ```mermaid
 sequenceDiagram
@@ -168,17 +168,21 @@ sequenceDiagram
 
 `LinaPro`支持两种部署模式，可以根据业务规模随时切换：
 
-**单机模式（默认）**
+### 单机模式（默认）
 
-```text
-[Nginx] → [lina-core :8080]
-              ↓
-           [MySQL]
+```mermaid
+graph TB
+    Nginx["Nginx"]
+    Core["lina-core :8080"]
+    DB[("MySQL")]
+
+    Nginx --> Core
+    Core --> DB
 ```
 
 适合开发环境和小规模生产部署，配置简单，资源占用低。
 
-**集群模式**
+### 集群模式
 
 ```mermaid
 graph TB

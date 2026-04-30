@@ -25,7 +25,7 @@ keywords:
 
 ## 概述
 
-`lina-core`是`LinaPro`框架的核心宿主服务，基于`GoFrame`构建。它是整个系统的稳定地基，承担所有通用平台能力，同时为插件提供运行时环境和稳定的扩展接缝。
+`lina-core`是`LinaPro`框架的核心宿主服务，基于`Go`语言构建。它是整个系统的稳定地基，承担所有通用平台能力，同时为插件提供运行时环境和稳定的扩展接缝。
 
 宿主的核心设计原则是：**只提供通用能力，不包含具体业务逻辑**。所有业务功能都通过插件机制扩展，宿主本身保持简洁和稳定。
 
@@ -33,42 +33,40 @@ keywords:
 
 ```text
 apps/lina-core/
-  api/                     API DTO 与路由契约
-    auth/                  认证相关接口定义
-    config/                系统参数接口定义
-    dict/                  字典管理接口定义
-    file/                  文件管理接口定义
-    health/                健康探针接口定义
-    i18n/                  国际化接口定义
-    job/                   定时任务接口定义
-    menu/                  菜单管理接口定义
-    plugin/                插件治理接口定义
-    role/                  角色管理接口定义
-    user/                  用户管理接口定义
-  internal/
-    cmd/                   服务启动与路由注册
-    controller/            HTTP 控制器
-    service/               业务服务层
-      apidoc/              接口文档聚合
-      auth/                认证服务
-      cluster/             集群选主与分布式协调
-      cron/                定时任务启动入口
-      i18n/                国际化运行时
-      jobmgmt/             持久化定时调度子系统
-      middleware/          HTTP 中间件（认证、权限、日志）
-      plugin/              插件生命周期管理
-  manifest/
-    config/                运行时配置文件模板
-    sql/                   DDL + Seed 数据
-    i18n/                  宿主运行时语言包
-  pkg/                     宿主与插件共享的稳定公共包
-    pluginhost/            插件扩展接缝定义
-    pluginbridge/          动态插件桥接层
+├── api/                     API DTO 与路由契约
+│   ├── auth/                认证相关接口定义
+│   ├── config/              系统参数接口定义
+│   ├── i18n/                国际化接口定义
+│   ├── job/                 定时任务接口定义
+│   ├── menu/                菜单管理接口定义
+│   ├── plugin/              插件治理接口定义
+│   ├── role/                角色管理接口定义
+│   ├── user/                用户管理接口定义
+│   └── ...                  其他接口定义
+├── internal/
+│   ├── cmd/                 服务启动与路由注册
+│   ├── controller/          HTTP 控制器
+│   └── service/             业务服务层
+│       ├── apidoc/          接口文档聚合
+│       ├── auth/            认证服务
+│       ├── cron/            定时任务启动入口
+│       ├── i18n/            国际化运行时
+│       ├── middleware/      HTTP 中间件（认证、权限、日志）
+│       ├── plugin/          插件生命周期管理
+│       └── ...              其他业务服务
+├── manifest/
+│   ├── config/              运行时配置文件模板
+│   ├── sql/                 DDL + Seed 数据
+│   └── i18n/                宿主运行时语言包
+└── pkg/                     宿主与插件共享的稳定公共包
+    ├── pluginhost/          插件扩展接缝定义
+    ├── pluginbridge/        动态插件桥接层
+    └── ...                  其他公共工具包
 ```
 
 ## API 接口层
 
-宿主`API`层使用`GoFrame`的`g.Meta`结构体标签定义路由契约和`DTO`（数据传输对象）。每个接口的路径、方法、权限标识、国际化`Key`和文档说明都声明在`api/`目录下的`Go`结构体中。
+宿主`API`层使用`g.Meta`结构体标签定义路由契约和`DTO`（数据传输对象）。每个接口的路径、方法、权限标识、国际化`Key`和文档说明都声明在`api/`目录下的`Go`结构体中。
 
 这种声明式的接口定义方式带来以下好处：
 
@@ -98,13 +96,11 @@ apps/lina-core/
 
 ### 会话管理
 
-```text
-在线用户管理：
-- 记录每个活跃会话的 IP 地址、设备信息、登录时间
-- 支持管理员强制下线指定用户（由 monitor-online 插件提供 UI）
-- 会话无活动超时通过 session.timeout 配置
-- 定期清理过期会话（session.cleanupInterval 配置）
-```
+- 记录每个活跃会话的 `IP` 地址、设备信息、登录时间
+- 支持管理员强制下线指定用户（由 `monitor-online` 插件提供 `UI`）
+- 会话无活动超时通过 `session.timeout` 配置
+- 定期清理过期会话（`session.cleanupInterval` 配置）
+
 
 ## 插件运行时
 

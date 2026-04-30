@@ -33,11 +33,11 @@ keywords:
 
 | 技术 | 版本 | 说明 |
 |------|------|------|
-| `Vue 3` | 3.x | 前端框架 |
-| `Vben5` | 5.x | 企业级`Vue`管理框架 |
-| `Ant Design Vue` | 4.x | `UI`组件库 |
-| `TypeScript` | 5.x | 类型系统 |
-| `pnpm` | 8.x | 包管理工具（`Monorepo`） |
+| `Vue 3` | `3.x` | 前端框架 |
+| `Vben5` | `5.x` | 企业级`Vue`管理框架 |
+| `Ant Design Vue` | `4.x`| `UI`组件库 |
+| `TypeScript` | `5.x` | 类型系统 |
+| `pnpm` | `8.x` | 包管理工具（`Monorepo`） |
 
 ## 功能模块
 
@@ -184,7 +184,7 @@ sequenceDiagram
     Plugin-->>Core: 注入插件菜单项到菜单树
     Core-->>WorkSpace: 返回完整菜单树（含插件菜单）
     WorkSpace->>WorkSpace: 渲染侧边栏
-    Note over WorkSpace: 插件菜单组件路径\n通过 dynamic-page 壳加载
+    Note over WorkSpace: 插件菜单组件路径<br/>通过 dynamic-page 壳加载
 ```
 
 当插件被禁用时，工作台调用菜单接口不会包含该插件的菜单项，用户界面上对应入口自动消失，无需重新部署或刷新配置。
@@ -196,7 +196,3 @@ sequenceDiagram
 | 用户名 | `admin` |
 | 密码 | `admin123` |
 | 访问地址 | `http://localhost:5666` |
-
-:::info 演示环境
-管理工作台在线演示地址即将开放，敬请期待。
-:::

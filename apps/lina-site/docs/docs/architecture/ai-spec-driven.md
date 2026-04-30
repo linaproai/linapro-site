@@ -25,7 +25,7 @@ keywords:
 
 ## 什么是规范驱动开发
 
-规范驱动开发（`Specification-Driven Development，SDD`）是`LinaPro`推行的`AI`原生研发方法论。其核心理念是：**规范先于代码存在，代码由规范驱动产生**。
+规范驱动开发（`Specification-Driven Development，SDD`）是一种`AI`原生研发工作流。其核心理念是：**规范先于代码存在，代码由规范驱动产生**。
 
 在传统开发流程中，需求文档和技术方案往往在代码实现后迅速过时，成为无人维护的历史文档。`SDD`通过以下机制解决这个问题：
 
@@ -55,7 +55,7 @@ flowchart LR
 
 **触发方式：**
 
-```
+```text
 /opsx:explore <需求描述>
 ```
 
@@ -78,7 +78,7 @@ flowchart LR
 
 **触发方式：**
 
-```
+```text
 /opsx:propose <change-name>
 ```
 
@@ -107,7 +107,7 @@ flowchart LR
 
 **触发方式：**
 
-```
+```text
 /opsx:apply
 ```
 
@@ -161,11 +161,11 @@ flowchart LR
 
 审查内容包括：
 
-- 代码质量：命名规范、错误处理、日志记录
-- 规范遵循：实现是否与`design.md`一致
-- 安全检查：`SQL`注入、权限遗漏、敏感信息泄露
-- `i18n`完整性：新增文案是否都有对应翻译键
-- `E2E`测试：测试覆盖是否足够
+- **代码质量**：命名规范、错误处理、日志记录
+- **规范遵循**：实现是否与`design.md`一致
+- **安全检查**：`SQL`注入、权限遗漏、敏感信息泄露
+- **`i18n`完整性**：新增文案是否都有对应翻译键
+- **`E2E`测试**：测试覆盖是否足够
 
 ### 阶段五：归档（/opsx:archive）
 
@@ -173,7 +173,7 @@ flowchart LR
 
 **触发方式：**
 
-```
+```text
 /opsx:archive
 ```
 
@@ -190,23 +190,23 @@ flowchart LR
 
 ```text
 openspec/
-  changes/               活跃和已归档的变更
-    <change-name>/        进行中的变更
-      proposal.md         变更提案
-      design.md           技术设计
-      tasks.md            任务清单
-      specs/              增量规范
-    archive/             已完成并归档的变更
-  specs/                 当前生效的基线规范
-    <capability>.md       具体能力的规范文档
-  config.yaml            OpenSpec 项目级配置
+├── changes/                    活跃和已归档的变更
+│   ├── <change-name>/          进行中的变更
+│   │   ├── proposal.md         变更提案
+│   │   ├── design.md           技术设计
+│   │   ├── tasks.md            任务清单
+│   │   └── specs/              增量规范
+│   └── archive/                已完成并归档的变更
+├── specs/                      当前生效的基线规范
+│   └── <capability>.md         具体能力的规范文档
+└── config.yaml                 OpenSpec 项目级配置
 ```
 
 ## 用户反馈处理
 
 当用户发现问题或提出改进意见时，通过`/lina-feedback`技能处理：
 
-```
+```text
 /lina-feedback <问题描述>
 ```
 
