@@ -53,6 +53,48 @@ keywords:
 - **企业级治理**：`JWT`认证配合声明式`RBAC`权限体系，内置操作日志、登录日志、会话管理等审计能力
 - **原生分布式**：底层支持分布式锁、键值缓存、水平扩展，无需额外改造即可应对业务规模增长
 
+## 技术架构
+
+```mermaid
+graph TB
+    subgraph Workflow["AI 研发工作流  openspec/"]
+        direction LR
+        Explore["🔍 探索"] --> Propose["📋 提案"] --> Implement["⚙️ 实现"] --> Review["🔎 审查"] --> Archive["📦 归档"]
+    end
+
+    subgraph Frontend["默认管理工作台  lina-vben"]
+        UI["Vue 3 + Vben5 + Ant Design"]
+    end
+
+    subgraph Host["核心宿主服务  lina-core"]
+        direction TB
+        API["API 接口层\n(g.Meta 路由定义 + DTO)"]
+        Ctrl["控制器层\n(HTTP 请求处理)"]
+        Svc["业务服务层\n(核心业务逻辑)"]
+        Plugin["插件运行时\n(生命周期编排 · 沙箱隔离)"]
+        Gov["治理服务\n(JWT · RBAC · 日志 · 会话)"]
+        API --> Ctrl --> Svc
+        Svc --> Plugin
+        Svc --> Gov
+    end
+
+    subgraph Plugins["插件层  lina-plugins"]
+        direction LR
+        Source["源码插件\n随宿主编译交付"]
+        Dynamic["WASM 动态插件\n运行时热加载"]
+    end
+
+    DB[("数据存储\nMySQL")]
+
+    Workflow -.->|规范驱动| Frontend
+    Workflow -.->|规范驱动| Host
+    UI -->|"HTTP / WebSocket"| API
+    Plugin -->|加载| Source
+    Plugin -->|沙箱执行| Dynamic
+    Svc --> DB
+    Gov --> DB
+```
+
 ## 核心功能
 
 ### AI 原生研发工作流
@@ -152,44 +194,7 @@ keywords:
 - 底层内置支持分布式锁与键值缓存机制，核心组件支持集群自动感知
 - 定时任务调度子系统具备分布式感知能力，集群环境下自动避免重复执行
 
-## 技术架构
 
-```mermaid
-graph TB
-    subgraph Workflow["AI 研发工作流  openspec/"]
-        direction LR
-        Explore["探索"] --> Propose["提案"] --> Implement["实现"] --> Review["审查"] --> Archive["归档"]
-    end
-
-    subgraph Frontend["管理工作台  lina-vben"]
-        UI["Vue 3 + Ant Design Vue"]
-    end
-
-    subgraph Host["核心宿主服务  lina-core"]
-        direction TB
-        API["API 接口层<br/>(RESTful 契约)"]
-        Svc["业务服务层<br/>(核心业务逻辑)"]
-        Plugin["插件运行时<br/>(生命周期编排)"]
-        Gov["治理服务<br/>(认证 · 权限 · 日志)"]
-        API --> Svc
-        Svc --> Plugin
-        Svc --> Gov
-    end
-
-    subgraph Plugins["插件层  lina-plugins"]
-        direction LR
-        Builtin["内置插件<br/>组织 · 监控 · 通知"]
-        Custom["自定义业务插件<br/>源码 / WASM"]
-    end
-
-    DB[("MySQL")]
-
-    Workflow -.->|规范驱动| Frontend
-    Workflow -.->|规范驱动| Host
-    UI -->|HTTP / WebSocket| API
-    Plugin -->|加载| Plugins
-    Svc --> DB
-```
 
 ## 技术栈
 
