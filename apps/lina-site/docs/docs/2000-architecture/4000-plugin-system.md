@@ -1,7 +1,6 @@
 ---
 slug: '/docs/plugin-system'
 title: '双模式插件系统'
-sidebar_position: 4
 hide_title: true
 description: '本文详细介绍 LinaPro 双模式插件系统的整体设计，包括源码插件和 WASM 动态插件的对比、插件生命周期（安装、启用、禁用、卸载）、插件隔离机制（数据库命名空间、文件命名空间、WASM 沙箱）、宿主与插件的边界规范，以及插件系统的扩展点体系，帮助开发者全面理解插件运行机制。'
 keywords:

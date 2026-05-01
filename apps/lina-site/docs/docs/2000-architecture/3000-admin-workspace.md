@@ -1,7 +1,6 @@
 ---
 slug: '/docs/admin-workspace'
 title: '默认管理工作台'
-sidebar_position: 3
 hide_title: true
 description: '本文详细介绍 LinaPro 默认管理工作台 lina-vben 的功能模块、技术栈和设计特点，包括权限管理、系统设置、任务调度、扩展中心和开发中心的完整功能说明，以及官方插件提供的扩展模块和插件菜单的动态注入机制，帮助开发者全面了解工作台的开箱即用能力。'
 keywords:

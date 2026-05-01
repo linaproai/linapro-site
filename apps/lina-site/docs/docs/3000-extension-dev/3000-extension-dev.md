@@ -1,7 +1,6 @@
 ---
 slug: '/docs/extension-dev'
 title: '扩展开发'
-sidebar_position: 1
 hide_title: true
 description: '本文介绍 LinaPro 双模式插件系统的设计理念和两种插件模式的适用场景对比，重点说明源码插件和 WASM 动态插件各自的优缺点、选型建议，以及动态插件热加载能力的核心价值，帮助开发者在开始插件开发前做出正确的技术选型决策。'
 keywords:

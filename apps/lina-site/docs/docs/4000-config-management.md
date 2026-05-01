@@ -1,7 +1,6 @@
 ---
 slug: '/docs/config-management'
 title: '配置管理'
-sidebar_position: 3
 hide_title: true
 description: '本文详细介绍 LinaPro 核心宿主服务的配置文件 config.yaml，提供完整的配置模板和各配置项的说明，涵盖 HTTP 服务、日志、数据库、JWT 认证、会话管理、定时调度、国际化、集群部署、文件上传和插件管理等所有配置分组，帮助开发者快速理解和调整框架的运行时行为。'
 keywords:

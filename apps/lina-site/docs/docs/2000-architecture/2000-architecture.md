@@ -1,7 +1,6 @@
 ---
 slug: '/docs/architecture'
 title: '架构设计'
-sidebar_position: 1
 hide_title: true
 description: '本文详细介绍 LinaPro 的整体架构设计，包括核心宿主服务、默认管理工作台、双模式插件系统和 AI 研发工作流四个层次的职责边界、运行时交互关系和设计原则，帮助开发者深入理解框架的分层模型、松耦合设计思路以及各组件如何协作完成业务功能交付。'
 keywords:
