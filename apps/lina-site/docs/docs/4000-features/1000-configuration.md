@@ -62,6 +62,8 @@ logger:
   extensions:
     # 是否开启 JSON 结构化日志（生产环境建议开启，便于日志采集系统解析）
     structured: false
+    # 是否在日志中输出 TraceID；默认 false，仅显式开启时输出
+    traceIDEnabled: false
 
 # 数据库配置
 # https://goframe.org/docs/core/gdb-config-file
@@ -168,9 +170,9 @@ plugin:
 
 | 配置分组 | 说明 |
 |---------|------|
-| `server` | `HTTP`服务监听地址、路由表输出、接口文档路径 |
-| `logger` | 日志文件路径、日志级别、结构化日志开关 |
-| `database` | 数据库连接串、`SQL`调试日志 |
+| `server` | `HTTP`服务监听地址、路由表输出、接口文档路径。<br/>更多配置项请参考：[GoFrame Server](https://goframe.org/docs/web/server-config-file-template) |
+| `logger` | 日志文件路径、日志级别、结构化日志开关。<br/>更多配置项请参考：[GoFrame Logger](https://goframe.org/docs/core/glog-config) |
+| `database` | 数据库连接串、`SQL`调试日志。<br/>更多配置项请参考：[GoFrame Database](https://goframe.org/docs/core/gdb-config-file) |
 | `jwt` | 签名密钥、`Token`有效期 |
 | `session` | 会话超时时间、清理任务间隔 |
 | `monitor` | 服务器指标采集间隔 |
