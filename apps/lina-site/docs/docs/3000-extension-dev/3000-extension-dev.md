@@ -91,8 +91,8 @@ keywords:
 
 插件开发商可以将插件编译为`.wasm`二进制文件分发，用户直接上传安装，无需接触源代码，也无需重新编译宿主服务。
 
-## 进一步阅读
+## 相关文档
 
-- [源码插件开发手册](/docs/source-plugin)：完整的源码插件开发流程和接口规范
-- [动态插件（WASM）开发手册](/docs/dynamic-plugin)：`WASM`动态插件的构建流程和桥接接口说明
-- [双模式插件系统](/docs/plugin-system)：插件系统整体架构和生命周期管理
+import DocCardList from '@theme/DocCardList';
+
+<DocCardList />

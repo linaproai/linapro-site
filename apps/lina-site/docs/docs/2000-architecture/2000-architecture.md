@@ -200,3 +200,9 @@ graph TB
 ```
 
 集群模式通过配置`cluster.enabled: true`启用，框架基于 `MySQL` 实现分布式选主、分布式锁和权限拓扑缓存（`sys_locker`、`sys_kv_cache` 表），无需引入额外中间件，也无需修改业务代码。详见[原生分布式架构](/docs/distributed-arch)。
+
+## 相关文档
+
+import DocCardList from '@theme/DocCardList';
+
+<DocCardList />
