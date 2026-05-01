@@ -1,5 +1,5 @@
 ---
-slug: '/quick/framework-intro'
+slug: '/quick/overview'
 title: '框架介绍'
 sidebar_position: 1
 hide_title: true

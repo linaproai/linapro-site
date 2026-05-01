@@ -1,5 +1,5 @@
 ---
-slug: '/quick/first-experience'
+slug: '/quick/your-first-plugin'
 title: '小试牛刀'
 sidebar_position: 3
 hide_title: true
@@ -242,4 +242,4 @@ flowchart LR
 - **每次迭代都有完整记录**，架构不会随时间漂移
 - **插件松耦合**，可以随时单独禁用或卸载，不影响其他模块
 
-接下来，你可以参考[扩展开发](/docs/extension-dev)文档深入了解源码插件和`WASM`动态插件的完整开发规范，或者查看[开发手册](/docs/architecture)了解框架的详细架构设计。
+接下来，你可以参考[扩展开发](/docs/plugin-development)文档深入了解源码插件和`WASM`动态插件的完整开发规范，或者查看[开发手册](/docs/architecture)了解框架的详细架构设计。

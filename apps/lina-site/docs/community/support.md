@@ -1,5 +1,5 @@
 ---
-slug: '/community/support/donate'
+slug: '/community/support'
 title: '支持我们'
 sidebar_position: 0
 hide_title: true

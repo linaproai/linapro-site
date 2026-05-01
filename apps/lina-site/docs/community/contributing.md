@@ -1,5 +1,5 @@
 ---
-slug: '/community/contribution'
+slug: '/community/contributing'
 title: '贡献指南'
 sidebar_position: 2
 hide_title: true

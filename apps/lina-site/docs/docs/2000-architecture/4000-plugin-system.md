@@ -217,4 +217,4 @@ func Register(p pluginhost.SourcePlugin) {
 }
 ```
 
-详细的插件开发手册参见[扩展开发](/docs/extension-dev)。
+详细的插件开发手册参见[扩展开发](/docs/plugin-development)。

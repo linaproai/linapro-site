@@ -114,7 +114,7 @@ graph TB
 
 `AI`研发工作流凌驾于所有层次之上，它是让规范、代码与测试保持同步的连接纽带。工作流不直接属于任何运行时组件，而是作为治理机制约束整个开发过程。
 
-详见[AI规范驱动开发](/docs/ai-spec-driven)。
+详见[AI规范驱动开发](/docs/spec-driven-development)。
 
 ## 分层边界原则
 
@@ -199,7 +199,7 @@ graph TB
     NN --> DB
 ```
 
-集群模式通过配置`cluster.enabled: true`启用，框架基于 `MySQL` 实现分布式选主、分布式锁和权限拓扑缓存（`sys_locker`、`sys_kv_cache` 表），无需引入额外中间件，也无需修改业务代码。详见[原生分布式架构](/docs/distributed-arch)。
+集群模式通过配置`cluster.enabled: true`启用，框架基于 `MySQL` 实现分布式选主、分布式锁和权限拓扑缓存（`sys_locker`、`sys_kv_cache` 表），无需引入额外中间件，也无需修改业务代码。详见[原生分布式架构](/docs/distributed-architecture)。
 
 ## 相关文档
 

@@ -36,9 +36,9 @@ Use the repository to read the source, open issues, follow release changes, and 
 
 | Section | Use it for |
 | --- | --- |
-| [Community Channels](/community/channels) | Join real-time discussions and ask usage questions. |
-| [Contribution Guide](/community/contribution) | Understand how to report problems, improve docs, and contribute code. |
-| [Support LinaPro](/community/support/donate) | Learn how to support the project and long-term maintenance. |
+| [Connect](/community/connect) | Join real-time discussions and ask usage questions. |
+| [Contributing](/community/contributing) | Understand how to report problems, improve docs, and contribute code. |
+| [Support LinaPro](/community/support) | Learn how to support the project and long-term maintenance. |
 
 ## Before Asking For Help
 

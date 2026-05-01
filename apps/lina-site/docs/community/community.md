@@ -37,9 +37,9 @@ keywords:
 
 | 栏目 | 用途 |
 | --- | --- |
-| [社区交流](/community/channels) | 加入实时讨论，反馈使用问题。 |
-| [贡献指南](/community/contribution) | 了解如何报告问题、改进文档和贡献代码。 |
-| [支持 LinaPro](/community/support/donate) | 了解支持项目和长期维护的方式。 |
+| [社区交流](/community/connect) | 加入实时讨论，反馈使用问题。 |
+| [贡献指南](/community/contributing) | 了解如何报告问题、改进文档和贡献代码。 |
+| [支持 LinaPro](/community/support) | 了解支持项目和长期维护的方式。 |
 
 ## 提问前建议准备
 

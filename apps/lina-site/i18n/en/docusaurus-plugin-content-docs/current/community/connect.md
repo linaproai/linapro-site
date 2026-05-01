@@ -1,5 +1,5 @@
 ---
-slug: '/community/channels'
+slug: '/community/connect'
 title: 'Community Channels'
 sidebar_position: 1
 description: 'This page lists the official LinaPro community communication channels, including QQ, WeChat, Discord, and GitHub issues, and explains which channel to use for real-time discussion, reproducible bug reports, feature requests, documentation feedback, and plugin development questions.'

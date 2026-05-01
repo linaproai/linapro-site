@@ -1,5 +1,5 @@
 ---
-slug: '/community/support/donate'
+slug: '/community/support'
 title: 'Support LinaPro'
 sidebar_position: 0
 description: 'This support page explains practical ways to help LinaPro continue long-term maintenance, including reporting reproducible problems, contributing documentation, improving examples, sharing production feedback, participating in community discussions, and supporting the open source project through public recognition or future donation channels.'

@@ -1,5 +1,5 @@
 ---
-slug: '/docs/source-plugin'
+slug: '/docs/source-plugins'
 title: '源码插件'
 hide_title: true
 description: '本文详细介绍 LinaPro 源码插件的开发流程、目录结构规范、接口定义方式、数据库和文件访问隔离机制、插件生命周期钩子注册、前端页面集成、菜单与权限声明，以及插件版本升级流程，提供完整的开发示例，帮助开发者掌握源码插件的核心开发技能和最佳实践。'

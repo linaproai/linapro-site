@@ -1,5 +1,5 @@
 ---
-slug: '/community/channels'
+slug: '/community/connect'
 title: '社区交流'
 sidebar_position: 1
 hide_title: true
