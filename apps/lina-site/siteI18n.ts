@@ -55,7 +55,7 @@ const SITE_SEO = {
     title: 'LinaPro.AI - 面向可持续交付的 AI 原生全栈框架',
     tagline: '面向可持续交付的 AI 原生全栈框架',
     description:
-      'LinaPro 把 AI 作为核心生产力：AI 主导分析、设计与实现，团队把握方向与关键决策，把"AI 越用越快"延续到产品的整个生命周期。框架自带核心宿主服务、管理工作台、插件运行时与规范驱动的 AI 原生研发工作流，帮助团队快速交付生产级应用，同时保持架构、测试与治理的可持续演进。',
+      '把 AI 作为全栈研发的核心生产力，以高效、易用、可维护的方式帮助每一位开发者交付生产级应用',
     keywords:
       'LinaPro,AI 原生全栈框架,可持续交付,AI 驱动开发,Go 后端框架,Vue 3 管理后台,RBAC 权限,WASM 插件,源码插件,规范驱动开发,OpenSpec,AI 原生研发工作流,lina-core,lina-vben,lina-plugins',
   },

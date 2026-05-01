@@ -1,7 +1,6 @@
 ---
 slug: '/quick/installation'
-title: '框架安装'
-sidebar_position: 2
+title: '快速安装'
 hide_title: true
 description: '本文介绍如何在几分钟内完成 LinaPro 框架的安装与初始配置，包括环境要求、一键安装脚本（支持 macOS、Linux 和 Windows 平台）、数据库初始化、使用 Claude Code 完成依赖安装，以及启动服务和验证安装结果的完整流程。'
 keywords:
@@ -27,22 +26,6 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 `LinaPro`提供一键安装脚本，支持`macOS`、`Linux`和`Windows`（`Git Bash`或`WSL`）平台，通常可在几分钟内完成完整安装。
-
-## 环境要求
-
-在开始安装前，请确认本机已具备以下运行环境：
-
-| 依赖 | 最低版本 | 说明 |
-|------|---------|------|
-| `Go` | 1.22+ | 后端运行时编译环境 |
-| `Node.js` | 20+ | 前端构建环境 |
-| `pnpm` | 8+ | 前端包管理工具 |
-| `MySQL` | 8.0+ | 数据库，需提前启动并创建好数据库 |
-| `Git` | 任意稳定版 | 源码克隆工具 |
-
-:::tip
-推荐使用[`nvm`](https://github.com/nvm-sh/nvm)管理`Node.js`版本，使用[`gvm`](https://github.com/moovweb/gvm)或官方安装包管理`Go`版本。
-:::
 
 ## 一键安装
 
@@ -92,7 +75,7 @@ curl -fsSL https://linapro.ai/install.sh | bash
 4. 初始化数据库结构和基础数据（`make init confirm=init`）
 5. 加载演示数据（可通过`LINAPRO_SKIP_MOCK=1`跳过）
 
-## 使用 Claude Code 完成准备工作
+## 依赖检查安装
 
 安装脚本执行完成后，推荐使用`Claude Code`打开项目目录，让`AI`帮助完成后续环境配置和准备工作。
 

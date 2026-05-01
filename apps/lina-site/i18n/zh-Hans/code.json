@@ -8,7 +8,7 @@
     "description": "Hero h1"
   },
   "home.hero.lead": {
-    "message": "LinaPro 把 AI 作为全栈研发的核心生产力，以高效、易用、可维护的方式帮助每一位开发者交付生产级应用。",
+    "message": "把 AI 作为全栈研发的核心生产力，以高效、易用、可维护的方式帮助每一位开发者交付生产级应用",
     "description": "Hero lead paragraph"
   },
   "home.hero.cta.start": {
@@ -224,7 +224,7 @@
     "description": "QuickStart footnote"
   },
   "home.cta.title": {
-    "message": "准备好交付 AI 驱动的软件了吗？",
+    "message": "准备好交付 AI 原生的软件了吗？",
     "description": "Final CTA title"
   },
   "home.cta.lead": {
