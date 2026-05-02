@@ -1,6 +1,6 @@
 ---
 slug: '/community/contributing'
-title: 'Contribution Guide'
+title: '🤝 Contribution Guide'
 sidebar_position: 2
 description: 'This contribution guide explains practical ways to help LinaPro, including reporting reproducible issues, improving documentation, proposing framework changes through OpenSpec, contributing code with focused tests, and keeping changes aligned with the repository architecture, plugin boundaries, and bilingual documentation workflow.'
 keywords:

@@ -1,6 +1,6 @@
 ---
 slug: '/quick/installation'
-title: '快速安装'
+title: '⚡ 快速安装'
 hide_title: true
 description: '本文介绍如何在几分钟内完成 LinaPro 框架的安装与初始配置，包括环境要求、一键安装脚本（支持 macOS、Linux 和 Windows 平台）、数据库初始化、使用 Claude Code 完成依赖安装，以及启动服务和验证安装结果的完整流程。'
 keywords:

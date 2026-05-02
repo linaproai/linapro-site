@@ -1,6 +1,6 @@
 ---
 slug: '/community'
-title: 'Open Source Community'
+title: '💬 Open Source Community'
 sidebar_position: 0
 description: 'The LinaPro open source community page collects the project repository, issue feedback path, real-time communication channels, contribution entry points, and support information so developers can join discussions, report problems, improve documentation, contribute code, and follow the AI-native full-stack framework ecosystem.'
 keywords:

@@ -1,6 +1,6 @@
 ---
 slug: '/docs/api-reference'
-title: '接口文档'
+title: '📡 接口文档'
 hide_title: true
 description: '本文介绍 LinaPro 框架内置的接口文档能力，包括宿主与插件接口的自动聚合机制、OpenAPI 格式文档的访问路径和在线调试方式、接口多语言翻译配置、接口文档与 RBAC 权限体系的集成，以及如何在管理工作台的开发中心中浏览和调试所有接口，帮助开发者高效进行接口开发和联调。'
 keywords:

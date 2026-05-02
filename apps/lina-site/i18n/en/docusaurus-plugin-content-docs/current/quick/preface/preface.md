@@ -1,6 +1,6 @@
 ---
 slug: '/quick/preface'
-title: 'Before You Start'
+title: '📋 Before You Start'
 sidebar_position: 0
 description: 'This LinaPro preface explains how to choose a reading path before starting development, what the quick-start section covers, when to move into the development manual, and how the official docs are organized around first experience, framework understanding, plugin extension, testing, deployment, and community participation.'
 keywords:

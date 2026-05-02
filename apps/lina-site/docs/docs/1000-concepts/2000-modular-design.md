@@ -1,6 +1,6 @@
 ---
 slug: '/docs/modular-design'
-title: '模块化设计'
+title: '🧩 模块化设计'
 hide_title: true
 description: '本文介绍 LinaPro 模块化设计的核心理念，阐述框架如何通过内置能力的领域解耦、插件作为独立模块单元、以及稳定的扩展接缝体系，让开发者能够像组装积木一样构建系统，大幅降低开发成本、提升交付质量和系统可维护性。'
 keywords:

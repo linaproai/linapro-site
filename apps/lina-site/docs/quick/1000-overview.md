@@ -1,6 +1,6 @@
 ---
 slug: '/quick/overview'
-title: '项目介绍'
+title: '🌟 项目介绍'
 hide_title: true
 description: '本文全面介绍 LinaPro 的项目背景、技术架构与核心功能。LinaPro 是一款 AI 原生全栈框架，基于 Go + Vue 3 构建，内置双模式插件系统、完整的 RBAC 权限管理、定时任务调度、在线 API 文档和规范驱动的 OpenSpec 研发工作流，帮助开发者和企业快速构建可持续交付的业务系统。'
 keywords:

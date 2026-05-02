@@ -166,19 +166,19 @@ const config: Config = {
         {
           type: 'docSidebar',
           sidebarId: 'quickSidebar',
-          label: 'Get Started',
+          label: '🚀 Get Started',
           position: 'left',
         },
         {
           type: 'docSidebar',
           sidebarId: 'docsSidebar',
-          label: 'Documentation',
+          label: '📖 Documentation',
           position: 'left',
         },
         {
           type: 'docSidebar',
           sidebarId: 'communitySidebar',
-          label: 'Community',
+          label: '💬 Community',
           position: 'left',
         },
 

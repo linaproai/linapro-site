@@ -1,6 +1,6 @@
 ---
 slug: '/quick/workspace-tour'
-title: 'Workspace Tour'
+title: '🗺️ Workspace Tour'
 sidebar_position: 2
 description: 'This quick tour introduces the LinaPro management workspace after the first login, including access control, system settings, job scheduling, extension management, developer tools, and official plugin modules, so new users can quickly understand which capabilities are provided out of the box.'
 keywords:

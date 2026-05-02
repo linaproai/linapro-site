@@ -1,6 +1,6 @@
 ---
 slug: '/docs/scheduled-tasks'
-title: '定时任务'
+title: '⏰ 定时任务'
 hide_title: true
 description: '本文详细介绍 LinaPro 定时调度子系统的设计和使用，包括 Cron 表达式配置、任务类型（Go 处理器和 Shell 命令）、任务分组管理、执行日志和异常查看、集群模式下的分布式任务调度防重复机制，以及如何在源码插件中注册自有定时任务处理器，帮助开发者实现周期性任务和自动化流程。'
 keywords:

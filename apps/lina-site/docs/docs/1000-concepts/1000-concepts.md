@@ -1,6 +1,6 @@
 ---
 slug: '/docs/concepts'
-title: '设计理念'
+title: '💡 设计理念'
 hide_title: true
 description: '本节介绍 LinaPro 的核心设计理念，包括 AI 原生设计、模块化设计和 AI 规范驱动开发，帮助开发者在深入使用框架之前建立正确的认知基础，理解框架各项设计决策背后的出发点。'
 keywords:

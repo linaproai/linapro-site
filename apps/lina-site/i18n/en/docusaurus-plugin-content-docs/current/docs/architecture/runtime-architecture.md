@@ -1,6 +1,6 @@
 ---
 slug: '/docs/architecture/runtime-architecture'
-title: 'Runtime Architecture'
+title: '🏗️ Runtime Architecture'
 sidebar_position: 0
 description: 'This architecture page describes how LinaPro runs at runtime, showing how the Vue management workspace consumes the Go core host APIs, how the host coordinates governance and plugin lifecycle, how official plugins are loaded, and how OpenSpec keeps requirements, implementation, tests, and archived specifications aligned.'
 keywords:
