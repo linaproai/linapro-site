@@ -118,13 +118,12 @@ make dev
 |------|------|
 | 默认管理工作台 | `http://localhost:5666` |
 | 后端`API`服务 | `http://localhost:8080` |
-| 接口文档 | `http://localhost:8080/api.json` |
 
 使用默认账号登录管理工作台：
 
 | 字段 | 值 |
 |------|-----|
-| 用户名 | `admin` |
+| 账号 | `admin` |
 | 密码 | `admin123` |
 
 ## 常用命令
