@@ -1,6 +1,6 @@
 ---
 slug: '/docs/testing-deployment'
-title: '🧪 Testing and Deployment'
+title: 'Testing and Deployment'
 sidebar_position: 0
 description: 'This testing and deployment page summarizes the LinaPro local command workflow, safety confirmations for database-changing commands, installer smoke tests, E2E suite expectations, build preparation, service ports, operational checks, and deployment-minded practices that should be verified before sharing a production change.'
 keywords:

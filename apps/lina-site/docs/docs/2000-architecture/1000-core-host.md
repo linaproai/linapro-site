@@ -1,6 +1,6 @@
 ---
 slug: '/docs/core-host'
-title: '🖥️ 核心宿主服务'
+title: '核心宿主服务'
 hide_title: true
 description: '本文详细介绍 LinaPro 核心宿主服务 lina-core 的功能设计和实现，包括 API 接口层、业务服务层、插件运行时、治理服务（JWT 认证、RBAC 权限、操作日志、会话管理）、定时调度子系统、国际化运行时，以及宿主向插件暴露的稳定扩展接缝和事件钩子系统。'
 keywords:

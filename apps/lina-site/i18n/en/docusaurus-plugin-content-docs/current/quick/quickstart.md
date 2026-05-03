@@ -1,6 +1,6 @@
 ---
 slug: '/quickstart'
-title: '🚀 Quick Start'
+title: 'Quick Start'
 sidebar_position: 1
 description: 'This LinaPro quick start walks new developers through the minimum local setup: installing the framework source, initializing the database, loading optional demo data, starting the Go backend and Vue management workspace, signing in with the default account, and checking the core API and plugin runtime before moving into deeper development manuals.'
 keywords:

@@ -1,6 +1,6 @@
 ---
 slug: '/docs'
-title: '📖 Development Manual'
+title: 'Development Manual'
 sidebar_position: 0
 description: 'The LinaPro development manual is the long-form reference for developers building production applications with the framework. It explains the core host, management workspace, plugin system, AI-native OpenSpec workflow, built-in capabilities, architecture boundaries, local commands, testing strategy, deployment preparation, and contribution-oriented engineering practices.'
 keywords:

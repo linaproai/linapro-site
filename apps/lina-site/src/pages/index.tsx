@@ -5,7 +5,7 @@ import CodeBlock from '@theme/CodeBlock';
 import Layout from '@theme/Layout';
 
 const REPO_URL = 'https://github.com/linaproai/linapro';
-const DOCS_URL = '/quickstart';
+const DOCS_URL = '/quick/overview';
 
 function HomepageHeader() {
     const githubImage = useBaseUrl('/img/github.svg');

@@ -1,6 +1,6 @@
 ---
 slug: '/docs/core-concepts/layers'
-title: '🧩 Framework Layers'
+title: 'Framework Layers'
 sidebar_position: 0
 description: 'This core concept page explains the four LinaPro layers: the Go core host service, Vue management workspace, official plugin workspace, and OpenSpec AI-native workflow. It clarifies each layer responsibility, how they collaborate, and why the framework keeps host, UI, plugin, and specification ownership separated.'
 keywords:

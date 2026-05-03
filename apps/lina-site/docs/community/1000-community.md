@@ -1,6 +1,6 @@
 ---
 slug: '/community'
-title: '💬 社区交流'
+title: '社区交流'
 hide_title: true
 description: '本文列出 LinaPro 官方社区交流渠道，包括 QQ 群、微信群、Discord 和 GitHub Issues，并说明不同渠道适合处理实时讨论、可复现缺陷、功能建议、文档反馈和插件开发问题，帮助用户选择合适的沟通入口。'
 keywords:

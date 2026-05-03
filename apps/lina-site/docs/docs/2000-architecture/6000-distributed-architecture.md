@@ -1,6 +1,6 @@
 ---
 slug: '/docs/distributed-architecture'
-title: '🌐 原生分布式架构'
+title: '原生分布式架构'
 hide_title: true
 description: '本文介绍 LinaPro 原生支持的分布式架构设计，包括单机模式与集群模式的部署差异、基于 Raft 风格的分布式选主机制、节点角色与水平扩容能力、权限拓扑版本同步、分布式锁与键值缓存的集群感知实现，以及如何通过配置启用集群模式并零代码改造实现高可用部署。'
 keywords:

@@ -1,6 +1,6 @@
 ---
 slug: '/docs/plugin-development'
-title: '🔧 Plugin Development'
+title: 'Plugin Development'
 sidebar_position: 0
 description: 'This plugin development manual explains the LinaPro plugin ownership model, source plugin and dynamic WASM plugin choices, plugin directory structure, manifest responsibilities, backend and frontend boundaries, SQL resource ownership, lifecycle behavior, and explicit source plugin upgrade workflow.'
 keywords:

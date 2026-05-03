@@ -1,6 +1,6 @@
 ---
 slug: '/docs/wasm-plugins'
-title: '🔩 动态插件（WASM）'
+title: '动态插件（WASM）'
 hide_title: true
 description: '本文详细介绍 LinaPro WASM 动态插件的开发流程、目录结构、构建方式、宿主服务桥接接口（runtime、storage、network、data）、插件清单中的服务权限声明、运行时上传和安装流程，以及与源码插件的关键区别，帮助开发者掌握 WASM 动态插件的开发和运维技能。'
 keywords:

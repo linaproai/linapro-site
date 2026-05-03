@@ -1,6 +1,6 @@
 ---
 slug: '/docs/core-concepts/built-in-capabilities'
-title: '⚡ Built-in Capabilities'
+title: 'Built-in Capabilities'
 sidebar_position: 1
 description: 'This page summarizes the LinaPro built-in capabilities available before custom business development starts, including access control, system settings, file management, job scheduling, plugin governance, developer tools, official organization, notice, online user, server monitor, operation log, and login log plugins.'
 keywords:

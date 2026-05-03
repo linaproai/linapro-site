@@ -1,6 +1,6 @@
 ---
 slug: '/quick/first-plugin'
-title: '🛠️ First Plugin Path'
+title: 'First Plugin Path'
 sidebar_position: 3
 description: 'This introductory plugin path explains how new LinaPro developers should approach extension work, when to choose a source plugin or a dynamic WASM plugin, which repository directories matter first, and what lifecycle, manifest, frontend, backend, SQL, and upgrade concepts should be understood before writing production plugins.'
 keywords:

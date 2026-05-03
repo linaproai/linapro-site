@@ -1,6 +1,6 @@
 ---
 slug: '/docs/ai-native'
-title: '🤖 AI原生设计'
+title: 'AI原生设计'
 hide_title: true
 description: '本文详细介绍 LinaPro 作为 AI 原生框架的设计理念，阐述 AI 原生的核心含义——将 AI 作为产品主路径而非附加功能，以及 AI 如何贯穿需求分析、系统设计、代码实现和测试验证全流程，帮助开发者理解规范驱动开发模式，并了解为什么不建议人类直接手动修改代码。'
 keywords:
