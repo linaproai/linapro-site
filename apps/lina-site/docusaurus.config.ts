@@ -172,13 +172,13 @@ const config: Config = {
         {
           type: 'docSidebar',
           sidebarId: 'docsSidebar',
-          label: '📖 Documentation',
+          label: '🗂️ Documentation',
           position: 'left',
         },
         {
           type: 'docSidebar',
           sidebarId: 'communitySidebar',
-          label: '💬 Community',
+          label: '🌐 Community',
           position: 'left',
         },
 
