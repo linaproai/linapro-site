@@ -122,31 +122,7 @@ flowchart TD
 - 每个插件的文件存储路径以插件`ID`作为命名空间，如`temp/upload/<plugin-id>/`
 - 动态插件在`WASM`沙箱中运行，对宿主文件系统和网络的访问通过受治理的宿主服务桥接
 
-## 扩展接缝（Extension Points）
-
-宿主通过`pkg/pluginhost`包向插件暴露稳定的扩展接缝。插件只能通过这些接缝与宿主交互，永远不直接调用宿主`internal/`包中的函数。
-
-**事件钩子（Hook）：**
-
-| 扩展点 | 触发时机 | 默认执行模式 |
-|--------|---------|------------|
-| `auth.login.succeeded` | 用户登录成功后 | 阻塞/异步（可配置） |
-| `auth.login.failed` | 用户登录失败后 | 阻塞/异步（可配置） |
-| `auth.logout.succeeded` | 用户退出登录后 | 阻塞/异步（可配置） |
-| `plugin.installed` | 动态插件安装后 | 阻塞/异步（可配置） |
-| `plugin.enabled` | 插件启用后 | 阻塞/异步（可配置） |
-| `plugin.disabled` | 插件禁用后 | 阻塞/异步（可配置） |
-| `plugin.uninstalled` | 动态插件卸载后 | 阻塞/异步（可配置） |
-| `system.started` | 宿主`HTTP`服务启动后 | 阻塞/异步（可配置） |
-
-**注册类扩展点（Registrar）：**
-
-| 扩展点 | 用途 | 执行模式 |
-|--------|-----|---------|
-| `http.route.register` | 插件注册自有`HTTP`路由 | 仅阻塞 |
-| `cron.register` | 插件注册自有定时任务 | 仅阻塞 |
-| `menu.filter` | 插件过滤或修改宿主菜单树 | 仅阻塞 |
-| `permission.filter` | 插件过滤或修改宿主权限列表 | 仅阻塞 |
+详见：[双模式插件系统](/docs/plugin-system)。
 
 ## 定时调度子系统
 
@@ -157,6 +133,8 @@ flowchart TD
 - **`Shell`执行**：支持通过`Shell`命令类型执行任意脚本，带超时控制和输出截断
 - **插件任务**：插件可以通过`cron.register`扩展点注册自有的定时任务处理器
 
+详见：[定时任务](/docs/scheduled-tasks)。
+
 ## 国际化运行时
 
 宿主提供完整的`I18N`运行时，支持动态切换语言：
@@ -166,7 +144,7 @@ flowchart TD
 - 接口文档的多语言翻译位于`manifest/i18n/<locale>/apidoc/`目录下
 - 通过`i18n.enabled`配置控制是否开启多语言，关闭时前端隐藏语言切换按钮
 
-详见[I18N国际化](/docs/i18n)。
+详见：[I18N国际化](/docs/i18n)。
 
 ## 接口文档聚合
 
@@ -176,7 +154,7 @@ flowchart TD
 - 管理工作台入口：「开发中心 → 接口文档」
 - 接口文档支持在线调试和参数测试
 
-详见[接口文档](/docs/api-reference)。
+详见：[接口文档](/docs/api-reference)。
 
 ## 健康探针
 
