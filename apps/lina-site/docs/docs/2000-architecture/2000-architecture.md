@@ -62,7 +62,7 @@ graph TB
 
     Workflow -.->|规范驱动| Frontend
     Workflow -.->|规范驱动| Host
-    UI -->|"HTTP / WebSocket"| API
+    UI -->|HTTP| API
     Plugin -->|加载| Source
     Plugin -->|沙箱执行| Dynamic
     Svc --> DB
