@@ -6,7 +6,7 @@ on:
       - main
   pull_request:
     branches: ["**"]
-    
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -28,10 +28,6 @@ jobs:
           cache: yarn
           cache-dependency-path: apps/lina-site/yarn.lock
 
-      - name: Install dependencies
-        run: |
-          cd apps/lina-site && yarn
-
       - name: Build website
         run: |
-          cd apps/lina-site && make build
+          make build
