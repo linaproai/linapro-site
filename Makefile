@@ -61,6 +61,11 @@ dev:
 	echo "Starting $$SITE_NAME at http://$$HOST:$$PORT$$SITE_PATH (locale=$$LOCALE, package-manager=$$PACKAGE_MANAGER)"; \
 	eval "$$START_CMD"
 
+## check: 检查中文文档在所有 i18n locale 中均有对应翻译文件
+.PHONY: check
+check:
+	@bash .github/workflows/consistency-check.sh
+
 ## build: 编译生成官网静态文件（输出到 apps/lina-site/build/）
 .PHONY: build
 build:

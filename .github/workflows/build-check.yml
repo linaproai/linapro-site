@@ -28,6 +28,9 @@ jobs:
           cache: yarn
           cache-dependency-path: apps/lina-site/yarn.lock
 
+      - name: Check doc i18n consistency
+        run: make check
+
       - name: Build website
         run: |
           make build
