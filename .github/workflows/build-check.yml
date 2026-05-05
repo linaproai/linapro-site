@@ -26,11 +26,12 @@ jobs:
         with:
           node-version: 24
           cache: yarn
+          cache-dependency-path: apps/lina-site/yarn.lock
 
       - name: Install dependencies
         run: |
-          cd linapro-site/apps/lina-site && yarn
+          cd apps/lina-site && yarn
 
       - name: Build website
         run: |
-          cd linapro-site/apps/lina-site && make build
+          cd apps/lina-site && make build
