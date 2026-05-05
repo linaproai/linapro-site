@@ -6,6 +6,7 @@ on:
       - main
   pull_request:
     branches: ["**"]
+    
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -28,8 +29,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          yarn
+          cd linapro-site/apps/lina-site && yarn
 
       - name: Build website
         run: |
-          make build
+          cd linapro-site/apps/lina-site && make build
