@@ -203,6 +203,22 @@ Once the plugin is enabled, **Content Management → Article Management** automa
 
 To adjust permissions, go to **Permission Management → Role Management** and grant the relevant role the article management button permissions.
 
+**Found an issue? Report it with `/lina-feedback`:**
+
+If you spot a bug, missing functionality, or a UX problem during acceptance, describe it in Claude Code and AI will fix it with targeted precision:
+
+```
+/lina-feedback The article list pagination is broken — page 2 shows the same results as page 1
+```
+
+AI will:
+
+- Record the issue as an `FB-N` task in `tasks.md`
+- Investigate the root cause and apply a minimal, focused fix
+- Write an E2E test to verify the fix and check for regressions in related modules
+
+Be specific: describe "where, what you did, what you expected, and what you saw" to help AI zero in faster. You can report multiple issues at once — AI handles them one by one and delivers a fix summary when done.
+
 ## Step 5: Archive the Change
 
 After verifying that everything works, archive this iteration to lock in the specs as a project baseline.

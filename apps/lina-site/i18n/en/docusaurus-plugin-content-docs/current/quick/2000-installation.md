@@ -2,7 +2,7 @@
 slug: '/quick/installation'
 title: 'Installation'
 hide_title: true
-description: 'Get LinaPro up and running in minutes. This guide covers system requirements, the one-command install script for macOS, Linux, and Windows, database initialization, using Claude Code to complete dependency setup, and how to start the service and verify a successful installation.'
+description: 'Get LinaPro up and running in minutes. This guide covers the one-command install script for macOS, Linux, and Windows, custom install options, config file setup, database connection configuration, database initialization, and how to start the development service and confirm a successful installation. Complete the environment setup before running the install script.'
 keywords:
   - LinaPro
   - installation
@@ -11,21 +11,25 @@ keywords:
   - macOS installation
   - Linux installation
   - Windows installation
-  - system requirements
-  - Go
-  - Node.js
-  - pnpm
-  - MySQL
-  - Claude Code
-  - make dev
-  - database initialization
   - one-click install
+  - config.yaml
+  - database configuration
+  - database initialization
+  - make init
+  - make dev
+  - installation verification
+  - development service
+  - environment setup
+  - Git Bash
+  - WSL
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 LinaPro provides a one-command install script that supports macOS, Linux, and Windows (Git Bash or WSL). The full installation typically completes in a few minutes.
+
+Before running the script, complete the [Environment Setup](/quick/environment) to ensure Go, Node.js, pnpm, MySQL, and the other required components are installed.
 
 ## One-Command Install
 
@@ -75,44 +79,49 @@ The install script runs the following steps in sequence:
 4. Initialize the database schema and seed data (`make init confirm=init`)
 5. Load demo data (skip with `LINAPRO_SKIP_MOCK=1`)
 
-## Setting Up with Claude Code
+## Starting the Service
 
-After the install script finishes, open the project directory in Claude Code and let AI help you complete the remaining environment setup.
+### Configure the database connection
 
-**Install Claude Code:**
-
-```bash
-npm install -g @anthropic-ai/claude-code
-```
-
-**Open the project:**
+Once the install script finishes, enter the project directory and copy the config template to create your local config file:
 
 ```bash
 cd linapro
-claude
+cp config.yaml.example config.yaml
 ```
 
-Once inside Claude Code, just tell AI what you want to do — for example:
+Open `config.yaml` in your editor and update the database section to match your local MySQL setup:
 
+```yaml
+database:
+  host: 127.0.0.1
+  port: 3306
+  user: root
+  password: 12345678
+  dbname: linapro
 ```
-Check whether the development environment is configured correctly and start the dev service.
+
+The defaults assume `root:12345678@127.0.0.1:3306`. If your MySQL uses different credentials or a non-standard port, update those values here.
+
+### Initialize the database
+
+With the config in place, run the following command to create the schema and seed initial data:
+
+```bash
+make init confirm=init
 ```
 
-Claude Code automatically reads `CLAUDE.md` to understand the project structure and conventions, then helps you with environment verification, configuration adjustments, and service startup.
+This creates all required tables and writes the default configuration data and demo records into the database.
 
-:::info
-LinaPro is an AI-native framework. The `CLAUDE.md` at the project root contains complete engineering rules and the development workflow guide — Claude Code uses this as its operating context when assisting with development tasks.
-:::
+### Start the development server
 
-## Starting the Development Service
-
-Once setup is complete, start the frontend and backend with a single command:
+Start the frontend and backend with a single command:
 
 ```bash
 make dev
 ```
 
-When the service is up, open the following URLs:
+When the services are up, open the following URLs:
 
 | Service | URL |
 |---------|-----|

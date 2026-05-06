@@ -2,7 +2,7 @@
 slug: '/quick/installation'
 title: '快速安装'
 hide_title: true
-description: '本文介绍如何在几分钟内完成 LinaPro 框架的安装与初始配置，包括环境要求、一键安装脚本（支持 macOS、Linux 和 Windows 平台）、数据库初始化、使用 Claude Code 完成依赖安装，以及启动服务和验证安装结果的完整流程。'
+description: '本文介绍如何在几分钟内完成 LinaPro 框架的安装与初始配置，包括一键安装脚本的使用方式（支持 macOS、Linux 和 Windows 平台）、自定义安装选项、配置文件设置、数据库连接配置与初始化流程，以及启动开发服务和验证安装结果的完整步骤。在运行安装脚本之前，请先完成环境配置。'
 keywords:
   - LinaPro
   - 框架安装
@@ -11,21 +11,25 @@ keywords:
   - macOS安装
   - Linux安装
   - Windows安装
-  - 环境要求
-  - Go
-  - Node.js
-  - pnpm
-  - MySQL
-  - Claude Code
-  - make dev
-  - 数据库初始化
   - 一键安装
+  - config.yaml
+  - 数据库配置
+  - 数据库初始化
+  - make init
+  - make dev
+  - 安装验证
+  - 开发服务
+  - 环境配置
+  - Git Bash
+  - WSL
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 `LinaPro`提供一键安装脚本，支持`macOS`、`Linux`和`Windows`（`Git Bash`或`WSL`）平台，通常可在几分钟内完成完整安装。
+
+运行安装脚本前，请先参阅[环境配置](/quick/environment)，确保`Go`、`Node.js`、`pnpm`、`MySQL`等必要组件已正确安装。
 
 ## 一键安装
 
@@ -48,9 +52,6 @@ LINAPRO_DIR=~/workspace/linapro curl -fsSL https://linapro.ai/install.sh | bash
 
 # 安装指定版本
 LINAPRO_VERSION=v0.5.0 curl -fsSL https://linapro.ai/install.sh | bash
-
-# 跳过演示数据初始化
-LINAPRO_SKIP_MOCK=1 curl -fsSL https://linapro.ai/install.sh | bash
 ```
 
 </TabItem>
@@ -67,46 +68,49 @@ curl -fsSL https://linapro.ai/install.sh | bash
 </TabItem>
 </Tabs>
 
-安装脚本会依次执行以下步骤：
 
-1. 检查依赖环境（`Go`、`Node.js`、`pnpm`、`MySQL`）
-2. 克隆`LinaPro`源码仓库
-3. 安装后端和前端依赖
-4. 初始化数据库结构和基础数据（`make init confirm=init`）
-5. 加载演示数据（可通过`LINAPRO_SKIP_MOCK=1`跳过）
+## 启动服务
 
-## 依赖检查安装
+### 配置数据库连接
 
-安装脚本执行完成后，推荐使用`Claude Code`打开项目目录，让`AI`帮助完成后续环境配置和准备工作。
-
-**安装 Claude Code：**
-
-```bash
-npm install -g @anthropic-ai/claude-code
-```
-
-**打开项目目录：**
+安装脚本执行完成后，进入项目目录，将配置模板复制为正式配置文件：
 
 ```bash
 cd linapro
-claude
+cp config.yaml.example config.yaml
 ```
 
-进入`Claude Code`后，直接告诉`AI`你想做什么，例如：
+用编辑器打开`config.yaml`，找到数据库连接部分，将其修改为你本地`MySQL`的实际连接信息：
 
+```yaml
+database:
+  default:
+    link: "mysql:root:12345678@tcp(127.0.0.1:3306)/linapro?charset=utf8mb4&parseTime=true&loc=Local&multiStatements=true"
 ```
-帮我检查一下开发环境是否配置正确，并启动开发服务
+
+默认配置使用`root:12345678@127.0.0.1:3306`，如果你的`MySQL`使用了不同的用户名、密码或端口，请在此处更新。
+
+### 初始化数据库
+
+配置完成后，执行以下命令创建数据库表结构并写入初始数据：
+
+```bash
+make init confirm=init
 ```
 
-`Claude Code`会自动读取项目配置文件（`CLAUDE.md`），了解项目结构和规范，然后帮助你完成环境验证、配置调整和服务启动等工作。
+初始化完成后，数据库中将包含系统所需的基础表结构和默认配置数据。
 
-:::info
-`LinaPro`是一款`AI`原生框架，项目根目录下的`CLAUDE.md`包含了完整的工程规则和研发工作流说明，`Claude Code`会以此为依据辅助你完成开发工作。
-:::
+### 加载演示数据（可选）
 
-## 启动开发服务
+配置完成后，执行以下命令加载官方提供的演示数据：
 
-完成上述准备工作后，执行以下命令启动前后端服务：
+```bash
+make mock confirm=mock
+```
+
+### 启动开发服务
+
+执行以下命令启动前后端服务：
 
 ```bash
 make dev
