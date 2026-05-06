@@ -9,10 +9,10 @@ export default function Comments(): JSX.Element {
     <div className="docusaurus-mt-lg">
       <Giscus
         id="comments"
-        repo="gogf/gf-site"
-        repoId="R_kgDONDiuow"
+        data-repo="linaproai/linapro-site"
+        data-repo-id="R_kgDOSIbhHw"
         category="General"
-        categoryId="DIC_kwDONDiuo84Cj4QE"
+        categoryId="DIC_kwDOSIbhH84C8cwX"
         mapping="pathname"
         strict="1"
         reactionsEnabled="1"
