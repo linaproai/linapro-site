@@ -24,6 +24,17 @@ keywords:
 
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
+## Discord
+
+https://discord.gg/Hyn5qxPwg
+
+## 微信群
+
+扫码或微信添加： `389961817`，备注`linapro`，欢迎技术交流与合作洽谈。
+
+<img src={useBaseUrl('/img/wechat.png')} width={200} alt="微信交流群二维码" />
+
+
 ## QQ群
 
 | 群组 |	群号|	状态 |
@@ -32,15 +43,6 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 | `LinaPro.AI`实战`2`群	| `1094972900`	| 🟢 可加入 |
 | `LinaPro.AI`实战`3`群	| `1103340933`	| 🟢 可加入 |
 
-## 微信群
-
-扫码或微信添加： `389961817`，备注`linapro`，欢迎技术交流与合作洽谈。
-
-<img src={useBaseUrl('/img/wechat.png')} width={200} alt="微信交流群二维码" />
-
-## Discord
-
-https://discord.gg/Hyn5qxPwg
 
 ## GitHub Issues
 
