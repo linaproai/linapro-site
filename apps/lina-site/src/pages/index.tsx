@@ -3,6 +3,7 @@ import Translate, {translate} from '@docusaurus/Translate';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 import CodeBlock from '@theme/CodeBlock';
 import Layout from '@theme/Layout';
+import {useEffect, useState} from 'react';
 
 const REPO_URL = 'https://github.com/linaproai/linapro';
 const DOCS_URL = '/quick/overview';
@@ -489,64 +490,93 @@ function Strengths() {
 
 const previewSlots = [
     {
-        id: 'overview',
+        id: 'i18n',
+        img: '/img/preview/linapro-i18n.webp',
         caption: (
-            <Translate id="home.modules.preview.overview" description="Screenshot slot: workspace overview">
-                Workspace overview
+            <Translate id="home.modules.preview.i18n" description="Screenshot slot: i18n governance">
+                Framework-level I18n Governance
             </Translate>
         ),
     },
     {
-        id: 'rbac',
+        id: 'plugin',
+        img: '/img/preview/linapro-plugin.webp',
         caption: (
-            <Translate id="home.modules.preview.rbac" description="Screenshot slot: users & roles">
-                Users & role permissions
+            <Translate id="home.modules.preview.plugin" description="Screenshot slot: plugin management">
+                Plugin Management
             </Translate>
         ),
     },
     {
-        id: 'modules',
+        id: 'apidoc',
+        img: '/img/preview/linapro-apidoc.webp',
         caption: (
-            <Translate id="home.modules.preview.modules" description="Screenshot slot: business modules">
-                Business modules
+            <Translate id="home.modules.preview.apidoc" description="Screenshot slot: API docs">
+                Built-in API Docs
             </Translate>
         ),
     },
     {
-        id: 'monitor',
+        id: 'menu',
+        img: '/img/preview/linapro-menu.webp',
         caption: (
-            <Translate id="home.modules.preview.monitor" description="Screenshot slot: monitoring & audit">
-                Monitoring & audit
+            <Translate id="home.modules.preview.menu" description="Screenshot slot: menu management">
+                Menu Management
             </Translate>
         ),
     },
 ];
 
 function Modules() {
+    const imgUrls = [
+        useBaseUrl(previewSlots[0].img),
+        useBaseUrl(previewSlots[1].img),
+        useBaseUrl(previewSlots[2].img),
+        useBaseUrl(previewSlots[3].img),
+    ];
+    const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!lightboxSrc) return;
+        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setLightboxSrc(null); };
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+    }, [lightboxSrc]);
+
     return (
-        <section className="home-section home-section--modules">
-            <div className="container">
-                <h2 className="section-title">
-                    <Translate id="home.modules.title" description="Modules section title">
-                        A workspace ready to use on day one
-                    </Translate>
-                </h2>
-                <p className="section-lead">
-                    <Translate id="home.modules.lead" description="Modules section lead">
-                        Start with a ready-to-use management workspace, then extend or replace modules as your product grows.
-                    </Translate>
-                </p>
-                <div className="modules-preview-grid">
-                    {previewSlots.map((slot) => (
-                        <div key={slot.id} className="modules-preview-card">
-                            <div className="modules-preview-placeholder">
-                                {slot.caption}
-                            </div>
-                        </div>
-                    ))}
+        <>
+            {lightboxSrc && (
+                <div className="preview-lightbox" onClick={() => setLightboxSrc(null)}>
+                    <img src={lightboxSrc} className="preview-lightbox-img" />
                 </div>
-            </div>
-        </section>
+            )}
+            <section className="home-section home-section--modules">
+                <div className="container">
+                    <h2 className="section-title">
+                        <Translate id="home.modules.title" description="Modules section title">
+                            A workspace ready to use on day one
+                        </Translate>
+                    </h2>
+                    <p className="section-lead">
+                        <Translate id="home.modules.lead" description="Modules section lead">
+                            Start with a ready-to-use management workspace, then extend or replace modules as your product grows.
+                        </Translate>
+                    </p>
+                    <div className="modules-preview-grid">
+                        {previewSlots.map((slot, idx) => (
+                            <div key={slot.id} className="modules-preview-card">
+                                <img
+                                    src={imgUrls[idx]}
+                                    alt={slot.id}
+                                    className="modules-preview-img"
+                                    onClick={() => setLightboxSrc(imgUrls[idx])}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+        </>
     );
 }
 
@@ -591,12 +621,6 @@ function QuickStart() {
                             </CodeBlock>
                         </div>
                     ))}
-                </div>
-                <div className="quickstart-footnote">
-                    <Translate id="home.quickstart.footnote" description="QuickStart footnote">
-                        Default account:
-                    </Translate>{' '}
-                    <code>admin</code> / <code>admin123</code>
                 </div>
             </div>
         </section>
