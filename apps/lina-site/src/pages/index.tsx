@@ -34,7 +34,7 @@ function HomepageHeader() {
 
                 <p className="hero-lead">
                     <Translate id="home.hero.lead" description="Hero lead paragraph">
-                        LinaPro helps teams build production-grade full-stack applications with AI, while keeping architecture, testing, and governance under control.
+                        Building production-grade full-stack applications with AI, while keeping architecture, testing, and governance under control.
                     </Translate>
                 </p>
 
