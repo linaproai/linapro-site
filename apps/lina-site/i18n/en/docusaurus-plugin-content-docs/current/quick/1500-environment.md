@@ -42,9 +42,6 @@ LinaPro depends on the following components during source development. Install t
 | `pnpm` | `10.0+` | Frontend package manager |
 | `MySQL` | `8.0+` | Relational database |
 | `Make` | - | Project command entrypoint |
-| `Claude Code` | `latest` | AI coding assistant and OpenSpec workflow runtime |
-| `OpenSpec` | `latest` | Spec-driven workflow CLI |
-| `goframe-v2` skill | `latest` | GoFrame-specific AI skill |
 
 ### Git
 

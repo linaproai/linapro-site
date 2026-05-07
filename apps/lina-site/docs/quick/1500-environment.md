@@ -42,10 +42,6 @@ import TabItem from '@theme/TabItem';
 | `pnpm` | `10.0+` | 前端包管理器 |
 | `MySQL` | `8.0+` | 关系型数据库 |
 | `Make` | - | 项目命令入口 |
-| `Claude Code` | `latest` | AI 编码助手，OpenSpec 工作流运行载体 |
-| `OpenSpec` | `latest` | 规范驱动工作流 CLI |
-| `goframe-v2` 技能 | `latest` | GoFrame 专属 AI 技能 |
-
 
 ### Git
 

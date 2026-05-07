@@ -1,0 +1,30 @@
+---
+slug: '/docs/tools'
+title: 'Dev Tools'
+hide_title: true
+description: 'An overview of the developer tooling built into LinaPro — covering every make command with usage examples, and the full AI skills library for frontend design, code review, testing, performance auditing, and OpenSpec workflows.'
+keywords:
+  - developer tools
+  - make commands
+  - AI skills
+  - development workflow
+  - LinaPro tools
+  - build tools
+  - test tools
+  - AI collaboration
+  - dev commands
+  - skills library
+---
+
+## Dev Tools
+
+`LinaPro` ships a complete toolchain that covers everyday development, build and release, testing, and AI-assisted workflows.
+
+- **[Dev Commands](/docs/dev-commands)**: A full reference for every `make` command at the project root — what each command does, its available options, and usage examples to get you up to speed quickly.
+- **[Dev Skills](/docs/dev-skills)**: The project's built-in AI skill library, spanning frontend design, code review, test coverage, performance auditing, and `OpenSpec` workflows — giving AI tools the context they need to make framework-aware decisions in each specific scenario.
+
+## Related Documents
+
+import DocCardList from '@theme/DocCardList';
+
+<DocCardList />

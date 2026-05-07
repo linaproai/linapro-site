@@ -115,6 +115,14 @@
     "message": "从探索、提案、实现到审查归档，AI 始终基于已验证规范推进，需求、代码与测试持续对齐，减少架构漂移。",
     "description": "Strength 1 desc"
   },
+  "home.strength.skills.title": {
+    "message": "丰富的 AI 技能体系",
+    "description": "Strength skills title"
+  },
+  "home.strength.skills.desc": {
+    "message": "内置涵盖代码生成、审查、测试与工作流自动化的 AI 技能库，可按需组合编排与灵活扩展，让 AI 能力深度融入研发全链路。",
+    "description": "Strength skills desc"
+  },
   "home.strength.contract.title": {
     "message": "全栈契约一体化",
     "description": "Strength contract title"
@@ -162,14 +170,6 @@
   "home.strength.distributed.desc": {
     "message": "权限拓扑同步、分布式锁、键值缓存均原生集群感知；从单节点到完整集群，无需任何架构改造即可平滑扩展。",
     "description": "Strength 5 desc"
-  },
-  "home.strength.upgrade.title": {
-    "message": "可追踪的升级治理",
-    "description": "Strength upgrade title"
-  },
-  "home.strength.upgrade.desc": {
-    "message": "框架与源码插件升级走显式流程，升级前校验风险，升级中同步结构、菜单、权限与治理资源，避免隐性版本漂移。",
-    "description": "Strength upgrade desc"
   },
   "home.strength.builtin.title": {
     "message": "生产就绪开箱即用",

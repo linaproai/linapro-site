@@ -314,11 +314,11 @@ const IconNetwork = () => (
     </svg>
 );
 
-const IconHistory = () => (
+const IconSkillLib = () => (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M4 5v5h5" />
-        <path d="M4.8 14a8 8 0 1 0 2-8.2L4 10" />
-        <path d="M12 8v4l3 2" />
+        <rect x="7" y="7" width="10" height="10" rx="1" />
+        <path d="M10 7V5M14 7V5M10 19v-2M14 19v-2M7 10H5M7 14H5M19 10h-2M19 14h-2" />
+        <circle cx="12" cy="12" r="2" />
     </svg>
 );
 
@@ -341,6 +341,20 @@ const strengths = [
         desc: (
             <Translate id="home.strength.workflow.desc" description="Strength 1 desc">
                 AI moves from exploration through proposal, implementation, review, and archiving against verified specs, keeping requirements, code, and tests aligned as the system evolves.
+            </Translate>
+        ),
+    },
+    {
+        id: 'skills',
+        Icon: IconSkillLib,
+        title: (
+            <Translate id="home.strength.skills.title" description="Strength skills title">
+                Rich AI Skills Ecosystem
+            </Translate>
+        ),
+        desc: (
+            <Translate id="home.strength.skills.desc" description="Strength skills desc">
+                A built-in library of purpose-built AI skills spanning code assistance, review, test generation, and workflow automation — composable across the full development lifecycle and extensible to any project context.
             </Translate>
         ),
     },
@@ -425,20 +439,6 @@ const strengths = [
         desc: (
             <Translate id="home.strength.distributed.desc" description="Strength 5 desc">
                 Permission topology sync, distributed locks, and the key-value cache are cluster-aware from the start, letting one node grow into a full cluster.
-            </Translate>
-        ),
-    },
-    {
-        id: 'upgrade',
-        Icon: IconHistory,
-        title: (
-            <Translate id="home.strength.upgrade.title" description="Strength upgrade title">
-                Traceable Upgrade Governance
-            </Translate>
-        ),
-        desc: (
-            <Translate id="home.strength.upgrade.desc" description="Strength upgrade desc">
-                Framework and source plugin upgrades follow a clear flow: validate risk first, then sync schemas, menus, permissions, and governance resources to prevent drift.
             </Translate>
         ),
     },
