@@ -152,31 +152,12 @@ This mechanism ensures permission changes take effect across all nodes quickly â
 
 ## Distributed Task Scheduling
 
-In cluster mode, the persistent scheduled task subsystem controls task execution scope through a per-task **scope** field, rather than relying on lock competition. When creating a task, choose one of two execution scopes:
+In cluster mode, the persistent scheduled task subsystem uses distributed locks to prevent duplicate task execution:
 
-| Scope | Description | Use case |
-|-------|-------------|----------|
-| `master_only` | Executes only on the current primary node; replicas detect the Cron trigger and skip, writing a skip log | Global singleton maintenance tasks: data archiving, aggregation reports |
-| `all_node` | Each node executes independently without coordination | Node-local tasks: local cache refresh, node health checks |
-
-```mermaid
-sequenceDiagram
-    participant N1 as Node 1 (Primary)
-    participant N2 as Node 2 (Replica)
-    participant DB as MySQL
-
-    Note over N1,N2: Cron fires, all nodes are aware
-
-    alt scope = master_only
-        N1->>DB: Execute task, write execution log
-        N2->>DB: Write skip log (non-primary node, skipped)
-    else scope = all_node
-        N1->>DB: Execute independently, write execution log
-        N2->>DB: Execute independently, write execution log
-    end
-```
-
-All execution results are written to the shared database and are visible to all nodes through the management workspace.
+- Each time a task fires, nodes compete to acquire a distributed lock
+- The node that acquires the lock executes the task; all other nodes skip
+- After the task completes, the lock is released and the result is written to the database
+- All nodes can view the task execution history
 
 ## Distributed Locks
 

@@ -2,16 +2,15 @@
 slug: '/quick/installation'
 title: '快速安装'
 hide_title: true
-description: '本文介绍如何在几分钟内完成 LinaPro 框架的安装与初始配置，包括一键安装脚本的使用方式（支持 macOS、Linux 和 Windows 平台）、自定义安装选项、配置文件设置、数据库连接配置与初始化流程，以及启动开发服务和验证安装结果的完整步骤。在运行安装脚本之前，请先完成环境配置。'
+description: '本文介绍如何在几分钟内完成 LinaPro 框架的安装与初始配置，包括通过 Git 克隆仓库获取源码（支持最新实验版本与指定稳定发布版本）、配置文件设置、数据库连接配置与初始化流程，以及加载演示数据、启动开发服务和验证安装结果的完整步骤。克隆仓库之前，请先完成环境配置。'
 keywords:
   - LinaPro
   - 框架安装
   - 快速开始
-  - 安装脚本
-  - macOS安装
-  - Linux安装
-  - Windows安装
-  - 一键安装
+  - git clone
+  - 克隆仓库
+  - 源码下载
+  - 稳定版本
   - config.yaml
   - 数据库配置
   - 数据库初始化
@@ -20,69 +19,38 @@ keywords:
   - 安装验证
   - 开发服务
   - 环境配置
-  - Git Bash
-  - WSL
+  - 演示数据
+  - make mock
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
+克隆仓库前，请先参阅[环境配置](/quick/environment)，确保`Go`、`Node.js`、`pnpm`、`MySQL`等必要组件已正确安装。
 
-`LinaPro`提供一键安装脚本，支持`macOS`、`Linux`和`Windows`（`Git Bash`或`WSL`）平台，通常可在几分钟内完成完整安装。
+## 克隆仓库
 
-运行安装脚本前，请先参阅[环境配置](/quick/environment)，确保`Go`、`Node.js`、`pnpm`、`MySQL`等必要组件已正确安装。
-
-## 一键安装
-
-`LinaPro`提供官方安装脚本，执行后会自动完成源码克隆、依赖安装和数据库初始化。
-
-<Tabs groupId="platform">
-<TabItem value="mac-linux" label="macOS / Linux" default>
+使用以下命令获取框架源码：
 
 ```bash
-curl -fsSL https://linapro.ai/install.sh | bash
+# 安装最新实验版本
+git clone --depth 1 https://github.com/linaproai/linapro.git linapro
+
+# 或者指定稳定发布版本，如 v0.1.0
+git clone --depth 1 --branch v0.1.0 https://github.com/linaproai/linapro.git linapro
 ```
-
-安装完成后，源码默认位于当前工作目录下的`./linapro`子目录中。
-
-**自定义安装选项：**
-
-```bash
-# 指定安装目录
-LINAPRO_DIR=~/workspace/linapro curl -fsSL https://linapro.ai/install.sh | bash
-
-# 安装指定版本
-LINAPRO_VERSION=v0.5.0 curl -fsSL https://linapro.ai/install.sh | bash
-```
-
-</TabItem>
-<TabItem value="windows" label="Windows（Git Bash / WSL）">
-
-`Windows`用户请在`Git Bash`或`WSL`环境中执行安装命令，不支持在原生`PowerShell`中直接运行。
-
-```bash
-curl -fsSL https://linapro.ai/install.sh | bash
-```
-
-**WSL 用户提示：** 如果使用`WSL 2`，建议将项目目录放在`WSL`文件系统内（如`~/workspace/linapro`），避免跨文件系统访问导致的性能问题。
-
-</TabItem>
-</Tabs>
-
 
 ## 启动服务
 
 ### 配置数据库连接
 
-安装脚本执行完成后，进入项目目录，将配置模板复制为正式配置文件：
+克隆完成后，进入项目目录，将配置模板复制为正式配置文件：
 
 ```bash
 cd linapro
-cp config.yaml.example config.yaml
+cp apps/lina-core/manifest/config/config.template.yaml apps/lina-core/manifest/config/config.yaml
 ```
 
 用编辑器打开`config.yaml`，找到数据库连接部分，将其修改为你本地`MySQL`的实际连接信息：
 
-```yaml
+```yaml title="apps/lina-core/manifest/config/config.yaml"
 database:
   default:
     link: "mysql:root:12345678@tcp(127.0.0.1:3306)/linapro?charset=utf8mb4&parseTime=true&loc=Local&multiStatements=true"
@@ -139,6 +107,8 @@ make status            # 查看服务运行状态
 make init confirm=init # 重新初始化数据库
 make mock confirm=mock # 重新加载演示数据
 make test              # 运行完整 E2E 测试套件
+make build             # 编译生成可发布的二进制文件
+make image             # 构建 Docker 镜像
 ```
 
 ## 安装验证

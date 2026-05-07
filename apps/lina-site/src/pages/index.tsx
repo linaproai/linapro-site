@@ -584,7 +584,7 @@ const quickStartBlocks = [
     {
         id: 'install',
         label: 'INSTALL',
-        body: 'curl -fsSL https://linapro.ai/install.sh | bash',
+        body: 'git clone --depth 1 https://github.com/linaproai/linapro.git linapro',
     },
     {
         id: 'init',

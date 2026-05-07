@@ -2,16 +2,15 @@
 slug: '/quick/installation'
 title: 'Installation'
 hide_title: true
-description: 'This guide explains how to install and initialize LinaPro in a few minutes, including how to use the one-command install script on macOS, Linux, and Windows, how to customize installation options, how to set up config.yaml and the database connection, how to initialize the database, how to load demo data, and how to start the development service and verify that the installation works. Complete the environment setup first.'
+description: 'How to install and initialize LinaPro in a few minutes — cloning the repository, configuring the database connection, initializing the database schema, loading demo data, and starting the development service. Complete the environment setup before cloning.'
 keywords:
   - LinaPro
   - framework installation
   - quick start
-  - install script
-  - macOS installation
-  - Linux installation
-  - Windows installation
-  - one-command install
+  - git clone
+  - clone repository
+  - source code
+  - stable release
   - config.yaml
   - database configuration
   - database initialization
@@ -20,68 +19,38 @@ keywords:
   - installation verification
   - development service
   - environment setup
-  - Git Bash
-  - WSL
+  - demo data
+  - make mock
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
+Before cloning the repository, read [Environment Setup](/quick/environment) and make sure required components such as `Go`, `Node.js`, `pnpm`, and `MySQL` are installed correctly.
 
-LinaPro provides a one-command install script for `macOS`, `Linux`, and `Windows` (`Git Bash` or `WSL`). A complete installation usually finishes in a few minutes.
+## Clone the Repository
 
-Before running the install script, read [Environment Setup](/quick/environment) and make sure required components such as `Go`, `Node.js`, `pnpm`, and `MySQL` are installed correctly.
-
-## One-Command Install
-
-LinaPro provides an official install script that automatically clones the source code, installs dependencies, and initializes the database.
-
-<Tabs groupId="platform">
-<TabItem value="mac-linux" label="macOS / Linux" default>
+Use the following commands to fetch the framework source code:
 
 ```bash
-curl -fsSL https://linapro.ai/install.sh | bash
+# Install the latest experimental version
+git clone --depth 1 https://github.com/linaproai/linapro.git linapro
+
+# Or pin to a specific stable release, e.g., v0.1.0
+git clone --depth 1 --branch v0.1.0 https://github.com/linaproai/linapro.git linapro
 ```
-
-After installation, the source code is placed in a `./linapro` subdirectory under the current working directory by default.
-
-**Custom install options:**
-
-```bash
-# Specify the installation directory
-LINAPRO_DIR=~/workspace/linapro curl -fsSL https://linapro.ai/install.sh | bash
-
-# Install a specific version
-LINAPRO_VERSION=v0.5.0 curl -fsSL https://linapro.ai/install.sh | bash
-```
-
-</TabItem>
-<TabItem value="windows" label="Windows (Git Bash / WSL)">
-
-`Windows` users should run the install command in `Git Bash` or `WSL`. Running it directly in native `PowerShell` is not supported.
-
-```bash
-curl -fsSL https://linapro.ai/install.sh | bash
-```
-
-**WSL note:** If you use `WSL 2`, keep the project directory inside the `WSL` filesystem, such as `~/workspace/linapro`, to avoid performance issues caused by cross-filesystem access.
-
-</TabItem>
-</Tabs>
 
 ## Starting the Service
 
 ### Configure the Database Connection
 
-After the install script finishes, enter the project directory and copy the config template as the active config file:
+After cloning, enter the project directory and copy the config template as the active config file:
 
 ```bash
 cd linapro
-cp config.yaml.example config.yaml
+cp apps/lina-core/manifest/config/config.template.yaml apps/lina-core/manifest/config/config.yaml
 ```
 
 Open `config.yaml` in an editor, find the database connection section, and update it to match your local `MySQL` connection details:
 
-```yaml
+```yaml title="apps/lina-core/manifest/config/config.yaml"
 database:
   default:
     link: "mysql:root:12345678@tcp(127.0.0.1:3306)/linapro?charset=utf8mb4&parseTime=true&loc=Local&multiStatements=true"
@@ -138,6 +107,8 @@ make status            # Check service status
 make init confirm=init # Reinitialize the database
 make mock confirm=mock # Reload demo data
 make test              # Run the full E2E test suite
+make build             # Build a production-ready binary
+make image             # Build the Docker image
 ```
 
 ## Installation Verification
