@@ -20,8 +20,8 @@ keywords:
 
 `LinaPro` ships a complete toolchain that covers everyday development, build and release, testing, and AI-assisted workflows.
 
-- **[Dev Commands](/docs/dev-commands)**: A full reference for every `make` command at the project root — what each command does, its available options, and usage examples to get you up to speed quickly.
-- **[Dev Skills](/docs/dev-skills)**: The project's built-in AI skill library, spanning frontend design, code review, test coverage, performance auditing, and `OpenSpec` workflows — giving AI tools the context they need to make framework-aware decisions in each specific scenario.
+- **[Dev Commands](/docs/commands)**: A full reference for every `make` command at the project root — what each command does, its available options, and usage examples to get you up to speed quickly.
+- **[Dev Skills](/docs/agent-skills)**: The project's built-in AI skill library, spanning frontend design, code review, test coverage, performance auditing, and `OpenSpec` workflows — giving AI tools the context they need to make framework-aware decisions in each specific scenario.
 
 ## Related Documents
 

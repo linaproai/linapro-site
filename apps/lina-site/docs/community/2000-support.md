@@ -2,7 +2,7 @@
 slug: '/community/support'
 title: '支持我们'
 hide_title: true
-description: '本文说明支持 LinaPro 长期维护的实际方式，包括反馈可复现问题、贡献文档、完善示例、分享生产实践、参与社区讨论，以及在未来捐赠渠道开放后通过官方入口支持开源项目持续发展。'
+description: '本文说明支持 LinaPro 长期维护的实际方式，包括反馈可复现问题、贡献文档、完善示例、分享生产实践、参与社区讨论，以及通过微信或支付宝捐赠支持开源项目持续发展。捐赠时请备注自己的 GitHub 或 Gitee 账号名称，便于后续整理捐赠记录。'
 keywords:
   - LinaPro
   - 支持 LinaPro
@@ -22,7 +22,18 @@ keywords:
   - AI 原生框架
 ---
 
+import useBaseUrl from '@docusaurus/useBaseUrl';
 
-## 捐赠渠道
+我们当前接受来自微信或支付宝的捐赠。捐赠时请备注自己的`GitHub`或`Gitee`账号名称，便于我们整理捐赠记录并致谢。
 
-捐赠信息尚未最终确定。官方捐赠渠道准备完成后，本页会补充入口和使用说明。
+## 支付宝
+
+<img src={useBaseUrl('/img/donate-alipay.webp')} style={{ width: '300px', maxWidth: '100%' }} alt="支付宝捐赠二维码" />
+
+## 微信
+
+<img src={useBaseUrl('/img/donate-wechat.webp')} style={{ width: '300px', maxWidth: '100%' }} alt="微信捐赠二维码" />
+
+## 捐赠记录
+
+TODO
