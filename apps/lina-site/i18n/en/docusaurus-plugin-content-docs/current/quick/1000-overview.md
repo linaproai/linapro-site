@@ -1,6 +1,6 @@
 ---
 slug: '/quick/overview'
-title: 'Project Overview'
+title: 'Overview'
 hide_title: true
 description: 'A comprehensive introduction to LinaPro — its background, architecture, and core capabilities. LinaPro is an AI-native full-stack framework built on Go + Vue 3, featuring a dual-mode plugin system, full RBAC permission management, scheduled task scheduling, live API documentation, a spec-driven OpenSpec development workflow, and a lifecycle-spanning AI skill set for building sustainable, continuously deliverable business systems.'
 keywords:

@@ -2,16 +2,16 @@
 slug: '/quick/installation'
 title: 'Installation'
 hide_title: true
-description: 'Get LinaPro up and running in minutes. This guide covers the one-command install script for macOS, Linux, and Windows, custom install options, config file setup, database connection configuration, database initialization, and how to start the development service and confirm a successful installation. Complete the environment setup before running the install script.'
+description: 'This guide explains how to install and initialize LinaPro in a few minutes, including how to use the one-command install script on macOS, Linux, and Windows, how to customize installation options, how to set up config.yaml and the database connection, how to initialize the database, how to load demo data, and how to start the development service and verify that the installation works. Complete the environment setup first.'
 keywords:
   - LinaPro
-  - installation
+  - framework installation
   - quick start
   - install script
   - macOS installation
   - Linux installation
   - Windows installation
-  - one-click install
+  - one-command install
   - config.yaml
   - database configuration
   - database initialization
@@ -27,13 +27,13 @@ keywords:
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-LinaPro provides a one-command install script that supports macOS, Linux, and Windows (Git Bash or WSL). The full installation typically completes in a few minutes.
+LinaPro provides a one-command install script for `macOS`, `Linux`, and `Windows` (`Git Bash` or `WSL`). A complete installation usually finishes in a few minutes.
 
-Before running the script, complete the [Environment Setup](/quick/environment) to ensure Go, Node.js, pnpm, MySQL, and the other required components are installed.
+Before running the install script, read [Environment Setup](/quick/environment) and make sure required components such as `Go`, `Node.js`, `pnpm`, and `MySQL` are installed correctly.
 
 ## One-Command Install
 
-The official install script handles source checkout, dependency installation, and database initialization automatically.
+LinaPro provides an official install script that automatically clones the source code, installs dependencies, and initializes the database.
 
 <Tabs groupId="platform">
 <TabItem value="mac-linux" label="macOS / Linux" default>
@@ -42,117 +42,111 @@ The official install script handles source checkout, dependency installation, an
 curl -fsSL https://linapro.ai/install.sh | bash
 ```
 
-After installation, the source code is placed in a `./linapro` subdirectory of your current working directory by default.
+After installation, the source code is placed in a `./linapro` subdirectory under the current working directory by default.
 
 **Custom install options:**
 
 ```bash
-# Install to a specific directory
+# Specify the installation directory
 LINAPRO_DIR=~/workspace/linapro curl -fsSL https://linapro.ai/install.sh | bash
 
 # Install a specific version
 LINAPRO_VERSION=v0.5.0 curl -fsSL https://linapro.ai/install.sh | bash
-
-# Skip demo data initialization
-LINAPRO_SKIP_MOCK=1 curl -fsSL https://linapro.ai/install.sh | bash
 ```
 
 </TabItem>
 <TabItem value="windows" label="Windows (Git Bash / WSL)">
 
-Windows users should run the install command inside Git Bash or WSL. Running it in native PowerShell is not supported.
+`Windows` users should run the install command in `Git Bash` or `WSL`. Running it directly in native `PowerShell` is not supported.
 
 ```bash
 curl -fsSL https://linapro.ai/install.sh | bash
 ```
 
-**WSL note:** If you're using WSL 2, keep the project directory inside the WSL filesystem (e.g., `~/workspace/linapro`) to avoid cross-filesystem performance issues.
+**WSL note:** If you use `WSL 2`, keep the project directory inside the `WSL` filesystem, such as `~/workspace/linapro`, to avoid performance issues caused by cross-filesystem access.
 
 </TabItem>
 </Tabs>
 
-The install script runs the following steps in sequence:
-
-1. Check dependencies (`Go`, `Node.js`, `pnpm`, `MySQL`)
-2. Clone the LinaPro source repository
-3. Install backend and frontend dependencies
-4. Initialize the database schema and seed data (`make init confirm=init`)
-5. Load demo data (skip with `LINAPRO_SKIP_MOCK=1`)
-
 ## Starting the Service
 
-### Configure the database connection
+### Configure the Database Connection
 
-Once the install script finishes, enter the project directory and copy the config template to create your local config file:
+After the install script finishes, enter the project directory and copy the config template as the active config file:
 
 ```bash
 cd linapro
 cp config.yaml.example config.yaml
 ```
 
-Open `config.yaml` in your editor and update the database section to match your local MySQL setup:
+Open `config.yaml` in an editor, find the database connection section, and update it to match your local `MySQL` connection details:
 
 ```yaml
 database:
-  host: 127.0.0.1
-  port: 3306
-  user: root
-  password: 12345678
-  dbname: linapro
+  default:
+    link: "mysql:root:12345678@tcp(127.0.0.1:3306)/linapro?charset=utf8mb4&parseTime=true&loc=Local&multiStatements=true"
 ```
 
-The defaults assume `root:12345678@127.0.0.1:3306`. If your MySQL uses different credentials or a non-standard port, update those values here.
+The default configuration uses `root:12345678@127.0.0.1:3306`. If your `MySQL` instance uses a different username, password, or port, update the value here.
 
-### Initialize the database
+### Initialize the Database
 
-With the config in place, run the following command to create the schema and seed initial data:
+After the config is ready, run the following command to create the database schema and write the initial data:
 
 ```bash
 make init confirm=init
 ```
 
-This creates all required tables and writes the default configuration data and demo records into the database.
+After initialization, the database contains the basic table structure and default configuration data required by the system.
 
-### Start the development server
+### Load Demo Data (Optional)
 
-Start the frontend and backend with a single command:
+After the config is ready, run the following command to load the official demo data:
+
+```bash
+make mock confirm=mock
+```
+
+### Start the Development Service
+
+Run the following command to start both frontend and backend services:
 
 ```bash
 make dev
 ```
 
-When the services are up, open the following URLs:
+When the services start successfully, visit:
 
 | Service | URL |
 |---------|-----|
 | Default management workspace | `http://localhost:5666` |
-| Backend API service | `http://localhost:8080` |
+| Backend `API` service | `http://localhost:8080` |
 
-Log in to the management workspace with the default credentials:
+Log in to the management workspace with the default account:
 
 | Field | Value |
 |-------|-------|
-| Username | `admin` |
+| Account | `admin` |
 | Password | `admin123` |
 
 ## Common Commands
 
 ```bash
-make dev               # Start the frontend and backend services
+make dev               # Start frontend and backend services
 make stop              # Stop all local services
-make status            # Check service process status
-make init confirm=init # Re-initialize the database
+make status            # Check service status
+make init confirm=init # Reinitialize the database
 make mock confirm=mock # Reload demo data
 make test              # Run the full E2E test suite
 ```
 
-## Verifying the Installation
+## Installation Verification
 
-After starting the service, open `http://localhost:5666` in a browser and log in with `admin / admin123`. If you can access the management workspace normally, the installation is complete.
+After the service starts, open `http://localhost:5666` in your browser and log in with `admin / admin123`. If you can enter the management workspace normally, the installation is complete.
 
-If you run into issues, try these troubleshooting steps:
+If you run into issues, use the following checklist:
 
-1. Confirm that MySQL is running and that the database connection settings in `config.yaml` are correct
-2. Check the backend log output for any errors
-3. Run `make status` to verify that both frontend and backend processes are running
-4. If the issue persists, visit [Community](/community) for help
+1. Confirm that `MySQL` is running and that the database connection in `config.yaml` is correct
+2. Check backend log output for service errors
+3. Run `make status` to inspect frontend and backend process status
+4. If the issue is still unresolved, visit [Community](/community) for help
