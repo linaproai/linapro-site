@@ -222,6 +222,30 @@ const config: Config = {
       // 默认支持的语言 https://github.com/FormidableLabs/prism-react-renderer/blob/master/packages/generate-prism-languages/index.ts#L9-L23
       // 默认支持的语言 "markup","jsx","tsx","swift","kotlin","objectivec","js-extras","reason","rust","graphql","yaml","go","cpp","markdown","python","json"
     },
+    // 搜索配置
+    algolia: {
+      // The application ID provided by Algolia
+      appId: 'JW5GFJ6RCL',
+
+      // Public API key: it is safe to commit it
+      apiKey: '8365f8bf9f2f6af4f2703e5c2e68ec08',
+
+      indexName: 'linapro',
+
+      // Optional: see doc section below
+      contextualSearch: true,
+
+      // Optional: Algolia search parameters
+      searchParameters: {},
+
+      // Optional: path for search page that enabled by default (`false` to disable it)
+      searchPagePath: 'search',
+
+      // Optional: whether the insights feature is enabled or not on Docsearch (`false` by default)
+      insights: false,
+
+      //... other Algolia params
+    },
   } satisfies Preset.ThemeConfig,
   scripts: [
     {
