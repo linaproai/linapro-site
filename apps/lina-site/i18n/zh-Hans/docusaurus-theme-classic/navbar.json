@@ -14,5 +14,9 @@
   "item.label.🌐 Community": {
     "message": "🌐 开源社区",
     "description": "Navbar item with label Open Source Community"
+  },
+  "item.label.🖥️ Demo": {
+    "message": "🖥️ 后台演示",
+    "description": "Navbar item with label Demo"
   }
 }
