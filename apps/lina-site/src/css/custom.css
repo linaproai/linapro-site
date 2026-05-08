@@ -612,6 +612,87 @@
   color: #c75975;
 }
 
+/* Match the compact DocSearch v3 navbar search box used by goframe.org while
+   keeping the current Docusaurus 3.10 / DocSearch v4 implementation. */
+body .DocSearch-Button {
+  --docsearch-searchbox-background: #ebedf0;
+  --docsearch-searchbox-focus-background: #ffffff;
+  --docsearch-searchbox-shadow: inset 0 0 0 2px var(--ifm-color-primary);
+  --docsearch-muted-color: #969faf;
+  --docsearch-key-gradient: linear-gradient(-225deg, #d5dbe4, #f8f8f8);
+  --docsearch-key-shadow: inset 0 -2px 0 0 #cdcde6,
+    inset 0 0 1px 1px #ffffff, 0 1px 2px 1px rgba(30, 35, 90, 0.4);
+  --docsearch-key-pressed-shadow: inset 0 -2px 0 0 #cdcde6,
+    inset 0 0 1px 1px #ffffff, 0 1px 1px 0 rgba(30, 35, 90, 0.4);
+  background: var(--docsearch-searchbox-background);
+  border: 0;
+  border-radius: 40px;
+  color: var(--docsearch-muted-color);
+  font-weight: 500;
+  height: 36px;
+  margin: 0 0 0 16px;
+  padding: 0 8px;
+}
+
+[data-theme='dark'] body .DocSearch-Button {
+  --docsearch-searchbox-background: #090a11;
+  --docsearch-searchbox-focus-background: #000000;
+  --docsearch-muted-color: #7f8497;
+  --docsearch-key-gradient: linear-gradient(-26.5deg, #565872, #31355b);
+  --docsearch-key-shadow: inset 0 -2px 0 0 #282d55,
+    inset 0 0 1px 1px #51577d, 0 2px 2px 0 rgba(3, 4, 9, 0.3);
+  --docsearch-key-pressed-shadow: inset 0 -2px 0 0 #282d55,
+    inset 0 0 1px 1px #51577d, 0 1px 1px 0 rgba(3, 4, 9, 0.3);
+}
+
+body .DocSearch-Button:active,
+body .DocSearch-Button:focus,
+body .DocSearch-Button:hover {
+  background: var(--docsearch-searchbox-focus-background);
+  box-shadow: var(--docsearch-searchbox-shadow);
+  color: var(--docsearch-text-color);
+  outline: none;
+}
+
+body .DocSearch-Button-Container {
+  align-items: center;
+  display: flex;
+}
+
+body .DocSearch-Button .DocSearch-Search-Icon {
+  color: var(--docsearch-text-color);
+  stroke-width: 1.6;
+}
+
+body .DocSearch-Button-Placeholder {
+  font-size: 1rem;
+  padding: 0 12px 0 6px;
+}
+
+body .DocSearch-Button-Key {
+  background: var(--docsearch-key-gradient);
+  border: 0;
+  border-radius: 3px;
+  box-shadow: var(--docsearch-key-shadow) !important;
+  color: var(--docsearch-muted-color);
+  font-size: 14px;
+  height: 18px;
+  margin-right: 0.4em;
+  padding: 0 0 2px;
+  position: relative;
+  top: -1px;
+  width: 20px;
+}
+
+body .DocSearch-Button-Key--ctrl {
+  width: 33px;
+}
+
+body .DocSearch-Button-Key--pressed {
+  box-shadow: var(--docsearch-key-pressed-shadow) !important;
+  transform: translate3d(0, 1px, 0);
+}
+
 body .button {
   display: inline-block;
   border-radius: 5px;

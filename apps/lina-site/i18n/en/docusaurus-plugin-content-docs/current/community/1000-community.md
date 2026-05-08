@@ -29,8 +29,11 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 | Group | ID | Status |
 | --- | --- | --- |
 | `LinaPro.AI` Group `1` | `1103336258` | 🟢 Open |
+
+<!--
 | `LinaPro.AI` Group `2` | `1094972900` | 🟢 Open |
 | `LinaPro.AI` Group `3` | `1103340933` | 🟢 Open |
+-->
 
 ## WeChat
 
