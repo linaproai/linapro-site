@@ -35,9 +35,27 @@ keywords:
 
 | Resource | URL |
 |----------|-----|
-| Open-source repository | https://github.com/linaproai/linapro |
-| Live demo | http://demo.linapro.ai/ <br/>Username: `admin` <br/>Password: `admin123` |
-| Official website | https://linapro.ai/ |
+| **Open-source repository** | https://github.com/linaproai/linapro |
+| **Live demo** | http://demo.linapro.ai/ <br/>Username: `admin` <br/>Password: `admin123` |
+| **Official website** | https://linapro.ai/ |
+
+:::info Tip
+The demo site is read-only, so data cannot be modified, but you can still explore the full `LinaPro` feature set and the management workspace flow. To try full read/write capabilities locally, use the official demo image to deploy a complete environment quickly.
+:::
+
+## Demo Container Image
+
+Run the following command locally to start the complete demo image:
+
+```bash
+docker run -p 8080:8080 ghcr.io/linaproai/linapro:nightly
+```
+
+Then visit http://127.0.0.1:8080 to try the default `LinaPro` management workspace with username/password `admin/admin123`.
+
+:::info Tip
+The `nightly` image is a daily build intended mainly for testing. You can also switch it to a stable version tag such as `v0.1.0`.
+:::
 
 ## Who LinaPro Is For
 

@@ -28,13 +28,13 @@ Each module is a complete, self-contained functional unit that can be installed,
 
 `LinaPro` treats modularity as a core principle from day one, not as a bolt-on extension added after the framework took shape.
 
-**Built-in capabilities are split by domain boundary**: Each capability domain of the host (`lina-core`) — authentication, authorization, users, menus, dictionaries, parameters, files, scheduling, plugin governance — is designed independently and evolves independently, with no cross-domain leakage. Each domain has a clear entry point and contract; external consumers can only access it through its public interface and cannot bypass the boundary to reach its internal implementation.
+- **Built-in capabilities are split by domain boundary**: Each capability domain of the host (`lina-core`) — authentication, authorization, users, menus, dictionaries, parameters, files, scheduling, plugin governance — is designed independently and evolves independently, with no cross-domain leakage. Each domain has a clear entry point and contract; external consumers can only access it through its public interface and cannot bypass the boundary to reach its internal implementation.
 
-**The plugin system is a first-class citizen**: Plugins are not an afterthought — they are the core of the framework's extension mechanism. From the very beginning of the project, the plugin runtime was designed alongside the host service with full lifecycle management and governance. Every official business capability is delivered under the same module specification as any third-party plugin.
+- **The plugin system is a first-class citizen**: Plugins are not an afterthought — they are the core of the framework's extension mechanism. From the very beginning of the project, the plugin runtime was designed alongside the host service with full lifecycle management and governance. Every official business capability is delivered under the same module specification as any third-party plugin.
 
-**Frontend and backend are modularized together**: Each plugin ships its own backend service, frontend pages, database resources, and permission declarations as a single, coherent module unit — not as two separate halves. Installing a plugin means installing a fully self-contained capability.
+- **Frontend and backend are modularized together**: Each plugin ships its own backend service, frontend pages, database resources, and permission declarations as a single, coherent module unit — not as two separate halves. Installing a plugin means installing a fully self-contained capability.
 
-**Stable extension seams**: The host exposes well-defined extension points to plugins. Plugins can only interact with the host through these seams — registering routes, responding to events, filtering menus, and so on — and can never reach into the host's internal implementation. This boundary design keeps inter-module dependencies clear and controlled, so the host can evolve internally without accidentally breaking existing plugins.
+- **Stable extension seams**: The host exposes well-defined extension points to plugins. Plugins can only interact with the host through these seams — registering routes, responding to events, filtering menus, and so on — and can never reach into the host's internal implementation. This boundary design keeps inter-module dependencies clear and controlled, so the host can evolve internally without accidentally breaking existing plugins.
 
 ## Building Blocks vs. Building From Scratch
 
@@ -48,9 +48,9 @@ Mature building blocks are naturally more stable and predictable than freshly bu
 
 `LinaPro` provides two categories of building blocks:
 
-**Host built-in modules**: Capabilities available out of the box from the core service — user and permission systems, dictionaries and parameter management, file storage, job scheduling, plugin governance, and more. These modules ship with the framework and require no additional installation; they form the stable foundation of every project.
+- **Host built-in modules**: Capabilities available out of the box from the core service — user and permission systems, dictionaries and parameter management, file storage, job scheduling, plugin governance, and more. These modules ship with the framework and require no additional installation; they form the stable foundation of every project.
 
-**Official plugin ecosystem**: Extension capabilities delivered as standalone plugins — covering common business domains (organization management, content management, monitoring and auditing, etc.) and vertical-industry use cases. The official plugin ecosystem will continue to grow, covering more and more common business scenarios. In the future, developers will be able to combine official plugins to quickly assemble a fully functional business system at minimal cost.
+- **Official plugin ecosystem**: Extension capabilities delivered as standalone plugins — covering common business domains (organization management, content management, monitoring and auditing, etc.) and vertical-industry use cases. The official plugin ecosystem will continue to grow, covering more and more common business scenarios. In the future, developers will be able to combine official plugins to quickly assemble a fully functional business system at minimal cost.
 
 ## Module Composability
 

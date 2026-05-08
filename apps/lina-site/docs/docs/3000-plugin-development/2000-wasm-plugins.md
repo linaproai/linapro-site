@@ -251,4 +251,4 @@ flowchart TD
 | 数据库访问 | 直接使用`GoFrame ORM` | 通过桥接接口，限制在命名空间内 |
 | 调试工具 | 标准`Go`调试工具 | 有限调试能力 |
 
-参考实现：`apps/lina-plugins/plugin-demo-dynamic/`
+参考源码实现：`apps/lina-plugins/plugin-demo-dynamic/`

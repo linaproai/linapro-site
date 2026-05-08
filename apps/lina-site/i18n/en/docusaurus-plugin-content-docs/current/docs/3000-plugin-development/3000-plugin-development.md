@@ -56,7 +56,7 @@ Source plugins cannot meet these needs — they require recompiling the entire h
 
 ## Choosing Between Them
 
-**Default to source plugins.** They are the right choice for most business development — better developer experience, higher performance, easier debugging, and a perfect fit with `LinaPro`'s AI-native workflow and built-in AI skills (`goframe-v2`, `lina-e2e`, `lina-review`, etc.). AI can make framework-compliant decisions at every stage of plugin development.
+**Default to source plugins.** They are the right choice for most business development — better developer experience, higher performance, easier debugging, and a perfect fit with `LinaPro`'s AI-native workflow and built-in AI skill system. `AI` can make framework-compliant decisions at every stage of plugin development.
 
 **Choose dynamic plugins when any of the following applies:**
 
@@ -64,7 +64,7 @@ Source plugins cannot meet these needs — they require recompiling the entire h
 - Emergency production fix with minimal downtime risk
 - You do not want to distribute source code (commercial plugin)
 - End users should be able to upload and manage plugins themselves
-- Let AI rapidly prototype and validate a feature that may be discarded afterward
+- Let `AI` rapidly prototype and validate a feature that may be discarded afterward
 
 ## The Core Value of Dynamic Plugins
 

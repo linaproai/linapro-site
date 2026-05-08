@@ -251,4 +251,4 @@ Dynamic plugins support independent version upgrades without redeploying the hos
 | Database access | Uses `GoFrame ORM` directly | Via bridge interface, limited to namespace |
 | Debug tools | Standard `Go` debug tools | Limited debugging capabilities |
 
-Reference implementation: `apps/lina-plugins/plugin-demo-dynamic/`
+Reference source implementation: `apps/lina-plugins/plugin-demo-dynamic/`

@@ -35,18 +35,23 @@ keywords:
 
 "AI-native" does not mean adding an AI assistant button to your product, nor does it mean using AI to help with one specific feature. AI-native means **making AI the primary path of the product, not an optional add-on**. In an AI-native design, AI is not a tool — AI is the team's core engineering productivity. The developer's role shifts from code writer to **direction-setter and key decision-maker**.
 
-`LinaPro` was designed from the ground up with AI-driven development in mind. On one hand, it provides a spec-driven AI development workflow so that developers can hand off requirements analysis, system design, code implementation, and test verification entirely to AI. On the other hand, it ships a built-in AI skill system covering the full development lifecycle, giving AI the domain-specific knowledge to make framework-compliant decisions in every concrete work context — backend development, frontend design, test coverage, performance auditing, and more. These two dimensions complement each other and together form the foundation of `LinaPro`'s AI-native design.
+`LinaPro` was designed from the ground up with AI-driven development in mind:
+
+- It provides a spec-driven AI-native development workflow, allowing developers to hand off requirements analysis, system design, code implementation, test verification, and other development work to `AI`.
+- It also ships a built-in AI skill system covering the full development lifecycle, giving `AI` the domain-specific knowledge to make framework-compliant decisions in concrete work contexts such as backend development, frontend design, testing, and performance auditing.
+
+These two dimensions complement each other and together form the foundation of `LinaPro`'s AI-native design.
 
 ## AI-Native vs. AI-Assisted
 
-| Dimension | AI-Assisted | AI-Native |
-|-----------|-------------|-----------|
-| **AI's role** | Optional support tool | Core engineering productivity, primary path |
-| **Where code comes from** | Humans write, AI assists | AI writes, humans decide |
-| **Documentation** | Humans maintain, prone to drifting from code | AI maintains in sync, tightly coupled to code |
-| **Architecture consistency** | Relies on manual review | Spec-anchored, AI automatically follows |
-| **Test coverage** | Written as needed, gaps possible | Mandatory E2E tests, a prerequisite for every change |
-| **Iteration speed** | Bounded by human coding speed | Bounded by AI processing speed |
+| Dimension | AI-Native | AI-Assisted |
+|-----------|-----------|-------------|
+| **AI's role** | Core engineering productivity, primary path | Optional support tool |
+| **Where code comes from** | `AI` writes, humans decide | Humans write, `AI` assists |
+| **Documentation** | `AI` maintains it in sync, tightly coupled to code | Humans maintain it, prone to drifting from code |
+| **Architecture consistency** | Spec-anchored, `AI` automatically follows | Fully dependent on manual review |
+| **Test coverage** | Mandatory `E2E` tests, a prerequisite for every change | Written as needed, gaps possible |
+| **Iteration speed** | Bounded by `AI` processing speed | Bounded by human coding speed |
 
 ## AI Across the Full Development Lifecycle
 

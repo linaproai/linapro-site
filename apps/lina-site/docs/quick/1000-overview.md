@@ -35,9 +35,29 @@ keywords:
 
 | 资源 | 地址 |
 |------|------|
-| 开源仓库 | https://github.com/linaproai/linapro |
-| 后台演示 | http://demo.linapro.ai/ <br/>账号：`admin` <br/>密码：`admin123`|
-| 官方网站 | https://linapro.ai/ |
+| **开源仓库** | https://github.com/linaproai/linapro |
+| **后台演示** | http://demo.linapro.ai/ <br/>账号：`admin` <br/>密码：`admin123`|
+| **官方网站** | https://linapro.ai/ |
+
+:::info 提示
+演示站点只读，无法修改数据，但可以完整体验`LinaPro`的功能和管理工作台的使用流程。如果需要在本地体验完整的读写功能，可以使用官方提供的演示镜像快速部署一个完整的环境。
+:::
+
+## 演示镜像
+
+
+
+可以在本地使用以下指令运行完整的演示镜像：
+
+```bash
+docker run -p 8080:8080 ghcr.io/linaproai/linapro:nightly
+```
+
+随后可以访问 http://127.0.0.1:8080 体验完整的`LinaPro`默认提供的管理工作台，账号密码`admin/admin123`。
+
+:::info 提示
+其中的镜像版本为`nightly`表示每日构建镜像，主要用于测试使用，也可以修改为稳定的版本标签如`v0.1.0`等。
+:::
 
 ## 项目定位
 
