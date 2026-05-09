@@ -2,7 +2,7 @@
 slug: '/quick/environment'
 title: '环境配置'
 hide_title: true
-description: '本文详细介绍运行 LinaPro 框架所需的全部环境依赖，包括 Git、Go（≥ 1.23）、Node.js（≥ 20.19）、pnpm（≥ 10.0）、PostgreSQL（14+）、Make，以及 AI 原生工作流所需的 Claude Code、OpenSpec CLI 和 goframe-v2 技能的版本要求与安装方法，并提供针对 macOS、Linux 和 Windows（WSL / Git Bash）平台的完整安装引导，帮助开发者在正式安装 LinaPro 之前快速完成本地环境准备。'
+description: '本文详细介绍运行 LinaPro 框架所需的全部环境依赖，包括 Git、Go（≥ 1.23）、Node.js（≥ 20.19）、pnpm（≥ 10.0）、PostgreSQL（14+）、Make，以及 AI 原生工作流推荐的 Claude Code、OpenSpec CLI 和 goframe-v2 技能的版本要求与安装方法，并提供针对 macOS、Linux 和 Windows（WSL / Git Bash）平台的完整安装引导，帮助开发者在正式安装 LinaPro 之前快速完成本地环境准备。'
 keywords:
   - LinaPro
   - 环境配置
@@ -212,13 +212,13 @@ sudo yum groupinstall "Development Tools"
 
 | 技能 | 是否必须 | 作用 |
 |------|:-------:|---------|
-| `OpenSpec` | 是 | 规范驱动工作流`CLI`，`LinaPro`核心工作流引擎，负责解析和执行`OpenSpec`规范定义的工作流 |
+| `OpenSpec` | 建议 | 可选的规范驱动工作流工具，推荐配合使用以获得最佳体验 |
 | `goframe-v2` | 建议 | `GoFrame`专属`AI`技能，提供代码生成、错误诊断和性能优化建议，提升`Go`框架代码生成质量 |
 | `find-skills` | 建议 | `AI`技能市场搜索工具，帮助开发者快速查找和评估适合项目的`AI`技能，提升技能选型效率 |
 
 ### OpenSpec
 
-`OpenSpec`是`LinaPro`规范驱动工作流的命令行工具，`/opsx:explore`、`/opsx:propose`、`/opsx:apply`和`/opsx:archive`等工作流技能均依赖此工具。
+`OpenSpec`是可选的规范驱动工作流命令行工具，推荐安装以获得完整的规范驱动工作流体验。安装后，`/opsx:explore`、`/opsx:propose`、`/opsx:apply`和`/opsx:archive`等工作流技能将自动使用`OpenSpec`作为底层引擎。
 
 ```bash
 npm install -g @fission-ai/openspec@latest

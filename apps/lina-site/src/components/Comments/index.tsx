@@ -1,9 +1,39 @@
-import { useColorMode } from "@docusaurus/theme-common";
 import Giscus from "@giscus/react";
+import { useEffect, useState } from "react";
+
+type ColorMode = "light" | "dark";
+
+function getHtmlColorMode(): ColorMode {
+  if (typeof document === "undefined") {
+    return "light";
+  }
+
+  return document.documentElement.getAttribute("data-theme") === "dark"
+    ? "dark"
+    : "light";
+}
+
+function useHtmlColorMode(): ColorMode {
+  const [colorMode, setColorMode] = useState<ColorMode>("light");
+
+  useEffect(() => {
+    const html = document.documentElement;
+    const syncColorMode = () => setColorMode(getHtmlColorMode());
+
+    syncColorMode();
+
+    const observer = new MutationObserver(syncColorMode);
+    observer.observe(html, { attributes: true, attributeFilter: ["data-theme"] });
+
+    return () => observer.disconnect();
+  }, []);
+
+  return colorMode;
+}
 
 // https://rikublock.dev/docs/tutorials/giscus-integration/
 export default function Comments(): JSX.Element {
-  const { colorMode } = useColorMode();
+  const colorMode = useHtmlColorMode();
 
   return (
     <div className="docusaurus-mt-lg">

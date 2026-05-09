@@ -35,7 +35,7 @@ keywords:
 
 ## OpenSpec 工作流
 
-`OpenSpec`是`LinaPro`内置的规范驱动`AI`研发工作流，以`openspec/`目录为核心，由五个阶段组成完整的研发闭环：
+`LinaPro`内置规范驱动的`AI`研发工作流，`OpenSpec`是该工作流的推荐实现工具，以`openspec/`目录为核心，由五个阶段组成完整的研发闭环：
 
 ```mermaid
 flowchart LR

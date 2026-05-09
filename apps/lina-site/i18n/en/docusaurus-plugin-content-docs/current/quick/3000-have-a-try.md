@@ -2,7 +2,7 @@
 slug: '/quick/have-a-try'
 title: 'Try It Out'
 hide_title: true
-description: "This guide walks through a complete article management CRUD source plugin example to demonstrate LinaPro's AI-native development flow, including requirement exploration with the OpenSpec workflow, proposal generation, AI-driven implementation, service startup and functional verification, and change archival. It helps developers experience the core development model of an AI-native framework."
+description: "This guide walks through a complete article management CRUD source plugin example to demonstrate LinaPro's AI-native development flow, including requirement exploration with the spec-driven workflow, proposal generation, AI-driven implementation, service startup and functional verification, and change archival. It helps developers experience the core development model of an AI-native framework."
 keywords:
   - LinaPro
   - first framework experience
@@ -33,7 +33,7 @@ Build a source plugin named `content-article` that provides article create, read
 - Article status management (draft, published)
 - Backend `RBAC` permission integration
 
-The entire development process is driven by `Claude Code` through the `OpenSpec` workflow and usually takes about `30` minutes.
+The entire development process is driven by `Claude Code` through the spec-driven workflow and usually takes about `30` minutes.
 
 :::info Note
 We recommend `Claude Code` because it is currently regarded as one of the strongest `AI Coding` tools in the industry. Other tools such as `Codex CLI` and `Cursor` also work well, so choose the `AI Coding` tool you are most comfortable with.
@@ -50,7 +50,7 @@ claude
 ```
 
 :::info Note
-In LinaPro development, you do not need to explicitly call `OpenSpec` slash commands. You can drive the entire process with natural-language instructions, and `AI` will identify the intent and execute the corresponding workflow operation. This guide uses explicit slash commands only to make each workflow stage easier to see.
+In LinaPro development, you can drive the entire process with natural-language instructions, and `AI` will identify the intent and execute the corresponding workflow operation. This guide uses explicit slash commands only to make each workflow stage easier to see.
 :::
 
 ## Step 1: Explore Requirements

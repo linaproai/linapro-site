@@ -2,7 +2,7 @@
 slug: '/quick/environment'
 title: 'Environment Setup'
 hide_title: true
-description: 'This guide covers every environment dependency required to run LinaPro from source, including Git, Go (>= 1.23), Node.js (>= 20.19), pnpm (>= 10.0), PostgreSQL (14+), Make, and the AI-native workflow tools Claude Code, OpenSpec CLI, and the goframe-v2 skill. It also provides installation guidance for macOS, Linux, and Windows (WSL / Git Bash) so you can prepare your local machine before installing LinaPro.'
+description: 'This guide covers every environment dependency required to run LinaPro from source, including Git, Go (>= 1.23), Node.js (>= 20.19), pnpm (>= 10.0), PostgreSQL (14+), Make, and the recommended AI-native workflow tools Claude Code, OpenSpec CLI, and the goframe-v2 skill. It also provides installation guidance for macOS, Linux, and Windows (WSL / Git Bash) so you can prepare your local machine before installing LinaPro.'
 keywords:
   - LinaPro
   - environment setup
@@ -212,13 +212,13 @@ LinaPro recommends installing the following `Agent Skills`:
 
 | Skill | Required | Purpose |
 |-------|:--------:|---------|
-| `OpenSpec` | Yes | Spec-driven workflow `CLI` and LinaPro's core workflow engine; parses and executes workflows defined by `OpenSpec` specs |
+| `OpenSpec` | Recommended | Optional spec-driven workflow tool — recommended for the best experience |
 | `goframe-v2` | Recommended | GoFrame-specific `AI` skill that provides code generation, diagnostics, and performance optimization guidance to improve generated `Go` code quality |
 | `find-skills` | Recommended | `AI` skill marketplace search tool for quickly finding and evaluating skills that fit the project |
 
 ### OpenSpec
 
-`OpenSpec` is LinaPro's spec-driven workflow command-line tool. Workflow skills such as `/opsx:explore`, `/opsx:propose`, `/opsx:apply`, and `/opsx:archive` all depend on it.
+`OpenSpec` is an optional spec-driven workflow command-line tool. Install it to unlock the full spec-driven workflow experience. Once installed, workflow skills such as `/opsx:explore`, `/opsx:propose`, `/opsx:apply`, and `/opsx:archive` will automatically use it as their underlying engine.
 
 ```bash
 npm install -g @fission-ai/openspec@latest

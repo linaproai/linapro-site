@@ -22,7 +22,7 @@ A framework's behavior is shaped by the choices made when it was designed. Under
 
 - **[Modular Design](/docs/modular-design)**: Every capability in the framework exists as a decoupled module that interacts with others through stable interfaces. Developers assemble systems like connecting building blocks rather than building from scratch each time — a fundamentally better way to deliver reliably at speed.
 
-- **[AI Spec-Driven Development](/docs/spec-driven-development)**: Built on the principle that specs come before code, the `OpenSpec` workflow captures every iteration's design decisions and implementation context as persistent documents, ensuring code, documentation, and tests are produced in the same iteration cycle — preventing architectural drift at the root.
+- **[AI Spec-Driven Development](/docs/spec-driven-development)**: Built on the principle that specs come before code, the spec-driven workflow captures every iteration's design decisions and implementation context as persistent documents, ensuring code, documentation, and tests are produced in the same iteration cycle — preventing architectural drift at the root. `OpenSpec` is the recommended tool for implementing this workflow.
 
 
 ## Related Documents

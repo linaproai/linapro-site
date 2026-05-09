@@ -2,7 +2,7 @@
 slug: '/quick/overview'
 title: 'Overview'
 hide_title: true
-description: 'A comprehensive introduction to LinaPro — its background, architecture, and core capabilities. LinaPro is an AI-native full-stack framework built on Go + Vue 3, featuring a dual-mode plugin system, full RBAC permission management, scheduled task scheduling, live API documentation, a spec-driven OpenSpec development workflow, and a lifecycle-spanning AI skill set for building sustainable, continuously deliverable business systems.'
+description: 'A comprehensive introduction to LinaPro — its background, architecture, and core capabilities. LinaPro is an AI-native full-stack framework built on Go + Vue 3, featuring a dual-mode plugin system, full RBAC permission management, scheduled task scheduling, live API documentation, a spec-driven AI development workflow, and a lifecycle-spanning AI skill set for building sustainable, continuously deliverable business systems.'
 keywords:
   - LinaPro
   - AI-native framework
@@ -14,7 +14,6 @@ keywords:
   - plugin system
   - WASM plugins
   - source plugins
-  - OpenSpec
   - RBAC permissions
   - scheduled tasks
   - internationalization
@@ -61,7 +60,7 @@ The `nightly` image is a daily build intended mainly for testing. You can also s
 
 LinaPro is designed for independent developers, engineering teams, and enterprises. Its core capabilities include:
 
-- **AI-native development workflow**: A built-in OpenSpec spec-driven workflow that puts AI in charge of analysis, design, and implementation. Every change is anchored to incremental specs and mandatory E2E tests, so the team stays focused on direction and decisions
+- **AI-native development workflow**: A built-in spec-driven AI development workflow with first-class OpenSpec support that puts AI in charge of analysis, design, and implementation. Every change is anchored to incremental specs and mandatory E2E tests, so the team stays focused on direction and decisions
 - **Rich AI skill ecosystem**: Over a dozen AI skills covering the full development lifecycle — backend development, frontend design, test authoring, code review, performance auditing, version upgrades, and more — embedded as domain knowledge in the framework's AI collaboration specs, so AI can make professionally grounded decisions in each context without needing re-briefed every session
 - **Rapid business development**: A ready-to-use management workspace and rich built-in modules that dramatically shorten time from zero to production
 - **Integrated full stack**: Frontend and backend designed as a unified system — API contracts, permission models, and design conventions fully aligned without the overhead of integrating two separate frameworks
@@ -116,7 +115,7 @@ graph TB
 
 ### AI-Native Development Workflow
 
-LinaPro's built-in OpenSpec workflow covers the complete cycle from requirement to delivery:
+LinaPro's built-in spec-driven AI development workflow, with first-class OpenSpec support, covers the complete cycle from requirement to delivery:
 
 - Explore → Propose → Implement → Review → Archive — every iteration goes through the full five-stage loop
 - Every change is anchored to incremental spec files and mandatory E2E tests, preventing architectural drift and coverage gaps

@@ -2,7 +2,7 @@
 slug: '/docs/agent-skills'
 title: '开发技能'
 hide_title: true
-description: '本文介绍 LinaPro 的 AI 专属技能体系，包含需手动安装的 OpenSpec CLI、goframe-v2 和 find-skills 三项外部技能，以及项目内置的前端设计、Git 工作流、代码审查、E2E 测试、性能审计等 13 项自动加载技能，帮助开发者全面了解各技能的作用、安装方法和使用方式。'
+description: '本文介绍 LinaPro 的 AI 专属技能体系，包含可选安装的 OpenSpec CLI、goframe-v2 和 find-skills 三项外部技能，以及项目内置的前端设计、Git 工作流、代码审查、E2E 测试、性能审计等 13 项自动加载技能，帮助开发者全面了解各技能的作用、安装方法和使用方式。'
 keywords:
   - AI技能
   - 开发技能
@@ -32,7 +32,7 @@ keywords:
 
 | 技能名称 | 适用场景 | 必要依赖 |
 |---------|---------|---------|
-| `openspec` | 规范驱动工作流引擎，`AI`研发核心依赖 | **必须安装** |
+| `openspec` | 可选的规范驱动工作流工具，推荐配合使用 | 建议安装 |
 | `goframe-v2` | `GoFrame`专属`AI`技能，提升后端代码生成质量 | 建议安装 |
 | `find-skills` | `AI`技能市场搜索工具，辅助技能选型 | 建议安装 |
 | `frontend-design` | 创作高品质、有辨识度的前端界面 | 无 |
@@ -61,7 +61,7 @@ keywords:
 
 ### openspec
 
-`OpenSpec`是`LinaPro`规范驱动工作流的命令行工具，`/opsx:explore`、`/opsx:propose`、`/opsx:apply`、`/opsx:archive`等核心工作流技能均依赖此工具运行。这是`LinaPro AI`研发工作流中**必须安装**的技能。
+`OpenSpec`是`LinaPro`规范驱动工作流的推荐命令行工具，安装后`/opsx:explore`、`/opsx:propose`、`/opsx:apply`、`/opsx:archive`等工作流技能将自动使用它作为底层引擎。这是`LinaPro AI`研发工作流中**建议安装**的技能。
 
 **适用场景**：执行`OpenSpec`探索、提案、实施和归档等完整工作流时。
 

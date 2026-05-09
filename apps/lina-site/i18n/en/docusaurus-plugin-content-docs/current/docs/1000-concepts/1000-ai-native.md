@@ -138,7 +138,7 @@ This is a common question from developers new to `LinaPro`: can I just edit the 
 
 ### Documentation and code immediately diverge
 
-`LinaPro` uses `SDD OpenSpec` spec documents (`design.md`, `specs/`) to describe the current state of the system. If you modify code without updating the specs, the next AI iteration will generate designs based on outdated specs, producing increasingly divergent results.
+`LinaPro` uses `SDD` spec documents (`design.md`, `specs/`) to describe the current state of the system, managed through `OpenSpec`. If you modify code without updating the specs, the next AI iteration will generate designs based on outdated specs, producing increasingly divergent results.
 
 ### AI cannot sense "implicit rules"
 

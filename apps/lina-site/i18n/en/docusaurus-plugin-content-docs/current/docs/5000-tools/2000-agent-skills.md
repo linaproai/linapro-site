@@ -2,7 +2,7 @@
 slug: '/docs/agent-skills'
 title: 'Dev Skills'
 hide_title: true
-description: 'A complete guide to LinaPro AI skills — the OpenSpec CLI, goframe-v2, and find-skills that require explicit installation, plus 13 project-bundled skills covering frontend design, Git workflows, code review, E2E testing, and performance auditing. Includes installation instructions and usage guidance for every skill.'
+description: 'A complete guide to LinaPro AI skills — the optional OpenSpec CLI, goframe-v2, and find-skills that can be installed externally, plus 13 project-bundled skills covering frontend design, Git workflows, code review, E2E testing, and performance auditing. Includes installation instructions and usage guidance for every skill.'
 keywords:
   - AI skills
   - dev skills
@@ -32,7 +32,7 @@ keywords:
 
 | Skill | Use case | Prerequisites |
 |-------|----------|---------------|
-| `openspec` | Spec-driven workflow engine — required for AI dev workflows | **Must install** (`npm`) |
+| `openspec` | Optional spec-driven workflow tool — recommended for AI dev workflows | Recommended (`npm`) |
 | `goframe-v2` | GoFrame-specific AI skill for higher-quality backend code | Recommended (`npx skills`) |
 | `find-skills` | AI skill marketplace search to help select the right skills | Recommended (`npx skills`) |
 | `frontend-design` | Create distinctive, high-quality frontend interfaces | None |
@@ -61,7 +61,7 @@ These three skills must be installed manually. Once installed, they take effect 
 
 ### openspec
 
-`OpenSpec` is the command-line tool powering `LinaPro`'s spec-driven development workflow. The core workflow skills — `/opsx:explore`, `/opsx:propose`, `/opsx:apply`, and `/opsx:archive` — all depend on this tool. It is **required** for the `LinaPro` AI dev workflow.
+`OpenSpec` is the recommended command-line tool for `LinaPro`'s spec-driven development workflow. Once installed, workflow skills such as `/opsx:explore`, `/opsx:propose`, `/opsx:apply`, and `/opsx:archive` will automatically use it as their underlying engine. It is **recommended** for the `LinaPro` AI dev workflow.
 
 **When to use**: Running any step of the `OpenSpec` workflow — exploration, proposals, implementation, and archiving.
 

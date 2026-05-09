@@ -111,9 +111,9 @@ The plugin layer is the heart of `LinaPro`'s extensibility. It supports two fund
 
 See [Dual-Mode Plugin System](/docs/plugin-system).
 
-## AI Development Workflow (openspec/)
+## AI Development Workflow
 
-The AI development workflow sits above all layers. It is the connective tissue that keeps specs, code, and tests in sync. The workflow does not belong to any runtime component — it acts as a governance mechanism that constrains the entire development process.
+The AI development workflow sits above all layers. It is the connective tissue that keeps specs, code, and tests in sync. The workflow does not belong to any runtime component — it acts as a governance mechanism that constrains the entire development process. `OpenSpec` is the recommended tool for implementing this workflow.
 
 See [AI Spec-Driven Development](/docs/spec-driven-development).
 

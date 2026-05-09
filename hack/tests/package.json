@@ -1,0 +1,10 @@
+{
+  "name": "linapro-site-e2e",
+  "private": true,
+  "scripts": {
+    "test": "playwright test -c playwright.config.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.52.0"
+  }
+}
