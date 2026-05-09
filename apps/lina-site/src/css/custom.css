@@ -813,8 +813,8 @@ table td {
   display: none;
 }
 
-/* too avoid too many navbar items when in short window size */
-@media only screen and (max-width: 900px) {
+/* avoid too many navbar items when in short window size */
+@media only screen and (max-width: 1100px) {
   .navbar__items {
     white-space: nowrap;
   }
