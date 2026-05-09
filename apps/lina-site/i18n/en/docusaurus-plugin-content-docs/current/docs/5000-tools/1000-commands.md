@@ -242,7 +242,7 @@ Both `init` and `mock` make destructive changes to the database. To prevent acci
 
 ### make init
 
-Initializes the database schema (`DDL`) and system seed data. The backend automatically selects the `MySQL` or `SQLite` dialect based on the `database.default.link` setting in `config.yaml`.
+Initializes the database schema (`DDL`) and system seed data. The backend automatically selects the `PostgreSQL` or `SQLite` dialect based on the `database.default.link` setting in `config.yaml`; `PostgreSQL 14+` is the default data store, while `SQLite` is only for local demos or smoke testing.
 
 ```bash
 # Initialize only (preserve existing data)

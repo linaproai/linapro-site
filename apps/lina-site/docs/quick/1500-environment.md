@@ -2,7 +2,7 @@
 slug: '/quick/environment'
 title: '环境配置'
 hide_title: true
-description: '本文详细介绍运行 LinaPro 框架所需的全部环境依赖，包括 Git、Go（≥ 1.23）、Node.js（≥ 20.19）、pnpm（≥ 10.0）、MySQL（8.0+）、Make，以及 AI 原生工作流所需的 Claude Code、OpenSpec CLI 和 goframe-v2 技能的版本要求与安装方法，并提供针对 macOS、Linux 和 Windows（WSL / Git Bash）平台的完整安装引导，帮助开发者在正式安装 LinaPro 之前快速完成本地环境准备。'
+description: '本文详细介绍运行 LinaPro 框架所需的全部环境依赖，包括 Git、Go（≥ 1.23）、Node.js（≥ 20.19）、pnpm（≥ 10.0）、PostgreSQL（14+）、Make，以及 AI 原生工作流所需的 Claude Code、OpenSpec CLI 和 goframe-v2 技能的版本要求与安装方法，并提供针对 macOS、Linux 和 Windows（WSL / Git Bash）平台的完整安装引导，帮助开发者在正式安装 LinaPro 之前快速完成本地环境准备。'
 keywords:
   - LinaPro
   - 环境配置
@@ -11,7 +11,7 @@ keywords:
   - Go
   - Node.js
   - pnpm
-  - MySQL
+  - PostgreSQL
   - Git
   - Make
   - Claude Code
@@ -40,7 +40,7 @@ import TabItem from '@theme/TabItem';
 | `Go` | `1.23+` | 后端服务运行时 |
 | `Node.js` | `20.19+` | 前端构建环境 |
 | `pnpm` | `10.0+` | 前端包管理器 |
-| `MySQL` | `8.0+` | 关系型数据库 |
+| `PostgreSQL` | `14+` | 默认关系型数据库 |
 | `Make` | - | 项目命令入口 |
 
 ### Git
@@ -132,36 +132,53 @@ npm install -g pnpm
 
 安装完成后运行`pnpm --version`，确认输出版本不低于`10.0.0`。
 
-### MySQL
+### PostgreSQL
 
-`LinaPro`要求`MySQL 8.0`及以上版本。
+`LinaPro`默认使用`PostgreSQL 14+`作为数据库。运行`make init`或`make dev`之前，请先准备好可连接的`PostgreSQL`实例。
 
 <Tabs groupId="platform">
 <TabItem value="mac-linux" label="macOS / Linux" default>
 
 ```bash
 # macOS（Homebrew）
-brew install mysql
-brew services start mysql
+brew install postgresql@14
+brew services start postgresql@14
 
 # Ubuntu / Debian
-sudo apt install mysql-server
-sudo systemctl enable --now mysql
+sudo apt install postgresql
+sudo systemctl enable --now postgresql
 
 # CentOS / RHEL
-sudo yum install mysql-server
-sudo systemctl enable --now mysqld
+sudo yum install postgresql-server postgresql-contrib
+sudo postgresql-setup --initdb
+sudo systemctl enable --now postgresql
 ```
+
+</TabItem>
+<TabItem value="docker" label="Docker">
+
+如果本机已安装`Docker`，可以直接启动一个本地`PostgreSQL`容器：
+
+```bash
+docker run \
+  -p 5432:5432 \
+  -e POSTGRES_PASSWORD=12345678 \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_DB=linapro \
+  postgres:14-alpine
+```
+
+该示例使用`postgres:12345678@127.0.0.1:5432`连接`linapro`数据库。如果沿用这个密码，请将项目`config.yaml`中的`database.default.link`改为`pgsql:postgres:12345678@tcp(127.0.0.1:5432)/linapro?sslmode=disable`。
 
 </TabItem>
 <TabItem value="windows" label="Windows（WSL）">
 
-在`WSL`中按`Linux`步骤安装，或通过 [MySQL Installer](https://dev.mysql.com/downloads/installer/) 在`Windows`侧安装后，从`WSL`通过`127.0.0.1`访问数据库。
+在`WSL`中按`Linux`步骤安装，或通过 [PostgreSQL Windows installer](https://www.postgresql.org/download/windows/) 在`Windows`侧安装后，从`WSL`通过`127.0.0.1`访问数据库。
 
 </TabItem>
 </Tabs>
 
-`LinaPro`默认使用`root:12345678@127.0.0.1:3306`连接数据库，可在项目的`config.yaml`中修改连接配置。
+`LinaPro`默认使用`postgres:postgres@127.0.0.1:5432`连接`linapro`数据库，对应连接串为`pgsql:postgres:postgres@tcp(127.0.0.1:5432)/linapro?sslmode=disable`，可在项目的`config.yaml`中修改连接配置。
 
 ### Make
 

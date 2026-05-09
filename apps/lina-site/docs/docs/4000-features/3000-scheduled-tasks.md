@@ -139,7 +139,7 @@ func cleanupExpiredArticles(ctx context.Context) error {
 sequenceDiagram
     participant N1 as 节点 1（主）
     participant N2 as 节点 2（从）
-    participant DB as MySQL
+    participant DB as PostgreSQL
 
     Note over N1,N2: Cron 触发，所有节点同时感知
 

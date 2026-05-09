@@ -58,7 +58,7 @@ graph TB
         Dynamic["WASM 动态插件\n运行时热加载"]
     end
 
-    DB[("数据存储\nMySQL")]
+    DB[("数据存储\nPostgreSQL")]
 
     Workflow -.->|规范驱动| Frontend
     Workflow -.->|规范驱动| Host
@@ -153,7 +153,7 @@ sequenceDiagram
     participant Vben as lina-vben
     participant Core as lina-core
     participant Plugin as 源码插件
-    participant DB as MySQL
+    participant DB as PostgreSQL
 
     User->>Vben: 访问管理工作台
     Vben->>Core: GET /api/v1/menu（获取菜单）
@@ -182,7 +182,7 @@ sequenceDiagram
 graph TB
     Nginx["Nginx"]
     Core["lina-core :8080"]
-    DB[("MySQL")]
+    DB[("PostgreSQL")]
 
     Nginx --> Core
     Core --> DB
@@ -198,7 +198,7 @@ graph TB
     N1["lina-core 节点 1"]
     N2["lina-core 节点 2\n分布式选主"]
     NN["lina-core 节点 N"]
-    DB[("MySQL")]
+    DB[("PostgreSQL")]
 
     LB --> N1
     LB --> N2
@@ -208,7 +208,7 @@ graph TB
     NN --> DB
 ```
 
-集群模式通过配置`cluster.enabled: true`启用，框架基于 `MySQL` 实现分布式选主、分布式锁和权限拓扑缓存（`sys_locker`、`sys_kv_cache` 表），无需引入额外中间件，也无需修改业务代码。详见[原生分布式架构](/docs/distributed-architecture)。
+集群模式通过配置`cluster.enabled: true`启用，框架基于`PostgreSQL`实现分布式选主、分布式锁和权限拓扑缓存（`sys_locker`、`sys_kv_cache`表），无需引入额外中间件，也无需修改业务代码。详见[原生分布式架构](/docs/distributed-architecture)。
 
 ## 相关文档
 

@@ -253,7 +253,7 @@ The `hack/config.yaml` configuration file points to the plugin's own tables:
 gfcli:
   gen:
     dao:
-      - link: "mysql:..."
+      - link: "pgsql:postgres:postgres@tcp(127.0.0.1:5432)/linapro?sslmode=disable"
         tables: "content_article_*"  # Only generate DAO for the plugin's own tables
         descriptionTag: true
 ```

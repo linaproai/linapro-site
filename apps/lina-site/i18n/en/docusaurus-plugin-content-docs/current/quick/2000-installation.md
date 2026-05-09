@@ -23,7 +23,7 @@ keywords:
   - make mock
 ---
 
-Before cloning the repository, read [Environment Setup](/quick/environment) and make sure required components such as `Go`, `Node.js`, `pnpm`, and `MySQL` are installed correctly.
+Before cloning the repository, read [Environment Setup](/quick/environment) and make sure required components such as `Go`, `Node.js`, `pnpm`, and `PostgreSQL` are installed correctly.
 
 ## Clone the Repository
 
@@ -39,6 +39,25 @@ git clone --depth 1 --branch v0.1.0 https://github.com/linaproai/linapro.git lin
 
 ## Starting the Service
 
+### Prepare PostgreSQL
+
+`LinaPro` uses `PostgreSQL 14+` as its default database. `make init` and `make dev` do not start or manage the database, so prepare a reachable `PostgreSQL` instance first. For local development, you can use this container:
+
+```bash
+docker run --name linapro-postgres \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=linapro \
+  -p 5432:5432 \
+  --health-cmd pg_isready \
+  --health-interval 10s \
+  --health-timeout 5s \
+  --health-retries 5 \
+  -d postgres:14-alpine
+```
+
+If local port `5432` is already occupied, map the container to another host port, such as `15432:5432`, and update the port in `database.default.link`.
+
 ### Configure the Database Connection
 
 After cloning, enter the project directory and copy the config template as the active config file:
@@ -48,15 +67,15 @@ cd linapro
 cp apps/lina-core/manifest/config/config.template.yaml apps/lina-core/manifest/config/config.yaml
 ```
 
-Open `config.yaml` in an editor, find the database connection section, and update it to match your local `MySQL` connection details:
+Open `config.yaml` in an editor, find the database connection section, and update it to match your local `PostgreSQL` connection details:
 
 ```yaml title="apps/lina-core/manifest/config/config.yaml"
 database:
   default:
-    link: "mysql:root:12345678@tcp(127.0.0.1:3306)/linapro?charset=utf8mb4&parseTime=true&loc=Local&multiStatements=true"
+    link: "pgsql:postgres:postgres@tcp(127.0.0.1:5432)/linapro?sslmode=disable"
 ```
 
-The default configuration uses `root:12345678@127.0.0.1:3306`. If your `MySQL` instance uses a different username, password, or port, update the value here.
+The default configuration connects to the `linapro` database with `postgres:postgres@127.0.0.1:5432`. If your `PostgreSQL` instance uses a different username, password, host, port, or database name, update the value here.
 
 ### Initialize the Database
 
@@ -117,7 +136,7 @@ After the service starts, open `http://localhost:5666` in your browser and log i
 
 If you run into issues, use the following checklist:
 
-1. Confirm that `MySQL` is running and that the database connection in `config.yaml` is correct
+1. Confirm that `PostgreSQL` is running and that the database connection in `config.yaml` is correct
 2. Check backend log output for service errors
 3. Run `make status` to inspect frontend and backend process status
 4. If the issue is still unresolved, visit [Community](/community) for help

@@ -242,7 +242,7 @@ make check-runtime-i18n-messages
 
 ### make init
 
-初始化数据库的表结构（`DDL`）和系统必需的种子数据。后端会按`config.yaml`中`database.default.link`的配置自动选择`MySQL`或`SQLite`方言。
+初始化数据库的表结构（`DDL`）和系统必需的种子数据。后端会按`config.yaml`中`database.default.link`的配置自动选择`PostgreSQL`或`SQLite`方言，其中`PostgreSQL 14+`是默认数据存储，`SQLite`仅用于本地演示或冒烟验证。
 
 ```bash
 # 仅初始化（保留现有数据）

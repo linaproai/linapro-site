@@ -253,7 +253,7 @@ gf gen dao
 gfcli:
   gen:
     dao:
-      - link: "mysql:..."
+      - link: "pgsql:postgres:postgres@tcp(127.0.0.1:5432)/linapro?sslmode=disable"
         tables: "content_article_*"  # 只生成插件自有表的 DAO
         descriptionTag: true
 ```

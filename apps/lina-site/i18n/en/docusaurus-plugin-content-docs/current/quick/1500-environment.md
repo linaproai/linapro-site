@@ -2,7 +2,7 @@
 slug: '/quick/environment'
 title: 'Environment Setup'
 hide_title: true
-description: 'This guide covers every environment dependency required to run LinaPro from source, including Git, Go (>= 1.23), Node.js (>= 20.19), pnpm (>= 10.0), MySQL (8.0+), Make, and the AI-native workflow tools Claude Code, OpenSpec CLI, and the goframe-v2 skill. It also provides installation guidance for macOS, Linux, and Windows (WSL / Git Bash) so you can prepare your local machine before installing LinaPro.'
+description: 'This guide covers every environment dependency required to run LinaPro from source, including Git, Go (>= 1.23), Node.js (>= 20.19), pnpm (>= 10.0), PostgreSQL (14+), Make, and the AI-native workflow tools Claude Code, OpenSpec CLI, and the goframe-v2 skill. It also provides installation guidance for macOS, Linux, and Windows (WSL / Git Bash) so you can prepare your local machine before installing LinaPro.'
 keywords:
   - LinaPro
   - environment setup
@@ -11,7 +11,7 @@ keywords:
   - Go
   - Node.js
   - pnpm
-  - MySQL
+  - PostgreSQL
   - Git
   - Make
   - Claude Code
@@ -40,7 +40,7 @@ LinaPro depends on the following components during source development. Install t
 | `Go` | `1.23+` | Backend service runtime |
 | `Node.js` | `20.19+` | Frontend build environment |
 | `pnpm` | `10.0+` | Frontend package manager |
-| `MySQL` | `8.0+` | Relational database |
+| `PostgreSQL` | `14+` | Default relational database |
 | `Make` | - | Project command entrypoint |
 
 ### Git
@@ -132,36 +132,53 @@ npm install -g pnpm
 
 After installation, run `pnpm --version` and confirm that the output is at least `10.0.0`.
 
-### MySQL
+### PostgreSQL
 
-LinaPro requires `MySQL 8.0` or later.
+LinaPro uses `PostgreSQL 14+` as its default database. Before running `make init` or `make dev`, prepare a reachable `PostgreSQL` instance.
 
 <Tabs groupId="platform">
 <TabItem value="mac-linux" label="macOS / Linux" default>
 
 ```bash
 # macOS (Homebrew)
-brew install mysql
-brew services start mysql
+brew install postgresql@14
+brew services start postgresql@14
 
 # Ubuntu / Debian
-sudo apt install mysql-server
-sudo systemctl enable --now mysql
+sudo apt install postgresql
+sudo systemctl enable --now postgresql
 
 # CentOS / RHEL
-sudo yum install mysql-server
-sudo systemctl enable --now mysqld
+sudo yum install postgresql-server postgresql-contrib
+sudo postgresql-setup --initdb
+sudo systemctl enable --now postgresql
 ```
+
+</TabItem>
+<TabItem value="docker" label="Docker">
+
+If `Docker` is already installed locally, you can start a local `PostgreSQL` container directly:
+
+```bash
+docker run \
+  -p 5432:5432 \
+  -e POSTGRES_PASSWORD=12345678 \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_DB=linapro \
+  postgres:14-alpine
+```
+
+This example connects to the `linapro` database with `postgres:12345678@127.0.0.1:5432`. If you keep this password, update `database.default.link` in the project's `config.yaml` to `pgsql:postgres:12345678@tcp(127.0.0.1:5432)/linapro?sslmode=disable`.
 
 </TabItem>
 <TabItem value="windows" label="Windows (WSL)">
 
-Install MySQL inside `WSL` using the `Linux` steps, or install it on the `Windows` side with [MySQL Installer](https://dev.mysql.com/downloads/installer/) and connect from `WSL` through `127.0.0.1`.
+Install `PostgreSQL` inside `WSL` using the `Linux` steps, or install it on the `Windows` side with the [PostgreSQL Windows installer](https://www.postgresql.org/download/windows/) and connect from `WSL` through `127.0.0.1`.
 
 </TabItem>
 </Tabs>
 
-By default, LinaPro connects to the database with `root:12345678@127.0.0.1:3306`. You can change the connection settings in the project's `config.yaml`.
+By default, LinaPro connects to the `linapro` database with `postgres:postgres@127.0.0.1:5432`, using the link `pgsql:postgres:postgres@tcp(127.0.0.1:5432)/linapro?sslmode=disable`. You can change the connection settings in the project's `config.yaml`.
 
 ### Make
 

@@ -43,9 +43,9 @@ cluster:
           │    (single node, all-in-one)     │
           └─────────────────┬────────────────┘
                             │
-                       ┌────▼────┐
-                       │  MySQL  │
-                       └─────────┘
+                       ┌────▼─────┐
+                       │PostgreSQL│
+                       └──────────┘
 ```
 
 ### Cluster mode
@@ -73,11 +73,11 @@ cluster:
                └──────┬───────┘
                       │
                ┌──────▼──────┐
-               │    MySQL    │
+               │ PostgreSQL  │
                └─────────────┘
 ```
 
-In cluster mode, all nodes share the same `MySQL` database. Nodes coordinate through the database — leader election lock, permission version synchronization — with no need to deploy `Redis`, `etcd`, or any additional middleware.
+In cluster mode, all nodes share the same `PostgreSQL` database. Nodes coordinate through the database — leader election lock, permission version synchronization — with no need to deploy `Redis`, `etcd`, or any additional middleware.
 
 ## Distributed Leader Election
 
@@ -87,7 +87,7 @@ In cluster mode, all nodes share the same `MySQL` database. Nodes coordinate thr
 sequenceDiagram
     participant N1 as Node 1
     participant N2 as Node 2
-    participant DB as MySQL
+    participant DB as PostgreSQL
 
     N1->>DB: Attempt to acquire election lock (INSERT/UPDATE)
     DB-->>N1: Success, becomes primary
@@ -137,7 +137,7 @@ sequenceDiagram
     participant Admin as Admin
     participant N1 as Node 1 (Primary)
     participant N2 as Node 2 (Replica)
-    participant DB as MySQL
+    participant DB as PostgreSQL
 
     Admin->>N1: Modify role permissions
     N1->>DB: Update permission data, increment version
@@ -186,7 +186,7 @@ The framework provides a cluster-aware key-value cache interface (`pkg/kvcache`)
 When business growth calls for more capacity, the steps are:
 
 1. Update `config.yaml` — set `cluster.enabled` to `true`
-2. Start a new host node instance pointing to the same `MySQL` database
+2. Start a new host node instance pointing to the same `PostgreSQL` database
 3. Add the new node to the load balancer
 
 No changes to business code are required. The framework automatically handles node discovery, leader election, and permission synchronization.

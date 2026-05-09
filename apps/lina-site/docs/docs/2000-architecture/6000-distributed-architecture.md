@@ -43,9 +43,9 @@ cluster:
           │    (single node, all-in-one)     │
           └─────────────────┬────────────────┘
                             │
-                       ┌────▼────┐
-                       │  MySQL  │
-                       └─────────┘
+                       ┌────▼─────┐
+                       │PostgreSQL│
+                       └──────────┘
 ```
 
 ### 集群模式
@@ -73,11 +73,11 @@ cluster:
                └──────┬───────┘
                       │
                ┌──────▼──────┐
-               │    MySQL    │
+               │ PostgreSQL  │
                └─────────────┘
 ```
 
-在集群模式下，各节点共享同一个`MySQL`数据库。节点间通过数据库实现分布式协调（选主锁、权限版本同步等），无需额外部署`Redis`或`Etcd`等中间件。
+在集群模式下，各节点共享同一个`PostgreSQL`数据库。节点间通过数据库实现分布式协调（选主锁、权限版本同步等），无需额外部署`Redis`或`Etcd`等中间件。
 
 ## 分布式选主
 
@@ -87,7 +87,7 @@ cluster:
 sequenceDiagram
     participant N1 as 节点 1
     participant N2 as 节点 2
-    participant DB as MySQL
+    participant DB as PostgreSQL
 
     N1->>DB: 尝试获取选举锁（INSERT/UPDATE）
     DB-->>N1: 成功，成为主节点
@@ -137,7 +137,7 @@ sequenceDiagram
     participant Admin as 管理员
     participant N1 as 节点 1（主）
     participant N2 as 节点 2（从）
-    participant DB as MySQL
+    participant DB as PostgreSQL
 
     Admin->>N1: 修改角色权限
     N1->>DB: 更新权限数据，递增版本号
@@ -186,7 +186,7 @@ err := locker.TryLock(ctx, "my-lock-key", 30*time.Second, func() error {
 当业务量增长需要扩容时，只需：
 
 1. 修改`config.yaml`，将`cluster.enabled`设为`true`
-2. 新启动一个宿主节点实例，指向同一个`MySQL`数据库
+2. 新启动一个宿主节点实例，指向同一个`PostgreSQL`数据库
 3. 在负载均衡器中添加新节点
 
 业务代码无需任何修改，框架自动完成节点发现、选主和权限同步。

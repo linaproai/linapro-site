@@ -21,7 +21,7 @@ keywords:
   - rapid development
   - plugin ecosystem
   - management workspace
-  - MySQL
+  - PostgreSQL
   - JWT authentication
 ---
 
@@ -101,7 +101,7 @@ graph TB
         Dynamic["WASM Dynamic Plugins\nhot-loaded at runtime"]
     end
 
-    DB[("Data Store\nMySQL")]
+    DB[("Data Store\nPostgreSQL")]
 
     Workflow -.->|spec-driven| Frontend
     Workflow -.->|spec-driven| Host
@@ -227,5 +227,5 @@ Plugins are LinaPro's primary extension mechanism — each plugin is a self-cont
 | Frontend framework | `Vue 3` | Based on the Vben 5 admin template |
 | Frontend UI | `Ant Design Vue` | Enterprise-grade UI component library |
 | Build tool | `Vite` | Fast frontend builds |
-| Database | `MySQL` | `8.0+`, primary data store |
+| Database | `PostgreSQL` / optional `SQLite` | `PostgreSQL 14+` is the default data store. `SQLite` is available for local demos or smoke testing only; it is single-node and not for production. |
 | Plugin runtime | `WebAssembly` | `tetratelabs/wazero`, powers WASM dynamic plugins |

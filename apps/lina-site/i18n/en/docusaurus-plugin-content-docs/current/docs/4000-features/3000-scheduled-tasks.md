@@ -139,7 +139,7 @@ In cluster mode, LinaPro uses a task **execution scope** field to control which 
 sequenceDiagram
     participant N1 as Node 1 (primary)
     participant N2 as Node 2 (replica)
-    participant DB as MySQL
+    participant DB as PostgreSQL
 
     Note over N1,N2: Cron fires — all nodes detect the trigger simultaneously
 

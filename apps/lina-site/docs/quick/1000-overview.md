@@ -21,7 +21,7 @@ keywords:
   - 快速开发
   - 插件生态
   - 管理工作台
-  - MySQL
+  - PostgreSQL
   - JWT认证
 ---
 
@@ -103,7 +103,7 @@ graph TB
         Dynamic["WASM 动态插件\n运行时热加载"]
     end
 
-    DB[("数据存储\nMySQL")]
+    DB[("数据存储\nPostgreSQL")]
 
     Workflow -.->|规范驱动| Frontend
     Workflow -.->|规范驱动| Host
@@ -229,5 +229,5 @@ graph TB
 | 前端框架 | `Vue 3` | 基于`Vben 5`管理台模板 |
 | 前端 UI | `Ant Design Vue` | 企业级 `UI` 组件库 |
 | 构建工具 | `Vite` | 极速前端构建 |
-| 数据库 | `MySQL` | `8.0+`，主数据存储 |
+| 数据库 | `PostgreSQL` / 可选`SQLite` | `PostgreSQL 14+`为默认数据存储；`SQLite`可用于本地演示或冒烟验证，仅支持单节点，不适用于生产 |
 | 插件运行时 | `WebAssembly` | `tetratelabs/wazero`，支持`WASM`动态插件 |

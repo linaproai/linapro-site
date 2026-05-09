@@ -69,9 +69,11 @@ logger:
 # https://goframe.org/docs/core/gdb-config-file
 database:
   default:
-    # DSN format: mysql:<user>:<pass>@tcp(<host>:<port>)/<dbname>?params
-    link: "mysql:root:12345678@tcp(127.0.0.1:3306)/linapro?charset=utf8mb4&parseTime=true&loc=Local&multiStatements=true"
-    # Whether to enable SQL debug logging (disable in production)
+    # Default database connection string
+    # PostgreSQL 14+: pgsql:postgres:postgres@tcp(127.0.0.1:5432)/linapro?sslmode=disable
+    # SQLite: sqlite::@file(./temp/sqlite/linapro.db)
+    link: "pgsql:postgres:postgres@tcp(127.0.0.1:5432)/linapro?sslmode=disable"
+    # Whether to enable SQL debug logs; keep disabled by default and enable temporarily for SQL diagnostics
     debug: false
 
 # JWT authentication configuration

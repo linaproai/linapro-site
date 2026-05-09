@@ -58,7 +58,7 @@ graph TB
         Dynamic["WASM Dynamic Plugins\nHot-loaded at runtime"]
     end
 
-    DB[("Data Store\nMySQL")]
+    DB[("Data Store\nPostgreSQL")]
 
     Workflow -.->|Spec-driven| Frontend
     Workflow -.->|Spec-driven| Host
@@ -153,7 +153,7 @@ sequenceDiagram
     participant Vben as lina-vben
     participant Core as lina-core
     participant Plugin as Source Plugin
-    participant DB as MySQL
+    participant DB as PostgreSQL
 
     User->>Vben: Access management workspace
     Vben->>Core: GET /api/v1/menu (fetch menu)
@@ -182,7 +182,7 @@ sequenceDiagram
 graph TB
     Nginx["Nginx"]
     Core["lina-core :8080"]
-    DB[("MySQL")]
+    DB[("PostgreSQL")]
 
     Nginx --> Core
     Core --> DB
@@ -198,7 +198,7 @@ graph TB
     N1["lina-core Node 1"]
     N2["lina-core Node 2\n(with distributed election)"]
     NN["lina-core Node N"]
-    DB[("MySQL")]
+    DB[("PostgreSQL")]
 
     LB --> N1
     LB --> N2
@@ -208,7 +208,7 @@ graph TB
     NN --> DB
 ```
 
-Cluster mode is enabled by setting `cluster.enabled: true`. The framework implements distributed leader election, distributed locks, and permission topology caching on top of `MySQL` (`sys_locker`, `sys_kv_cache` tables) — no additional middleware required, and no changes to business code. See [Native Distributed Architecture](/docs/distributed-architecture).
+Cluster mode is enabled by setting `cluster.enabled: true`. The framework implements distributed leader election, distributed locks, and permission topology caching on top of `PostgreSQL` (`sys_locker`, `sys_kv_cache` tables) — no additional middleware required, and no changes to business code. See [Native Distributed Architecture](/docs/distributed-architecture).
 
 ## Related Documents
 

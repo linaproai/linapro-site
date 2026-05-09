@@ -69,9 +69,11 @@ logger:
 # https://goframe.org/docs/core/gdb-config-file
 database:
   default:
-    # 数据库连接串格式：mysql:<user>:<pass>@tcp(<host>:<port>)/<dbname>?参数
-    link: "mysql:root:12345678@tcp(127.0.0.1:3306)/linapro?charset=utf8mb4&parseTime=true&loc=Local&multiStatements=true"
-    # 是否开启 SQL 调试日志（生产环境建议关闭）
+    # 默认数据库连接串
+    # PostgreSQL 14+: pgsql:postgres:postgres@tcp(127.0.0.1:5432)/linapro?sslmode=disable
+    # SQLite: sqlite::@file(./temp/sqlite/linapro.db)
+    link: "pgsql:postgres:postgres@tcp(127.0.0.1:5432)/linapro?sslmode=disable"
+    # 是否开启 SQL 调试日志；默认关闭，排查 SQL 执行明细时再临时开启
     debug: false
 
 # JWT 认证配置

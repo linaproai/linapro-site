@@ -23,7 +23,7 @@ keywords:
   - make mock
 ---
 
-克隆仓库前，请先参阅[环境配置](/quick/environment)，确保`Go`、`Node.js`、`pnpm`、`MySQL`等必要组件已正确安装。
+克隆仓库前，请先参阅[环境配置](/quick/environment)，确保`Go`、`Node.js`、`pnpm`、`PostgreSQL`等必要组件已正确安装。
 
 ## 克隆仓库
 
@@ -39,6 +39,25 @@ git clone --depth 1 --branch v0.1.0 https://github.com/linaproai/linapro.git lin
 
 ## 启动服务
 
+### 准备 PostgreSQL
+
+`LinaPro`默认使用`PostgreSQL 14+`作为数据库。`make init`和`make dev`不会启动或管理数据库，请先准备可连接的`PostgreSQL`实例。本地开发可以使用以下容器：
+
+```bash
+docker run --name linapro-postgres \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=linapro \
+  -p 5432:5432 \
+  --health-cmd pg_isready \
+  --health-interval 10s \
+  --health-timeout 5s \
+  --health-retries 5 \
+  -d postgres:14-alpine
+```
+
+如果本机`5432`端口已被占用，可以将容器映射到其他本机端口，例如`15432:5432`，并同步修改`database.default.link`中的端口。
+
 ### 配置数据库连接
 
 克隆完成后，进入项目目录，将配置模板复制为正式配置文件：
@@ -48,15 +67,15 @@ cd linapro
 cp apps/lina-core/manifest/config/config.template.yaml apps/lina-core/manifest/config/config.yaml
 ```
 
-用编辑器打开`config.yaml`，找到数据库连接部分，将其修改为你本地`MySQL`的实际连接信息：
+用编辑器打开`config.yaml`，找到数据库连接部分，将其修改为你本地`PostgreSQL`的实际连接信息：
 
 ```yaml title="apps/lina-core/manifest/config/config.yaml"
 database:
   default:
-    link: "mysql:root:12345678@tcp(127.0.0.1:3306)/linapro?charset=utf8mb4&parseTime=true&loc=Local&multiStatements=true"
+    link: "pgsql:postgres:postgres@tcp(127.0.0.1:5432)/linapro?sslmode=disable"
 ```
 
-默认配置使用`root:12345678@127.0.0.1:3306`，如果你的`MySQL`使用了不同的用户名、密码或端口，请在此处更新。
+默认配置使用`postgres:postgres@127.0.0.1:5432`连接`linapro`数据库，如果你的`PostgreSQL`使用了不同的用户名、密码、主机、端口或数据库名，请在此处更新。
 
 ### 初始化数据库
 
@@ -117,7 +136,7 @@ make image             # 构建 Docker 镜像
 
 如果遇到问题，可以通过以下步骤排查：
 
-1. 确认`MySQL`服务已启动且`config.yaml`中的数据库连接配置正确
+1. 确认`PostgreSQL`服务已启动且`config.yaml`中的数据库连接配置正确
 2. 查看后端日志输出，确认服务是否有异常
 3. 执行`make status`检查前后端进程状态
 4. 如果问题仍未解决，请前往[社区交流](/community)寻求帮助
