@@ -144,6 +144,18 @@
 }
 
 @media (max-width: 640px) {
+  .home-section--hero {
+    padding-top: 16px;
+  }
+
+  .logo-container {
+    margin-top: 10px;
+  }
+
+  .logo-container .logo {
+    width: min(280px, 100%);
+  }
+
   .hero-title {
     font-size: 1.7rem;
   }
@@ -814,7 +826,7 @@ table td {
 }
 
 /* avoid too many navbar items when in short window size */
-@media only screen and (max-width: 1100px) {
+@media only screen and (max-width: 1200px) {
   .navbar__items {
     white-space: nowrap;
   }
