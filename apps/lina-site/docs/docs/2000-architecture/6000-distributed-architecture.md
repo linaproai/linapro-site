@@ -2,7 +2,7 @@
 slug: '/docs/distributed-architecture'
 title: '原生分布式架构'
 hide_title: true
-description: '本文介绍 LinaPro 原生支持的分布式架构设计，包括单机模式与集群模式的部署差异、基于 Raft 风格的分布式选主机制、节点角色与水平扩容能力、权限拓扑版本同步、分布式锁与键值缓存的集群感知实现，以及如何通过配置启用集群模式并零代码改造实现高可用部署。'
+description: '本文介绍 LinaPro 原生支持的分布式架构设计，包括单机模式与集群模式的部署差异、基于 Redis 的分布式协调与选主机制、节点角色与水平扩容能力、权限拓扑版本同步、分布式锁与键值缓存的集群感知实现，以及如何通过配置启用集群模式并零代码改造实现高可用部署。'
 keywords:
   - 分布式架构
   - 集群模式
@@ -20,6 +20,7 @@ keywords:
   - 租约
   - 主节点
   - 从节点
+  - Redis协调器
 ---
 
 ## 概述
@@ -30,7 +31,7 @@ keywords:
 
 ### 单机模式（默认）
 
-默认情况下，`LinaPro`以单机模式运行，适合开发环境和小规模生产部署：
+默认情况下，`LinaPro`以单机模式运行，适合开发环境和小规模生产部署。单机模式不需要`Redis`，只依赖`PostgreSQL`和进程内缓存协调：
 
 ```yaml
 cluster:
@@ -50,14 +51,22 @@ cluster:
 
 ### 集群模式
 
-将`cluster.enabled`设置为`true`后，框架自动启用分布式协调机制，支持多节点水平扩展：
+将`cluster.enabled`设置为`true`后，框架启用分布式协调机制，支持多节点水平扩展。**集群模式必须配置分布式协调器**，当前版本仅支持`redis`：
 
 ```yaml
 cluster:
   enabled: true
+  coordination: redis        # 必填，当前仅支持 redis
   election:
-    lease: 30s           # 选举锁租约时长
-    renewInterval: 10s   # 租约续约间隔（建议为租约时长的 1/3）
+    lease: 30s               # 选举锁租约时长
+    renewInterval: 10s       # 租约续约间隔（建议为租约时长的 1/3）
+  redis:
+    address: "127.0.0.1:6379"
+    db: 0
+    password: ""
+    connectTimeout: 3s
+    readTimeout: 2s
+    writeTimeout: 2s
 ```
 
 ```text
@@ -69,42 +78,46 @@ cluster:
          │   Node 1  │  │   Node 2  │  ...
          │ (primary) │  │ (replica) │
          └─────┬─────┘  └─────┬─────┘
-               │              │
+               │    Redis     │
                └──────┬───────┘
                       │
+              ┌───────▼──────┐
+              │    Redis     │  ← 集群协调（选主、缓存、分布式锁）
+              └──────────────┘
+                      │
                ┌──────▼──────┐
-               │ PostgreSQL  │
+               │ PostgreSQL  │  ← 数据持久化
                └─────────────┘
 ```
 
-在集群模式下，各节点共享同一个`PostgreSQL`数据库。节点间通过数据库实现分布式协调（选主锁、权限版本同步等），无需额外部署`Redis`或`Etcd`等中间件。
+在集群模式下，各节点共享同一个`PostgreSQL`数据库作为数据存储，通过`Redis`实现分布式协调（选主锁、分布式锁、集群感知缓存等）。
 
 ## 分布式选主
 
-`LinaPro`采用基于数据库乐观锁的选主机制，轻量可靠：
+集群模式通过`Redis`实现选主，轻量可靠：
 
 ```mermaid
 sequenceDiagram
     participant N1 as 节点 1
     participant N2 as 节点 2
-    participant DB as PostgreSQL
+    participant R as Redis
 
-    N1->>DB: 尝试获取选举锁（INSERT/UPDATE）
-    DB-->>N1: 成功，成为主节点
-    N2->>DB: 尝试获取选举锁
-    DB-->>N2: 失败（锁已被持有）
+    N1->>R: 尝试获取选举锁（SET NX）
+    R-->>N1: 成功，成为主节点
+    N2->>R: 尝试获取选举锁
+    R-->>N2: 失败（锁已被持有）
     Note over N2: 成为从节点，等待主节点失效
 
     loop 租约续约（每 renewInterval）
-        N1->>DB: 续约选举锁（更新租约时间戳）
-        DB-->>N1: 续约成功
+        N1->>R: 续约选举锁（EXPIRE 刷新租约）
+        R-->>N1: 续约成功
     end
 
     Note over N1: 节点 1 异常下线，停止续约
 
-    N2->>DB: 检测到租约超过 lease 时长未续约
-    N2->>DB: 尝试获取选举锁
-    DB-->>N2: 成功，成为新的主节点
+    N2->>R: 检测到租约超过 lease 时长未续约
+    N2->>R: 尝试获取选举锁
+    R-->>N2: 成功，成为新的主节点
 ```
 
 **租约时长配置建议：**

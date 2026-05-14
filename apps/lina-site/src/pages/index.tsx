@@ -298,13 +298,6 @@ const IconGlobe = () => (
     </svg>
 );
 
-const IconShield = () => (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 3l8 3v6c0 5-3.5 8.5-8 9-4.5-.5-8-4-8-9V6z" />
-        <path d="M9 12l2 2 4-4" />
-    </svg>
-);
-
 const IconNetwork = () => (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="5" r="2.2" />
@@ -326,6 +319,17 @@ const IconCheckCircle = () => (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="9" />
         <path d="M8 12l3 3 5-6" />
+    </svg>
+);
+
+const IconTenants = () => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="8" cy="7" r="2.5" />
+        <path d="M3 19c0-3 2-5 5-5s5 2 5 5" />
+        <circle cx="17" cy="7" r="2.5" />
+        <path d="M14 19c0-2.5 1.3-4.3 3-4.8" />
+        <path d="M20 14.5c1 .8 1.7 2.1 1.8 3.5" />
+        <path d="M14 19h7" />
     </svg>
 );
 
@@ -415,20 +419,6 @@ const strengths = [
         ),
     },
     {
-        id: 'governance',
-        Icon: IconShield,
-        title: (
-            <Translate id="home.strength.governance.title" description="Strength 4 title">
-                Enterprise Governance Out of the Box
-            </Translate>
-        ),
-        desc: (
-            <Translate id="home.strength.governance.desc" description="Strength 4 desc">
-                JWT, declarative RBAC, permission tags, field masking, forced logout, and IP/device auditing are built in, with permission changes applied in seconds.
-            </Translate>
-        ),
-    },
-    {
         id: 'distributed',
         Icon: IconNetwork,
         title: (
@@ -438,7 +428,21 @@ const strengths = [
         ),
         desc: (
             <Translate id="home.strength.distributed.desc" description="Strength 5 desc">
-                Permission topology sync, distributed locks, and the key-value cache are cluster-aware from the start, letting one node grow into a full cluster.
+                Permission topology sync, distributed locks, and the key-value cache are cluster-aware from the start, letting one node grow into a full cluster via a distributed coordinator — with no application code changes required.
+            </Translate>
+        ),
+    },
+    {
+        id: 'multitenant',
+        Icon: IconTenants,
+        title: (
+            <Translate id="home.strength.multitenant.title" description="Strength multitenant title">
+                Native Multi-tenant Support
+            </Translate>
+        ),
+        desc: (
+            <Translate id="home.strength.multitenant.desc" description="Strength multitenant desc">
+                Tenant middleware, identity context, and plugin governance hooks are built into the host core. The official plugin adds full tenant lifecycle management — and when it's not installed, the host falls back to single-tenant mode automatically.
             </Translate>
         ),
     },
@@ -452,7 +456,7 @@ const strengths = [
         ),
         desc: (
             <Translate id="home.strength.builtin.desc" description="Strength 6 desc">
-                Core services, official plugins, and a full management workspace ship together, with infrastructure already wired so teams can focus on business immediately.
+                JWT, declarative RBAC, forced logout, and IP/device auditing are built in, with permission changes applied in seconds. Core services, official plugins, and a full management workspace ship together, so teams can focus on business logic from day one.
             </Translate>
         ),
     },

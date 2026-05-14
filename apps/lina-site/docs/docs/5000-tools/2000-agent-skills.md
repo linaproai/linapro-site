@@ -41,6 +41,7 @@ keywords:
 | `git-worktree` | 创建独立`Git`工作树隔离开发任务 | 无 |
 | `karpathy-guidelines` | 减少`AI`编码错误的行为守则 | 无 |
 | `lina-archive-consolidate` | 聚合`OpenSpec`归档迭代为统一目录 | 无 |
+| `lina-auto-archive` | 自动扫描并归档已完成的`OpenSpec`变更 | 需安装`OpenSpec CLI` |
 | `lina-e2e` | `E2E`测试用例命名规范与管理标准 | 需安装`Playwright` |
 | `lina-feedback` | 追踪并修复`OpenSpec`变更后报告的问题 | 无 |
 | `lina-perf-audit` | 全面的后端`API`性能审计（手动触发） | 需运行中的`LinaPro`服务 |
@@ -158,6 +159,18 @@ npx skills add find-skills -g
 **适用场景**：归档目录积累了大量零散迭代记录，需要定期整理合并时。
 
 **使用方式**：使用`/lina-archive-consolidate`命令触发。
+
+### lina-auto-archive
+
+自动扫描`openspec/changes/`目录，将所有已完成的活跃变更批量归档，并汇总处理结果。
+
+技能会严格检查每个变更的完成状态——`OpenSpec`状态完成且任务全部完成才允许归档，任何未完成项一律跳过，不会强制放行，也不会绕过校验。归档完成后以中文汇报成功归档列表和未归档变更的原因。
+
+**适用场景**：需要批量清理已完成变更、定期整理活跃变更目录时。
+
+**必要依赖**：需要安装`OpenSpec CLI`（`npm install -g @fission-ai/openspec@latest`）。
+
+**使用方式**：使用`/lina-auto-archive`命令触发。
 
 ### lina-e2e
 

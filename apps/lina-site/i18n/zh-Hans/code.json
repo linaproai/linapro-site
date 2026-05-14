@@ -155,28 +155,28 @@
     "message": "宿主、源码插件、动态插件与接口文档共用翻译资源，新增语言以资源文件为准，并内置缺失检查、来源诊断与缓存。",
     "description": "Strength localization desc"
   },
-  "home.strength.governance.title": {
-    "message": "企业级治理开箱即用",
-    "description": "Strength 4 title"
-  },
-  "home.strength.governance.desc": {
-    "message": "JWT、声明式 RBAC、权限标签、字段脱敏、强制下线、IP 与设备指纹审计直接内置，权限变更可秒级生效。",
-    "description": "Strength 4 desc"
-  },
   "home.strength.distributed.title": {
     "message": "原生分布式架构",
     "description": "Strength 5 title"
   },
   "home.strength.distributed.desc": {
-    "message": "权限拓扑同步、分布式锁、键值缓存均原生集群感知；从单节点到完整集群，无需任何架构改造即可平滑扩展。",
+    "message": "权限拓扑同步、分布式锁、键值缓存均原生集群感知；集群模式通过分布式协调器实现选主与一致性，从单节点扩展到完整集群无需任何业务改造。",
     "description": "Strength 5 desc"
+  },
+  "home.strength.multitenant.title": {
+    "message": "原生多租户支持",
+    "description": "Strength multitenant title"
+  },
+  "home.strength.multitenant.desc": {
+    "message": "租户中间件、身份上下文与插件治理接缝内置于宿主核心。官方插件提供完整的租户生命周期管理；未安装时宿主自动回退单租户模式，迁移零成本。",
+    "description": "Strength multitenant desc"
   },
   "home.strength.builtin.title": {
     "message": "生产就绪开箱即用",
     "description": "Strength 6 title"
   },
   "home.strength.builtin.desc": {
-    "message": "核心服务、官方插件与功能完备的管理工作台开箱即用；不必从零搭建基础设施，第一天就能专注业务本身。",
+    "message": "JWT、声明式 RBAC、强制下线、IP 与设备审计直接内置，权限变更秒级生效。核心服务、官方插件与完备管理工作台一并交付，第一天即可专注业务本身。",
     "description": "Strength 6 desc"
   },
   "home.strengths.title": {

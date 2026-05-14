@@ -2,7 +2,7 @@
 slug: '/docs/commands'
 title: '开发指令'
 hide_title: true
-description: '本文介绍 LinaPro 项目中所有 make 指令的作用、支持的参数选项和使用示例，涵盖开发服务管理、完整构建、WASM 插件构建、Docker 镜像构建、测试验证、国际化检查和数据库初始化等所有场景，帮助开发者熟练使用项目工具链。'
+description: '本文介绍 LinaPro 项目中所有 make 指令的作用、支持的参数选项和使用示例，涵盖开发服务管理、完整构建、WASM 插件构建、Docker 镜像构建、测试验证、国际化检查和数据库初始化等所有场景，帮助开发者熟练使用项目工具链。指令集支持 macOS、Linux 和 Windows 多平台。'
 keywords:
   - make指令
   - 开发指令
@@ -20,9 +20,28 @@ keywords:
   - Docker镜像
   - E2E测试
   - 数据库初始化
+  - Windows支持
+  - make.cmd
+  - 跨平台
 ---
 
-`LinaPro`项目根目录提供了一套完整的`make`指令，通过`hack/makefiles/`下的分模块文件统一管理。在项目根目录执行`make help`可随时查看所有可用指令。
+`LinaPro`项目根目录提供了一套完整的开发指令，通过`hack/makefiles/`下的分模块文件统一管理，底层由`hack/tools/linactl`（Go 实现）驱动，支持`macOS`、`Linux`和`Windows`多平台无缝使用。
+
+## 平台说明
+
+**macOS / Linux**：直接使用`make`指令。
+
+**Windows**：使用项目根目录的`make.cmd`代替`make`，无需安装`WSL`或`Git Bash`，在`cmd`或`PowerShell`中执行：
+
+```cmd
+make.cmd dev
+make.cmd build
+make.cmd help
+```
+
+后续文档中所有`make <指令>`示例，`Windows`用户将`make`替换为`make.cmd`即可，参数格式完全一致。
+
+在项目根目录执行`make help`（Windows：`make.cmd help`）可随时查看所有可用指令。
 
 ## 指令总览
 

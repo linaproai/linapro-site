@@ -37,6 +37,17 @@ git clone --depth 1 https://github.com/linaproai/linapro.git linapro
 git clone --depth 1 --branch v0.1.0 https://github.com/linaproai/linapro.git linapro
 ```
 
+克隆完成后，初始化官方插件子模块（`lina-plugins`是独立的`Git`子仓库，默认不会随主仓库自动拉取）：
+
+```bash
+cd linapro
+git submodule update --init --recursive
+```
+
+:::info 说明
+官方插件目录`apps/lina-plugins/`以`Git submodule`形式管理，与主框架解耦，使主框架更精简轻量。如果只需要运行主框架而不需要官方插件，可以跳过此步骤。
+:::
+
 ## 启动服务
 
 ### 准备 PostgreSQL

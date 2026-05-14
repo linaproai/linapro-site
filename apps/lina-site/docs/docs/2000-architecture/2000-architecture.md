@@ -79,7 +79,7 @@ graph TB
 │    ├── lina-core/                   # 核心宿主服务（Go）
 │    ├── lina-vben/                   # 默认管理工作台（Vue 3）
 │    └── lina-plugins/                # 插件系统
-└── openspec/                         # AI 研发工作流
+└── openspec/                         # 可选 AI 研发工作流
 ```
 
 ## 核心宿主服务（lina-core）
@@ -109,11 +109,13 @@ graph TB
 
 插件层是`LinaPro`扩展能力的核心，支持两种截然不同的插件交付模式。宿主通过`pluginhost`包暴露稳定的扩展接缝，插件只能通过这些接缝与宿主交互，永远不直接访问宿主内部实现。
 
+官方插件目录`apps/lina-plugins/`以`Git submodule`形式独立维护，与主框架仓库解耦，使主框架更精简轻量；用户根据需要通过`git submodule update --init --recursive`按需拉取。
+
 详见[双模式插件系统](/docs/plugin-system)。
 
 ## AI 研发工作流
 
-`AI`研发工作流凌驾于所有层次之上，它是让规范、代码与测试保持同步的连接纽带。工作流不直接属于任何运行时组件，而是作为治理机制约束整个开发过程。推荐使用`OpenSpec`作为该工作流的实现工具。
+`AI`研发工作流凌驾于所有层次之上，它是让规范、代码与测试保持同步的连接纽带。工作流不直接属于任何运行时组件，而是作为治理机制约束整个开发过程。推荐使用`OpenSpec`作为该工作流的可选实现工具，框架对其提供内置支持。
 
 详见[AI规范驱动开发](/docs/spec-driven-development)。
 
