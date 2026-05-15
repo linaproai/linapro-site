@@ -48,7 +48,7 @@ git clone --depth 1 --branch v0.1.0 https://github.com/linaproai/linapro.git lin
 ```bash
 docker run \
   -p 5432:5432 \
-  -e POSTGRES_PASSWORD=12345678 \
+  -e POSTGRES_PASSWORD=postgres \
   -e POSTGRES_USER=postgres \
   -e POSTGRES_DB=linapro \
   postgres:14-alpine
