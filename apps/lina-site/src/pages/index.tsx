@@ -344,7 +344,7 @@ const strengths = [
         ),
         desc: (
             <Translate id="home.strength.workflow.desc" description="Strength 1 desc">
-                AI moves from exploration through proposal, implementation, review, and archiving against verified specs, keeping requirements, code, and tests aligned as the system evolves.
+                AI advances from exploration through archiving against verified specs, keeping requirements, code, and tests continuously aligned.
             </Translate>
         ),
     },
@@ -358,7 +358,7 @@ const strengths = [
         ),
         desc: (
             <Translate id="home.strength.skills.desc" description="Strength skills desc">
-                A built-in library of purpose-built AI skills spanning code assistance, review, test generation, and workflow automation — composable across the full development lifecycle and extensible to any project context.
+                A built-in library of AI skills for code assistance, review, test generation, and workflow automation — composable and extensible to any project.
             </Translate>
         ),
     },
@@ -372,7 +372,7 @@ const strengths = [
         ),
         desc: (
             <Translate id="home.strength.coupling.desc" description="Strength 2 desc">
-                Business modules depend on interfaces instead of hard dependencies, so each one can be enabled, replaced, retired, or evolved without full-stack rewrites.
+                Modules depend on interfaces instead of hard dependencies, so each can be enabled, replaced, or retired without full-stack rewrites.
             </Translate>
         ),
     },
@@ -386,7 +386,7 @@ const strengths = [
         ),
         desc: (
             <Translate id="home.strength.plugins.desc" description="Strength 3 desc">
-                Source plugins handle deep extensions, while WASM plugins hot-load at runtime; both run in isolated sandboxes with namespaced resources for safer operations.
+                Source plugins handle deep extensions; WASM plugins hot-load at runtime — both run in isolated sandboxes with namespaced resource access.
             </Translate>
         ),
     },
@@ -400,7 +400,7 @@ const strengths = [
         ),
         desc: (
             <Translate id="home.strength.contract.desc" description="Strength contract desc">
-                Service APIs, OpenAPI docs, permission metadata, and the Vue workspace share one model, so host and plugin APIs stay documented and testable.
+                Service APIs, OpenAPI docs, and permission metadata share one model with the workspace, so all interfaces stay documented and testable.
             </Translate>
         ),
     },
@@ -414,7 +414,7 @@ const strengths = [
         ),
         desc: (
             <Translate id="home.strength.i18n.desc" description="Strength localization desc">
-                The host, source plugins, dynamic plugins, and API docs share translation resources, with file-based language packs, missing-key checks, source diagnostics, and runtime caching.
+                The host, plugins, and API docs share translation resources, with file-based language packs, missing-key checks, and runtime caching.
             </Translate>
         ),
     },
@@ -428,7 +428,7 @@ const strengths = [
         ),
         desc: (
             <Translate id="home.strength.distributed.desc" description="Strength 5 desc">
-                Permission topology sync, distributed locks, and the key-value cache are cluster-aware from the start, letting one node grow into a full cluster via a distributed coordinator — with no application code changes required.
+                Permission sync, locks, and caching are cluster-aware by default, letting a single node scale to a full cluster without code changes.
             </Translate>
         ),
     },
@@ -442,7 +442,7 @@ const strengths = [
         ),
         desc: (
             <Translate id="home.strength.multitenant.desc" description="Strength multitenant desc">
-                Tenant middleware, identity context, and plugin governance hooks are built into the host core. The official plugin adds full tenant lifecycle management — and when it's not installed, the host falls back to single-tenant mode automatically.
+                Tenant middleware, identity context, and governance hooks are built into the host core, with automatic fallback to single-tenant mode.
             </Translate>
         ),
     },
@@ -456,7 +456,7 @@ const strengths = [
         ),
         desc: (
             <Translate id="home.strength.builtin.desc" description="Strength 6 desc">
-                JWT, declarative RBAC, forced logout, and IP/device auditing are built in, with permission changes applied in seconds. Core services, official plugins, and a full management workspace ship together, so teams can focus on business logic from day one.
+                JWT, declarative RBAC, forced logout, and IP/device auditing are built in, with permission changes applied in seconds from day one.
             </Translate>
         ),
     },

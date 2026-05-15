@@ -112,7 +112,7 @@
     "description": "Strength 1 title"
   },
   "home.strength.workflow.desc": {
-    "message": "从探索、提案、实现到审查归档，AI 始终基于已验证规范推进，需求、代码与测试持续对齐，减少架构漂移。",
+    "message": "从探索到归档，AI 依据验证规范全程推进，需求、代码与测试始终保持对齐。",
     "description": "Strength 1 desc"
   },
   "home.strength.skills.title": {
@@ -120,7 +120,7 @@
     "description": "Strength skills title"
   },
   "home.strength.skills.desc": {
-    "message": "内置涵盖代码生成、审查、测试与工作流自动化的 AI 技能库，可按需组合编排与灵活扩展，让 AI 能力深度融入研发全链路。",
+    "message": "内置代码生成、审查、测试与自动化技能库，可组合扩展，深度融入研发全链路。",
     "description": "Strength skills desc"
   },
   "home.strength.contract.title": {
@@ -128,7 +128,7 @@
     "description": "Strength contract title"
   },
   "home.strength.contract.desc": {
-    "message": "服务 API、OpenAPI 文档、权限元数据与 Vue 工作台共享同一模型，宿主和插件接口自动汇入接口文档并可在线调试。",
+    "message": "API、文档、权限与工作台共享同一模型，接口自动汇入文档并可在线调试。",
     "description": "Strength contract desc"
   },
   "home.strength.coupling.title": {
@@ -136,7 +136,7 @@
     "description": "Strength 2 title"
   },
   "home.strength.coupling.desc": {
-    "message": "业务模块以接口协作、独立演进，可按需启用、替换或下线，不把局部变化扩散成全栈改造，长期保持清晰边界。",
+    "message": "业务模块以接口协作，可按需启用、替换或下线，局部变更不扩散为全栈改造。",
     "description": "Strength 2 desc"
   },
   "home.strength.plugins.title": {
@@ -144,7 +144,7 @@
     "description": "Strength 3 title"
   },
   "home.strength.plugins.desc": {
-    "message": "源码插件适合深度扩展，WASM 插件支持运行时热加载；两类插件都在隔离沙箱中运行，资源按命名空间管理。",
+    "message": "源码插件深度扩展，WASM 插件热加载运行，均在隔离沙箱中安全管理资源。",
     "description": "Strength 3 desc"
   },
   "home.strength.i18n.title": {
@@ -152,7 +152,7 @@
     "description": "Strength localization title"
   },
   "home.strength.i18n.desc": {
-    "message": "宿主、源码插件、动态插件与接口文档共用翻译资源，新增语言以资源文件为准，并内置缺失检查、来源诊断与缓存。",
+    "message": "宿主、插件与接口文档共用翻译资源，内置缺失检查、来源诊断与运行时缓存。",
     "description": "Strength localization desc"
   },
   "home.strength.distributed.title": {
@@ -160,7 +160,7 @@
     "description": "Strength 5 title"
   },
   "home.strength.distributed.desc": {
-    "message": "权限拓扑同步、分布式锁、键值缓存均原生集群感知；集群模式通过分布式协调器实现选主与一致性，从单节点扩展到完整集群无需任何业务改造。",
+    "message": "权限同步、分布式锁与缓存均原生集群感知，单节点可无缝扩展至完整分布式集群。",
     "description": "Strength 5 desc"
   },
   "home.strength.multitenant.title": {
@@ -168,7 +168,7 @@
     "description": "Strength multitenant title"
   },
   "home.strength.multitenant.desc": {
-    "message": "租户中间件、身份上下文与插件治理接缝内置于宿主核心。官方插件提供完整的租户生命周期管理；未安装时宿主自动回退单租户模式，迁移零成本。",
+    "message": "租户中间件与治理接缝内置宿主核心，支持完整生命周期管理，可自动回退单租户。",
     "description": "Strength multitenant desc"
   },
   "home.strength.builtin.title": {
@@ -176,7 +176,7 @@
     "description": "Strength 6 title"
   },
   "home.strength.builtin.desc": {
-    "message": "JWT、声明式 RBAC、强制下线、IP 与设备审计直接内置，权限变更秒级生效。核心服务、官方插件与完备管理工作台一并交付，第一天即可专注业务本身。",
+    "message": "内置 JWT、RBAC、强制下线与设备审计，权限秒级生效，首日即可专注业务。",
     "description": "Strength 6 desc"
   },
   "home.strengths.title": {
