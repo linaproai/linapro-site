@@ -258,16 +258,12 @@ info, err := ctx.Runtime().GetFrameworkInfo()
 
 动态插件的完整使用流程：
 
-```mermaid
-flowchart TD
-    A["构建 .wasm 文件<br/>go run . wasm p=plugin-id"] --> B["登录管理工作台"]
-    B --> C["进入扩展中心 → 插件管理"]
-    C --> D["点击「上传插件」<br/>上传 .wasm 文件"]
-    D --> E["确认权限声明<br/>（hostServices 中申请的宿主服务）"]
-    E --> F["点击「安装」<br/>执行安装 SQL（如有）"]
-    F --> G["点击「启用」<br/>插件功能立即可用"]
-    G --> H["左侧菜单出现插件入口"]
-```
+1. 构建`.wasm`文件：`go run . wasm p=<plugin-id>`，产物输出到`temp/output/<plugin-id>.wasm`
+2. 登录管理工作台，进入**扩展中心 → 插件管理**
+3. 点击**上传插件**，选择构建好的`.wasm`文件
+4. 确认权限声明（即`plugin.yaml`中`hostServices`申请的宿主服务），管理员审核后继续
+5. 点击**安装**，宿主执行安装`SQL`（如有）并写入治理记录
+6. 点击**启用**，插件功能立即生效，左侧菜单出现插件入口
 
 ## 版本升级
 

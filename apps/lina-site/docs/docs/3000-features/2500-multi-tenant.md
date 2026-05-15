@@ -65,10 +65,10 @@ keywords:
 
 ```yaml
 id: multi-tenant
-type: source
-scope_nature: platform_only
-supports_multi_tenant: false
-default_install_mode: global
+type: source                   # 源码插件，随宿主一起编译
+scope_nature: platform_only    # 仅在平台上下文治理，不进入租户上下文
+supports_multi_tenant: false   # 自身不支持租户级安装，因为它就是租户控制面
+default_install_mode: global   # 全局唯一安装，不按租户独立启停
 ```
 
 启用后，平台管理员可以使用以下能力：

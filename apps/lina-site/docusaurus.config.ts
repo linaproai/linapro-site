@@ -184,11 +184,6 @@ const config: Config = {
 
         // 右边导航栏
         {
-          href: 'http://demo.linapro.ai/',
-          label: '🖥️ Demo',
-          position: 'right' as const,
-        },
-        {
           type: 'docsVersionDropdown',
           position: 'right' as const,
           dropdownActiveClassDisabled: true,

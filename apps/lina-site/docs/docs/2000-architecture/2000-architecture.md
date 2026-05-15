@@ -119,13 +119,13 @@ graph TB
 
 官方插件目录`apps/lina-plugins/`以`Git submodule`形式独立维护，远端仓库为`https://github.com/linaproai/official-plugins.git`。主框架仓库默认保持精简轻量，用户根据需要通过`git submodule update --init --recursive`按需拉取官方插件内容。未初始化该子模块时，宿主仍可按`host-only`模式运行；存在插件清单时，开发、构建和镜像命令会自动进入插件完整模式，也可以通过`plugins=0`强制宿主模式。
 
-详见[双模式插件系统](/docs/plugin-system)。
+详见：[双模式插件系统](/docs/plugin-system)。
 
 ## AI 研发工作流
 
 `AI`研发工作流凌驾于所有层次之上，它是让规范、代码与测试保持同步的连接纽带。工作流不直接属于任何运行时组件，而是作为治理机制约束整个开发过程。`OpenSpec`不是`LinaPro`运行时依赖，项目不安装它也可以运行；但框架内置了对`OpenSpec`目录结构、指令和技能的良好支持，强烈建议在正式团队协作中安装并使用。
 
-详见[AI规范驱动开发](/docs/spec-driven-development)。
+详见：[AI规范驱动开发](/docs/spec-driven-development)。
 
 ## AI 技能体系（.agents/skills/）
 
@@ -133,7 +133,7 @@ graph TB
 
 技能涵盖前端设计、前端工程模式、`Git`提交与工作树管理、`OpenSpec`探索/提案/实施/归档、反馈闭环、代码审查、`E2E`测试、性能审计、自动归档和浏览器自动化等场景。项目内置技能随源码自动加载；`OpenSpec CLI`、`goframe-v2`、`find-skills`等外部技能或工具按需安装。
 
-详见[AI原生设计](/docs/ai-native)。
+详见：[AI原生设计](/docs/ai-native)。
 
 ## 分层边界原则
 
@@ -222,7 +222,7 @@ graph TB
     NN -.-> Redis
 ```
 
-集群模式通过配置`cluster.enabled: true`启用，当前版本必须同时配置`cluster.coordination: redis`和可连通的`cluster.redis`端点。`PostgreSQL`负责持久化业务与治理数据，`Redis`协调器负责选主、分布式锁、热态会话和集群感知缓存等跨节点协调能力，无需修改业务代码。详见[原生分布式架构](/docs/distributed-architecture)。
+集群模式通过配置`cluster.enabled: true`启用，当前版本必须同时配置`cluster.coordination: redis`和可连通的`cluster.redis`端点。`PostgreSQL`负责持久化业务与治理数据，`Redis`协调器负责选主、分布式锁、热态会话和集群感知缓存等跨节点协调能力，无需修改业务代码。详见：[原生分布式架构](/docs/distributed-architecture)。
 
 ## 相关文档
 

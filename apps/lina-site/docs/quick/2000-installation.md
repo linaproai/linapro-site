@@ -39,17 +39,6 @@ git clone --depth 1 https://github.com/linaproai/linapro.git linapro
 git clone --depth 1 --branch v0.1.0 https://github.com/linaproai/linapro.git linapro
 ```
 
-克隆完成后，初始化官方插件子模块（`lina-plugins`是独立的`Git`子仓库，默认不会随主仓库自动拉取）：
-
-```bash
-cd linapro
-git submodule update --init --recursive
-```
-
-:::info 说明
-官方插件目录`apps/lina-plugins/`以`Git submodule`形式管理，与主框架解耦，使主框架更精简轻量。如果只需要运行主框架而不需要官方插件，可以跳过此步骤。
-:::
-
 ## 启动服务
 
 ### 准备 PostgreSQL
@@ -57,16 +46,12 @@ git submodule update --init --recursive
 `LinaPro`默认使用`PostgreSQL 14+`作为数据库。`make init`和`make dev`不会启动或管理数据库，请先准备可连接的`PostgreSQL`实例。本地开发可以使用以下容器：
 
 ```bash
-docker run --name linapro-postgres \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=linapro \
+docker run \
   -p 5432:5432 \
-  --health-cmd pg_isready \
-  --health-interval 10s \
-  --health-timeout 5s \
-  --health-retries 5 \
-  -d postgres:14-alpine
+  -e POSTGRES_PASSWORD=12345678 \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_DB=linapro \
+  postgres:14-alpine
 ```
 
 如果本机`5432`端口已被占用，可以将容器映射到其他本机端口，例如`15432:5432`，并同步修改`database.default.link`中的端口。
@@ -95,23 +80,10 @@ database:
 配置完成后，执行以下命令创建数据库表结构并写入初始数据：
 
 ```bash
-cd hack/tools/linactl
-go run . init confirm=init
-```
-
-`macOS`和`Linux`用户也可以使用根目录`make`兼容入口：
-
-```bash
 make init confirm=init
 ```
 
-`Windows`用户可以在`cmd.exe`中执行：
-
-```cmd
-make init confirm=init
-```
-
-在`PowerShell`中执行：
+`Windows`用户如果使用`PowerShell`，可执行：
 
 ```powershell
 .\make init confirm=init
@@ -124,26 +96,12 @@ make init confirm=init
 配置完成后，执行以下命令加载官方提供的演示数据：
 
 ```bash
-cd hack/tools/linactl
-go run . mock confirm=mock
-```
-
-或使用兼容入口：
-
-```bash
 make mock confirm=mock
 ```
 
 ### 启动开发服务
 
 执行以下命令启动前后端服务：
-
-```bash
-cd hack/tools/linactl
-go run . dev
-```
-
-或使用兼容入口：
 
 ```bash
 make dev
@@ -165,19 +123,6 @@ make dev
 
 ## 常用命令
 
-```bash
-cd hack/tools/linactl
-go run . dev          # 启动前后端服务
-go run . stop         # 停止所有本地服务
-go run . status       # 查看服务运行状态
-go run . init confirm=init # 重新初始化数据库
-go run . mock confirm=mock # 重新加载演示数据
-go run . test         # 运行完整 E2E 测试套件
-go run . build        # 编译生成可发布的二进制文件
-go run . image        # 构建 Docker 镜像
-```
-
-`macOS`和`Linux`兼容入口：
 
 ```bash
 make dev               # 启动前后端服务
@@ -190,7 +135,7 @@ make build             # 编译生成可发布的二进制文件
 make image             # 构建 Docker 镜像
 ```
 
-`Windows cmd.exe`可直接使用`make <指令>`；`PowerShell`使用`.\make <指令>`或`.\make.cmd <指令>`。
+> `Windows cmd.exe`可直接使用`make <指令>`；`PowerShell`使用`.\make <指令>`或`.\make.cmd <指令>`。
 
 ## 安装验证
 

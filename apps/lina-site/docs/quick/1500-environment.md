@@ -43,9 +43,6 @@ import TabItem from '@theme/TabItem';
 | `Node.js` | `20.19+` | 前端构建环境 |
 | `pnpm` | `10.0+` | 前端包管理器 |
 | `PostgreSQL` | `14+` | 默认关系型数据库 |
-| `Redis` | - | 可选集群协调器，单机模式不需要 |
-| `linactl` | 随源码提供 | 跨平台开发命令入口 |
-| `Make` | - | `macOS`/`Linux`兼容命令入口 |
 
 ### Git
 
@@ -184,31 +181,9 @@ docker run \
 
 `LinaPro`默认使用`postgres:postgres@127.0.0.1:5432`连接`linapro`数据库，对应连接串为`pgsql:postgres:postgres@tcp(127.0.0.1:5432)/linapro?sslmode=disable`，可在项目的`config.yaml`中修改连接配置。
 
-### Redis（可选）
-
-单机模式不需要`Redis`。只有启用`cluster.enabled: true`的多节点集群部署时，才需要准备可连接的`Redis`实例，并在`config.yaml`中配置`cluster.coordination: redis`和`cluster.redis`端点。
-
-本地验证集群协调能力时，可以使用容器快速启动：
-
-```bash
-docker run --name linapro-redis -p 6379:6379 -d redis:7-alpine
-```
-
-### linactl 与 Make
-
-`LinaPro`的长期维护命令入口是随源码提供的`hack/tools/linactl`，它使用`Go`实现，支持`Windows`、`Linux`和`macOS`：
-
-```bash
-cd hack/tools/linactl
-go run . help
-go run . status
-```
-
-根目录`Makefile`和`make.cmd`是兼容入口，底层同样调用`linactl`。
-
 ### Make
 
-`macOS`和`Linux`用户可以继续使用`make`。如未安装：
+`macOS`和`Linux`系统通常已内置了`make`工具。如未安装：
 
 <Tabs groupId="platform">
 <TabItem value="mac-linux" label="macOS / Linux" default>

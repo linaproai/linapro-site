@@ -171,19 +171,20 @@ DROP TABLE IF EXISTS content_article_record;
 ### 第四步：定义 API 接口
 
 ```go
-// backend/api/article/article.go
-package article
+// backend/api/article/v1/article_list.go
+package v1
 
 import "github.com/gogf/gf/v2/frame/g"
 
 type ArticleListReq struct {
-    g.Meta   `path:"/plugin/content-article/article" method:"get" tags:"文章管理" summary:"文章列表" middleware:"AuthMiddleware,PermMiddleware" perm:"content-article:article:view"`
+    g.Meta   `path:"/plugins/content-article/article" method:"get" tags:"文章管理" summary:"文章列表" permission:"content-article:article:view"`
     Page     int    `json:"page"     v:"min:1"          dc:"页码"`
     PageSize int    `json:"pageSize" v:"min:1,max:100"  dc:"每页数量"`
 }
 
+// backend/api/article/v1/article_create.go
 type ArticleCreateReq struct {
-    g.Meta  `path:"/plugin/content-article/article" method:"post" tags:"文章管理" summary:"创建文章" middleware:"AuthMiddleware,PermMiddleware" perm:"content-article:article:create"`
+    g.Meta  `path:"/plugins/content-article/article" method:"post" tags:"文章管理" summary:"创建文章" permission:"content-article:article:create"`
     Title   string `json:"title"   v:"required|length:1,255" dc:"文章标题"`
     Content string `json:"content" v:"required"              dc:"文章内容"`
 }
@@ -211,47 +212,87 @@ func (s *ArticleService) List(ctx context.Context, page, pageSize int) (list int
 
 ### 第六步：注册插件
 
+每个插件的`backend/`入口文件在`init()`中完成自注册，无需外部显式调用：
+
 ```go
 // backend/plugin.go
 package backend
 
 import (
-    "github.com/linaproai/linapro/apps/lina-core/pkg/pluginhost"
-    "github.com/linaproai/linapro/apps/lina-plugins/content-article/backend/internal/controller"
+    "context"
+
+    contentarticle "lina-plugin-content-article"
+    "lina-core/pkg/pluginhost"
+    articlectrl "lina-plugin-content-article/backend/internal/controller/article"
+    articlesvc "lina-plugin-content-article/backend/internal/service/article"
 )
 
-func Register(p pluginhost.SourcePlugin) {
-    // 绑定前端资源（从 plugin_embed.go 引入）
-    p.Assets().UseEmbeddedFiles(embedFS)
+const pluginID = "content-article"
+
+func init() {
+    plugin := pluginhost.NewSourcePlugin(pluginID)
+
+    // 绑定插件嵌入资源（plugin.yaml、manifest/、frontend/）
+    plugin.Assets().UseEmbeddedFiles(contentarticle.EmbeddedFiles)
 
     // 注册插件 HTTP 路由
-    p.HTTP().RegisterRoutes(
+    plugin.HTTP().RegisterRoutes(
         pluginhost.ExtensionPointHTTPRouteRegister,
         pluginhost.CallbackExecutionModeBlocking,
-        func(group *ghttp.RouterGroup) {
-            group.Bind(controller.NewArticleController())
-        },
+        registerRoutes,
     )
 
     // 注册卸载清理逻辑（在 SQL 删表之前清理文件等资源）
-    p.Lifecycle().RegisterUninstallHandler(func(ctx context.Context, keepData bool) error {
-        if !keepData {
-            // 清理插件上传的文件
+    plugin.Lifecycle().RegisterUninstallHandler(func(ctx context.Context, input pluginhost.SourcePluginUninstallInput) error {
+        if !input.PurgeStorageData() {
+            return nil
         }
-        return nil
+        // 清理插件上传的文件
+        return articlesvc.PurgeStorageData(ctx)
     })
+
+    pluginhost.RegisterSourcePlugin(plugin)
+}
+
+// registerRoutes 使用宿主发布的中间件目录注册插件路由。
+func registerRoutes(ctx context.Context, registrar pluginhost.HTTPRegistrar) error {
+    svc := articlesvc.New(registrar.HostServices().I18n(), registrar.HostServices().TenantFilter())
+    ctrl := articlectrl.NewV1(svc)
+    routes := registrar.Routes()
+    middlewares := routes.Middlewares()
+    routes.Group("/api/v1", func(group pluginhost.RouteGroup) {
+        group.Middleware(
+            middlewares.NeverDoneCtx(),
+            middlewares.HandlerResponse(),
+            middlewares.CORS(),
+            middlewares.Ctx(),
+        )
+        group.Group("/", func(group pluginhost.RouteGroup) {
+            group.Middleware(
+                middlewares.Auth(),
+                middlewares.Tenancy(),
+                middlewares.Permission(),
+            )
+            group.Bind(
+                ctrl.ListArticles,
+                ctrl.CreateArticle,
+            )
+        })
+    })
+    return nil
 }
 ```
 
-在宿主插件注册文件中接线：
+插件通过在`init()`中调用`pluginhost.RegisterSourcePlugin(plugin)`完成自注册。宿主在`plugin-full`构建时通过`linactl`自动生成聚合入口文件`plugins.go`，其中包含所有已配置插件的空白导入：
 
 ```go
-// apps/lina-plugins/lina-plugins.go
-import contentarticle "github.com/linaproai/linapro/apps/lina-plugins/content-article/backend"
+// apps/lina-plugins/plugins.go（由 linactl 自动生成，勿手动编辑）
+package linaplugins
 
-func init() {
-    pluginregistry.Register("content-article", contentarticle.Register)
-}
+import (
+    _ "lina-plugin-content-article/backend"
+    // ... 其他插件
+)
 ```
 
 ## 数据库访问
@@ -271,8 +312,11 @@ gfcli:
   gen:
     dao:
       - link: "pgsql:postgres:postgres@tcp(127.0.0.1:5432)/linapro?sslmode=disable"
-        tables: "content_article_*"  # 只生成插件自有表的 DAO
+        path: "internal"
+        tables: "content_article_record"        # 明确列出插件自有表，不使用通配符
+        importPrefix: "lina-plugin-content-article/backend/internal"
         descriptionTag: true
+        noModelComment: true
 ```
 
 ## 前端页面
@@ -307,12 +351,14 @@ onMounted(() => run())
 
 ```go
 // 监听用户登录成功事件，记录登录日志
-p.Hooks().RegisterHook(
+plugin.Hooks().RegisterHook(
     pluginhost.ExtensionPointAuthLoginSucceeded,
     pluginhost.CallbackExecutionModeAsync,  // 异步执行，不阻塞登录流程
-    func(ctx context.Context, payload *pluginhost.HookPayload) error {
-        // 将登录信息写入插件自有的日志表
-        return recordLoginLog(ctx, payload)
+    func(ctx context.Context, payload pluginhost.HookPayload) error {
+        // 从 payload 中提取登录信息
+        userName := pluginhost.HookPayloadStringValue(payload.Values(), pluginhost.HookPayloadKeyUserName)
+        ip := pluginhost.HookPayloadStringValue(payload.Values(), pluginhost.HookPayloadKeyIP)
+        return recordLoginLog(ctx, userName, ip)
     },
 )
 ```
@@ -321,16 +367,14 @@ p.Hooks().RegisterHook(
 
 当插件发布新版本时（修改`plugin.yaml`中的`version`字段），升级流程如下：
 
-1. 宿主启动时扫描发现新版本（`plugin.yaml`版本 > 数据库中已安装版本）
-2. 如果发现版本不匹配，**宿主启动失败**并提示执行升级命令
-3. 通过`AI`工具侧提供的`lina-upgrade`技能执行升级（该技能不属于当前项目`.agents/skills/`内置目录，请以你的`AI`工具技能配置为准）：
+1. 在`manifest/sql/`中添加幂等的增量`SQL`文件（新增列、新增表等，所有语句使用`IF NOT EXISTS`）
+2. 将`plugin.yaml`中的`version`字段改为新版本号
+3. 重新编译宿主；宿主启动时会检测到数据库中的已安装版本与二进制中的声明版本不一致
+4. 版本不匹配时，宿主会**拒绝启动**并在日志中列出所有待升级的插件及版本差异
+5. 执行升级操作（运行增量 SQL 并更新注册表），使数据库版本与二进制版本一致
+6. 重启宿主，新版本正式生效
 
-```
-# 在 Claude Code 中
-upgrade source plugin content-article
-```
-
-4. 升级完成后重启宿主，新版本正式生效
+升级 SQL 的设计原则与安装 SQL 相同——必须保证幂等性，已有内容重复执行不会报错。宿主在执行升级时会重跑安装 SQL 目录下的全部文件，仅新增的语句会实际产生变更。
 
 ## 最佳实践
 
