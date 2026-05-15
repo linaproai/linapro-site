@@ -2,7 +2,7 @@
 slug: '/docs/configuration'
 title: '配置管理'
 hide_title: true
-description: '本文详细介绍 LinaPro 核心宿主服务的配置文件 config.yaml，提供完整的配置模板和各配置项的说明，涵盖 HTTP 服务、日志、数据库、JWT 认证、会话管理、定时调度、国际化、集群部署、文件上传和插件管理等所有配置分组，帮助开发者快速理解和调整框架的运行时行为。'
+description: '本文详细介绍 LinaPro 核心宿主服务的配置文件 config.yaml，提供与当前源码一致的配置模板和配置项说明，涵盖 HTTP 服务、日志、PostgreSQL 默认数据库、JWT 认证、会话管理、定时调度、仅内置中英文的国际化配置、Redis 集群协调、文件上传和插件治理等配置分组，帮助开发者理解并调整框架的运行时行为。'
 keywords:
   - 配置管理
   - config.yaml
@@ -20,6 +20,9 @@ keywords:
   - 运行时配置
   - 环境配置
   - 生产配置
+  - PostgreSQL
+  - Redis协调器
+  - 多租户插件治理
 ---
 
 ## 配置文件位置
@@ -124,20 +127,34 @@ i18n:
       nativeName: English
     - locale: zh-CN
       nativeName: 简体中文
-    - locale: zh-TW
-      nativeName: 繁體中文
 
 # 集群部署配置
 cluster:
   # 是否开启集群多节点模式
   # 单机部署设为 false；多节点水平扩展设为 true
   enabled: false
+  # 集群模式协调后端；cluster.enabled=true 时必填
+  # 当前版本仅支持 redis，单机模式不会连接 Redis
+  coordination: redis
   election:
     # 主节点选举锁租约时长
     # 主节点下线后，其他节点最多等待此时长后完成重新选主
     lease: 30s
     # 租约续约间隔，建议为 lease 的 1/3
     renewInterval: 10s
+  redis:
+    # 集群协调使用的 Redis 地址
+    address: "127.0.0.1:6379"
+    # Redis 逻辑数据库
+    db: 0
+    # Redis 密码；Redis 未启用认证时留空
+    password: ""
+    # Redis 连接超时时间
+    connectTimeout: 3s
+    # Redis 读取超时时间
+    readTimeout: 2s
+    # Redis 写入超时时间
+    writeTimeout: 2s
 
 # 文件上传配置
 upload:
@@ -148,6 +165,9 @@ upload:
 
 # 插件配置
 plugin:
+  # 是否允许平台管理员在 LifecycleGuard 否决后强制卸载插件
+  # 强制操作必须审计；生产环境应结合组织治理策略谨慎开启
+  allowForceUninstall: true
   # 动态插件相关配置
   dynamic:
     # 动态插件（.wasm 文件）存储目录
@@ -158,12 +178,9 @@ plugin:
   # withMockData: true 表示同时加载该插件的 manifest/sql/mock-data 下的演示数据
   # 注意：演示数据不建议在生产环境启用
   autoEnable:
-    # - id: "org-center"
-    # - id: "content-notice"
-    # - id: "monitor-online"
-    # - id: "monitor-server"
-    # - id: "monitor-operlog"
-    # - id: "monitor-loginlog"
+    # - id: "demo-control"
+    #   withMockData: false
+    # - id: "plugin-demo-source"
     # - id: "plugin-demo-dynamic"
     #   withMockData: true
 ```
@@ -182,9 +199,31 @@ plugin:
 | `shutdown` | 优雅关停超时时间 |
 | `scheduler` | 定时任务默认时区 |
 | `i18n` | 默认语言、多语言开关、语言列表 |
-| `cluster` | 集群模式开关、选主租约配置 |
+| `cluster` | 集群模式开关、`Redis`协调器、选主租约配置 |
 | `upload` | 上传目录、文件大小限制 |
-| `plugin` | 动态插件目录、自动启用插件清单 |
+| `plugin` | 强制卸载策略、动态插件目录、自动启用插件清单 |
+
+## 数据库说明
+
+`PostgreSQL 14+`是`LinaPro`默认数据库，也是生产环境推荐数据库。运行`make init`、`make dev`或跨平台`linactl`同名命令前，需要先准备可连接的`PostgreSQL`实例；这些命令不会自动启动或托管数据库。
+
+如需单节点本地演示或冒烟验证，可以将`database.default.link`改为`SQLite`连接串：
+
+```yaml
+database:
+  default:
+    link: "sqlite::@file(./temp/sqlite/linapro.db)"
+```
+
+`SQLite`模式会强制保持单节点运行，不支持集群模式，也不建议用于生产部署。
+
+## 集群协调说明
+
+单机模式下，`cluster.enabled: false`，宿主不会连接`Redis`，只依赖`PostgreSQL`和进程内协调即可运行。
+
+集群模式下，`cluster.enabled: true`时必须配置`cluster.coordination: redis`和`cluster.redis`端点。当前版本仅支持`Redis`协调器，配置项采用稳定的`coordination`标量形式，为后续扩展其他协调后端预留空间。
+
+`Redis`协调器承担选主、分布式锁、热态会话和集群感知缓存等跨节点协调能力；`PostgreSQL`仍负责业务数据、治理数据和插件状态的持久化。
 
 ## 生产环境注意事项
 
@@ -199,4 +238,6 @@ plugin:
 1. `logger.structured`：生产环境设为`true`，便于日志采集系统（如`ELK`、`Loki`）解析
 2. `logger.path`：设置日志文件目录，避免日志丢失
 3. `scheduler.defaultTimezone`：根据业务实际所在时区调整
-4. `plugin.autoEnable`：按需列出生产环境需要自动启用的插件
+4. `cluster.redis`：集群部署时使用独立、可靠、带认证的`Redis`实例
+5. `plugin.allowForceUninstall`：根据组织治理要求确认是否允许平台管理员强制卸载被`LifecycleGuard`否决的插件
+6. `plugin.autoEnable`：按需列出生产环境需要自动启用的插件

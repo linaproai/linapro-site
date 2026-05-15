@@ -2,7 +2,7 @@
 slug: '/quick/environment'
 title: '环境配置'
 hide_title: true
-description: '本文详细介绍运行 LinaPro 框架所需的全部环境依赖，包括 Git、Go（≥ 1.23）、Node.js（≥ 20.19）、pnpm（≥ 10.0）、PostgreSQL（14+）、Make，以及 AI 原生工作流推荐的 Claude Code、OpenSpec CLI 和 goframe-v2 技能的版本要求与安装方法，并提供针对 macOS、Linux 和 Windows（WSL / Git Bash）平台的完整安装引导，帮助开发者在正式安装 LinaPro 之前快速完成本地环境准备。'
+description: '本文详细介绍运行 LinaPro 框架所需的全部环境依赖，包括 Git、Go（≥ 1.23）、Node.js（≥ 20.19）、pnpm（≥ 10.0）、PostgreSQL（14+）、可选 Redis 集群协调器、跨平台 linactl 开发指令入口，以及 AI 原生工作流推荐的 Claude Code、OpenSpec CLI、goframe-v2 和 find-skills 的版本要求与安装方法，并提供针对 macOS、Linux 和 Windows 平台的安装引导，帮助开发者在正式安装 LinaPro 之前快速完成本地环境准备。'
 keywords:
   - LinaPro
   - 环境配置
@@ -14,6 +14,8 @@ keywords:
   - PostgreSQL
   - Git
   - Make
+  - linactl
+  - Redis
   - Claude Code
   - OpenSpec
   - goframe-v2
@@ -41,7 +43,9 @@ import TabItem from '@theme/TabItem';
 | `Node.js` | `20.19+` | 前端构建环境 |
 | `pnpm` | `10.0+` | 前端包管理器 |
 | `PostgreSQL` | `14+` | 默认关系型数据库 |
-| `Make` | - | 项目命令入口 |
+| `Redis` | - | 可选集群协调器，单机模式不需要 |
+| `linactl` | 随源码提供 | 跨平台开发命令入口 |
+| `Make` | - | `macOS`/`Linux`兼容命令入口 |
 
 ### Git
 
@@ -62,9 +66,9 @@ sudo yum install git
 ```
 
 </TabItem>
-<TabItem value="windows" label="Windows（Git Bash / WSL）">
+<TabItem value="windows" label="Windows">
 
-访问 [git-scm.com](https://git-scm.com/download/win) 下载并安装`Git for Windows`。安装完成后，后续所有命令均在`Git Bash`中执行。
+访问 [git-scm.com](https://git-scm.com/download/win) 下载并安装`Git for Windows`。安装完成后，可以在`cmd.exe`、`PowerShell`、`Git Bash`或`WSL`中使用`git`命令。
 
 </TabItem>
 </Tabs>
@@ -87,9 +91,9 @@ echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc && source ~/.bashrc
 ```
 
 </TabItem>
-<TabItem value="windows" label="Windows（WSL）">
+<TabItem value="windows" label="Windows">
 
-在`WSL`中按`Linux`步骤安装，或访问 [go.dev/dl](https://go.dev/dl/) 下载`Windows`安装包（`.msi`）完成图形化安装。
+访问 [go.dev/dl](https://go.dev/dl/) 下载`Windows`安装包（`.msi`）完成图形化安装，或在`WSL`中按`Linux`步骤安装。
 
 </TabItem>
 </Tabs>
@@ -113,9 +117,9 @@ brew install node
 ```
 
 </TabItem>
-<TabItem value="windows" label="Windows（WSL）">
+<TabItem value="windows" label="Windows">
 
-在`WSL`中按`Linux`步骤安装`nvm`，或访问 [nodejs.org](https://nodejs.org/) 下载`Windows`版本并配合`WSL`使用。
+推荐使用 [nvm-windows](https://github.com/coreybutler/nvm-windows) 或访问 [nodejs.org](https://nodejs.org/) 下载`Windows`版本。也可以在`WSL`中按`Linux`步骤安装`nvm`。
 
 </TabItem>
 </Tabs>
@@ -171,18 +175,40 @@ docker run \
 该示例使用`postgres:12345678@127.0.0.1:5432`连接`linapro`数据库。如果沿用这个密码，请将项目`config.yaml`中的`database.default.link`改为`pgsql:postgres:12345678@tcp(127.0.0.1:5432)/linapro?sslmode=disable`。
 
 </TabItem>
-<TabItem value="windows" label="Windows（WSL）">
+<TabItem value="windows" label="Windows">
 
-在`WSL`中按`Linux`步骤安装，或通过 [PostgreSQL Windows installer](https://www.postgresql.org/download/windows/) 在`Windows`侧安装后，从`WSL`通过`127.0.0.1`访问数据库。
+可通过 [PostgreSQL Windows installer](https://www.postgresql.org/download/windows/) 在`Windows`侧安装，也可以使用`Docker Desktop`运行上面的`PostgreSQL`容器。使用`WSL`时，可从`WSL`通过`127.0.0.1`访问`Windows`侧数据库，或直接在`WSL`发行版内安装`PostgreSQL`。
 
 </TabItem>
 </Tabs>
 
 `LinaPro`默认使用`postgres:postgres@127.0.0.1:5432`连接`linapro`数据库，对应连接串为`pgsql:postgres:postgres@tcp(127.0.0.1:5432)/linapro?sslmode=disable`，可在项目的`config.yaml`中修改连接配置。
 
+### Redis（可选）
+
+单机模式不需要`Redis`。只有启用`cluster.enabled: true`的多节点集群部署时，才需要准备可连接的`Redis`实例，并在`config.yaml`中配置`cluster.coordination: redis`和`cluster.redis`端点。
+
+本地验证集群协调能力时，可以使用容器快速启动：
+
+```bash
+docker run --name linapro-redis -p 6379:6379 -d redis:7-alpine
+```
+
+### linactl 与 Make
+
+`LinaPro`的长期维护命令入口是随源码提供的`hack/tools/linactl`，它使用`Go`实现，支持`Windows`、`Linux`和`macOS`：
+
+```bash
+cd hack/tools/linactl
+go run . help
+go run . status
+```
+
+根目录`Makefile`和`make.cmd`是兼容入口，底层同样调用`linactl`。
+
 ### Make
 
-`macOS` 和 `Linux` 通常已内置`Make`。如未安装：
+`macOS`和`Linux`用户可以继续使用`make`。如未安装：
 
 <Tabs groupId="platform">
 <TabItem value="mac-linux" label="macOS / Linux" default>
@@ -199,9 +225,9 @@ sudo yum groupinstall "Development Tools"
 ```
 
 </TabItem>
-<TabItem value="windows" label="Windows（WSL）">
+<TabItem value="windows" label="Windows">
 
-在`WSL`中按对应的`Linux`发行版步骤安装即可。
+`Windows`不要求安装`GNU Make`。仓库根目录提供`make.cmd`薄包装入口，`cmd.exe`中可以直接执行`make help`，`PowerShell`中使用`.\make help`或`.\make.cmd help`。
 
 </TabItem>
 </Tabs>

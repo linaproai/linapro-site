@@ -2,7 +2,7 @@
 slug: '/docs/wasm-plugins'
 title: '动态插件（WASM）'
 hide_title: true
-description: '本文详细介绍 LinaPro WASM 动态插件的开发流程、目录结构、构建方式、宿主服务桥接接口（runtime、storage、network、data）、插件清单中的服务权限声明、运行时上传和安装流程，以及与源码插件的关键区别，帮助开发者掌握 WASM 动态插件的开发和运维技能。'
+description: '本文详细介绍 LinaPro WASM 动态插件的开发流程、目录结构、跨平台 linactl 构建方式、宿主服务桥接接口（runtime、cron、storage、network、data）、插件清单中的 hostServices 服务权限声明、多租户清单字段、运行时上传和安装流程，以及与源码插件的关键区别，帮助开发者掌握 WASM 动态插件的开发和运维技能。'
 keywords:
   - WASM动态插件
   - 动态插件
@@ -11,12 +11,14 @@ keywords:
   - 插件桥接
   - pluginbridge
   - 宿主服务
+  - hostServices
   - storage服务
   - network服务
   - data服务
+  - cron服务
   - runtime服务
   - 插件上传
-  - make wasm
+  - linactl wasm
   - LinaPro插件
   - 动态注入
   - 插件沙箱
@@ -49,7 +51,7 @@ apps/lina-plugins/<plugin-id>/
 
 ## 插件清单（宿主服务声明）
 
-动态插件必须在`plugin.yaml`中声明所需的宿主服务，宿主在安装和启用时验证权限：
+动态插件必须在`plugin.yaml`中声明多租户边界、依赖关系和所需宿主服务，宿主在安装和启用时验证权限：
 
 ```yaml
 # 插件唯一标识（kebab-case），全局唯一
@@ -60,16 +62,43 @@ name: 动态插件示例
 version: v0.1.0
 # 插件类型：dynamic 表示 WASM 动态插件
 type: dynamic
+# 多租户作用域和默认安装模式
+scope_nature: tenant_aware
+supports_multi_tenant: true
+default_install_mode: tenant_scoped
 # 插件功能简介
 description: 一个演示动态插件能力的示例插件
 
-# 申请宿主服务权限
-# 安装时需要管理员确认这些权限声明
-services:
-  - runtime   # 访问运行时信息（框架版本、节点 ID 等）
-  - storage   # 文件存储访问（限制在插件命名空间内）
-  - network   # 受限 HTTP 网络请求
-  - data      # 数据库访问（限制在插件命名空间内）
+# 申请宿主服务权限，安装时需要管理员确认这些权限声明
+hostServices:
+  - service: runtime
+    methods:
+      - log.write
+      - info.now
+      - info.node
+  - service: storage
+    methods:
+      - put
+      - get
+      - delete
+    resources:
+      paths:
+        - demo-record-files/
+  - service: network
+    methods:
+      - request
+    resources:
+      - url: https://example.com
+  - service: data
+    methods:
+      - list
+      - get
+      - create
+      - update
+      - delete
+    resources:
+      tables:
+        - plugin_demo_dynamic_record
 
 # 插件菜单声明
 menus:
@@ -77,7 +106,7 @@ menus:
     name: 动态插件示例                     # 菜单显示名称
     path: my-dynamic-plugin-main          # 前端路由路径，全局唯一
     component: system/plugin/dynamic-page # 动态插件页面固定使用此组件
-    type: M                               # 菜单类型：M=菜单项，C=目录，B=按钮
+    type: M                               # 菜单类型：D=目录，M=菜单项，B=按钮
     sort: 1                               # 排序权重，数值越小越靠前
 ```
 
@@ -85,10 +114,11 @@ menus:
 
 | 服务 | 说明 | 典型用途 |
 |------|------|---------|
-| `runtime` | 获取运行时元数据 | 显示框架版本、节点信息 |
+| `runtime` | 获取运行时元数据、写入宿主日志、维护插件状态 | 显示框架版本、节点信息、记录运行日志 |
+| `cron` | 注册动态插件内置定时任务 | 周期性同步、清理、统计任务 |
 | `storage` | 读写插件命名空间内的文件 | 上传附件、生成报告文件 |
-| `network` | 发起外部`HTTP`请求 | 调用第三方`API`、`Webhook` |
-| `data` | 访问插件命名空间内的数据库数据 | 读写插件自有数据 |
+| `network` | 发起受治理的外部`HTTP`请求 | 调用第三方`API`、`Webhook` |
+| `data` | 访问授权表范围内的数据库数据 | 读写插件自有数据 |
 
 ## 构建动态插件
 
@@ -99,11 +129,18 @@ menus:
 ### 构建命令
 
 ```bash
-# 在项目根目录执行，构建所有动态插件
-make wasm
+# 跨平台入口：在 hack/tools/linactl 目录下执行
+cd hack/tools/linactl
+go run . wasm
+go run . wasm p=my-dynamic-plugin
 
-# 只构建指定插件
+# Linux/macOS 兼容入口
+make wasm
 make wasm p=my-dynamic-plugin
+
+# Windows 兼容入口
+make.cmd wasm
+make.cmd wasm p=my-dynamic-plugin
 ```
 
 构建产物输出到`temp/output/my-dynamic-plugin.wasm`。
@@ -223,12 +260,12 @@ info, err := ctx.Runtime().GetFrameworkInfo()
 
 ```mermaid
 flowchart TD
-    A["构建 .wasm 文件\nmake wasm p=plugin-id"] --> B["登录管理工作台"]
+    A["构建 .wasm 文件<br/>go run . wasm p=plugin-id"] --> B["登录管理工作台"]
     B --> C["进入扩展中心 → 插件管理"]
-    C --> D["点击「上传插件」\n上传 .wasm 文件"]
-    D --> E["确认权限声明\n（services 中申请的宿主服务）"]
-    E --> F["点击「安装」\n执行安装 SQL（如有）"]
-    F --> G["点击「启用」\n插件功能立即可用"]
+    C --> D["点击「上传插件」<br/>上传 .wasm 文件"]
+    D --> E["确认权限声明<br/>（hostServices 中申请的宿主服务）"]
+    E --> F["点击「安装」<br/>执行安装 SQL（如有）"]
+    F --> G["点击「启用」<br/>插件功能立即可用"]
     G --> H["左侧菜单出现插件入口"]
 ```
 

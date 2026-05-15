@@ -2,7 +2,7 @@
 slug: '/docs/agent-skills'
 title: '开发技能'
 hide_title: true
-description: '本文介绍 LinaPro 的 AI 专属技能体系，包含可选安装的 OpenSpec CLI、goframe-v2 和 find-skills 三项外部技能，以及项目内置的前端设计、Git 工作流、代码审查、E2E 测试、性能审计等 13 项自动加载技能，帮助开发者全面了解各技能的作用、安装方法和使用方式。'
+description: '本文介绍 LinaPro 的 AI 专属技能体系，包含可选安装的 OpenSpec CLI、goframe-v2 和 find-skills 三项外部工具或技能，以及项目内置的前端设计、Git 工作流、代码审查、E2E 测试、性能审计、OpenSpec 实施归档等自动加载技能，并说明源码插件升级等场景可能依赖 AI 工具侧提供的 lina-upgrade 技能，帮助开发者全面了解各技能的作用、安装方法和使用方式。'
 keywords:
   - AI技能
   - 开发技能
@@ -48,7 +48,13 @@ keywords:
 | `lina-review` | 代码与规范的结构化审查 | 无 |
 | `openspec-explore` | 需求探索与问题分析的思维伙伴模式 | 无 |
 | `openspec-propose` | 一步生成完整`OpenSpec`变更提案 | 无 |
+| `openspec-apply-change` | 按`OpenSpec`任务清单实施变更 | 需安装`OpenSpec CLI` |
+| `openspec-archive-change` | 归档完成的`OpenSpec`变更 | 需安装`OpenSpec CLI` |
 | `playwright-cli` | 浏览器自动化交互与`Playwright`测试 | 需安装`Playwright` |
+
+:::info 说明
+源码和运维说明中提到的`lina-upgrade`用于框架与源码插件升级治理。当前仓库会在检测到已安装源码插件存在待升级版本时提示通过`AI`工具调用`lina-upgrade`，但该技能不在`.agents/skills/`项目内置目录中；请以你所使用的`AI`工具侧技能配置为准。
+:::
 
 ## 如何使用技能
 
@@ -245,6 +251,26 @@ npx playwright install --with-deps chromium
 **适用场景**：需要为一项新功能或改动创建完整的`OpenSpec`变更提案时。
 
 **使用方式**：使用`/openspec-propose`命令触发，描述你想实现的变更内容。
+
+### openspec-apply-change
+
+按照`OpenSpec`变更目录中的`tasks.md`逐项实施代码、文档和测试改动。该技能通常在提案和设计已经完成后触发，负责把变更从规范落到可运行实现。
+
+**适用场景**：已经存在`openspec/changes/<change-id>/`，需要开始或继续实施任务时。
+
+**必要依赖**：建议安装`OpenSpec CLI`。
+
+**使用方式**：使用`/openspec-apply-change`命令触发，或直接告诉`AI`继续实施当前`OpenSpec`变更。
+
+### openspec-archive-change
+
+归档已经完成的`OpenSpec`变更，将增量规范合并到基线规范，并把变更目录移动到归档区。
+
+**适用场景**：变更实现、审查和验证全部完成，需要沉淀为长期基线时。
+
+**必要依赖**：建议安装`OpenSpec CLI`。
+
+**使用方式**：使用`/openspec-archive-change`命令触发，或让`AI`归档当前完成的变更。
 
 ### playwright-cli
 

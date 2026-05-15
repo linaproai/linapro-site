@@ -2,7 +2,7 @@
 slug: '/docs/commands'
 title: '开发指令'
 hide_title: true
-description: '本文介绍 LinaPro 项目中所有 make 指令的作用、支持的参数选项和使用示例，涵盖开发服务管理、完整构建、WASM 插件构建、Docker 镜像构建、测试验证、国际化检查和数据库初始化等所有场景，帮助开发者熟练使用项目工具链。指令集支持 macOS、Linux 和 Windows 多平台。'
+description: '本文介绍 LinaPro 项目中跨平台开发指令集的作用、支持的参数选项和使用示例，涵盖 linactl、Makefile 兼容入口、Windows make.cmd 包装入口、开发服务管理、完整构建、WASM 插件构建、Docker 镜像构建、测试验证、国际化检查和数据库初始化等场景，帮助开发者在 macOS、Linux 和 Windows 上稳定使用同一套项目工具链。'
 keywords:
   - make指令
   - 开发指令
@@ -14,6 +14,7 @@ keywords:
   - make image
   - make init
   - make wasm
+  - linactl
   - 开发工作流
   - 后端构建
   - 前端构建
@@ -25,23 +26,45 @@ keywords:
   - 跨平台
 ---
 
-`LinaPro`项目根目录提供了一套完整的开发指令，通过`hack/makefiles/`下的分模块文件统一管理，底层由`hack/tools/linactl`（Go 实现）驱动，支持`macOS`、`Linux`和`Windows`多平台无缝使用。
+`LinaPro`项目提供了一套跨平台开发指令集。长期维护的任务编排集中在`hack/tools/linactl`中，以`Go`程序实现；根目录`Makefile`和`make.cmd`只是兼容入口，都会转发到底层`linactl`。因此同一套命令可以在`macOS`、`Linux`和`Windows`上使用，不再依赖`GNU Make`或`POSIX Shell`作为唯一入口。
 
 ## 平台说明
 
-**macOS / Linux**：直接使用`make`指令。
+**跨平台原生命令**：所有平台都可以直接使用`linactl`：
 
-**Windows**：使用项目根目录的`make.cmd`代替`make`，无需安装`WSL`或`Git Bash`，在`cmd`或`PowerShell`中执行：
-
-```cmd
-make.cmd dev
-make.cmd build
-make.cmd help
+```bash
+cd hack/tools/linactl
+go run . help
+go run . status
+go run . init confirm=init
+go run . dev
 ```
 
-后续文档中所有`make <指令>`示例，`Windows`用户将`make`替换为`make.cmd`即可，参数格式完全一致。
+**macOS / Linux**：可以继续使用根目录`make`兼容入口：
 
-在项目根目录执行`make help`（Windows：`make.cmd help`）可随时查看所有可用指令。
+```bash
+make help
+make init confirm=init
+make dev
+```
+
+**Windows cmd.exe**：使用项目根目录的`make.cmd`包装入口。在`cmd.exe`中会按可执行文件扩展名查找当前目录脚本，因此可直接省略`.cmd`后缀：
+
+```cmd
+make dev
+make build
+make help
+```
+
+**Windows PowerShell**：需要加当前目录前缀。默认`Windows`环境下可写成`.\make`；如需避免与本机已安装的其他`make`命令混淆，可显式使用`.\make.cmd`：
+
+```powershell
+.\make help
+.\make init confirm=init
+.\make dev
+```
+
+后续文档中所有`make <指令>`示例，都可以等价替换为`cd hack/tools/linactl && go run . <指令>`，参数格式保持一致。
 
 ## 指令总览
 
@@ -52,15 +75,38 @@ make.cmd help
 | `make status` | 开发服务 | 查看前后端运行状态及日志路径 |
 | `make build` | 构建 | 完整构建前端、插件和后端二进制 |
 | `make wasm` | 构建 | 构建所有或指定运行时`WASM`插件 |
+| `make tidy` | 构建 | 整理宿主、工具和插件相关`Go`模块依赖 |
 | `make image` | 镜像 | 构建生产`Docker`镜像 |
 | `make image-build` | 镜像 | 仅准备镜像产物，不执行`Docker`构建 |
 | `make test` | 测试 | 运行完整`E2E`测试套件 |
-| `make test-scripts` | 测试 | 运行工具脚本的单元与`smoke`测试 |
-| `make check-runtime-i18n` | 国际化 | 扫描运行时硬编码文案 |
-| `make check-runtime-i18n-messages` | 国际化 | 校验运行时语言包`key`覆盖情况 |
+| `make test.go` | 测试 | 运行`Go`单元测试 |
+| `make test.host` | 测试 | 只运行宿主自有`E2E`测试 |
+| `make test.plugins` | 测试 | 运行官方插件自有`E2E`测试 |
+| `make test.scripts` | 测试 | 运行工具脚本的单元与`smoke`测试 |
+| `make i18n.check` | 国际化 | 扫描运行时硬编码文案并校验语言包`key`覆盖 |
 | `make init` | 数据库 | 初始化数据库表结构和种子数据 |
 | `make mock` | 数据库 | 加载演示`Mock`数据 |
 | `make help` | 其他 | 查看所有可用指令 |
+
+`linactl`还直接提供`plugins.init`、`plugins.install`、`plugins.update`和`plugins.status`等插件工作区管理命令，用于需要把官方插件子模块转换为普通插件目录、安装配置中的源码插件或查看插件工作区状态的高级场景。
+
+## 插件模式参数
+
+官方插件目录`apps/lina-plugins/`是`Git submodule`。当该目录已初始化且包含插件清单时，`dev`、`build`、`image`和相关`Go`测试命令会自动进入插件完整模式，并基于根目录宿主专用`go.work`生成已忽略的`temp/go.work.plugins`，再通过`GOWORK`解析源码插件模块。
+
+如果只需要运行主框架，可以跳过子模块初始化，或在命令中传入`plugins=0`强制宿主模式：
+
+```bash
+make dev plugins=0
+make build plugins=0
+make image plugins=0
+```
+
+构建或测试官方插件前，需要先初始化子模块：
+
+```bash
+git submodule update --init --recursive
+```
 
 ## 开发服务
 
@@ -129,7 +175,7 @@ make build v=1
 build:
   # 目标平台列表，使用goos/goarch格式，make build platforms=...可覆盖
   platforms:        
-    - "linux/amd64"
+    - "auto"
   # 是否启用 CGO
   cgoEnabled: false 
   # 构建产物输出路径，相对于仓库根目录
@@ -140,14 +186,14 @@ build:
 
 | 字段 | 默认值 | 说明 |
 |------|--------|------|
-| `build.platforms` | `["linux/amd64"]` | 目标平台列表，使用`goos/goarch`格式，`make build platforms=...`可覆盖 |
+| `build.platforms` | `["auto"]` | 目标平台列表，使用`goos/goarch`格式，`auto`表示`linux/<当前架构>`，`make build platforms=...`可覆盖 |
 | `build.cgoEnabled` | `false` | 是否启用`CGO` |
 | `build.outputDir` | `temp/output` | 构建产物输出路径，相对于仓库根目录 |
 | `build.binaryName` | `lina` | 宿主二进制文件名 |
 
 ### make wasm
 
-单独构建运行时`WASM`插件，产物输出到`temp/output/`。支持使用`p=<plugin-id>`只构建指定插件，省略时构建全部。
+单独构建运行时`WASM`插件。`make wasm`是兼容入口，默认把产物输出到`temp/output/`，支持使用`p=<plugin-id>`只构建指定插件。需要覆盖输出目录或只做构建探测时，直接使用`linactl wasm`。
 
 ```bash
 # 构建所有 WASM 插件
@@ -156,8 +202,29 @@ make wasm
 # 只构建指定插件（plugin-id 为插件目录名）
 make wasm p=my-plugin
 
-# 开启详细日志
-make wasm verbose=1
+# 指定输出目录（linactl 原生命令）
+cd hack/tools/linactl
+go run . wasm p=my-plugin out=../../temp/output
+
+# 仅检查可构建的动态插件（linactl 原生命令）
+go run . wasm dry_run=true
+```
+
+### linactl prepare-packed-assets
+
+准备后端嵌入发布所需的前端静态资源和`manifest`资产，通常由`make build`或`make dev`自动调用。需要单独检查嵌入资源时可以手动执行：
+
+```bash
+cd hack/tools/linactl
+go run . prepare-packed-assets
+```
+
+### make tidy
+
+整理宿主、开发工具和插件相关`Go`模块依赖，适合在升级依赖或初始化插件完整模式后执行：
+
+```bash
+make tidy
 ```
 
 ## 镜像
@@ -225,30 +292,58 @@ make image-build
 make test
 ```
 
-### make test-scripts
+### make test.go
 
-运行`hack/tests/scripts/`下所有工具脚本的单元和`smoke`测试，用于验证仓库辅助脚本的基本正确性。
+运行所有受维护`Go`模块的单元测试，支持通过`plugins=0`强制宿主模式。
 
 ```bash
-make test-scripts
+make test.go
+make test.go plugins=0
+```
+
+### make test.host
+
+只运行宿主自有`Playwright E2E`测试，不要求初始化官方插件子模块。
+
+```bash
+make test.host
+```
+
+### make test.plugins
+
+运行官方插件自有`Playwright E2E`测试，执行前需要先初始化`apps/lina-plugins/`子模块。
+
+```bash
+make test.plugins
+```
+
+### make test.scripts
+
+运行跨平台仓库工具的单元和`smoke`检查，用于验证`linactl`、`make.cmd`等辅助入口的基本正确性。
+
+```bash
+make test.scripts
 ```
 
 ## 国际化
 
-### make check-runtime-i18n
+### make i18n.check
 
-扫描运行时可见的代码路径，检测未被纳入国际化体系的硬编码文案。适合在提交新功能前进行`i18n`合规自查。
+扫描运行时可见的代码路径，检测未被纳入国际化体系的硬编码文案，并校验宿主和各插件运行时语言包的消息`key`覆盖情况。适合在提交新功能前进行`i18n`合规自查。
 
 ```bash
-make check-runtime-i18n
+make i18n.check
 ```
 
-### make check-runtime-i18n-messages
+## 插件工具
 
-校验宿主和各插件运行时语言包的消息`key`覆盖情况，检测缺失或多余的翻译`key`。
+### linactl plugins.status
+
+查看当前官方插件工作区状态。高级开发者也可以使用`plugins.init`、`plugins.install`和`plugins.update`管理非子模块形态的源码插件工作区。
 
 ```bash
-make check-runtime-i18n-messages
+cd hack/tools/linactl
+go run . plugins.status
 ```
 
 ## 数据库

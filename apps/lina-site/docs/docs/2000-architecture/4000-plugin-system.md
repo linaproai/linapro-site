@@ -2,7 +2,7 @@
 slug: '/docs/plugin-system'
 title: '双模式插件系统'
 hide_title: true
-description: '本文详细介绍 LinaPro 双模式插件系统的整体设计，包括源码插件和 WASM 动态插件的对比、插件生命周期（安装、启用、禁用、卸载）、插件隔离机制（数据库命名空间、文件命名空间、WASM 沙箱）、宿主与插件的边界规范，以及插件系统的扩展点体系，帮助开发者全面理解插件运行机制。'
+description: '本文详细介绍 LinaPro 双模式插件系统的整体设计，包括官方插件子模块、源码插件和 WASM 动态插件的对比、插件生命周期（安装、启用、禁用、卸载）、插件隔离机制（数据库命名空间、tenant_id 租户过滤、文件命名空间、WASM 沙箱）、多租户插件清单字段、宿主与插件的边界规范，以及插件系统的扩展点体系，帮助开发者全面理解插件运行机制。'
 keywords:
   - 插件系统
   - 双模式插件
@@ -20,11 +20,17 @@ keywords:
   - 插件边界
   - plugin.yaml
   - 插件注册
+  - 官方插件子模块
+  - scope_nature
+  - tenant_id
+  - 多租户插件
 ---
 
 ## 概述
 
 插件系统是`LinaPro`的核心能力之一，支持以松耦合的方式扩展系统的任意能力。每个插件是一个自包含的模块包，可以独立声明`API`路由、业务服务、数据库表结构、前端页面和菜单项，宿主在运行时加载和卸载插件，无需修改宿主代码。
+
+官方源码插件以`apps/lina-plugins/`子模块形式按需引入，远端仓库为`https://github.com/linaproai/official-plugins.git`。主框架仓库默认保持精简轻量，未初始化官方插件子模块时仍可运行宿主核心能力；需要官方插件、插件完整构建或插件`E2E`测试时，再执行`git submodule update --init --recursive`拉取插件内容。
 
 `LinaPro`支持两种插件模式，适应不同的交付场景：
 
@@ -67,6 +73,15 @@ version: v0.1.0
 # 插件类型：source（源码插件）或 dynamic（动态插件）
 type: source
 
+# 多租户作用域：platform_only 或 tenant_aware
+scope_nature: tenant_aware
+
+# 是否支持租户级安装与治理
+supports_multi_tenant: true
+
+# 默认安装模式：global 或 tenant_scoped
+default_install_mode: tenant_scoped
+
 # 插件说明
 description: 提供文章内容的增删改查管理功能
 
@@ -86,8 +101,8 @@ menus:
     path: content-article-list             # 前端路由路径，全局唯一
     component: system/plugin/dynamic-page  # 插件页面固定使用此组件，由宿主动态加载插件前端
     perms: content-article:article:view    # 访问该菜单所需的权限标识
-    icon: ant-design:file-text-outlined    # 菜单图标，使用 Ant Design 图标名
-    type: M                                # 菜单类型：M=菜单项，C=目录，B=按钮
+    icon: ant-design:file-text-outlined    # 菜单图标，使用 Iconify 图标名
+    type: M                                # 菜单类型：D=目录，M=菜单项，B=按钮
     sort: 1                                # 排序权重，数值越小越靠前
 ```
 
@@ -134,6 +149,8 @@ stateDiagram-v2
         插件 ID 前缀            插件 ID 前缀
 ```
 
+需要支持多租户的插件表应使用`tenant_id`列作为租户判别字段，并通过宿主发布的`TenantFilterService`追加租户过滤条件。未启用`multi-tenant`插件时，默认`tenant_id = 0`表示平台租户。
+
 **文件存储命名空间隔离**
 
 每个插件的文件存储路径以插件`ID`作为命名空间：
@@ -155,6 +172,18 @@ stateDiagram-v2
 - **运行时信息访问**：通过宿主`runtime`服务桥接获取
 
 动态插件必须在`plugin.yaml`中声明所需的宿主服务（`services`字段），宿主在安装和启用时验证服务权限。
+
+## 多租户插件字段
+
+插件清单需要明确声明多租户边界，便于宿主和`multi-tenant`插件进行统一治理：
+
+| 字段 | 可选值 | 说明 |
+|------|--------|------|
+| `scope_nature` | `platform_only` / `tenant_aware` | 插件仅在平台上下文治理，还是可进入租户上下文 |
+| `supports_multi_tenant` | `true` / `false` | 是否支持租户级安装、开通和数据隔离 |
+| `default_install_mode` | `global` / `tenant_scoped` | 默认全局启用，还是按租户独立启停 |
+
+`platform_only`插件用于平台级治理，例如`multi-tenant`自身；`tenant_aware`插件可根据业务需要选择全局启用或租户级启用。详见：[多租户能力](/docs/multi-tenant)。
 
 ## 宿主与插件的边界规范
 

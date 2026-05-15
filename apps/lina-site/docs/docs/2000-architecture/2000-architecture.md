@@ -2,10 +2,10 @@
 slug: '/docs/architecture'
 title: '架构设计'
 hide_title: true
-description: '本文详细介绍 LinaPro 的整体架构设计，包括核心宿主服务、默认管理工作台、双模式插件系统、AI 研发工作流和丰富的 AI 技能体系五个层次的职责边界、运行时交互关系和设计原则，帮助开发者深入理解框架的分层模型、松耦合设计思路以及各组件如何协作完成业务功能交付。'
+description: '本文详细介绍 LinaPro 的整体架构设计，包括核心宿主服务、默认管理工作台、官方插件子模块、双模式插件系统、可选的 OpenSpec AI 研发工作流、多租户基础能力、Redis 集群协调和 AI 技能体系等内容，帮助开发者理解框架的分层模型、松耦合设计思路以及各组件如何协作完成业务功能交付。'
 keywords:
   - LinaPro架构
-  - 四层架构
+  - 分层架构
   - 核心宿主服务
   - lina-core
   - lina-vben
@@ -21,17 +21,20 @@ keywords:
   - RBAC权限
   - 设计原则
   - 扩展点
+  - 多租户
+  - Redis协调器
+  - OpenSpec可选组件
 ---
 
 
 
 ## 架构总览
 
-`LinaPro`采用四层分离的架构模型，每一层都遵循松耦合原则独立设计，层与层之间通过定义良好的接口协作，而不是硬依赖内部实现。关键的层级组件包括：
+`LinaPro`采用分层解耦的架构模型，每一层都遵循松耦合原则独立设计，层与层之间通过定义良好的接口协作，而不是硬依赖内部实现。关键的层级组件包括：
 
 ```mermaid
 graph TB
-    subgraph Workflow["AI 研发工作流  openspec/"]
+    subgraph Workflow["可选 AI 研发工作流  openspec/"]
         direction LR
         Explore["🔍 探索"] --> Propose["📋 提案"] --> Implement["⚙️ 实现"] --> Review["🔎 审查"] --> Archive["📦 归档"]
     end
@@ -46,19 +49,22 @@ graph TB
         Ctrl["控制器层\n(HTTP 请求处理)"]
         Svc["业务服务层\n(核心业务逻辑)"]
         Plugin["插件运行时\n(生命周期编排 · 沙箱隔离)"]
+        Tenant["多租户基础能力\n(bizctx · tenant_id · 插件治理)"]
         Gov["治理服务\n(JWT · RBAC · 日志 · 会话)"]
         API --> Ctrl --> Svc
         Svc --> Plugin
+        Svc --> Tenant
         Svc --> Gov
     end
 
-    subgraph Plugins["插件层  lina-plugins"]
+    subgraph Plugins["官方插件子模块  apps/lina-plugins"]
         direction LR
         Source["源码插件\n随宿主编译交付"]
         Dynamic["WASM 动态插件\n运行时热加载"]
     end
 
     DB[("数据存储\nPostgreSQL")]
+    Redis[("集群协调\nRedis")]
 
     Workflow -.->|规范驱动| Frontend
     Workflow -.->|规范驱动| Host
@@ -67,6 +73,7 @@ graph TB
     Plugin -->|沙箱执行| Dynamic
     Svc --> DB
     Gov --> DB
+    Svc -.->|cluster.enabled=true| Redis
 ```
 
 ## 目录结构
@@ -78,7 +85,7 @@ graph TB
 ├── apps/                             # 应用管理
 │    ├── lina-core/                   # 核心宿主服务（Go）
 │    ├── lina-vben/                   # 默认管理工作台（Vue 3）
-│    └── lina-plugins/                # 插件系统
+│    └── lina-plugins/                # 官方插件子模块（按需初始化）
 └── openspec/                         # 可选 AI 研发工作流
 ```
 
@@ -93,6 +100,7 @@ graph TB
 - 加载和管理源码插件及`WASM`动态插件的完整生命周期
 - 运行宿主级定时任务和持久化定时调度子系统
 - 提供国际化运行时，聚合宿主和插件的语言资源
+- 提供多租户请求上下文、租户过滤和插件租户治理所需的稳定基础能力
 
 
 ## 默认管理工作台（lina-vben）
@@ -105,17 +113,17 @@ graph TB
 - 插件菜单通过宿主动态路由自动注入，无需修改工作台代码
 - 开发者可以通过插件机制替换任意模块，甚至替换整个工作台
 
-## 双模式插件系统（lina-plugins）
+## 官方插件子模块（apps/lina-plugins）
 
 插件层是`LinaPro`扩展能力的核心，支持两种截然不同的插件交付模式。宿主通过`pluginhost`包暴露稳定的扩展接缝，插件只能通过这些接缝与宿主交互，永远不直接访问宿主内部实现。
 
-官方插件目录`apps/lina-plugins/`以`Git submodule`形式独立维护，与主框架仓库解耦，使主框架更精简轻量；用户根据需要通过`git submodule update --init --recursive`按需拉取。
+官方插件目录`apps/lina-plugins/`以`Git submodule`形式独立维护，远端仓库为`https://github.com/linaproai/official-plugins.git`。主框架仓库默认保持精简轻量，用户根据需要通过`git submodule update --init --recursive`按需拉取官方插件内容。未初始化该子模块时，宿主仍可按`host-only`模式运行；存在插件清单时，开发、构建和镜像命令会自动进入插件完整模式，也可以通过`plugins=0`强制宿主模式。
 
 详见[双模式插件系统](/docs/plugin-system)。
 
 ## AI 研发工作流
 
-`AI`研发工作流凌驾于所有层次之上，它是让规范、代码与测试保持同步的连接纽带。工作流不直接属于任何运行时组件，而是作为治理机制约束整个开发过程。推荐使用`OpenSpec`作为该工作流的可选实现工具，框架对其提供内置支持。
+`AI`研发工作流凌驾于所有层次之上，它是让规范、代码与测试保持同步的连接纽带。工作流不直接属于任何运行时组件，而是作为治理机制约束整个开发过程。`OpenSpec`不是`LinaPro`运行时依赖，项目不安装它也可以运行；但框架内置了对`OpenSpec`目录结构、指令和技能的良好支持，强烈建议在正式团队协作中安装并使用。
 
 详见[AI规范驱动开发](/docs/spec-driven-development)。
 
@@ -123,7 +131,7 @@ graph TB
 
 `LinaPro`内置了覆盖研发全生命周期的`AI`专属技能，以领域知识的形式内嵌于框架的`AI`协作规范（`.agents/skills/`）中。这些技能不属于任何运行时组件，但它们是`AI`工具在每个具体工作场景下做出符合框架约束的专业决策的依据。
 
-技能涵盖后端开发、前端设计、测试保障、代码审查、性能审计、版本升级等十余项专属技能，无需额外安装，`AI`工具在处理对应场景时会自动激活相关技能。
+技能涵盖前端设计、前端工程模式、`Git`提交与工作树管理、`OpenSpec`探索/提案/实施/归档、反馈闭环、代码审查、`E2E`测试、性能审计、自动归档和浏览器自动化等场景。项目内置技能随源码自动加载；`OpenSpec CLI`、`goframe-v2`、`find-skills`等外部技能或工具按需安装。
 
 详见[AI原生设计](/docs/ai-native)。
 
@@ -133,7 +141,7 @@ graph TB
 
 ### 宿主不了解业务域
 
-`lina-core`不包含任何具体的业务逻辑（如产品管理、订单管理等），这些能力在理想情况下是通过插件提供，而宿主只提供稳定的通用基础设施。
+`lina-core`不包含任何具体的业务逻辑（如产品管理、订单管理等），这些能力在理想情况下是通过插件提供，而宿主只提供稳定的通用基础设施。多租户上下文、权限、会话、插件治理和调度属于宿主基础能力，不代表宿主直接承载具体业务域。
 
 ### 插件不修改宿主内部
 
@@ -176,7 +184,7 @@ sequenceDiagram
 
 ## 部署模型
 
-`LinaPro`支持两种部署模式，可以根据业务规模随时切换：
+`LinaPro`支持两种部署模式，可以根据业务规模随时切换。无论单机还是集群，默认数据存储都是`PostgreSQL 14+`；`SQLite`仅适合单节点本地演示或冒烟验证。
 
 ### 单机模式（默认）
 
@@ -201,6 +209,7 @@ graph TB
     N2["lina-core 节点 2\n分布式选主"]
     NN["lina-core 节点 N"]
     DB[("PostgreSQL")]
+    Redis[("Redis\n协调器")]
 
     LB --> N1
     LB --> N2
@@ -208,9 +217,12 @@ graph TB
     N1 --> DB
     N2 --> DB
     NN --> DB
+    N1 -.-> Redis
+    N2 -.-> Redis
+    NN -.-> Redis
 ```
 
-集群模式通过配置`cluster.enabled: true`启用，框架基于`PostgreSQL`实现分布式选主、分布式锁和权限拓扑缓存（`sys_locker`、`sys_kv_cache`表），无需引入额外中间件，也无需修改业务代码。详见[原生分布式架构](/docs/distributed-architecture)。
+集群模式通过配置`cluster.enabled: true`启用，当前版本必须同时配置`cluster.coordination: redis`和可连通的`cluster.redis`端点。`PostgreSQL`负责持久化业务与治理数据，`Redis`协调器负责选主、分布式锁、热态会话和集群感知缓存等跨节点协调能力，无需修改业务代码。详见[原生分布式架构](/docs/distributed-architecture)。
 
 ## 相关文档
 

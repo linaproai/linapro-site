@@ -2,7 +2,7 @@
 slug: '/docs/core-host'
 title: '核心宿主服务'
 hide_title: true
-description: '本文详细介绍 LinaPro 核心宿主服务 lina-core 的功能设计和实现，包括 API 接口层、业务服务层、插件运行时、治理服务（JWT 认证、RBAC 权限、操作日志、会话管理）、定时调度子系统、国际化运行时，以及宿主向插件暴露的稳定扩展接缝和事件钩子系统。'
+description: '本文详细介绍 LinaPro 核心宿主服务 lina-core 的功能设计和实现，包括 API 接口层、业务服务层、插件运行时、治理服务（JWT 认证、RBAC 权限、操作日志、会话管理）、多租户上下文与 tenant_id 过滤接缝、定时调度子系统、国际化运行时、Redis 集群协调，以及宿主向插件暴露的稳定扩展接缝和事件钩子系统。'
 keywords:
   - lina-core
   - 核心宿主服务
@@ -20,6 +20,9 @@ keywords:
   - 事件钩子
   - 插件生命周期
   - LinaPro
+  - 多租户
+  - tenant_id
+  - Redis协调器
 ---
 
 ## 概述
@@ -48,6 +51,7 @@ apps/lina-core/
 │   └── service/             # 业务服务层
 │       ├── apidoc/          # 接口文档聚合
 │       ├── auth/            # 认证服务
+│       ├── coordination/     # 集群协调抽象与 Redis 实现接入
 │       ├── cron/            # 定时任务启动入口
 │       ├── i18n/            # 国际化运行时
 │       ├── middleware/      # HTTP 中间件（认证、权限、日志）
@@ -60,6 +64,7 @@ apps/lina-core/
 └── pkg/                     # 宿主与插件共享的稳定公共包
     ├── pluginhost/          # 插件扩展接缝定义
     ├── pluginbridge/        # 动态插件桥接层
+    ├── pluginservice/       # 发布给源码插件的稳定宿主服务契约
     └── ...                  # 其他公共工具包
 ```
 
@@ -100,6 +105,16 @@ apps/lina-core/
 - 会话无活动超时通过 `session.timeout` 配置
 - 定期清理过期会话（`session.cleanupInterval` 配置）
 
+### 多租户上下文
+
+宿主内置租户上下文接缝，源码插件可以通过`pkg/pluginservice/contract`中的稳定契约读取当前请求身份：
+
+- `bizctx`提供当前用户、租户、代管身份和平台绕过标识的只读快照
+- `TenantFilterService`提供默认`tenant_id`列过滤能力，帮助租户感知插件隔离自有表数据
+- 未启用`multi-tenant`插件时，请求默认运行在`tenant_id = 0`的平台租户上下文中
+- 平台管理员代管租户时，审计链路可以记录真实操作者和被代管租户
+
+详见：[多租户能力](/docs/multi-tenant)。
 
 ## 插件运行时
 
@@ -143,8 +158,17 @@ flowchart TD
 - 插件语言包位于各插件的`manifest/i18n/<locale>/`目录下，启用插件后自动合并
 - 接口文档的多语言翻译位于`manifest/i18n/<locale>/apidoc/`目录下
 - 通过`i18n.enabled`配置控制是否开启多语言，关闭时前端隐藏语言切换按钮
+- 默认只内置`en-US`和`zh-CN`两套完整语言包，其他语言需要项目团队自行翻译和维护
 
 详见：[I18N国际化](/docs/i18n)。
+
+## 集群协调
+
+宿主内置统一的`coordination`抽象，覆盖分布式锁、短期`KV`、缓存修订、跨节点事件和健康检查。单机模式使用本地轻量模式；集群模式启用`cluster.enabled: true`后，当前版本必须配置`cluster.coordination: redis`。
+
+`Redis`协调器用于跨节点选主、分布式锁、热态会话和集群感知缓存等能力，`PostgreSQL`仍负责业务和治理数据持久化。
+
+详见：[原生分布式架构](/docs/distributed-architecture)。
 
 ## 接口文档聚合
 

@@ -2,7 +2,7 @@
 slug: '/docs/source-plugins'
 title: '源码插件'
 hide_title: true
-description: '本文详细介绍 LinaPro 源码插件的开发流程、目录结构规范、接口定义方式、数据库和文件访问隔离机制、插件生命周期钩子注册、前端页面集成、菜单与权限声明，以及插件版本升级流程，提供完整的开发示例，帮助开发者掌握源码插件的核心开发技能和最佳实践。'
+description: '本文详细介绍 LinaPro 源码插件的开发流程、目录结构规范、官方插件子模块工作区、接口定义方式、PostgreSQL 安装 SQL、多租户清单字段、数据库和文件访问隔离机制、插件生命周期钩子注册、前端页面集成、菜单与权限声明，以及插件版本升级流程，提供完整的开发示例，帮助开发者掌握源码插件的核心开发技能和最佳实践。'
 keywords:
   - 源码插件
   - 插件开发
@@ -11,6 +11,9 @@ keywords:
   - GoFrame插件
   - 插件注册
   - pluginhost
+  - PostgreSQL
+  - 多租户插件
+  - 官方插件子模块
   - 插件DAO
   - 插件控制器
   - 插件服务
@@ -24,7 +27,9 @@ keywords:
 
 ## 概述
 
-源码插件是`LinaPro`最常用的扩展形式，与宿主一起编译部署，通过`pluginhost`包提供的稳定接口与宿主协作，插件之间保持隔离，共享宿主的治理能力（认证、权限、日志、调度等）。
+源码插件是`LinaPro`最常用的扩展形式，与宿主一起编译部署，通过`pluginhost`包提供的稳定接口与宿主协作，插件之间保持隔离，共享宿主的治理能力（认证、权限、日志、调度、多租户上下文等）。
+
+官方源码插件位于`apps/lina-plugins/`，该目录在主框架仓库中以`Git submodule`形式按需挂载。只运行宿主核心能力时可以不初始化该子模块；开发、构建或测试官方插件前，需要先执行`git submodule update --init --recursive`拉取插件工作区。
 
 ## 目录结构
 
@@ -54,7 +59,7 @@ apps/lina-plugins/<plugin-id>/
 │   └── i18n/                       # 插件运行时语言包（可选）
 │       └── <locale>/apidoc/        # 插件接口文档语言包（可选）
 ├── README.md
-└── README.zh_CN.md
+└── README.zh-CN.md
 ```
 
 :::tip
@@ -88,6 +93,12 @@ name: 文章管理
 version: v0.1.0
 # 插件类型：source 表示源码插件，随宿主编译部署
 type: source
+# 多租户作用域：platform_only 表示仅平台上下文治理，tenant_aware 表示可进入租户上下文
+scope_nature: tenant_aware
+# 是否支持租户级安装、开通和数据隔离
+supports_multi_tenant: true
+# 默认安装模式：global 表示全局启用，tenant_scoped 表示按租户独立启停
+default_install_mode: tenant_scoped
 # 插件功能简介
 description: 提供文章内容的增删改查管理功能
 # 插件作者
@@ -102,8 +113,8 @@ menus:
     path: content-article-list             # 前端路由路径，全局唯一
     component: system/plugin/dynamic-page  # 插件页面固定使用此组件，由宿主动态加载
     perms: content-article:article:view # 访问该菜单所需的权限标识
-    icon: ant-design:file-text-outlined # 菜单图标，使用 Ant Design 图标名
-    type: M                             # 菜单类型：M=菜单项，C=目录，B=按钮
+    icon: ant-design:file-text-outlined # 菜单图标，使用 Iconify 图标名
+    type: M                             # 菜单类型：D=目录，M=菜单项，B=按钮
     sort: 1                             # 排序权重，数值越小越靠前
     remark: 文章管理菜单                  # 菜单备注说明（可选）
   - key: plugin:content-article:create
@@ -128,27 +139,33 @@ menus:
 
 ### 第三步：编写安装 SQL
 
-安装`SQL`必须具备幂等性（使用`IF NOT EXISTS`），确保重复执行不会失败：
+安装`SQL`必须具备幂等性（使用`IF NOT EXISTS`、`IF NOT EXISTS`索引和可重复执行的数据写入语句），确保重复执行不会失败。当前默认数据库为`PostgreSQL 14+`，插件安装脚本也应优先使用`PostgreSQL`方言：
 
 ```sql
 -- manifest/sql/001-init.sql
-CREATE TABLE IF NOT EXISTS `content_article_record` (
-    `id`         BIGINT       NOT NULL AUTO_INCREMENT COMMENT '文章ID',
-    `title`      VARCHAR(255) NOT NULL               COMMENT '文章标题',
-    `content`    LONGTEXT     NOT NULL               COMMENT '文章内容',
-    `status`     TINYINT      NOT NULL DEFAULT 0     COMMENT '状态：0=草稿 1=已发布',
-    `created_by` BIGINT       NOT NULL DEFAULT 0     COMMENT '创建人ID',
-    `created_at` DATETIME     NOT NULL               COMMENT '创建时间',
-    `updated_at` DATETIME     NOT NULL               COMMENT '更新时间',
-    PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='文章记录表';
+CREATE TABLE IF NOT EXISTS content_article_record (
+    "id"         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    "tenant_id"  INT          NOT NULL DEFAULT 0,
+    "title"      VARCHAR(255) NOT NULL DEFAULT '',
+    "content"    TEXT         NOT NULL DEFAULT '',
+    "status"     SMALLINT     NOT NULL DEFAULT 0,
+    "created_by" BIGINT       NOT NULL DEFAULT 0,
+    "created_at" TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+COMMENT ON TABLE content_article_record IS 'Article record table';
+COMMENT ON COLUMN content_article_record."tenant_id" IS 'Owning tenant ID, 0 means PLATFORM';
+
+CREATE INDEX IF NOT EXISTS idx_content_article_record_tenant_status
+    ON content_article_record ("tenant_id", "status");
 ```
 
 卸载`SQL`：
 
 ```sql
 -- manifest/sql/uninstall/001-cleanup.sql
-DROP TABLE IF EXISTS `content_article_record`;
+DROP TABLE IF EXISTS content_article_record;
 ```
 
 ### 第四步：定义 API 接口
@@ -239,7 +256,7 @@ func init() {
 
 ## 数据库访问
 
-插件使用`GoFrame`的`gf gen dao`命令生成数据访问层。插件的`DAO`层与宿主`DAO`层完全独立，通过数据库命名空间隔离：
+插件使用`GoFrame`的`gf gen dao`命令生成数据访问层。插件的`DAO`层与宿主`DAO`层完全独立，通过数据库命名空间和租户判别列隔离。需要支持多租户的插件表应包含`tenant_id`列，并在查询时通过宿主发布的租户过滤能力追加租户条件；未启用多租户插件时，`tenant_id = 0`表示平台上下文。
 
 ```bash
 # 在插件 backend/ 目录下执行
@@ -306,7 +323,7 @@ p.Hooks().RegisterHook(
 
 1. 宿主启动时扫描发现新版本（`plugin.yaml`版本 > 数据库中已安装版本）
 2. 如果发现版本不匹配，**宿主启动失败**并提示执行升级命令
-3. 通过`lina-upgrade AI`技能执行升级：
+3. 通过`AI`工具侧提供的`lina-upgrade`技能执行升级（该技能不属于当前项目`.agents/skills/`内置目录，请以你的`AI`工具技能配置为准）：
 
 ```
 # 在 Claude Code 中

@@ -131,7 +131,7 @@ sequenceDiagram
 
 **主节点独有职责：**
 
-- 执行宿主级定时任务（`make start`类型的周期性维护任务）
+- 执行宿主级周期性维护任务
 - 权限拓扑版本广播（通知所有节点刷新缓存）
 - 动态插件生命周期协调
 
@@ -151,14 +151,14 @@ sequenceDiagram
     participant N1 as 节点 1（主）
     participant N2 as 节点 2（从）
     participant DB as PostgreSQL
+    participant R as Redis
 
     Admin->>N1: 修改角色权限
     N1->>DB: 更新权限数据，递增版本号
-    N1->>DB: 写入版本变更通知
-    Note over N2: 定期检查版本号变化
-    N2->>DB: 查询版本号（发现高于本地缓存版本）
+    N1->>R: 发布缓存版本变更
+    Note over N2: 观察到版本变更
     N2->>DB: 重新加载权限拓扑
-    Note over N2: 本地缓存更新完成\n新请求立即使用新权限
+    Note over N2: 本地缓存更新完成<br/>新请求立即使用新权限
 ```
 
 这种机制确保权限变更在所有节点上快速生效（最长不超过3秒），无需用户重新登录。
@@ -199,7 +199,8 @@ err := locker.TryLock(ctx, "my-lock-key", 30*time.Second, func() error {
 当业务量增长需要扩容时，只需：
 
 1. 修改`config.yaml`，将`cluster.enabled`设为`true`
-2. 新启动一个宿主节点实例，指向同一个`PostgreSQL`数据库
-3. 在负载均衡器中添加新节点
+2. 配置`cluster.coordination: redis`和可连接的`cluster.redis`端点
+3. 新启动一个宿主节点实例，指向同一个`PostgreSQL`数据库
+4. 在负载均衡器中添加新节点
 
 业务代码无需任何修改，框架自动完成节点发现、选主和权限同步。

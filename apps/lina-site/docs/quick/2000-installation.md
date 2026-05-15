@@ -2,7 +2,7 @@
 slug: '/quick/installation'
 title: '快速安装'
 hide_title: true
-description: '本文介绍如何在几分钟内完成 LinaPro 框架的安装与初始配置，包括通过 Git 克隆仓库获取源码（支持最新实验版本与指定稳定发布版本）、配置文件设置、数据库连接配置与初始化流程，以及加载演示数据、启动开发服务和验证安装结果的完整步骤。克隆仓库之前，请先完成环境配置。'
+description: '本文介绍如何在几分钟内完成 LinaPro 框架的安装与初始配置，包括通过 Git 克隆仓库获取源码、按需初始化官方插件子模块、准备默认 PostgreSQL 数据库、复制并调整配置文件、使用跨平台 linactl 或兼容 make 入口初始化数据库、加载演示数据、启动开发服务和验证安装结果的完整步骤。克隆仓库之前，请先完成环境配置。'
 keywords:
   - LinaPro
   - 框架安装
@@ -21,6 +21,8 @@ keywords:
   - 环境配置
   - 演示数据
   - make mock
+  - linactl
+  - 官方插件子模块
 ---
 
 克隆仓库前，请先参阅[环境配置](/quick/environment)，确保`Go`、`Node.js`、`pnpm`、`PostgreSQL`等必要组件已正确安装。
@@ -93,7 +95,26 @@ database:
 配置完成后，执行以下命令创建数据库表结构并写入初始数据：
 
 ```bash
+cd hack/tools/linactl
+go run . init confirm=init
+```
+
+`macOS`和`Linux`用户也可以使用根目录`make`兼容入口：
+
+```bash
 make init confirm=init
+```
+
+`Windows`用户可以在`cmd.exe`中执行：
+
+```cmd
+make init confirm=init
+```
+
+在`PowerShell`中执行：
+
+```powershell
+.\make init confirm=init
 ```
 
 初始化完成后，数据库中将包含系统所需的基础表结构和默认配置数据。
@@ -103,12 +124,26 @@ make init confirm=init
 配置完成后，执行以下命令加载官方提供的演示数据：
 
 ```bash
+cd hack/tools/linactl
+go run . mock confirm=mock
+```
+
+或使用兼容入口：
+
+```bash
 make mock confirm=mock
 ```
 
 ### 启动开发服务
 
 执行以下命令启动前后端服务：
+
+```bash
+cd hack/tools/linactl
+go run . dev
+```
+
+或使用兼容入口：
 
 ```bash
 make dev
@@ -131,6 +166,20 @@ make dev
 ## 常用命令
 
 ```bash
+cd hack/tools/linactl
+go run . dev          # 启动前后端服务
+go run . stop         # 停止所有本地服务
+go run . status       # 查看服务运行状态
+go run . init confirm=init # 重新初始化数据库
+go run . mock confirm=mock # 重新加载演示数据
+go run . test         # 运行完整 E2E 测试套件
+go run . build        # 编译生成可发布的二进制文件
+go run . image        # 构建 Docker 镜像
+```
+
+`macOS`和`Linux`兼容入口：
+
+```bash
 make dev               # 启动前后端服务
 make stop              # 停止所有本地服务
 make status            # 查看服务运行状态
@@ -140,6 +189,8 @@ make test              # 运行完整 E2E 测试套件
 make build             # 编译生成可发布的二进制文件
 make image             # 构建 Docker 镜像
 ```
+
+`Windows cmd.exe`可直接使用`make <指令>`；`PowerShell`使用`.\make <指令>`或`.\make.cmd <指令>`。
 
 ## 安装验证
 
