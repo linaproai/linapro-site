@@ -2,7 +2,7 @@
 slug: '/docs/plugin-system'
 title: '双模式插件系统'
 hide_title: true
-description: '本文详细介绍 LinaPro 双模式插件系统的整体设计，包括官方插件子模块、源码插件和 WASM 动态插件的对比、插件生命周期（安装、启用、禁用、卸载）、插件隔离机制（数据库命名空间、tenant_id 租户过滤、文件命名空间、WASM 沙箱）、多租户插件清单字段、宿主与插件的边界规范，以及插件系统的扩展点体系，帮助开发者全面理解插件运行机制。'
+description: '本文详细介绍 LinaPro 双模式插件系统的设计理念、整体架构与工作原理，包括源码插件和 WASM 动态插件两种模式的选择依据、关键组件职责（catalog、lifecycle、pluginhost、pluginbridge）、插件清单（plugin.yaml）规范、完整生命周期状态机、数据库命名空间与 WASM 沙箱隔离机制、多租户字段设计，以及插件的开发注册流程与宿主边界规范，帮助开发者全面理解并使用 LinaPro 插件扩展体系。'
 keywords:
   - 插件系统
   - 双模式插件
@@ -16,23 +16,51 @@ keywords:
   - 热加载
   - 插件扩展点
   - pluginhost
+  - pluginbridge
   - LinaPro
   - 插件边界
   - plugin.yaml
   - 插件注册
-  - 官方插件子模块
+  - catalog
+  - lifecycle
   - scope_nature
   - tenant_id
   - 多租户插件
+  - 插件开发
+  - hostServices
+  - 插件依赖
 ---
 
 ## 概述
 
-插件系统是`LinaPro`实现业务扩展的核心机制。每个插件都是一个**自包含的功能模块**，可以独立声明`API`路由、业务服务、数据库表结构、前端页面和菜单项，**无需修改宿主代码**。源码插件随宿主一起编译，动态插件则以`.wasm`文件形式在运行时热加载，无需重启宿主或重新编译主框架。
+插件系统是`LinaPro`实现业务扩展的核心机制。每个插件都是一个**自包含的功能模块**，可以独立声明`API`路由、业务服务、数据库表结构、前端页面和菜单项，**无需修改宿主代码**。
 
-## 架构总览
+`LinaPro`提供两种插件交付模式：**源码插件**随宿主一起编译打包，与主框架共享完整的工具链和开发体验；**`WASM`动态插件**以独立`.wasm`文件形式在运行时热加载，无需重启宿主或重新编译主框架。两种模式共享同一套插件治理面，只是在运行形态和宿主能力访问方式上有所不同。
 
-插件系统的核心不只是"扫描插件目录并注册路由"，而是一条完整的治理主链：从清单发现、依赖检查，到生命周期编排、运行时收敛，再到宿主服务授权。不论是源码插件还是`WASM`动态插件，最终都会进入同一套插件治理面，只是在运行形态和宿主能力访问方式上有所不同。
+## 设计理念
+
+### 为什么需要双模式
+
+单一的插件交付方式很难同时满足研发效率、部署灵活性和安全性这三个维度的要求：
+
+- **仅有源码插件**：所有业务功能需要一起编译，引入新插件或修复紧急问题都需要重新构建和重启整个服务，对生产环境影响面大，且商业化分发必须暴露源码。
+- **仅有动态插件**：`WASM`沙箱的运行时开销在高吞吐场景下不可忽视，跨语言的`ABI`协议也增加了普通业务功能的开发复杂度，让大多数功能的迭代成本变高。
+
+双模式设计让开发者可以根据实际场景选择最合适的交付方式：**长期业务功能首选源码插件**，获得最佳的开发体验和运行性能；**热修复、临时功能或需要保护源码的商业分发**则选用动态插件，实现不停机上线。
+
+### 统一治理面
+
+两种模式虽然在交付形态上不同，但在宿主侧共享同一套治理主链：
+
+- 同一套`plugin.yaml`清单规范，同一套依赖检查、生命周期状态机和数据库治理记录
+- 同一套隔离机制：数据库命名空间、文件存储命名空间、租户过滤接缝
+- 同一套多租户策略：`scope_nature`、`supports_multi_tenant`、`default_install_mode`字段
+
+无论插件以哪种方式交付，管理端看到的行为、API 接口和数据隔离保证都完全一致。
+
+## 整体架构
+
+插件系统的核心不只是"扫描插件目录并注册路由"，而是一条完整的治理主链：从清单发现、依赖检查，到生命周期编排、运行时收敛，再到宿主服务授权。
 
 下图展示了插件从交付入口进入宿主治理主链的完整过程：
 
@@ -40,48 +68,36 @@ keywords:
 flowchart TD
     subgraph Delivery["插件交付入口"]
         Source["源码插件<br/>apps/lina-plugins/*"]
-        Dynamic["动态插件<br/>.wasm"]
-    end
-
-    subgraph Manifest["清单与产物描述"]
-        SourceManifest["plugin.yaml<br/>SQL / i18n / frontend"]
-        Artifact["WASM 自定义段<br/>manifest / routes / assets"]
+        Dynamic["动态插件<br/>.wasm 文件"]
     end
 
     subgraph Pipeline["宿主治理主链"]
         Catalog["catalog<br/>清单发现与发布快照"]
         Dependency["dependency<br/>依赖与版本检查"]
         Lifecycle["lifecycle<br/>安装 / 启用 / 禁用 / 卸载"]
-        Projection["integration / runtime<br/>投影到菜单、路由、Hook、Cron和运行态"]
-        Cache["plugin-runtime cache<br/>刷新启用快照与派生缓存"]
+        Integration["integration / runtime<br/>菜单、路由、Hook、Cron 投影"]
+        Cache["plugin-runtime cache<br/>运行时快照与派生缓存"]
     end
 
-    Source --> SourceManifest
-    Dynamic --> Artifact
-    SourceManifest --> Catalog
-    Artifact --> Catalog
+    Source -->|"plugin.yaml + SQL + 前端资源"| Catalog
+    Dynamic -->|"WASM 自定义段（manifest / routes / assets）"| Catalog
     Catalog --> Dependency
     Dependency --> Lifecycle
-    Lifecycle --> Projection
-    Projection --> Cache
+    Lifecycle --> Integration
+    Integration --> Cache
 ```
 
-主链中三个关键组件的职责分工：
+主链中各关键组件的职责：
 
 | 组件 | 职责 |
 |------|------|
-| `catalog` | 将`plugin.yaml`或`WASM`自定义段转换为宿主可审查的清单与发布快照 |
-| `lifecycle` | 负责状态转换（安装/启用/禁用/卸载）和`SQL`执行；动态插件的运行态由`runtime Reconciler`最终收敛 |
-| `pluginbridge` | 仅服务于动态插件的沙箱调用；源码插件直接通过`pkg/pluginhost`和`pluginservice/contract`接入宿主稳定服务 |
+| `catalog` | 将`plugin.yaml`或`WASM`自定义段转换为宿主可审查的清单与发布快照，写入`sys_plugin_release` |
+| `dependency` | 检查框架版本范围、插件间依赖满足情况，以及是否存在循环依赖 |
+| `lifecycle` | 负责状态转换（安装/启用/禁用/卸载）和迁移`SQL`执行；动态插件的运行态由`runtime Reconciler`最终收敛 |
+| `integration` | 将已启用插件的菜单、权限、路由、钩子、定时任务同步到宿主运行时 |
+| `plugin-runtime cache` | 维护启用插件的快照和派生缓存，供请求路径低延迟读取 |
 
-
-
-## 两种模式对比
-
-`LinaPro`提供两种插件交付模式，分别面向不同的开发与运营场景：
-
-- **源码插件**：与宿主一起编译打包，开发体验与主框架完全一致，适合长期维护的核心业务功能。
-- **`WASM`动态插件**：以独立`.wasm`文件形式在运行时热加载，无需重启宿主，适合临时功能、热修复或不想暴露源码的商业分发场景。
+### 两种模式对比
 
 | 维度 | 源码插件 | `WASM`动态插件 |
 |------|---------|--------------|
@@ -89,20 +105,122 @@ flowchart TD
 | **热加载** | 不支持，需重启宿主 | 支持，无需重启宿主 |
 | **性能** | 原生`Go`性能 | 略低于原生，有沙箱调用开销 |
 | **隔离程度** | 命名空间隔离 | 完整`WASM`沙箱隔离 |
-| **宿主服务访问** | 通过`pluginhost.HostServices`和`pluginservice/contract`稳定契约访问 | 通过`hostServices`授权快照和`pluginbridge`统一协议访问 |
-| **源码可见性** | 与宿主仓库一起管理 | 可以只分发二进制，不暴露源码 |
-| **适用场景** | 长期业务功能模块 | 临时功能、热修复、商业插件分发 |
-| **开发复杂度** | 低，与宿主共享所有工具 | 中，需要了解`WASM`构建流程 |
+| **宿主服务访问** | 通过`pluginhost.HostServices`和`pluginservice/contract`稳定契约直接调用 | 通过`hostServices`授权快照和`pluginbridge`统一协议访问 |
+| **源码可见性** | 与宿主仓库一起管理 | 可只分发二进制，不暴露源码 |
+| **适用场景** | 长期业务功能模块 | 热修复、临时功能、商业插件分发 |
+| **开发复杂度** | 低，与宿主共享所有工具 | 中，需了解`WASM`构建流程 |
 
-**在大多数场景推荐优先选择源码插件**，开发体验更好、性能更优、与宿主工具链无缝集成。以下情况再考虑动态插件：
+**在大多数场景下推荐优先选择源码插件**。以下情况再考虑动态插件：
 
-- 需要不重启宿主即可即插即用的热加载能力
+- 需要不重启宿主即可上线的热加载能力
 - 生产环境紧急热修复，最小化影响范围
 - 商业化插件分发，不想对外暴露源码
 
+## 工作原理
+
+### 源码插件工作流程
+
+源码插件以`Go`包的形式与宿主一同编译。插件在`init()`函数中通过`pluginhost.NewSourcePlugin()`创建插件实例，注册路由、事件钩子、定时任务和生命周期回调，最后调用`pluginhost.RegisterSourcePlugin()`完成注册。宿主启动时统一收集所有已注册的源码插件，并在生命周期流程中将它们的能力投影到运行时。
+
+```mermaid
+flowchart LR
+    A["插件 init()<br/>注册到 pluginhost"] --> B["宿主启动<br/>扫描已注册插件"]
+    B --> C["catalog<br/>读取 plugin.yaml 发布清单"]
+    C --> D["lifecycle<br/>执行安装 SQL / 同步菜单权限"]
+    D --> E["integration<br/>注册路由 / Hook / Cron"]
+    E --> F["运行时就绪<br/>请求进入插件路由"]
+```
+
+源码插件通过`pkg/pluginhost`暴露的`SourcePlugin`接口与宿主交互，可访问宿主发布的所有稳定服务，包括`TenantFilterService`（租户过滤）、`I18n`（国际化）、`Auth`（认证上下文）等。
+
+### 动态插件工作流程
+
+动态插件被编译为标准`WASM`模块，通过`WASM`自定义段（Custom Section）内嵌清单和路由表。上传到宿主后，`catalog`解析产物，`Reconciler`在后台异步收敛运行状态——将`WASM`模块装载到沙箱，并将路由注册到宿主的动态路由捕获器。
+
+```mermaid
+flowchart LR
+    A["上传 .wasm 文件"] --> B["catalog<br/>解析 WASM 自定义段"]
+    B --> C["lifecycle<br/>验证授权 / 执行安装 SQL"]
+    C --> D["runtime Reconciler<br/>异步装载 WASM 沙箱"]
+    D --> E["plugin-runtime cache<br/>刷新路由快照"]
+    E --> F["动态路由就绪<br/>/api/v1/extensions/{pluginId}/*"]
+```
+
+动态插件的所有`HTTP`请求统一由宿主前缀`/api/v1/extensions/{pluginId}/...`接收，宿主完成`JWT`认证、`RBAC`、数据权限校验后，将请求封装为`pluginbridge`协议传入`WASM`沙箱——插件代码永远无法绕过这层校验。
+
+下图展示一次完整的动态插件`API`请求链路：
+
+```mermaid
+sequenceDiagram
+    participant Browser as 浏览器
+    participant Core as lina-core
+    participant Wasm as WASM 插件
+    participant Bridge as pluginbridge
+    participant HostSvc as 宿主服务
+
+    Browser->>Core: GET /api/v1/extensions/{pluginId}/...
+    Core->>Core: JWT 认证 / RBAC / 数据权限校验
+    Core->>Wasm: 传入 BridgeRequestEnvelopeV1<br/>（路由契约 + 请求快照 + 身份快照）
+    Wasm->>Bridge: host_call 请求宿主服务（可选）
+    Bridge->>Bridge: 校验 hostServices 授权快照和资源边界
+    Bridge->>HostSvc: 调用 data / storage / cache 等服务
+    HostSvc-->>Bridge: 返回受治理的结果
+    Bridge-->>Wasm: 返回结构化响应
+    Wasm-->>Core: BridgeResponseEnvelopeV1
+    Core-->>Browser: HTTP 响应
+```
+
+## 关键组件
+
+### pluginhost
+
+`pkg/pluginhost`是宿主向源码插件暴露的稳定公共包。插件只能通过这个包与宿主交互，严禁直接`import`宿主`internal/`目录下的任何包。
+
+`SourcePlugin`接口提供了六个能力注册入口：
+
+| 接口 | 说明 |
+|------|------|
+| `Assets()` | 绑定嵌入的前端静态资源（`embed.FS`） |
+| `HTTP()` | 注册`HTTP`路由，获取宿主中间件（认证、权限、租户） |
+| `Hooks()` | 订阅宿主发布的事件钩子（登录成功、插件安装等） |
+| `Cron()` | 注册定时任务，自动感知主节点 |
+| `Lifecycle()` | 注册安装前后、卸载、租户开通等生命周期回调 |
+| `Governance()` | 声明菜单过滤和权限过滤逻辑 |
+
+宿主通过`HostServices`目录向插件开放稳定的服务契约，包括`TenantFilterService`、`I18n`、`BizCtx`、`Config`、`Notify`、`Session`等。
+
+### pluginbridge
+
+`pkg/pluginbridge`是动态插件的沙箱通信层，定义了宿主与`WASM`模块之间的`ABI`协议。宿主侧负责将认证和授权结果打包为`BridgeRequestEnvelopeV1`，通过线性内存传入`WASM`实例；动态插件通过`pluginbridge`的`Guest`工具包接收请求并返回`BridgeResponseEnvelopeV1`。
+
+动态插件需要导出三个`WASM`函数：
+
+| 导出函数 | 说明 |
+|------|------|
+| `lina_dynamic_route_alloc(size)` | 宿主调用，分配请求数据缓冲区 |
+| `lina_dynamic_route_execute(size)` | 宿主调用，触发请求处理并返回响应指针 |
+| `lina_host_call_alloc(size)` | 接收宿主回调响应时分配缓冲区 |
+
+插件需要访问宿主能力时，通过`pluginbridge`发起`host_call`，宿主的`pluginbridge`服务端校验授权快照后决定是否放行。
+
+### plugin-runtime cache
+
+`plugin-runtime cache`维护已启用插件的快照，供请求路径低延迟读取，避免每次请求都回查数据库。当插件状态发生变化（启用、禁用、升级）时，`lifecycle`会发布修订通知，`cache`重新刷新快照并使前端包、`i18n`资源和`WASM`编译缓存失效。
+
+### catalog 与 lifecycle
+
+`catalog`负责将`plugin.yaml`或`WASM`自定义段转换为宿主可审查的清单，写入`sys_plugin_release`表作为发布快照。`lifecycle`则基于快照执行状态转换：
+
+- 安装时执行迁移`SQL`，同步菜单和权限到治理数据库
+- 启用时将路由、钩子、定时任务投影到运行时
+- 禁用时隐藏路由和菜单，保留数据
+- 卸载时执行卸载`SQL`，清理治理记录
+
+动态插件的启用/禁用状态还会通过`desired_state`字段和`generation`计数驱动`Reconciler`异步收敛，确保集群中各节点的`WASM`沙箱状态最终一致。
+
 ## 插件清单（plugin.yaml）
 
-每个插件都需要在根目录放置一个`plugin.yaml`清单文件。宿主通过它识别插件身份、菜单结构、多租户策略和运行时依赖。以下是一个包含完整字段注释的示例：
+每个插件都需要在根目录放置`plugin.yaml`清单文件。宿主通过它识别插件身份、菜单结构、多租户策略和运行时依赖。
 
 ```yaml
 # 插件唯一标识（kebab-case）
@@ -126,33 +244,23 @@ supports_multi_tenant: true
 # 默认安装模式：global 或 tenant_scoped
 default_install_mode: tenant_scoped
 
-# 插件说明
 description: 提供文章内容的增删改查管理功能
-
-# 插件作者
 author: linapro
-
-# 插件主页
-homepage: https://example.com/plugins/content-article
-
-# 插件许可证
 license: Apache-2.0
 
 # 插件菜单声明
 menus:
-  - key: plugin:content-article:list       # 菜单唯一标识，格式建议为 plugin:<插件ID>:<功能>
-    name: 文章管理                          # 菜单显示名称（支持 i18n Key）
-    path: content-article-list             # 前端路由路径，全局唯一
-    component: system/plugin/dynamic-page  # 插件页面固定使用此组件，由宿主动态加载插件前端
-    perms: content-article:article:view    # 访问该菜单所需的权限标识
-    icon: ant-design:file-text-outlined    # 菜单图标，使用 Iconify 图标名
-    type: M                                # 菜单类型：D=目录，M=菜单项，B=按钮
-    sort: 1                                # 排序权重，数值越小越靠前
+  - key: plugin:content-article:list
+    name: 文章管理
+    path: content-article-list
+    component: system/plugin/dynamic-page
+    perms: content-article:article:view
+    icon: ant-design:file-text-outlined
+    type: M     # D=目录，M=菜单项，B=按钮
+    sort: 1
 ```
 
 **声明运行时依赖（可选）**
-
-如果插件依赖特定框架版本或其他插件，可以在清单中追加`dependencies`字段。宿主在安装或升级前会自动检查框架版本范围、插件依赖是否满足、自动安装策略，以及是否存在循环依赖：
 
 ```yaml
 dependencies:
@@ -162,50 +270,66 @@ dependencies:
     - id: plugin-demo-source
       version: ">=0.1.0"
       required: true
-      install: auto
+      install: auto    # 自动安装缺失的依赖
 ```
 
 **声明宿主服务权限（动态插件专用）**
 
-动态插件还需要通过`hostServices`字段声明希望调用的宿主服务、方法和资源边界。这是一份权限申请清单——真正生效的是宿主在安装或启用阶段确认后写入发布快照的授权结果，未申请的服务和资源在沙箱内无法访问：
+动态插件须通过`hostServices`字段提前申请所需的宿主服务和资源边界。宿主在安装或启用时确认授权并写入发布快照，运行时任何未申请的调用都会被`pluginbridge`直接拒绝：
 
 ```yaml
 hostServices:
   - service: data
-    methods:
-      - list
-      - get
+    methods: [get, list, mutate, transaction]
     resources:
       tables:
         - content_article_record
   - service: storage
-    methods:
-      - put
-      - get
+    methods: [get, put, delete, list]
     resources:
       paths:
         - content-article/
+  - service: cache
+    methods: [get, set, delete, incr, expire]
+  - service: network
+    methods: [request]
+    resources:
+      - url: "https://api.example.com"
 ```
+
+宿主目前支持的`hostServices`服务标识：
+
+| 服务 | 说明 |
+|------|------|
+| `runtime` | 日志写入、插件级状态读写、时间/UUID/节点信息 |
+| `data` | 受治理的数据库读写（带表命名空间和租户过滤） |
+| `storage` | 受命名空间约束的文件存储操作 |
+| `cache` | 分布式缓存读写 |
+| `network` | 对外`HTTP`请求（需声明目标`URL`） |
+| `cron` | 动态注册定时任务 |
+| `lock` | 分布式锁 |
+| `secret` | 敏感配置读取 |
+| `event` | 事件发布与订阅 |
+| `config` | 插件配置读取 |
+| `notify` | 消息通知发送 |
 
 ## 插件生命周期
 
-插件状态分为**管理端可见状态**和**宿主内部收敛状态**两个维度。管理端主要关注发现、安装、启用、禁用和卸载这五个阶段；宿主内部则会进一步追踪`desired_state`、`current_state`、`generation`和`release_id`等字段，用于动态插件的跨节点收敛和缓存刷新。
-
-下图展示插件的完整状态流转，包括中间过渡状态和失败回退路径：
+插件状态分为**管理端可见状态**和**宿主内部收敛状态**两个维度。宿主内部通过`desired_state`（期望状态）、`current_state`（当前状态）、`generation`（修订号）和`release_id`（活跃发布）四个字段驱动动态插件的跨节点收敛。
 
 ```mermaid
 stateDiagram-v2
     [*] --> 已发现: 清单扫描 / 动态包上传
-    已发现 --> 安装中: 安装请求<br/>依赖检查<br/>授权确认
-    安装中 --> 已安装: 执行 SQL<br/>同步 sys_plugin / sys_plugin_release
-    已安装 --> 启用中: 启用请求<br/>desired_state = enabled
-    启用中 --> 已启用: 注册菜单 / 路由 / Hook / Cron<br/>刷新运行时缓存
-    已启用 --> 禁用中: 禁用请求<br/>desired_state = installed
-    禁用中 --> 已禁用: 隐藏菜单和动态路由<br/>保留数据
+    已发现 --> 安装中: 安装请求
+    安装中 --> 已安装: 执行迁移 SQL / 同步治理记录
+    已安装 --> 启用中: 启用请求
+    启用中 --> 已启用: 注册菜单 / 路由 / Hook / Cron
+    已启用 --> 禁用中: 禁用请求
+    禁用中 --> 已禁用: 隐藏路由和菜单 / 保留数据
     已禁用 --> 启用中: 重新启用
-    已禁用 --> 卸载中: 卸载请求<br/>依赖反查 / Guard 校验
+    已禁用 --> 卸载中: 卸载请求
     已安装 --> 卸载中: 卸载请求
-    卸载中 --> 已发现: 执行卸载 SQL<br/>清理发布与资源投影
+    卸载中 --> 已发现: 执行卸载 SQL / 清理治理记录
     安装中 --> 失败: SQL / 依赖 / 授权失败
     启用中 --> 失败: 运行时收敛失败
     卸载中 --> 失败: 反向依赖或 Guard 阻断
@@ -215,129 +339,73 @@ stateDiagram-v2
 
 | 状态 | 说明 |
 |------|------|
-| **已发现** | 宿主扫描到`plugin.yaml`，但尚未安装 |
-| **安装中 / 启用中 / 禁用中 / 卸载中** | 宿主正在执行依赖检查、授权确认、`SQL`迁移、发布快照更新或`Reconciler`收敛 |
-| **已安装** | 执行了安装`SQL`并同步治理数据，但功能未激活 |
-| **已启用** | 菜单、路由、钩子、定时任务、前端资源和语言资源已进入运行时 |
-| **已禁用** | 路由和菜单已隐藏，数据保留，可随时重新启用 |
-| **失败** | 生命周期步骤被依赖、`SQL`、授权、运行时产物或`Guard Hook`阻断，修复后可重新同步或重新执行操作 |
+| **已发现** | 宿主扫描到`plugin.yaml`或上传了`.wasm`，但尚未安装 |
+| **安装中** | 正在执行依赖检查、授权确认和迁移`SQL` |
+| **已安装** | 安装`SQL`已执行并同步治理数据，功能尚未激活 |
+| **启用中** | 正在将菜单、路由、钩子投影到运行时，或等待`Reconciler`收敛 |
+| **已启用** | 插件功能完全激活，请求可以正常路由到插件 |
+| **禁用中** | 正在从运行时撤出路由和菜单 |
+| **已禁用** | 路由和菜单已隐藏，数据和数据表完整保留 |
+| **卸载中** | 正在执行卸载`SQL`，清理治理记录 |
+| **失败** | 生命周期步骤被依赖、`SQL`、授权或`Guard Hook`阻断 |
 
-**禁用 vs. 卸载**
+**禁用 vs. 卸载的区别**
 
-- **禁用**：仅隐藏菜单和路由，插件的数据和数据表完整保留，随时可以重新启用恢复原状。
-- **卸载**：管理端会弹窗询问是否同时清理插件自有数据。选择清理后执行卸载`SQL`，数据无法找回；选择保留则仅清理治理记录，数据表保持不动。
-
-下图展示了生命周期各操作的内部执行步骤。源码插件和动态插件的差异主要体现在启用阶段的运行时收敛路径上：
-
-```mermaid
-flowchart TD
-    A["安装 / 启用 / 禁用 / 卸载"] --> B["读取期望清单或活跃发布"]
-    B --> C["依赖检查<br/>框架版本 / 插件依赖 / 反向依赖"]
-    C --> D{"是否需要宿主服务授权?"}
-    D -->|"是"| E["确认 hostServices<br/>保存授权快照"]
-    D -->|"否"| F{"插件类型"}
-    E --> F
-
-    F -->|"源码插件"| G["执行 manifest/sql<br/>同步菜单 / 权限 / i18n<br/>注册路由 / Hook / Cron"]
-    F -->|"动态插件"| H["写入 desired_state<br/>提交 runtime Reconciler"]
-    H --> I["准备活跃 release<br/>更新 node_state / generation<br/>装载 WASM 产物"]
-
-    G --> J["刷新启用快照<br/>发布 plugin-runtime cache 修订"]
-    I --> J
-    J --> K["失效前端包 / i18n / WASM 编译缓存"]
-    K --> L["管理端和请求路径看到新状态"]
-```
-
-## 动态插件请求流程
-
-动态插件的所有`HTTP`请求统一由宿主固定前缀`/api/v1/extensions/{pluginId}/...`接收。宿主负责完成认证、`RBAC`、数据权限等校验后，再将请求封装为`pluginbridge`协议交给`WASM`沙箱执行——插件代码永远无法绕过这层校验直接响应请求。
-
-下图展示了一次完整的动态插件`API`请求的处理链路：
-
-```mermaid
-sequenceDiagram
-    participant Browser as 浏览器 / lina-vben
-    participant Core as lina-core 动态路由
-    participant Runtime as plugin runtime
-    participant Wasm as WASM 插件
-    participant Bridge as pluginbridge
-    participant HostSvc as 宿主服务
-
-    Browser->>Core: 请求 /api/v1/extensions/{pluginId}/...
-    Core->>Runtime: 确认 plugin-runtime cache 已刷新
-    Runtime->>Runtime: 基于活跃 release 匹配 route contract
-    Runtime-->>Core: 返回插件清单和路由元数据
-    Core->>Core: JWT 认证 / RBAC / 数据权限校验
-    Core->>Wasm: 执行桥接路由请求
-    Wasm->>Bridge: 可选 host_call 请求宿主服务
-    Bridge->>Bridge: 校验 hostServices 授权快照和资源边界
-    Bridge->>HostSvc: 调用 data / storage / network / cache 等服务
-    HostSvc-->>Bridge: 返回受治理的宿主能力结果
-    Bridge-->>Wasm: 返回结构化响应
-    Wasm-->>Core: 返回 Bridge Response Envelope
-    Core-->>Browser: 输出 HTTP 响应
-```
+- **禁用**：仅隐藏路由和菜单，插件的数据表和数据完整保留，随时可以重新启用。
+- **卸载**：管理端询问是否同时清理插件自有数据。选择清理后执行卸载`SQL`，数据无法找回；选择保留则仅清理治理记录，数据表不动。
 
 ## 插件隔离机制
 
-`LinaPro`通过三个维度确保插件之间、以及插件与宿主之间相互不干扰：数据库命名空间隔离、文件存储命名空间隔离，以及`WASM`沙箱隔离。
+`LinaPro`通过三个维度确保插件之间以及插件与宿主之间相互不干扰。
 
 **数据库命名空间隔离**
 
-每个插件的数据表必须以插件`ID`（`kebab-case`转`snake_case`）作为前缀：
+每个插件的数据表必须以插件`ID`（`kebab-case`转`snake_case`）作为前缀，避免与宿主或其他插件的表名冲突：
 
 ```text
-宿主表：sys_user、sys_role、sys_menu ...
-插件表：content_article_record、org_center_dept ...
-       ^^^^^^^^^^^^^^^^       ^^^^^^^^^^^
-        插件 ID 前缀            插件 ID 前缀
+宿主表：sys_user、sys_role、sys_menu
+插件表：content_article_record（插件 content-article）
+        org_center_dept（插件 org-center）
 ```
 
-需要支持多租户的插件表应使用`tenant_id`列作为租户判别字段，并通过宿主发布的`TenantFilterService`追加租户过滤条件。未启用`multi-tenant`插件时，默认`tenant_id = 0`表示平台租户。
+需要支持多租户的插件表应包含`tenant_id`列，并通过宿主发布的`TenantFilterService`追加租户过滤条件。未启用`multi-tenant`插件时，默认`tenant_id = 0`代表平台租户。
 
 **文件存储命名空间隔离**
 
-每个插件的文件存储路径以插件`ID`作为命名空间：
+每个插件的文件存储路径以插件`ID`作为命名空间前缀：
 
 ```text
-宿主文件：temp/upload/
-插件文件：temp/upload/content-article/
-                    ^^^^^^^^^^^^^^^^
-                     插件 ID 命名空间
+插件文件路径示例：temp/upload/content-article/
 ```
 
 **`WASM`沙箱隔离**
 
 动态插件在`WASM`沙箱中运行，对宿主能力的访问受到严格约束：
 
-- **文件系统访问**：通过宿主`storage`服务桥接，限制在插件命名空间内
-- **数据库访问**：通过宿主`data`服务桥接，限制在插件命名空间内
-- **网络访问**：通过宿主`network`服务桥接，受申请的权限约束
-- **运行时信息访问**：通过宿主`runtime`服务桥接获取
+- 数据库访问：通过宿主`data`服务桥接，仅限`hostServices.resources.tables`声明的表
+- 文件访问：通过宿主`storage`服务桥接，仅限`hostServices.resources.paths`声明的路径
+- 网络访问：通过宿主`network`服务桥接，仅限`hostServices.resources.url`声明的目标
+- 运行时信息：通过宿主`runtime`服务桥接获取
 
-动态插件必须在`plugin.yaml`中通过`hostServices`字段提前申请所需的宿主服务。宿主在安装和启用时验证权限声明，并将确认后的授权快照写入当前活跃发布——运行时任何未申请的调用都会被`pluginbridge`直接拒绝。
+运行时任何未在授权快照中声明的调用都会被`pluginbridge`直接拒绝，插件代码无法绕过这层约束。
 
-## 多租户插件字段
+## 多租户支持
 
-插件清单通过以下三个字段声明自己与多租户系统的边界关系，宿主和`multi-tenant`插件依据这些声明进行统一治理：
+插件清单通过三个字段声明与多租户系统的边界关系：
 
 | 字段 | 可选值 | 说明 |
 |------|--------|------|
-| `scope_nature` | `platform_only` / `tenant_aware` | 插件仅在平台上下文治理，还是可进入租户上下文 |
-| `supports_multi_tenant` | `true` / `false` | 是否支持租户级安装、开通和数据隔离 |
+| `scope_nature` | `platform_only` / `tenant_aware` | 插件是否可进入租户上下文 |
+| `supports_multi_tenant` | `true` / `false` | 是否支持租户级安装和数据隔离 |
 | `default_install_mode` | `global` / `tenant_scoped` | 默认全局启用，还是按租户独立启停 |
 
-`platform_only`插件用于平台级治理，例如`multi-tenant`自身；`tenant_aware`插件可根据业务需要选择全局启用或租户级启用。详见：[多租户能力](/docs/multi-tenant)。
+`platform_only`插件（如`multi-tenant`本身）仅在平台上下文治理；`tenant_aware`插件可根据业务需要选择全局启用（所有租户共享一个安装实例，如`org-center`）或按租户独立启停（如`plugin-demo-source`）。详见[多租户能力](/docs/multi-tenant)。
 
 ## 宿主与插件的边界规范
 
-清晰的边界是插件系统长期稳定的基础。以下规范约束了插件可以做什么、不可以做什么，开发者在编写插件时需要严格遵守。
-
 **宿主拥有顶级菜单目录**
 
-宿主发布了一组稳定的顶级菜单目录键：`dashboard`、`iam`、`setting`、`scheduler`、`extension`、`developer`。插件菜单必须挂载在这些目录下（通过`parent_key`字段指定），或者使用自己独立的顶级目录。
-
-官方插件的固定挂载点：
+宿主发布了一组稳定的顶级菜单目录键：`dashboard`、`iam`、`setting`、`scheduler`、`extension`、`developer`。插件菜单必须通过`parent_key`挂载在这些目录下，或使用自己独立的顶级目录键。官方插件的固定挂载点：
 
 | 插件 | 挂载目录 |
 |------|---------|
@@ -345,49 +413,149 @@ sequenceDiagram
 | `content-notice` | `content` |
 | 所有`monitor-*`插件 | `monitor` |
 
-**插件不直接访问宿主内部包**
+**插件不能直接访问宿主内部包**
 
 插件只能通过`pkg/pluginhost`暴露的稳定接口与宿主交互，严禁`import`宿主`internal/`目录下的任何包。宿主内部实现随时可能变化，直接依赖会导致插件在宿主升级后编译失败。
 
-**插件服务逻辑放在`internal/service/`下**
+**插件服务逻辑放在`backend/internal/service/`下**
 
 插件后端的所有业务逻辑必须在`backend/internal/service/`目录下实现，不能在插件根目录创建顶层`service/`包，以避免与宿主包命名冲突。
 
 **安装`SQL`必须具备幂等性**
 
-安装`SQL`必须使用`CREATE TABLE IF NOT EXISTS`等幂等语句。这是因为用户可能在「卸载时选择保留数据」后再重新安装，幂等写法可以确保数据正常复用，而不会因重复建表而报错。
+安装`SQL`必须使用`CREATE TABLE IF NOT EXISTS`等幂等语句。因为用户可能在「卸载时选择保留数据」后重新安装，幂等写法确保数据正常复用而不报错。
 
-## 扩展点注册示例
+## 使用方式
 
-源码插件通过`pluginhost.SourcePlugin`接口向宿主注册自身能力。以下是一个典型的插件入口文件结构，涵盖前端资源绑定、路由注册、事件钩子和卸载清理：
+### 开发源码插件
+
+源码插件的开发流程与主框架保持一致，核心入口是`backend/plugin.go`：
 
 ```go
-// backend/plugin.go
 package backend
 
 import "github.com/linaproai/linapro/apps/lina-core/pkg/pluginhost"
 
-func Register(p pluginhost.SourcePlugin) {
+func init() {
+    plugin := pluginhost.NewSourcePlugin("my-plugin")
+
     // 绑定嵌入的前端资源
-    p.Assets().UseEmbeddedFiles(embedFS)
+    plugin.Assets().UseEmbeddedFiles(embeddedFiles)
 
     // 注册 HTTP 路由
-    p.HTTP().RegisterRoutes(
+    plugin.HTTP().RegisterRoutes(
         pluginhost.ExtensionPointHTTPRouteRegister,
         pluginhost.CallbackExecutionModeBlocking,
         registerRoutes,
     )
 
-    // 注册登录成功后的钩子
-    p.Hooks().RegisterHook(
+    // 注册事件钩子（异步执行）
+    plugin.Hooks().RegisterHook(
         pluginhost.ExtensionPointAuthLoginSucceeded,
         pluginhost.CallbackExecutionModeAsync,
         onLoginSucceeded,
     )
 
-    // 注册卸载清理逻辑
-    p.Lifecycle().RegisterUninstallHandler(onUninstall)
+    // 注册定时任务
+    plugin.Cron().RegisterCron(
+        pluginhost.ExtensionPointCronRegister,
+        pluginhost.CallbackExecutionModeBlocking,
+        registerCronJobs,
+    )
+
+    // 注册生命周期回调
+    plugin.Lifecycle().RegisterBeforeInstallHandler(onBeforeInstall)
+    plugin.Lifecycle().RegisterAfterInstallHandler(onAfterInstall)
+    plugin.Lifecycle().RegisterUninstallHandler(onUninstall)
+
+    pluginhost.RegisterSourcePlugin(plugin)
 }
 ```
+
+路由注册时可以直接使用宿主提供的中间件和服务：
+
+```go
+func registerRoutes(ctx context.Context, registrar pluginhost.HTTPRegistrar) error {
+    hostServices := registrar.HostServices()
+    svc := myservice.New(hostServices.TenantFilter(), hostServices.I18n())
+
+    routes := registrar.Routes()
+    middlewares := routes.Middlewares()
+    routes.Group("/api/v1", func(group pluginhost.RouteGroup) {
+        group.Middleware(
+            middlewares.Auth(),
+            middlewares.Tenancy(),
+            middlewares.Permission(),
+        )
+        group.Bind(mycontroller.NewV1(svc))
+    })
+    return nil
+}
+```
+
+### 开发动态插件
+
+动态插件的入口是`main.go`，需要导出三个`WASM`函数并将请求委托给`pluginbridge`处理：
+
+```go
+package main
+
+import "github.com/linaproai/linapro/apps/lina-core/pkg/pluginbridge"
+
+var guestRuntime = pluginbridge.NewGuestRuntime(backend.HandleRequest)
+
+//go:wasmexport lina_dynamic_route_alloc
+func linaDynamicRouteAlloc(size uint32) uint32 {
+    return guestRuntime.Alloc(size)
+}
+
+//go:wasmexport lina_dynamic_route_execute
+func linaDynamicRouteExecute(size uint32) uint64 {
+    ptr, length, err := guestRuntime.Execute(size)
+    if err != nil {
+        fallback, _ := pluginbridge.EncodeResponseEnvelope(
+            pluginbridge.NewInternalErrorResponse(err.Error()),
+        )
+        ptr, length, _ = guestRuntime.ExposeResponseBuffer(fallback)
+    }
+    return uint64(ptr)<<32 | uint64(length)
+}
+
+//go:wasmexport lina_host_call_alloc
+func linaHostCallAlloc(size uint32) uint32 {
+    return guestRuntime.HostCallAlloc(size)
+}
+
+func main() {}
+```
+
+路由调度通过`pluginbridge.MustNewGuestControllerRouteDispatcher`注册控制器：
+
+```go
+// backend/plugin.go
+var dispatcher = pluginbridge.MustNewGuestControllerRouteDispatcher(
+    mycontroller.New(),
+)
+
+func HandleRequest(req *pluginbridge.BridgeRequestEnvelopeV1) (*pluginbridge.BridgeResponseEnvelopeV1, error) {
+    return dispatcher.HandleRequest(req)
+}
+```
+
+### 插件的安装与卸载
+
+插件的安装、启用、禁用和卸载均通过管理端的插件治理界面操作，宿主会自动执行依赖检查、迁移`SQL`和运行时投影。动态插件还可以通过`API`上传`.wasm`文件后触发安装流程。
+
+卸载时管理端会询问是否同时清理插件自有数据：选择清理则执行卸载`SQL`并删除数据，选择保留则仅清理治理记录，数据表和数据保持不动，可在下次安装时继续使用。
+
+### 插件依赖管理
+
+插件可以在`plugin.yaml`的`dependencies`字段声明对框架版本或其他插件的依赖。宿主在安装前自动检查：
+
+- `framework.version`：检查当前宿主版本是否在声明的`semver`范围内
+- `plugins`：检查所有`required: true`的插件是否已安装且版本满足要求
+- `install: auto`：对声明了自动安装的依赖插件，宿主会在安装当前插件前自动安装依赖
+
+卸载时宿主同样会检查反向依赖——如果存在其他已启用插件依赖于当前插件，卸载请求会被`Guard`拦截，需要先卸载依赖它的插件。
 
 详细的插件开发手册参见[扩展开发](/docs/plugin-development)。

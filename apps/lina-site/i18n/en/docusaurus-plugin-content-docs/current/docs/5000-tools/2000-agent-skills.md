@@ -2,7 +2,7 @@
 slug: '/docs/agent-skills'
 title: 'Dev Skills'
 hide_title: true
-description: 'A complete guide to LinaPro AI skills — the optional OpenSpec CLI, goframe-v2, and find-skills that can be installed externally, plus 13 project-bundled skills covering frontend design, Git workflows, code review, E2E testing, and performance auditing. Includes installation instructions and usage guidance for every skill.'
+description: 'A complete guide to LinaPro AI skills — the optional OpenSpec CLI, goframe-v2, and find-skills that can be installed externally, plus project-bundled skills covering frontend design, Git workflows, code review, E2E testing, performance auditing, and OpenSpec apply/archive automation. Includes installation instructions and usage guidance for every skill.'
 keywords:
   - AI skills
   - dev skills
@@ -32,22 +32,29 @@ keywords:
 
 | Skill | Use case | Prerequisites |
 |-------|----------|---------------|
-| `openspec` | Optional spec-driven workflow tool — recommended for AI dev workflows | Recommended (`npm`) |
-| `goframe-v2` | GoFrame-specific AI skill for higher-quality backend code | Recommended (`npx skills`) |
-| `find-skills` | AI skill marketplace search to help select the right skills | Recommended (`npx skills`) |
+| `openspec` | Optional spec-driven workflow tool — recommended for AI dev workflows | Recommended |
+| `goframe-v2` | GoFrame-specific AI skill for higher-quality backend code | Recommended |
+| `find-skills` | AI skill marketplace search to help select the right skills | Recommended |
 | `frontend-design` | Create distinctive, high-quality frontend interfaces | None |
 | `frontend-patterns` | React / frontend best practices and design patterns | None |
 | `git-commit-push` | Generate a conventional commit message and push | None |
 | `git-worktree` | Create an isolated Git worktree for a task | None |
 | `karpathy-guidelines` | Behavioral guardrails to reduce AI coding mistakes | None |
 | `lina-archive-consolidate` | Consolidate archived OpenSpec iterations | None |
+| `lina-auto-archive` | Automatically scan and archive completed OpenSpec changes | OpenSpec CLI required |
 | `lina-e2e` | E2E test case naming conventions and management | Playwright required |
 | `lina-feedback` | Track and fix issues reported after an OpenSpec change | None |
 | `lina-perf-audit` | Comprehensive backend API performance audit (manual only) | Running LinaPro environment |
 | `lina-review` | Structured code and spec review | None |
 | `openspec-explore` | Thinking-partner mode for exploring ideas and problems | None |
 | `openspec-propose` | Generate a complete OpenSpec change proposal in one step | None |
+| `openspec-apply-change` | Implement changes per an OpenSpec task list | OpenSpec CLI recommended |
+| `openspec-archive-change` | Archive completed OpenSpec changes | OpenSpec CLI recommended |
 | `playwright-cli` | Browser automation and Playwright test authoring | Playwright required |
+
+:::info Note
+The `lina-upgrade` skill referenced in source and ops documentation handles framework and source-plugin upgrade governance. The repository prompts you to invoke it via your AI tool when an installed source plugin has a pending upgrade, but this skill is not bundled in the `.agents/skills/` project directory — consult your AI tool's own skill configuration.
+:::
 
 ## How to Use Skills
 
@@ -151,6 +158,18 @@ Reads archived `OpenSpec` iterations from `openspec/changes/archive/`, groups th
 
 **How to invoke**: Use `/lina-archive-consolidate`.
 
+### lina-auto-archive
+
+Automatically scans the `openspec/changes/` directory and batch-archives all completed active changes, then summarizes the results.
+
+The skill strictly checks each change's completion status — only changes where the `OpenSpec` status is complete and all tasks are done are eligible for archiving. Any incomplete items are skipped; nothing is force-passed or bypassed. After archiving, it reports the list of successfully archived changes and the reasons for any skipped changes.
+
+**When to use**: Batch-cleaning completed changes or periodically tidying the active changes directory.
+
+**Prerequisites**: Requires `OpenSpec CLI` (`npm install -g @fission-ai/openspec@latest`).
+
+**How to invoke**: Use `/lina-auto-archive`.
+
 ### lina-e2e
 
 Defines the project's `Playwright E2E` test case management standards: file naming (globally unique `TC{NNNN}` IDs that are never reused), module-based directory layout, test file templates, independence requirements (one test per file, fully self-contained), and page object model usage.
@@ -218,6 +237,26 @@ Generates a complete `OpenSpec` change with all required artifacts in a single s
 **When to use**: Kicking off a new feature or change that needs a full `OpenSpec` proposal.
 
 **How to invoke**: Use `/openspec-propose` and describe the change you want to make.
+
+### openspec-apply-change
+
+Implements code, documentation, and test changes according to the `tasks.md` in an `OpenSpec` change directory. This skill is typically triggered after the proposal and design are complete, responsible for taking the change from spec to runnable implementation.
+
+**When to use**: An `openspec/changes/<change-id>/` directory already exists and you need to start or continue implementing tasks.
+
+**Prerequisites**: `OpenSpec CLI` recommended.
+
+**How to invoke**: Use `/openspec-apply-change`, or simply tell the AI to continue implementing the current `OpenSpec` change.
+
+### openspec-archive-change
+
+Archives a completed `OpenSpec` change by merging incremental specs into the baseline spec and moving the change directory to the archive area.
+
+**When to use**: The change implementation, review, and verification are all done and it needs to be consolidated into the long-term baseline.
+
+**Prerequisites**: `OpenSpec CLI` recommended.
+
+**How to invoke**: Use `/openspec-archive-change`, or ask the AI to archive the current completed change.
 
 ### playwright-cli
 

@@ -2,7 +2,7 @@
 slug: '/docs/distributed-architecture'
 title: 'Native Distributed Architecture'
 hide_title: true
-description: 'How LinaPro natively supports distributed deployment — single-node vs. cluster mode, Raft-style distributed leader election, node roles and horizontal scaling, permission topology version synchronization, distributed locks and cluster-aware key-value cache, and how to enable cluster mode with zero code changes.'
+description: 'How LinaPro natively supports distributed deployment — single-node vs. cluster mode, Redis-based distributed coordination and leader election, node roles and horizontal scaling, permission topology version synchronization, distributed locks and cluster-aware key-value cache, and how to enable cluster mode with zero code changes.'
 keywords:
   - distributed architecture
   - cluster mode
@@ -20,6 +20,7 @@ keywords:
   - lease
   - primary node
   - replica node
+  - Redis coordinator
 ---
 
 ## Overview
@@ -30,7 +31,7 @@ keywords:
 
 ### Single-node mode (default)
 
-By default, `LinaPro` runs in single-node mode, suitable for development environments and small-scale production deployments:
+By default, `LinaPro` runs in single-node mode, suitable for development environments and small-scale production deployments. Single-node mode does not require `Redis` — it relies only on `PostgreSQL` and in-process cache coordination:
 
 ```yaml
 cluster:
@@ -50,14 +51,22 @@ cluster:
 
 ### Cluster mode
 
-Setting `cluster.enabled` to `true` activates the distributed coordination mechanism and enables horizontal scaling across multiple nodes:
+Setting `cluster.enabled` to `true` activates the distributed coordination mechanism and enables horizontal scaling across multiple nodes. **Cluster mode requires a distributed coordinator** — the current version only supports `redis`:
 
 ```yaml
 cluster:
   enabled: true
+  coordination: redis        # Required — currently only redis is supported
   election:
-    lease: 30s           # Election lock lease duration
-    renewInterval: 10s   # Lease renewal interval (recommended: 1/3 of lease)
+    lease: 30s               # Election lock lease duration
+    renewInterval: 10s       # Lease renewal interval (recommended: 1/3 of lease)
+  redis:
+    address: "127.0.0.1:6379"
+    db: 0
+    password: ""
+    connectTimeout: 3s
+    readTimeout: 2s
+    writeTimeout: 2s
 ```
 
 ```text
@@ -69,42 +78,46 @@ cluster:
          │   Node 1  │  │   Node 2  │  ...
          │ (primary) │  │ (replica) │
          └─────┬─────┘  └─────┬─────┘
-               │              │
+               │    Redis     │
                └──────┬───────┘
                       │
+              ┌───────▼──────┐
+              │    Redis     │  ← Cluster coordination (election, caching, distributed locks)
+              └──────────────┘
+                      │
                ┌──────▼──────┐
-               │ PostgreSQL  │
+               │ PostgreSQL  │  ← Data persistence
                └─────────────┘
 ```
 
-In cluster mode, all nodes share the same `PostgreSQL` database. Nodes coordinate through the database — leader election lock, permission version synchronization — with no need to deploy `Redis`, `etcd`, or any additional middleware.
+In cluster mode, all nodes share the same `PostgreSQL` database for data storage, and coordinate through `Redis` for distributed election, distributed locks, cluster-aware caching, and more.
 
 ## Distributed Leader Election
 
-`LinaPro` uses a database optimistic-lock based election mechanism — lightweight and reliable:
+Cluster mode uses `Redis` for leader election — lightweight and reliable:
 
 ```mermaid
 sequenceDiagram
     participant N1 as Node 1
     participant N2 as Node 2
-    participant DB as PostgreSQL
+    participant R as Redis
 
-    N1->>DB: Attempt to acquire election lock (INSERT/UPDATE)
-    DB-->>N1: Success, becomes primary
-    N2->>DB: Attempt to acquire election lock
-    DB-->>N2: Failed (lock held)
+    N1->>R: Attempt to acquire election lock (SET NX)
+    R-->>N1: Success, becomes primary
+    N2->>R: Attempt to acquire election lock
+    R-->>N2: Failed (lock held)
     Note over N2: Becomes replica, awaits primary failure
 
     loop Lease renewal (every renewInterval)
-        N1->>DB: Renew election lock (update lease timestamp)
-        DB-->>N1: Renewal successful
+        N1->>R: Renew election lock (EXPIRE refreshes lease)
+        R-->>N1: Renewal successful
     end
 
     Note over N1: Node 1 goes down, stops renewing
 
-    N2->>DB: Detects lease expired beyond threshold
-    N2->>DB: Attempt to acquire election lock
-    DB-->>N2: Success, becomes new primary
+    N2->>R: Detects lease expired beyond lease duration
+    N2->>R: Attempt to acquire election lock
+    R-->>N2: Success, becomes new primary
 ```
 
 **Lease configuration recommendations:**
@@ -118,7 +131,7 @@ sequenceDiagram
 
 **Primary-only responsibilities:**
 
-- Execute host-level scheduled tasks (periodic maintenance tasks of the `make start` type)
+- Execute host-level periodic maintenance tasks
 - Permission topology version broadcast (notifying all nodes to refresh their cache)
 - Dynamic plugin lifecycle coordination
 
@@ -138,14 +151,14 @@ sequenceDiagram
     participant N1 as Node 1 (Primary)
     participant N2 as Node 2 (Replica)
     participant DB as PostgreSQL
+    participant R as Redis
 
     Admin->>N1: Modify role permissions
     N1->>DB: Update permission data, increment version
-    N1->>DB: Write version change notification
-    Note over N2: Periodically check version changes
-    N2->>DB: Query version (finds higher than local cache)
+    N1->>R: Publish cache version change
+    Note over N2: Observes version change
     N2->>DB: Reload permission topology
-    Note over N2: Local cache updated\nNew requests use new permissions immediately
+    Note over N2: Local cache updated<br/>New requests use new permissions immediately
 ```
 
 This mechanism ensures permission changes take effect across all nodes quickly — within at most 3 seconds — with no user re-login required.
@@ -186,7 +199,8 @@ The framework provides a cluster-aware key-value cache interface (`pkg/kvcache`)
 When business growth calls for more capacity, the steps are:
 
 1. Update `config.yaml` — set `cluster.enabled` to `true`
-2. Start a new host node instance pointing to the same `PostgreSQL` database
-3. Add the new node to the load balancer
+2. Configure `cluster.coordination: redis` and a reachable `cluster.redis` endpoint
+3. Start a new host node instance pointing to the same `PostgreSQL` database
+4. Add the new node to the load balancer
 
 No changes to business code are required. The framework automatically handles node discovery, leader election, and permission synchronization.
