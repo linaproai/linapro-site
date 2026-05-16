@@ -65,20 +65,21 @@ LinaPro is designed for independent developers, engineering teams, and enterpris
 - **Rapid business development**: A ready-to-use management workspace and rich built-in modules that dramatically shorten time from zero to production
 - **Integrated full stack**: Frontend and backend designed as a unified system — API contracts, permission models, and design conventions fully aligned without the overhead of integrating two separate frameworks
 - **Complete API documentation**: Automatically aggregates host and plugin APIs with an interactive online browser and debugger
-- **Plugin ecosystem**: A dual-mode plugin system (source plugins + WASM dynamic plugins) — any capability can be extended or replaced via plugins
+- **Plugin ecosystem**: A dual-mode plugin system (source plugins + WASM dynamic plugins) — any capability can be extended or replaced via plugins. Official plugins are maintained as `submodule`s, pulled on demand without bloating the core framework
+- **Multi-tenant support**: Native multi-tenant capabilities built into the framework, with an official multi-tenant management plugin. Automatically falls back to single-tenant mode when disabled, with zero migration cost
 - **Enterprise governance**: JWT authentication paired with declarative RBAC, with permissions declared at the API definition layer for natural auditability. Built-in operation logs, login logs, and session management
-- **Native distributed architecture**: Built-in distributed locks, key-value cache, and horizontal scaling — no special migration required as your workload grows
+- **Native distributed architecture**: Built-in distributed locks, key-value cache, and horizontal scaling. Cluster mode uses a `Redis` coordinator for high availability — no changes to business code required
 
 ## Architecture
 
 ```mermaid
 graph TB
-    subgraph Workflow["AI Development Workflow  openspec/"]
+    subgraph Workflow["Optional AI Dev Workflow  openspec/"]
         direction LR
         Explore["🔍 Explore"] --> Propose["📋 Propose"] --> Implement["⚙️ Implement"] --> Review["🔎 Review"] --> Archive["📦 Archive"]
     end
 
-    subgraph Frontend["Default Management UI  lina-vben"]
+    subgraph Frontend["Default Management Workspace  lina-vben"]
         UI["Vue 3 + Vben5 + Ant Design"]
     end
 
@@ -88,19 +89,22 @@ graph TB
         Ctrl["Controller Layer\n(HTTP request handling)"]
         Svc["Service Layer\n(core business logic)"]
         Plugin["Plugin Runtime\n(lifecycle orchestration · sandbox isolation)"]
+        Tenant["Multi-Tenant Foundation\n(bizctx · tenant_id · plugin governance)"]
         Gov["Governance Services\n(JWT · RBAC · audit logs · sessions)"]
         API --> Ctrl --> Svc
         Svc --> Plugin
+        Svc --> Tenant
         Svc --> Gov
     end
 
-    subgraph Plugins["Plugin Layer  lina-plugins"]
+    subgraph Plugins["Official Plugin Submodules  apps/lina-plugins"]
         direction LR
         Source["Source Plugins\ncompiled and deployed with the host"]
         Dynamic["WASM Dynamic Plugins\nhot-loaded at runtime"]
     end
 
     DB[("Data Store\nPostgreSQL")]
+    Redis[("Cluster Coordination\nRedis")]
 
     Workflow -.->|spec-driven| Frontend
     Workflow -.->|spec-driven| Host
@@ -109,6 +113,7 @@ graph TB
     Plugin -->|sandbox execution| Dynamic
     Svc --> DB
     Gov --> DB
+    Svc -.->|cluster.enabled=true| Redis
 ```
 
 ## Core Features
