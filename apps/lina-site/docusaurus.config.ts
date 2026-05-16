@@ -2,7 +2,8 @@ const LATEST_VERSION_LABEL = 'v0.1.x(Latest)';
 
 import type { Options as IdealImageOptions } from '@docusaurus/plugin-ideal-image';
 import type * as Preset from '@docusaurus/preset-classic';
-import type { Config } from '@docusaurus/types';
+import type { Config, Plugin } from '@docusaurus/types';
+import path from 'node:path';
 import { themes as prismThemes } from 'prism-react-renderer';
 import {
   DEFAULT_LOCALE,
@@ -12,6 +13,30 @@ import {
 } from './siteI18n';
 
 const siteSeo = getCurrentSiteSeo();
+const vscodeLanguageserverTypesEsmPath = path.join(
+  path.dirname(path.dirname(require.resolve('vscode-languageserver-types'))),
+  'esm',
+  'main.js',
+);
+
+function mermaidServerBundleAliasPlugin(): Plugin {
+  return {
+    name: 'linapro-mermaid-server-bundle-alias',
+    configureWebpack(_config, isServer) {
+      if (!isServer) {
+        return {};
+      }
+
+      return {
+        resolve: {
+          alias: {
+            'vscode-languageserver-types$': vscodeLanguageserverTypesEsmPath,
+          },
+        },
+      };
+    },
+  };
+}
 
 // https://docusaurus.io/docs/api/plugins/@docusaurus/plugin-content-docs#markdown-front-matter
 // https://docusaurus.io/zh-CN/docs/api/docusaurus-config
@@ -48,6 +73,21 @@ const config: Config = {
   },
   // 配置 Mermaid 主题
   themes: ['@docusaurus/theme-mermaid'],
+  plugins: [
+    mermaidServerBundleAliasPlugin,
+    require.resolve('docusaurus-plugin-image-zoom'),
+    [
+      'ideal-image',
+      {
+        quality: 70,
+        max: 1030,
+        min: 640,
+        steps: 2,
+        // Use false to debug, but it incurs huge perf costs
+        disableInDev: true,
+      } satisfies IdealImageOptions,
+    ],
+  ],
   presets: [
     [
       'classic',
@@ -78,20 +118,6 @@ const config: Config = {
           customCss: require.resolve('./src/css/custom.css'),
         },
       } satisfies Preset.Options,
-    ],
-  ],
-  plugins: [
-    require.resolve('docusaurus-plugin-image-zoom'),
-    [
-      'ideal-image',
-      {
-        quality: 70,
-        max: 1030,
-        min: 640,
-        steps: 2,
-        // Use false to debug, but it incurs huge perf costs
-        disableInDev: true,
-      } satisfies IdealImageOptions,
     ],
   ],
   themeConfig: {
