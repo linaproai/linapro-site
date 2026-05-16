@@ -80,7 +80,7 @@ docker run -p 8080:8080 ghcr.io/linaproai/linapro:nightly
 
 ```mermaid
 graph TB
-    subgraph Workflow["可选 AI 研发工作流  openspec/"]
+    subgraph Workflow["AI 研发工作流  openspec/"]
         direction LR
         Explore["🔍 探索"] --> Propose["📋 提案"] --> Implement["⚙️ 实现"] --> Review["🔎 审查"] --> Archive["📦 归档"]
     end
@@ -95,7 +95,7 @@ graph TB
         Ctrl["控制器层\n(HTTP 请求处理)"]
         Svc["业务服务层\n(核心业务逻辑)"]
         Plugin["插件运行时\n(生命周期编排 · 沙箱隔离)"]
-        Tenant["多租户基础能力\n(bizctx · tenant_id · 插件治理)"]
+        Tenant["原生多租户\n(bizctx · tenant_id)"]
         Gov["治理服务\n(JWT · RBAC · 日志 · 会话)"]
         API --> Ctrl --> Svc
         Svc --> Plugin
@@ -103,7 +103,7 @@ graph TB
         Svc --> Gov
     end
 
-    subgraph Plugins["官方插件子模块  apps/lina-plugins"]
+    subgraph Plugins["插件系统  apps/lina-plugins"]
         direction LR
         Source["源码插件\n随宿主编译交付"]
         Dynamic["WASM 动态插件\n运行时热加载"]
@@ -115,7 +115,7 @@ graph TB
     Workflow -.->|规范驱动| Frontend
     Workflow -.->|规范驱动| Host
     UI -->|HTTP| API
-    Plugin -->|加载| Source
+    Plugin -->|编译加载| Source
     Plugin -->|沙箱执行| Dynamic
     Svc --> DB
     Gov --> DB
@@ -166,7 +166,7 @@ graph TB
 
 官方源码插件位于`apps/lina-plugins/`，以`Git submodule`形式挂载到主仓库。未初始化子模块时，主框架仍可按宿主模式运行；需要官方插件内容时，再执行`git submodule update --init --recursive`按需拉取。
 
-### 企业级安全认证
+### 企业级权限治理
 
 - `JWT`认证配合声明式`RBAC`权限体系，权限通过`API`定义层的标签声明，天然可见可审计
 - 权限粒度细至按钮级别，支持菜单、页面、操作三级精细控制
@@ -199,10 +199,10 @@ graph TB
 
 | 类别 | 技术 | 说明 |
 |------|------|------|
-| 后端语言 | `Go` | `v1.25.0` |
-| 后端框架 | `GoFrame` | `v2.10.1`，提供路由、`ORM`、配置等全套能力 |
-| 前端框架 | `Vue 3` | 基于`Vben 5`管理台模板 |
-| 前端 UI | `Ant Design Vue` | 企业级 `UI` 组件库 |
-| 构建工具 | `Vite` | 极速前端构建 |
-| 数据库 | `PostgreSQL` / 可选`SQLite` | `PostgreSQL 14+`为默认数据存储；`SQLite`可用于本地演示或冒烟验证，仅支持单节点，不适用于生产 |
-| 插件运行时 | `WebAssembly` | `tetratelabs/wazero`，支持`WASM`动态插件 |
+| **后端语言** | `Go` | `v1.25.0` |
+| **后端框架** | `GoFrame` | `v2.10.1`，提供路由、`ORM`、配置等全套能力 |
+| **前端框架** | `Vue 3` | 基于`Vben 5`管理台模板 |
+| **前端 `UI`** | `Ant Design Vue` | 企业级 `UI` 组件库 |
+| **构建工具** | `Vite` | 极速前端构建 |
+| **数据存储** | `PostgreSQL` / 可选`SQLite` | `PostgreSQL 14+`为默认数据存储；`SQLite`可用于本地演示或冒烟验证 |
+| **插件运行时** | `WebAssembly` | `tetratelabs/wazero`，支持`WASM`动态插件 |

@@ -37,7 +37,7 @@ LinaPro depends on the following components during source development. Install t
 | Component | Version requirement | Notes |
 |-----------|--------------------|-------|
 | `Git` | - | Version control; required by the install script |
-| `Go` | `1.23+` | Backend service runtime |
+| `Go` | `1.25+` | Backend service runtime |
 | `Node.js` | `20.19+` | Frontend build environment |
 | `pnpm` | `10.0+` | Frontend package manager |
 | `PostgreSQL` | `14+` | Default relational database |

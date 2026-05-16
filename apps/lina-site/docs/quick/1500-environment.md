@@ -39,7 +39,7 @@ import TabItem from '@theme/TabItem';
 | 组件 | 版本要求 | 说明 |
 |------|---------|------|
 | `Git` | - | 版本控制，安装脚本依赖 |
-| `Go` | `1.23+` | 后端服务运行时 |
+| `Go` | `1.25+` | 后端服务运行时 |
 | `Node.js` | `20.19+` | 前端构建环境 |
 | `pnpm` | `10.0+` | 前端包管理器 |
 | `PostgreSQL` | `14+` | 默认关系型数据库 |
@@ -72,7 +72,7 @@ sudo yum install git
 
 ### Go
 
-需要`Go 1.23`及以上版本，可通过`go version`确认当前版本。
+需要`Go 1.25`及以上版本，可通过`go version`确认当前版本。
 
 <Tabs groupId="platform">
 <TabItem value="mac-linux" label="macOS / Linux" default>
