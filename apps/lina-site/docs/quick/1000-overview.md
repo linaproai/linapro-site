@@ -95,19 +95,22 @@ graph TB
         Ctrl["控制器层\n(HTTP 请求处理)"]
         Svc["业务服务层\n(核心业务逻辑)"]
         Plugin["插件运行时\n(生命周期编排 · 沙箱隔离)"]
+        Tenant["多租户基础能力\n(bizctx · tenant_id · 插件治理)"]
         Gov["治理服务\n(JWT · RBAC · 日志 · 会话)"]
         API --> Ctrl --> Svc
         Svc --> Plugin
+        Svc --> Tenant
         Svc --> Gov
     end
 
-    subgraph Plugins["插件层  lina-plugins"]
+    subgraph Plugins["官方插件子模块  apps/lina-plugins"]
         direction LR
         Source["源码插件\n随宿主编译交付"]
         Dynamic["WASM 动态插件\n运行时热加载"]
     end
 
     DB[("数据存储\nPostgreSQL")]
+    Redis[("集群协调\nRedis")]
 
     Workflow -.->|规范驱动| Frontend
     Workflow -.->|规范驱动| Host
@@ -116,6 +119,7 @@ graph TB
     Plugin -->|沙箱执行| Dynamic
     Svc --> DB
     Gov --> DB
+    Svc -.->|cluster.enabled=true| Redis
 ```
 
 ## 核心功能
