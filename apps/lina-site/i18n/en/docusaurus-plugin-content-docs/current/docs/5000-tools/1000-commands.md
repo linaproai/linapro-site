@@ -2,7 +2,7 @@
 slug: '/docs/commands'
 title: 'Dev Commands'
 hide_title: true
-description: 'A complete reference for every make command in the LinaPro project — what each command does, what options it accepts, and usage examples covering dev server management, full builds, WASM plugin builds, Docker image builds, testing, i18n validation, and database initialization.'
+description: 'A complete reference for the cross-platform dev command set in the LinaPro project — covering linactl, Makefile compatibility entry, Windows make.cmd wrapper, dev server management, full builds, WASM plugin builds, Docker image builds, testing, i18n validation, plugin tools, and database initialization on macOS, Linux, and Windows.'
 keywords:
   - make commands
   - dev commands
@@ -14,15 +14,57 @@ keywords:
   - make image
   - make init
   - make wasm
+  - linactl
   - development workflow
   - backend build
   - frontend build
   - Docker image
   - E2E testing
   - database initialization
+  - Windows support
+  - make.cmd
+  - cross-platform
 ---
 
-The LinaPro project root provides a complete set of `make` commands, organized across module files under `hack/makefiles/`. Run `make help` in the project root at any time to see all available commands.
+The `LinaPro` project provides a cross-platform dev command set. Long-term task orchestration lives in `hack/tools/linactl`, implemented as a `Go` program; the root `Makefile` and `make.cmd` are compatibility entries that forward to the underlying `linactl`. This means the same commands work on `macOS`, `Linux`, and `Windows`, without depending on `GNU Make` or `POSIX Shell` as the sole entry point.
+
+## Platform Notes
+
+**Cross-platform native commands**: All platforms can use `linactl` directly:
+
+```bash
+cd hack/tools/linactl
+go run . help
+go run . status
+go run . init confirm=init
+go run . dev
+```
+
+**macOS / Linux**: The root `make` compatibility entry continues to work:
+
+```bash
+make help
+make init confirm=init
+make dev
+```
+
+**Windows cmd.exe**: Use the `make.cmd` wrapper at the project root. In `cmd.exe`, executable extensions are resolved from the current directory, so the `.cmd` suffix can be omitted:
+
+```cmd
+make dev
+make build
+make help
+```
+
+**Windows PowerShell**: Requires a current-directory prefix. In a default `Windows` environment, `.\make` works; to avoid confusion with any locally installed `make`, use `.\make.cmd` explicitly:
+
+```powershell
+.\make help
+.\make init confirm=init
+.\make dev
+```
+
+All `make <command>` examples in this document can be equivalently replaced with `cd hack/tools/linactl && go run . <command>` — argument formats remain the same.
 
 ## Command Overview
 
@@ -33,15 +75,38 @@ The LinaPro project root provides a complete set of `make` commands, organized a
 | `make status` | Dev server | Show the running status and log paths for both servers |
 | `make build` | Build | Full build: frontend, plugins, and backend binary |
 | `make wasm` | Build | Build all or specific runtime `WASM` plugins |
+| `make tidy` | Build | Tidy `Go` module dependencies for host, tools, and plugins |
 | `make image` | Image | Build a production `Docker` image |
 | `make image-build` | Image | Prepare image artifacts only, skip the `Docker` build step |
 | `make test` | Test | Run the full `E2E` test suite |
-| `make test-scripts` | Test | Run unit and smoke tests for tooling scripts |
-| `make check-runtime-i18n` | i18n | Scan for hardcoded strings in runtime code |
-| `make check-runtime-i18n-messages` | i18n | Validate message key coverage in runtime language packs |
+| `make test.go` | Test | Run `Go` unit tests |
+| `make test.host` | Test | Run host-only `E2E` tests |
+| `make test.plugins` | Test | Run official plugin `E2E` tests |
+| `make test.scripts` | Test | Run unit and smoke tests for tooling scripts |
+| `make i18n.check` | i18n | Scan for hardcoded strings and validate language pack key coverage |
 | `make init` | Database | Initialize database schema and seed data |
 | `make mock` | Database | Load demo `Mock` data |
 | `make help` | Other | List all available commands |
+
+`linactl` also provides `plugins.init`, `plugins.install`, `plugins.update`, and `plugins.status` for advanced scenarios such as converting official plugin submodules into regular plugin directories, installing configured source plugins, or inspecting the plugin workspace state.
+
+## Plugin Mode Parameters
+
+The official plugin directory `apps/lina-plugins/` is a `Git submodule`. When this directory is initialized and contains plugin manifests, the `dev`, `build`, `image`, and related `Go` test commands automatically enter full plugin mode. A `temp/go.work.plugins` file (git-ignored) is generated from the root host-only `go.work`, and source plugin modules are resolved via `GOWORK`.
+
+If you only need to run the main framework, skip the submodule initialization or pass `plugins=0` to force host-only mode:
+
+```bash
+make dev plugins=0
+make build plugins=0
+make image plugins=0
+```
+
+Before building or testing official plugins, initialize the submodules first:
+
+```bash
+git submodule update --init --recursive
+```
 
 ## Dev Server
 
@@ -110,7 +175,7 @@ Default values for the build are managed centrally in `hack/config.yaml` at the 
 build:
   # Target platform list in goos/goarch format; overridable with make build platforms=...
   platforms:
-    - "linux/amd64"
+    - "auto"
   # Whether to enable CGO
   cgoEnabled: false
   # Build output path, relative to the repository root
@@ -121,14 +186,14 @@ build:
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `build.platforms` | `["linux/amd64"]` | Target platform list in `goos/goarch` format; override with `make build platforms=...` |
+| `build.platforms` | `["auto"]` | Target platform list in `goos/goarch` format; `auto` means `linux/<current-arch>`; override with `make build platforms=...` |
 | `build.cgoEnabled` | `false` | Whether to enable `CGO` |
 | `build.outputDir` | `temp/output` | Build output path, relative to the repository root |
 | `build.binaryName` | `lina` | Host binary filename |
 
 ### make wasm
 
-Builds the runtime `WASM` plugins separately, with output written to `temp/output/`. Use `p=<plugin-id>` to build a single plugin; omit it to build all plugins.
+Builds runtime `WASM` plugins separately. `make wasm` is a compatibility entry that outputs artifacts to `temp/output/` by default, with `p=<plugin-id>` support for building a specific plugin. To override the output directory or perform a build-only probe, use `linactl wasm` directly.
 
 ```bash
 # Build all WASM plugins
@@ -137,8 +202,29 @@ make wasm
 # Build a specific plugin (plugin-id is the plugin directory name)
 make wasm p=my-plugin
 
-# Enable verbose logging
-make wasm verbose=1
+# Specify output directory (linactl native command)
+cd hack/tools/linactl
+go run . wasm p=my-plugin out=../../temp/output
+
+# Dry-run: list buildable dynamic plugins (linactl native command)
+go run . wasm dry_run=true
+```
+
+### linactl prepare-packed-assets
+
+Prepares frontend static assets and `manifest` resources for backend embedding. Usually called automatically by `make build` or `make dev`. Run manually when you need to inspect embedded assets in isolation:
+
+```bash
+cd hack/tools/linactl
+go run . prepare-packed-assets
+```
+
+### make tidy
+
+Tidies `Go` module dependencies for the host, dev tools, and plugins. Useful after upgrading dependencies or initializing full plugin mode:
+
+```bash
+make tidy
 ```
 
 ## Image
@@ -206,30 +292,58 @@ Runs the full `Playwright E2E` test suite under `hack/tests/`. Make sure the dev
 make test
 ```
 
-### make test-scripts
+### make test.go
 
-Runs unit and smoke tests for all tooling scripts under `hack/tests/scripts/`, verifying the basic correctness of repository helper scripts.
+Runs unit tests for all maintained `Go` modules. Pass `plugins=0` to force host-only mode.
 
 ```bash
-make test-scripts
+make test.go
+make test.go plugins=0
+```
+
+### make test.host
+
+Runs only the host's own `Playwright E2E` tests. Does not require the official plugin submodules to be initialized.
+
+```bash
+make test.host
+```
+
+### make test.plugins
+
+Runs the official plugins' own `Playwright E2E` tests. Requires the `apps/lina-plugins/` submodules to be initialized first.
+
+```bash
+make test.plugins
+```
+
+### make test.scripts
+
+Runs unit and smoke tests for cross-platform repository tooling, verifying the basic correctness of `linactl`, `make.cmd`, and other helper entry points.
+
+```bash
+make test.scripts
 ```
 
 ## i18n
 
-### make check-runtime-i18n
+### make i18n.check
 
-Scans runtime-visible code paths for hardcoded strings not covered by the i18n system. Run this before committing new features to catch compliance issues early.
+Scans runtime-visible code paths for hardcoded strings not covered by the i18n system, and validates message key coverage across the host and plugin runtime language packs. Run this before committing new features to catch compliance issues early.
 
 ```bash
-make check-runtime-i18n
+make i18n.check
 ```
 
-### make check-runtime-i18n-messages
+## Plugin Tools
 
-Validates message key coverage across the host and plugin runtime language packs, detecting missing or extraneous translation keys.
+### linactl plugins.status
+
+View the current official plugin workspace status. Advanced developers can also use `plugins.init`, `plugins.install`, and `plugins.update` to manage source plugin workspaces in non-submodule form.
 
 ```bash
-make check-runtime-i18n-messages
+cd hack/tools/linactl
+go run . plugins.status
 ```
 
 ## Database

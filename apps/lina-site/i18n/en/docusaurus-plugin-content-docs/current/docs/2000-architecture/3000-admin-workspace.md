@@ -1,8 +1,8 @@
 ---
 slug: '/docs/admin-workspace'
-title: 'Management Workspace'
+title: 'Default Management Workspace'
 hide_title: true
-description: 'A comprehensive look at lina-vben, the LinaPro default management workspace — its functional modules, technology stack, and design characteristics, including access control, system settings, job scheduling, extension center, developer center, official plugin extensions, and the dynamic menu injection mechanism.'
+description: 'A comprehensive look at lina-vben, the LinaPro default management workspace — its functional modules, technology stack, and design characteristics, covering access control, system settings, job scheduling, multi-tenant management, organization management, content management, system monitoring, extension center, and developer center, as well as the dynamic menu injection mechanism for plugins.'
 keywords:
   - lina-vben
   - management workspace
@@ -19,14 +19,45 @@ keywords:
   - API documentation
   - dynamic menus
   - RBAC
+  - multi-tenant
+  - tenant management
+  - organization management
+  - system monitoring
   - LinaPro
 ---
 
 ## Overview
 
-`lina-vben` is `LinaPro`'s default management workspace, built on `Vue 3 + Vben5 + Ant Design Vue + TypeScript`. It is the standard UI expression layer for the `lina-core` host `API` and all plugin `API`s.
+`lina-vben` is `LinaPro`'s built-in default management workspace, built on `Vue 3 + Vben5 + Ant Design Vue + TypeScript`. It serves as the standard `UI` expression layer for the `lina-core` host `API` and all plugin `API`s.
 
 Developers can build business applications directly on top of the workspace, extend or replace any module on demand through the plugin mechanism, or replace it entirely with a custom frontend workspace.
+
+```mermaid
+graph TB
+    subgraph FE["Frontend Layer"]
+        WS["lina-vben<br/>Management Workspace"]
+    end
+
+    subgraph BE["Host Layer (lina-core)"]
+        direction LR
+        Auth["Authentication & Authorization"]
+        MenuSvc["Menu Governance"]
+        PluginEngine["Plugin Engine"]
+    end
+
+    subgraph PL["Plugin Layer"]
+        direction LR
+        SP["Source Plugins<br/>multi-tenant / org-center<br/>monitor-* / content-notice"]
+        DP["Dynamic Plugins (WASM)"]
+    end
+
+    DB[("Database<br/>PostgreSQL / SQLite")]
+
+    WS -->|"REST API"| BE
+    BE --> PL
+    BE --> DB
+    PL --> DB
+```
 
 ## Technology Stack
 
@@ -39,6 +70,8 @@ Developers can build business applications directly on top of the workspace, ext
 | `pnpm` | `8.x` | Package manager (monorepo) |
 
 ## Functional Modules
+
+All functional modules in `lina-vben` are listed below. Some modules are provided by official plugins — once installed and enabled, their menus are automatically injected into the workspace without modifying any workspace code.
 
 ### Access Control
 
@@ -69,6 +102,21 @@ Developers can build business applications directly on top of the workspace, ext
 | **Menu types** | Supports directory (`D`), menu (`M`), and button (`B`) |
 | **Dynamic configuration** | Menu paths, components, icons, and sort order are all adjustable from the management UI |
 | **Permission identifiers** | Button-type menus bind permission identifiers used for `RBAC` authorization |
+
+**RBAC Permission Model**
+
+```mermaid
+graph LR
+    User["User"] -->|"belongs to"| Role["Role"]
+    Role -->|"selects"| Menu["Menu<br/>(Directory / Page / Button)"]
+    Menu -->|"binds"| Perm["Permission ID<br/>system:user:list"]
+
+    API["API Request<br/>(JWT Token)"] --> Check["Permission Check"]
+    Check -->|"reads user roles"| Role
+    Check -->|"matches permission IDs"| Perm
+    Check -->|"✓ pass"| Pass["Normal Response"]
+    Check -->|"✗ deny"| Deny["403 Forbidden"]
+```
 
 ### System Settings
 
@@ -120,6 +168,110 @@ Group scheduled tasks by business domain for easier navigation and permission co
 | **Log list** | View historical execution logs with filtering by task and time range |
 | **Log details** | View the full output and error information for each execution |
 
+### Multi-Tenant Management
+
+> Requires installing and enabling the official `multi-tenant` plugin. When not installed, the host falls back to single-tenant mode (`tenant_id = 0`) — out-of-the-box functionality is not affected.
+
+The `LinaPro` framework natively builds multi-tenant infrastructure into the host layer, including tenant middleware, `bizctx` tenant identity, tenant-aware cache scoping, and plugin governance fields. The `multi-tenant` plugin builds on top of this to provide a complete tenant management console and lifecycle governance capabilities.
+
+**Tenant Management**
+
+| Feature | Description |
+|---------|-------------|
+| **Tenant list** | Paginated view of all tenants with filters for name and status |
+| **Create tenant** | Create a tenant and complete the initial provisioning process |
+| **Edit tenant** | Modify tenant basic info and configuration |
+| **Lifecycle management** | Enable, disable, and delete tenants, executing corresponding lifecycle hooks |
+| **Tenant impersonation** | Platform administrators can enter the workspace as a tenant for troubleshooting |
+
+**Tenant Plugin Governance**
+
+Each tenant can independently control the enabled state of `tenant_scoped` plugins, enabling per-tenant plugin activation:
+
+| Feature | Description |
+|---------|-------------|
+| **Plugin list** | View available plugins and their enabled status for the current tenant |
+| **Enable plugin** | Activate a specific plugin capability for the current tenant |
+| **Disable plugin** | Deactivate a specific plugin capability for the current tenant |
+
+**Multi-Tenant Policy**
+
+| Configuration | Default | Description |
+|---------------|---------|-------------|
+| Isolation model | `pool` | Shared-database isolation based on the `tenant_id` column |
+| User-tenant cardinality | `multi` | A single user can belong to multiple tenants simultaneously |
+| Resolver chain | `override → jwt → session → header → subdomain → default` | Attempts to resolve the current request's tenant context in order |
+| Ambiguity handling | `prompt` | When the tenant cannot be determined, returns a tenant selection prompt |
+
+**Tenant Resolution Flow**
+
+```mermaid
+flowchart LR
+    Request["HTTP Request"] --> Chain
+
+    subgraph Chain["Tenant Resolver Chain (tried in order)"]
+        direction TB
+        R1["override (explicit override)"] --> R2["jwt (tenant_id from token)"]
+        R2 --> R3["session (session cache)"]
+        R3 --> R4["header (X-Tenant-ID)"]
+        R4 --> R5["subdomain"]
+        R5 --> R6["default (fallback tenant_id = 0)"]
+    end
+
+    Chain -->|"resolved"| CTX["bizctx injection<br/>tenant context"]
+    CTX --> Filter["tenant_id column filtering<br/>Pool isolation model"]
+    Filter --> DB[("Shared Database<br/>PostgreSQL")]
+```
+
+### Organization Management
+
+> Requires installing and enabling the official `org-center` plugin.
+
+| Feature | Description |
+|---------|-------------|
+| **Department management** | Tree-structured org chart with multi-level department hierarchy |
+| **Position management** | Define position types for user assignment and permission layering |
+
+### Content Management
+
+> Requires installing and enabling the official `content-notice` plugin.
+
+| Feature | Description |
+|---------|-------------|
+| **Notices & announcements** | Create, edit, publish, and delete announcements with multiple notice types |
+
+### System Monitoring
+
+System monitoring is composed of multiple independent official plugins that can be installed selectively:
+
+**Online Users** (requires `monitor-online` plugin)
+
+| Feature | Description |
+|---------|-------------|
+| **Online user list** | View all currently active sessions in real time |
+| **Force logout** | Terminate a specific user's online session |
+
+**Server Monitor** (requires `monitor-server` plugin)
+
+| Feature | Description |
+|---------|-------------|
+| **Resource collection** | Periodically collect server resource metrics such as `CPU`, memory, and disk |
+| **Monitoring display** | View resource usage trends and current status in the management UI |
+
+**Operation Logs** (requires `monitor-operlog` plugin)
+
+| Feature | Description |
+|---------|-------------|
+| **Log list** | Query user action audit records |
+| **Log details** | Includes request parameters, response results, and operation duration |
+
+**Login Logs** (requires `monitor-loginlog` plugin)
+
+| Feature | Description |
+|---------|-------------|
+| **Log list** | Query user login history |
+| **Log details** | Includes login `IP`, device fingerprint, and login time |
+
 ### Extension Center
 
 **Plugin Management**
@@ -153,19 +305,6 @@ At startup, the host automatically scans the host and all enabled plugins' inter
 | Memory usage | Used memory and total memory |
 | Disk information | Usage for each disk partition |
 | Runtime information | `Go` runtime version, goroutine count, etc. |
-
-## Official Plugin Extensions
-
-The following modules are provided by official plugins. Once a plugin is installed and enabled, its menus are automatically injected into the management workspace — no changes to workspace code required:
-
-| Plugin | Mount location | Menu modules | Key features |
-|--------|---------------|--------------|--------------|
-| `org-center` | Organization | Department management, position management | Hierarchical org chart, position definitions |
-| `content-notice` | Content | Notices & announcements | Announcement CRUD with multiple notice types |
-| `monitor-online` | System monitor | Online users | Real-time session view, force logout |
-| `monitor-server` | System monitor | Server monitor | CPU, memory, and disk metrics |
-| `monitor-operlog` | System monitor | Operation logs | User action audit with request params and duration |
-| `monitor-loginlog` | System monitor | Login logs | Login record query with IP and device fingerprint |
 
 ## How Dynamic Menu Injection Works
 
