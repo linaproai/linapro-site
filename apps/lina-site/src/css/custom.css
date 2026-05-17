@@ -135,6 +135,21 @@
   text-align: center;
 }
 
+.hero-badges {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.hero-badges > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
 .hero-cta {
   margin-top: 28px;
   display: flex;

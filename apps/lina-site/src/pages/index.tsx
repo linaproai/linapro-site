@@ -24,6 +24,26 @@ function HomepageHeader() {
                             description: 'Alt text for the LinaPro logo in the hero',
                         })}
                     />
+
+                    <div className="hero-badges">
+                        <div>
+                            <a href="https://github.com/linaproai/linapro/actions/workflows/main-ci.yml" target="_blank" rel="noopener noreferrer"><img src="https://github.com/linaproai/linapro/actions/workflows/main-ci.yml/badge.svg" alt="LinaPro CI" /></a>
+                            <a href="https://github.com/linaproai/linapro/releases" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/github/v/release/linaproai/linapro?style=flat&v=2" alt="LinaPro Stable Release" /></a>
+                            <a href="https://github.com/linaproai/linapro" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/github/license/linaproai/linapro.svg?style=flat&v=2" alt="LinaPro License" /></a>
+                            <a href="https://github.com/linaproai/linapro" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/badge/production-ready-blue.svg?style=flat" alt="LinaPro Is Production Ready" /></a>
+                        </div>
+                        <div>
+                            <a href="https://vuejs.org/" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/badge/Vue-3.x-42b883.svg" alt="Vue" /></a>
+                            <a href="https://golang.org/" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/badge/Go-1.25+-00ADD8.svg" alt="Go" /></a>
+                            <a href="https://www.typescriptlang.org/" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/badge/TypeScript-5.x-3178C6.svg" alt="TypeScript" /></a>
+                            <a href="https://vitejs.dev/" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/badge/Vite-6.x-646CFF.svg" alt="Vite" /></a>
+                            <a href="https://element-plus.org/" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/badge/Element_Plus-2.x-409EFF.svg" alt="Element Plus" /></a>
+                            <a href="https://tailwindcss.com/" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/badge/Tailwind_CSS-3.x-06B6D4.svg" alt="Tailwind CSS" /></a>
+                            <a href="https://goframe.org/" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/badge/GoFrame-v2-00ADD8.svg" alt="GoFrame" /></a>
+                            <a href="https://github.com/Daymychen/art-design-pro" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/badge/Art_Design_Pro-UI-FF6B6B.svg" alt="Art Design Pro" /></a>
+                        </div>
+                    </div>
+
                 </div>
 
                 <h1 className="hero-title">
@@ -34,7 +54,7 @@ function HomepageHeader() {
 
                 <p className="hero-lead">
                     <Translate id="home.hero.lead" description="Hero lead paragraph">
-                        Building production-grade full-stack applications with AI, with architecture, testing, and governance built in.
+                        Ship production full-stack apps faster — AI-native, governed, and ready from day one.
                     </Translate>
                 </p>
 
