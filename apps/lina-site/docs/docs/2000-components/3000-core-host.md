@@ -186,7 +186,7 @@ flowchart LR
 | `master_only` | 仅主节点执行，适合全局唯一任务 |
 | `all_node` | 每个节点都执行，适合节点本地任务 |
 
-内置任务、执行日志、并发策略和插件任务注册方式见[定时任务](/docs/scheduled-tasks)。
+内置任务、执行日志、并发策略和插件任务注册方式见[定时任务](/docs/cron-tasks)。
 
 ## 国际化运行时
 
@@ -269,7 +269,7 @@ health:
 - [配置管理](/docs/configuration)：宿主运行时配置分组与生产检查项。
 - [接口文档](/docs/api-reference)：宿主和插件统一`OpenAPI`文档聚合。
 - [多租户能力](/docs/multi-tenant)：宿主租户上下文和官方租户控制面。
-- [定时任务](/docs/scheduled-tasks)：持久化调度、内置任务和插件任务。
+- [定时任务](/docs/cron-tasks)：持久化调度、内置任务和插件任务。
 - [I18N国际化](/docs/i18n)：宿主、插件和接口文档语言资源。
 - [双模式插件系统](/docs/plugin-system)：宿主如何治理源码插件和动态插件。
 - [插件管理](/docs/plugin-management)：插件代码来源和运行时管理流程。

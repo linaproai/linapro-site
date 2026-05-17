@@ -250,4 +250,4 @@ flowchart LR
 - **Every iteration has a complete record**, so the architecture does not drift over time
 - **Plugins use a loosely coupled design**, so they can be disabled or uninstalled independently without affecting other modules
 
-Next, read [Plugin Development](/docs/plugin-development) to learn the full development rules for source plugins and `WASM` dynamic plugins, or read [Development Manual](/docs/architecture) for the framework's detailed architecture design.
+Next, read [Source Plugins](/docs/source-plugins) to learn the full development rules for source plugins and `WASM` dynamic plugins, or read [Components](/docs/components) for the framework's detailed architecture design.

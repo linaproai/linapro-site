@@ -139,7 +139,7 @@ session:
   cleanupInterval: 5m
 ```
 
-`session.timeout`决定无活动会话的过期时间，`session.cleanupInterval`决定内置会话清理任务的运行间隔。该清理任务会投影到宿主持久化任务系统中，更多说明见[定时任务](/docs/scheduled-tasks)。
+`session.timeout`决定无活动会话的过期时间，`session.cleanupInterval`决定内置会话清理任务的运行间隔。该清理任务会投影到宿主持久化任务系统中，更多说明见[定时任务](/docs/cron-tasks)。
 
 ## 监控、健康与关停
 

@@ -139,7 +139,7 @@ session:
   cleanupInterval: 5m
 ```
 
-`session.timeout` determines how long an inactive session lives. `session.cleanupInterval` controls how often the built-in session cleanup task runs. This cleanup task is projected into the host's persistent task system — see [Scheduled Tasks](/docs/scheduled-tasks) for details.
+`session.timeout` determines how long an inactive session lives. `session.cleanupInterval` controls how often the built-in session cleanup task runs. This cleanup task is projected into the host's persistent task system — see [Scheduled Tasks](/docs/cron-tasks) for details.
 
 ## Monitoring, Health, and Shutdown
 
