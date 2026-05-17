@@ -1,0 +1,208 @@
+---
+slug: '/docs/source-plugins'
+title: '源码插件'
+hide_title: true
+description: '本文从组件设计和开发实践角度介绍 LinaPro 源码插件，说明源码插件的适用场景、目录结构、plugin.yaml清单、安装SQL、API契约、服务层实现、pluginhost注册、数据库访问、前端页面、事件钩子、运行时升级和最佳实践，帮助开发者用原生Go方式扩展长期业务能力。'
+keywords:
+  - 源码插件
+  - 插件开发
+  - pluginhost
+  - plugin.yaml
+  - 插件目录结构
+  - GoFrame插件
+  - 插件注册
+  - 安装SQL
+  - 运行时升级
+  - 插件前端
+  - 插件DAO
+  - 多租户插件
+  - tenant_id
+  - 菜单声明
+  - 权限声明
+  - 生命周期回调
+  - LinaPro插件
+---
+
+## 基本介绍
+
+源码插件是`LinaPro`推荐的默认扩展方式。它以`Go`源码形式与宿主一起编译部署，使用`pluginhost`注册路由、钩子、定时任务、生命周期回调和治理逻辑，适合长期维护、性能要求高、需要完整工程体验的业务模块。
+
+官方源码插件位于`apps/lina-plugins/`。主仓库通过该目录挂载官方插件工作区；用户项目也在该目录下维护自己的业务插件。
+
+## 适用场景
+
+| 场景 | 是否推荐源码插件 | 原因 |
+|------|------------------|------|
+| 长期业务模块 | 推荐 | 可测试、可审查、性能最好 |
+| 组织、内容、监控等后台能力 | 推荐 | 与宿主权限、菜单、调度和多租户协作紧密 |
+| 运行时热加载 | 不优先 | 源码插件需要重新构建和部署宿主 |
+| 商业二进制分发 | 不优先 | 源码插件通常暴露源码 |
+
+## 标准目录结构
+
+```text
+apps/lina-plugins/<plugin-id>/
+├── plugin.yaml
+├── plugin_embed.go
+├── backend/
+│   ├── api/                         # API DTO与路由契约
+│   ├── internal/
+│   │   ├── controller/              # HTTP控制器
+│   │   ├── service/                 # 业务服务层
+│   │   ├── dao/                     # gf gen dao生成
+│   │   └── model/                   # do/entity模型
+│   └── plugin.go                    # 插件注册入口
+├── frontend/
+│   └── pages/                       # 插件页面
+├── manifest/
+│   ├── sql/                         # 安装与升级SQL
+│   │   ├── mock-data/               # 演示数据，可选
+│   │   └── uninstall/               # 卸载SQL
+│   └── i18n/                        # 插件语言包
+└── README.md
+```
+
+`backend/internal/service/`是插件服务逻辑的固定位置，不要在插件根目录或`backend/`根目录另建`service/`包。
+
+## 插件清单
+
+`plugin.yaml`声明插件身份、运行形态、多租户边界、菜单和权限：
+
+```yaml
+id: content-article
+name: 文章管理
+version: v0.1.0
+type: source
+scope_nature: tenant_aware
+supports_multi_tenant: true
+default_install_mode: tenant_scoped
+description: 提供文章内容的增删改查管理功能
+author: linapro
+license: Apache-2.0
+menus:
+  - key: plugin:content-article:list
+    name: 文章管理
+    path: content-article-list
+    component: system/plugin/dynamic-page
+    perms: content-article:article:view
+    icon: ant-design:file-text-outlined
+    type: M
+    sort: 1
+  - key: plugin:content-article:create
+    parent_key: plugin:content-article:list
+    name: 创建文章
+    perms: content-article:article:create
+    type: B
+```
+
+菜单`key`必须全局唯一，推荐使用`plugin:<plugin-id>:<menu-key>`格式。按钮权限通过`type: B`挂在菜单下，不直接出现在侧边栏中。
+
+## 数据库与SQL
+
+插件安装`SQL`位于`manifest/sql/`，卸载`SQL`位于`manifest/sql/uninstall/`。安装和升级脚本必须幂等，常用`CREATE TABLE IF NOT EXISTS`、`CREATE INDEX IF NOT EXISTS`等写法。
+
+```sql
+CREATE TABLE IF NOT EXISTS content_article_record (
+    "id" BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    "tenant_id" INT NOT NULL DEFAULT 0,
+    "title" VARCHAR(255) NOT NULL DEFAULT '',
+    "content" TEXT NOT NULL DEFAULT '',
+    "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_content_article_record_tenant
+    ON content_article_record ("tenant_id");
+```
+
+需要支持多租户的插件表应包含`tenant_id`列。未启用`multi-tenant`插件时，`tenant_id = 0`表示平台上下文。
+
+## API与服务层
+
+插件`API`定义同样使用`g.Meta`声明路径、方法、权限和文档说明：
+
+```go
+type ArticleListReq struct {
+    g.Meta `path:"/plugins/content-article/article" method:"get" tags:"Article" summary:"List articles" permission:"content-article:article:view"`
+    Page     int `json:"page" v:"min:1"`
+    PageSize int `json:"pageSize" v:"min:1,max:100"`
+}
+```
+
+服务层通过插件自有`DAO`访问数据库。需要租户隔离时，应使用宿主发布的`TenantFilterService`追加租户条件，而不是手写不一致的过滤规则。
+
+## 注册入口
+
+源码插件在`backend/plugin.go`中通过`init()`注册：
+
+```go
+func init() {
+    plugin := pluginhost.NewSourcePlugin("content-article")
+
+    plugin.Assets().UseEmbeddedFiles(contentarticle.EmbeddedFiles)
+
+    plugin.HTTP().RegisterRoutes(
+        pluginhost.ExtensionPointHTTPRouteRegister,
+        pluginhost.CallbackExecutionModeBlocking,
+        registerRoutes,
+    )
+
+    plugin.Cron().RegisterCron(
+        pluginhost.ExtensionPointCronRegister,
+        pluginhost.CallbackExecutionModeBlocking,
+        registerCronJobs,
+    )
+
+    plugin.Lifecycle().RegisterBeforeUpgradeHandler(beforeUpgrade)
+    plugin.Lifecycle().RegisterAfterUpgradeHandler(afterUpgrade)
+
+    pluginhost.RegisterSourcePlugin(plugin)
+}
+```
+
+宿主在插件完整模式下生成聚合入口，空白导入已配置插件，使这些`init()`注册逻辑进入宿主进程。
+
+## 前端页面
+
+源码插件的前端页面位于`frontend/pages/`，由宿主工作台动态页壳加载。插件菜单中的`component`通常使用：
+
+```yaml
+component: system/plugin/dynamic-page
+```
+
+页面可以复用默认工作台的前端生态和设计规范。插件禁用后，宿主菜单接口不再返回该插件入口，工作台侧边栏会自动隐藏。
+
+## 事件钩子与定时任务
+
+源码插件可以订阅宿主事件，例如登录成功、插件启用、系统启动等。钩子可以同步阻断，也可以异步执行，取决于注册时选择的执行模式。
+
+插件也可以注册自己的定时任务处理器，供管理工作台创建任务时选择：
+
+```go
+plugin.Cron().RegisterCron(
+    pluginhost.ExtensionPointCronRegister,
+    pluginhost.CallbackExecutionModeBlocking,
+    func(registry pluginhost.CronRegistry) error {
+        registry.Register("content-article:cleanup", cleanupExpiredArticles)
+        return nil
+    },
+)
+```
+
+## 运行时升级
+
+源码插件文件更新后，宿主会比较数据库中的有效版本和当前发现版本。发现更高版本时，插件进入`pending_upgrade`运行时状态，宿主基础治理能力保持可用，插件业务入口进入受控状态。
+
+管理员在插件管理页执行显式运行时升级。升级流程会重新读取有效清单和目标清单，执行依赖检查、`BeforeUpgrade`回调、插件自定义升级逻辑、升级`SQL`、治理资源同步、有效版本切换和缓存失效。失败后进入`upgrade_failed`，可以查看诊断信息并重试。
+
+这种模型避免把文件覆盖误认为数据和治理资源已经完成升级。
+
+## 最佳实践
+
+- 插件`ID`使用`kebab-case`，数据库表前缀使用对应的`snake_case`。
+- 安装和升级`SQL`必须幂等，避免保留数据后重新安装失败。
+- 服务逻辑放在`backend/internal/service/`。
+- 插件只使用`pluginhost`和`pluginservice`等稳定契约，不直接依赖宿主`internal/`包。
+- 多租户插件表预留`tenant_id`列，并使用宿主租户过滤服务。
+- 菜单和按钮权限一并声明，避免页面可见但操作权限缺失。
+- 卸载时区分治理记录、数据库数据和文件数据，避免误删。
+

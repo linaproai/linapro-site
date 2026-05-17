@@ -25,7 +25,7 @@ keywords:
 - **[AI规范驱动开发](/docs/spec-driven-development)**：基于规范先于代码的理念，通过规范驱动工作流将每次迭代的设计决策和实现过程固化为持久化文档，确保代码、文档和测试在同一轮迭代中同步产生，从根本上防止架构漂移。推荐使用`OpenSpec`作为工作流的实现工具。
 
 
-## 相关文档
+## 相关内容
 
 import DocCardList from '@theme/DocCardList';
 

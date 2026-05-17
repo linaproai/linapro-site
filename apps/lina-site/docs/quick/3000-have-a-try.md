@@ -250,4 +250,4 @@ flowchart LR
 - **每次迭代都有完整记录**，架构不会随时间漂移
 - **插件采用松耦合设计**，可以随时单独禁用或卸载，不影响其他模块
 
-接下来，你可以参考[扩展开发](../docs/4000-plugin-development/4000-plugin-development.md)文档深入了解源码插件和`WASM`动态插件的完整开发规范，或者查看[开发手册](../docs/2000-architecture/2000-architecture.md)了解框架的详细架构设计。
+接下来，你可以阅读[组件设计](/docs/components)建立整体组件地图，再深入查看[源码插件](/docs/source-plugins)、[WASM动态插件](/docs/wasm-plugins)和[核心宿主服务](/docs/core-host)等页面，理解框架的扩展方式和架构边界。

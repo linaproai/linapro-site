@@ -34,7 +34,7 @@ function HomepageHeader() {
 
                 <p className="hero-lead">
                     <Translate id="home.hero.lead" description="Hero lead paragraph">
-                        Building production-grade full-stack applications with AI, while keeping architecture, testing, and governance under control.
+                        Building production-grade full-stack applications with AI, with architecture, testing, and governance built in.
                     </Translate>
                 </p>
 
@@ -344,7 +344,7 @@ const strengths = [
         ),
         desc: (
             <Translate id="home.strength.workflow.desc" description="Strength 1 desc">
-                AI advances from exploration through archiving against verified specs, keeping requirements, code, and tests continuously aligned.
+                Verified specs guide AI from discovery to release, keeping requirements, code, and tests aligned.
             </Translate>
         ),
     },
@@ -358,7 +358,7 @@ const strengths = [
         ),
         desc: (
             <Translate id="home.strength.skills.desc" description="Strength skills desc">
-                A built-in library of AI skills for code assistance, review, test generation, and workflow automation — composable and extensible to any project.
+                Reusable AI skills handle coding, review, tests, and automation across every project.
             </Translate>
         ),
     },
@@ -372,7 +372,7 @@ const strengths = [
         ),
         desc: (
             <Translate id="home.strength.coupling.desc" description="Strength 2 desc">
-                Modules depend on interfaces instead of hard dependencies, so each can be enabled, replaced, or retired without full-stack rewrites.
+                Interface-based modules can be enabled, replaced, or removed without full-stack rewrites.
             </Translate>
         ),
     },
@@ -386,7 +386,7 @@ const strengths = [
         ),
         desc: (
             <Translate id="home.strength.plugins.desc" description="Strength 3 desc">
-                Source plugins handle deep extensions; WASM plugins hot-load at runtime — both run in isolated sandboxes with namespaced resource access.
+                Source plugins handle deep extension; WASM plugins hot-load with sandboxed resources.
             </Translate>
         ),
     },
@@ -400,7 +400,7 @@ const strengths = [
         ),
         desc: (
             <Translate id="home.strength.contract.desc" description="Strength contract desc">
-                Service APIs, OpenAPI docs, and permission metadata share one model with the workspace, so all interfaces stay documented and testable.
+                APIs, docs, permissions, and workspace screens share one documented, testable model.
             </Translate>
         ),
     },
@@ -414,7 +414,7 @@ const strengths = [
         ),
         desc: (
             <Translate id="home.strength.i18n.desc" description="Strength localization desc">
-                The host, plugins, and API docs share translation resources, with file-based language packs, missing-key checks, and runtime caching.
+                Host, plugins, and API docs share language packs, checks, and runtime caches.
             </Translate>
         ),
     },
@@ -428,7 +428,7 @@ const strengths = [
         ),
         desc: (
             <Translate id="home.strength.distributed.desc" description="Strength 5 desc">
-                Permission sync, locks, and caching are cluster-aware by default, letting a single node scale to a full cluster without code changes.
+                Cluster-aware sync, locks, and caching let one node scale out without code changes.
             </Translate>
         ),
     },
@@ -442,7 +442,7 @@ const strengths = [
         ),
         desc: (
             <Translate id="home.strength.multitenant.desc" description="Strength multitenant desc">
-                Tenant middleware, identity context, and governance hooks are built into the host core, with automatic fallback to single-tenant mode.
+                Tenant context and governance hooks live in core, with single-tenant fallback built in.
             </Translate>
         ),
     },
@@ -456,7 +456,7 @@ const strengths = [
         ),
         desc: (
             <Translate id="home.strength.builtin.desc" description="Strength 6 desc">
-                JWT, declarative RBAC, forced logout, and IP/device auditing are built in, with permission changes applied in seconds from day one.
+                JWT, RBAC, forced logout, and device auditing ship ready for day-one operations.
             </Translate>
         ),
     },
@@ -468,7 +468,7 @@ function Strengths() {
             <div className="container">
                 <h2 className="section-title">
                     <Translate id="home.strengths.title" description="Strengths section title">
-                        Framework Highlights
+                        Highlights
                     </Translate>
                 </h2>
                 <p className="section-lead">

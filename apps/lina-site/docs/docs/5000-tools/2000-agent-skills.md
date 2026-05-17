@@ -32,7 +32,7 @@ keywords:
 
 | 技能名称 | 适用场景 | 必要依赖 |
 |---------|---------|---------|
-| `openspec` | 可选的规范驱动工作流工具，推荐配合使用 | 建议安装 |
+| `openspec` | 可选的规范驱动工作流工具，推荐配合使用 | 强烈建议安装 |
 | `goframe-v2` | `GoFrame`专属`AI`技能，提升后端代码生成质量 | 建议安装 |
 | `find-skills` | `AI`技能市场搜索工具，辅助技能选型 | 建议安装 |
 | `frontend-design` | 创作高品质、有辨识度的前端界面 | 无 |
@@ -40,8 +40,8 @@ keywords:
 | `git-commit-push` | 生成规范提交信息并推送到远端 | 无 |
 | `git-worktree` | 创建独立`Git`工作树隔离开发任务 | 无 |
 | `karpathy-guidelines` | 减少`AI`编码错误的行为守则 | 无 |
-| `lina-archive-consolidate` | 聚合`OpenSpec`归档迭代为统一目录 | 无 |
-| `lina-auto-archive` | 自动扫描并归档已完成的`OpenSpec`变更 | 需安装`OpenSpec CLI` |
+| `lina-archive-consolidate` | 聚合`OpenSpec`归档迭代为统一目录（通常用于CI自动化） | 无 |
+| `lina-auto-archive` | 自动扫描并归档已完成的`OpenSpec`变更（通常用于CI自动化） | 需安装`OpenSpec CLI` |
 | `lina-e2e` | `E2E`测试用例命名规范与管理标准 | 需安装`Playwright` |
 | `lina-feedback` | 追踪并修复`OpenSpec`变更后报告的问题 | 无 |
 | `lina-perf-audit` | 全面的后端`API`性能审计（手动触发） | 需运行中的`LinaPro`服务 |
@@ -52,9 +52,6 @@ keywords:
 | `openspec-archive-change` | 归档完成的`OpenSpec`变更 | 需安装`OpenSpec CLI` |
 | `playwright-cli` | 浏览器自动化交互与`Playwright`测试 | 需安装`Playwright` |
 
-:::info 说明
-源码和运维说明中提到的`lina-upgrade`用于框架与源码插件升级治理。当前仓库会在检测到已安装源码插件存在待升级版本时提示通过`AI`工具调用`lina-upgrade`，但该技能不在`.agents/skills/`项目内置目录中；请以你所使用的`AI`工具侧技能配置为准。
-:::
 
 ## 如何使用技能
 
