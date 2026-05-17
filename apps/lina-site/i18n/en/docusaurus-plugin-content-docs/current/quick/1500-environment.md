@@ -41,7 +41,6 @@ LinaPro depends on the following components during source development. Install t
 | `Node.js` | `20.19+` | Frontend build environment |
 | `pnpm` | `10.0+` | Frontend package manager |
 | `PostgreSQL` | `14+` | Default relational database |
-| `Make` | - | Project command entrypoint |
 
 ### Git
 
