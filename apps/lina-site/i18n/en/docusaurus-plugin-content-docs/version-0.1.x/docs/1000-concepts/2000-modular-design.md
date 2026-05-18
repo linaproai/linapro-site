@@ -2,17 +2,12 @@
 slug: '/docs/modular-design'
 title: 'Modular Design'
 hide_title: true
-description: 'An exploration of LinaPro modular design — how the leanness principle (keep the core minimal, extend through plugins), domain-bounded built-in capabilities, a first-class plugin system, stable extension seams, and real-world examples like cloud storage and LDAP/OIDC authentication let developers assemble systems from proven building blocks rather than building everything from scratch.'
+description: 'An exploration of LinaPro modular design — how domain-bounded built-in capabilities, first-class plugin system, stable extension seams, and lifecycle-managed modules let developers assemble systems from proven building blocks rather than building everything from scratch.'
 keywords:
   - modular design
-  - leanness principle
   - building blocks
   - decoupled design
   - plugin ecosystem
-  - plugin extension
-  - storage backend plugin
-  - authentication plugin
-  - interface abstraction
   - module lifecycle
   - composable modules
   - pluggable
@@ -40,18 +35,6 @@ Each module is a complete, self-contained functional unit that can be installed,
 - **Frontend and backend are modularized together**: Each plugin ships its own backend service, frontend pages, database resources, and permission declarations as a single, coherent module unit — not as two separate halves. Installing a plugin means installing a fully self-contained capability.
 
 - **Stable extension seams**: The host exposes well-defined extension points to plugins. Plugins can only interact with the host through these seams — registering routes, responding to events, filtering menus, and so on — and can never reach into the host's internal implementation. This boundary design keeps inter-module dependencies clear and controlled, so the host can evolve internally without accidentally breaking existing plugins.
-
-## The Leanness Principle
-
-`LinaPro`'s core framework follows one simple design rule: **only keep what is truly core and universal — anything that can be provided by a plugin should be provided by a plugin**.
-
-The main framework is not a container for features; it is a stable capability foundation. As business requirements grow, the path forward is to enrich the plugin ecosystem with new plugins — not to pile new implementations into the framework itself. This keeps the framework lean, its core logic manageable, and its external evolution predictable.
-
-**Cloud storage is a practical example**: to integrate Qiniu Cloud or `AWS S3` object storage, the concrete integration logic does not live inside the framework. Instead, a dedicated storage plugin provides the implementation. Once the plugin is enabled, file writes are automatically routed to the cloud; the framework's only role in this is **defining the storage interface abstraction**. That abstraction layer lets different storage backends be swapped in seamlessly, with callers completely unaware of the underlying change.
-
-**Authentication follows the same principle**: integrating protocols like `LDAP` or `OIDC` means the framework exposes only a thin authentication interface. The actual protocol handshake and user-mapping logic live in the plugin. This division of responsibility means the framework never grows heavier with each new third-party integration, and developers can extend authentication methods on their own schedule without waiting for a framework release.
-
-This principle is the foundation of `LinaPro`'s plugin ecosystem: **the framework provides interface-level abstractions; plugins provide composable concrete implementations**. Each stays within its own boundary, and together they let the system handle diverse requirements while remaining architecturally clean.
 
 ## Building Blocks vs. Building From Scratch
 

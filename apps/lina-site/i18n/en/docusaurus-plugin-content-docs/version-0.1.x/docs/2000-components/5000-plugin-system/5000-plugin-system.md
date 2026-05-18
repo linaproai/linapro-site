@@ -34,17 +34,6 @@ The plugin system is `LinaPro`'s core extension mechanism for business capabilit
 
 The two modes differ in runtime form, but share the same plugin governance plane. The admin side sees the same plugin lifecycle, dependencies, permissions, status, and multi-tenant policies.
 
-## Plugins Don't Have to Include a Frontend
-
-`LinaPro`'s plugin system does not require every plugin to provide a frontend page. Whether a plugin solves the problem depends not on whether it has a UI, but on whether it implements the extension capability the host needs.
-
-Many plugins deliver their full value by extending backend behavior, with no user interface at all. Common examples include:
-
-- **Storage backend plugins**: Integrate Qiniu Cloud, `AWS S3`, or other object storage services, taking over the framework's file upload and read logic. Once enabled, the framework's file storage behavior switches automatically — no changes to any calling code, and no visible impact on the frontend.
-- **Authentication provider plugins**: Connect `LDAP` directory services or `OIDC` identity providers to extend the user login experience. The framework calls the plugin's concrete implementation through the authentication interface, making the underlying protocol completely transparent to the business layer.
-
-For this kind of backend-only plugin, the `menus` field in `plugin.yaml` is typically empty. The plugin simply registers `HTTP` routes or implements the host's extension point interfaces via `pluginhost`, and the framework consumes the plugin's capabilities through interface calls. Frontend and backend modularity are two natural choices within the same plugin model — not a requirement imposed on every plugin.
-
 ## Why Two Modes?
 
 A single plugin form cannot simultaneously satisfy development efficiency, runtime performance, hot-loading, and commercial distribution.

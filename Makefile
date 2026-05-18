@@ -191,7 +191,9 @@ version:
 		yarn --cwd "$$SITE_DIR" install; \
 	fi; \
 	echo "Archiving $$SITE_NAME docs as version $$VERSION..."; \
-	cd "$$SITE_DIR" && yarn run docusaurus docs:version "$$VERSION"
+	cd "$$SITE_DIR" && yarn run docusaurus docs:version "$$VERSION"; \
+	echo "Syncing versioned i18n docs for $$VERSION..."; \
+	node "$$SITE_DIR/scripts/sync-versioned-i18n-docs.js" "$$VERSION"
 
 ## image: 将 docs/blog/i18n 中被引用的本地内容图片转换为 WebP，并更新引用、删除安全的原图 [IMAGE_FLAGS=--dry-run|--include-static] [WEBP_INCLUDE_STATIC=1|0] [WEBP_LOSSLESS=1|0] [WEBP_QUALITY=1-100]
 # 默认使用无损 WebP，避免降低图片质量；只有 WEBP_LOSSLESS=0 时 WEBP_QUALITY 才用于有损压缩。

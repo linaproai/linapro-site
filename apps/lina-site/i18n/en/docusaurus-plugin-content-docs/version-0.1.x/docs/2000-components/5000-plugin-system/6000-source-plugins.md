@@ -1,0 +1,206 @@
+---
+slug: '/docs/source-plugins'
+title: 'Source Plugins'
+hide_title: true
+description: 'A component-level and developer-practice guide to LinaPro source plugins — use cases, directory structure, plugin.yaml manifest, installation SQL, API contracts, service layer implementation, pluginhost registration, database access, frontend pages, event hooks, runtime upgrades, and best practices for extending long-term business capabilities with native Go.'
+keywords:
+  - source plugins
+  - plugin development
+  - pluginhost
+  - plugin.yaml
+  - plugin directory structure
+  - GoFrame plugin
+  - plugin registration
+  - installation SQL
+  - runtime upgrade
+  - plugin frontend
+  - plugin DAO
+  - multi-tenant plugins
+  - tenant_id
+  - menu declarations
+  - permission declarations
+  - lifecycle callbacks
+---
+
+## Introduction
+
+Source plugins are `LinaPro`'s recommended default extension method. They are compiled and deployed together with the host as `Go` source code, using `pluginhost` to register routes, hooks, scheduled tasks, lifecycle callbacks, and governance logic. They are suited for long-term business modules that require high performance and a complete engineering experience.
+
+Official source plugins live in `apps/lina-plugins/`. The main repository mounts the official plugin workspace through this directory. User projects also maintain their own business plugins here.
+
+## When to Use
+
+| Scenario | Recommended? | Reason |
+|----------|-------------|--------|
+| Long-term business modules | Yes | Testable, auditable, best performance |
+| Organization, content, monitoring capabilities | Yes | Tight integration with host permissions, menus, scheduling, and multi-tenancy |
+| Runtime hot-loading | Not preferred | Source plugins require rebuilding and redeploying the host |
+| Commercial binary distribution | Not preferred | Source plugins typically expose source code |
+
+## Standard Directory Structure
+
+```text
+apps/lina-plugins/<plugin-id>/
+├── plugin.yaml
+├── plugin_embed.go
+├── backend/
+│   ├── api/                         # API DTOs and route contracts
+│   ├── internal/
+│   │   ├── controller/              # HTTP controllers
+│   │   ├── service/                 # Business service layer
+│   │   ├── dao/                     # gf gen dao generated
+│   │   └── model/                   # do/entity models
+│   └── plugin.go                    # Plugin registration entry
+├── frontend/
+│   └── pages/                       # Plugin pages
+├── manifest/
+│   ├── sql/                         # Installation and upgrade SQL
+│   │   ├── mock-data/               # Demo data, optional
+│   │   └── uninstall/               # Uninstall SQL
+│   └── i18n/                        # Plugin language packs
+└── README.md
+```
+
+`backend/internal/service/` is the fixed location for plugin service logic. Do not create a `service/` package at the plugin root or `backend/` root.
+
+## Plugin Manifest
+
+`plugin.yaml` declares plugin identity, runtime form, multi-tenant boundaries, menus, and permissions:
+
+```yaml
+id: content-article
+name: 文章管理
+version: v0.1.0
+type: source
+scope_nature: tenant_aware
+supports_multi_tenant: true
+default_install_mode: tenant_scoped
+description: 提供文章内容的增删改查管理功能
+author: linapro
+license: Apache-2.0
+menus:
+  - key: plugin:content-article:list
+    name: 文章管理
+    path: content-article-list
+    component: system/plugin/dynamic-page
+    perms: content-article:article:view
+    icon: ant-design:file-text-outlined
+    type: M
+    sort: 1
+  - key: plugin:content-article:create
+    parent_key: plugin:content-article:list
+    name: 创建文章
+    perms: content-article:article:create
+    type: B
+```
+
+Menu `key` values must be globally unique. Use the `plugin:<plugin-id>:<menu-key>` format. Button permissions are attached under menus via `type: B` and do not appear in the sidebar directly.
+
+## Database and SQL
+
+Installation SQL is located in `manifest/sql/`, and uninstall SQL in `manifest/sql/uninstall/`. Installation and upgrade scripts must be idempotent — use `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`, and similar patterns.
+
+```sql
+CREATE TABLE IF NOT EXISTS content_article_record (
+    "id" BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    "tenant_id" INT NOT NULL DEFAULT 0,
+    "title" VARCHAR(255) NOT NULL DEFAULT '',
+    "content" TEXT NOT NULL DEFAULT '',
+    "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_content_article_record_tenant
+    ON content_article_record ("tenant_id");
+```
+
+Plugin tables that need multi-tenant support should include a `tenant_id` column. When the `multi-tenant` plugin is not enabled, `tenant_id = 0` represents the platform context.
+
+## API and Service Layer
+
+Plugin API definitions also use `g.Meta` to declare paths, methods, permissions, and documentation:
+
+```go
+type ArticleListReq struct {
+    g.Meta `path:"/plugins/content-article/article" method:"get" tags:"Article" summary:"List articles" permission:"content-article:article:view"`
+    Page     int `json:"page" v:"min:1"`
+    PageSize int `json:"pageSize" v:"min:1,max:100"`
+}
+```
+
+The service layer accesses the database through the plugin's own `DAO`. When tenant isolation is needed, use the host-published `TenantFilterService` to append tenant conditions rather than hand-writing inconsistent filter rules.
+
+## Registration Entry
+
+Source plugins register in `backend/plugin.go` through `init()`:
+
+```go
+func init() {
+    plugin := pluginhost.NewSourcePlugin("content-article")
+
+    plugin.Assets().UseEmbeddedFiles(contentarticle.EmbeddedFiles)
+
+    plugin.HTTP().RegisterRoutes(
+        pluginhost.ExtensionPointHTTPRouteRegister,
+        pluginhost.CallbackExecutionModeBlocking,
+        registerRoutes,
+    )
+
+    plugin.Cron().RegisterCron(
+        pluginhost.ExtensionPointCronRegister,
+        pluginhost.CallbackExecutionModeBlocking,
+        registerCronJobs,
+    )
+
+    plugin.Lifecycle().RegisterBeforeUpgradeHandler(beforeUpgrade)
+    plugin.Lifecycle().RegisterAfterUpgradeHandler(afterUpgrade)
+
+    pluginhost.RegisterSourcePlugin(plugin)
+}
+```
+
+The host generates an aggregation entry in plugin-complete mode, blank-importing configured plugins so their `init()` registration logic enters the host process.
+
+## Frontend Pages
+
+Source plugin frontend pages live in `frontend/pages/` and are loaded by the host workspace's dynamic page shell. The `component` field in plugin menus typically uses:
+
+```yaml
+component: system/plugin/dynamic-page
+```
+
+Pages can reuse the default workspace's frontend ecosystem and design conventions. When a plugin is disabled, the host menu API no longer returns that plugin's entry, and the workspace sidebar hides it automatically.
+
+## Event Hooks and Scheduled Tasks
+
+Source plugins can subscribe to host events — for example, login success, plugin enablement, and system startup. Hooks can be synchronous-blocking or asynchronous, depending on the execution mode chosen at registration.
+
+Plugins can also register their own scheduled task handlers for administrators to select when creating tasks in the admin workspace:
+
+```go
+plugin.Cron().RegisterCron(
+    pluginhost.ExtensionPointCronRegister,
+    pluginhost.CallbackExecutionModeBlocking,
+    func(registry pluginhost.CronRegistry) error {
+        registry.Register("content-article:cleanup", cleanupExpiredArticles)
+        return nil
+    },
+)
+```
+
+## Runtime Upgrade
+
+After source plugin files are updated, the host compares the active version in the database with the currently discovered version. When a higher version is found, the plugin enters the `pending_upgrade` runtime state. Host base governance capabilities remain available, while plugin business entry points enter a controlled state.
+
+The administrator executes an explicit runtime upgrade in the plugin management page. The upgrade flow re-reads the active and target manifests, runs dependency checks, `BeforeUpgrade` callbacks, plugin custom upgrade logic, upgrade `SQL`, governance resource synchronization, active version switching, and cache invalidation. On failure, it enters `upgrade_failed` — diagnostics can be reviewed and the upgrade retried.
+
+This model prevents file overwrites from being mistaken for completed data and governance resource upgrades.
+
+## Best Practices
+
+- Use `kebab-case` for plugin `ID` and the corresponding `snake_case` for database table prefixes.
+- Installation and upgrade `SQL` must be idempotent — avoid failures when reinstalling with retained data.
+- Place service logic in `backend/internal/service/`.
+- Use only stable contracts like `pluginhost` and `pluginservice` — do not depend on host `internal/` packages directly.
+- Reserve a `tenant_id` column in multi-tenant plugin tables and use the host tenant filter service.
+- Declare menus and button permissions together to avoid pages being visible but operations lacking permission.
+- Distinguish governance records, database data, and file data during uninstallation to avoid accidental deletion.
