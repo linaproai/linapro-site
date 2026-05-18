@@ -1,4 +1,4 @@
-const LATEST_VERSION_LABEL = 'v0.1.x(Latest)';
+const LATEST_VERSION_LABEL = '0.2.x(Latest)';
 
 import type { Options as IdealImageOptions } from '@docusaurus/plugin-ideal-image';
 import type * as Preset from '@docusaurus/preset-classic';

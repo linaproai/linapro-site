@@ -7,6 +7,15 @@ SITE_DEFAULT_HOST ?= 127.0.0.1
 SITE_DEFAULT_PORT ?= 3000
 SITE_DEFAULT_LOCALE ?= zh-Hans
 
+ifneq ($(filter version,$(MAKECMDGOALS)),)
+VERSION_ARG := $(word 2,$(MAKECMDGOALS))
+ifneq ($(VERSION_ARG),)
+.PHONY: $(VERSION_ARG)
+$(VERSION_ARG):
+	@:
+endif
+endif
+
 ## dev: 启动官网本地开发服务
 .PHONY: dev
 dev:
@@ -160,6 +169,29 @@ build:
 	echo "Building $$SITE_NAME with $$PACKAGE_MANAGER..."; \
 	eval "$$BUILD_CMD"; \
 	echo "Build complete: $$SITE_DIR/build/"
+
+## version: 归档当前文档为指定版本，用法：make version 0.1.x
+.PHONY: version
+version:
+	@set -e; \
+	SITE_DIR="$(SITE_DIR)"; \
+	SITE_NAME="$(SITE_NAME)"; \
+	VERSION="$(VERSION_ARG)"; \
+	if [ -z "$$VERSION" ]; then \
+		echo "Usage: make version <version>"; \
+		exit 1; \
+	fi; \
+	[ -f "$$SITE_DIR/package.json" ] || { echo "Error: missing $$SITE_DIR/package.json"; exit 1; }; \
+	if ! command -v yarn >/dev/null 2>&1; then \
+		echo "Error: yarn is required"; \
+		exit 1; \
+	fi; \
+	if [ ! -x "$$SITE_DIR/node_modules/.bin/docusaurus" ]; then \
+		echo "Installing $$SITE_NAME dependencies with yarn..."; \
+		yarn --cwd "$$SITE_DIR" install; \
+	fi; \
+	echo "Archiving $$SITE_NAME docs as version $$VERSION..."; \
+	cd "$$SITE_DIR" && yarn run docusaurus docs:version "$$VERSION"
 
 ## image: 将 docs/blog/i18n 中被引用的本地内容图片转换为 WebP，并更新引用、删除安全的原图 [IMAGE_FLAGS=--dry-run|--include-static] [WEBP_INCLUDE_STATIC=1|0] [WEBP_LOSSLESS=1|0] [WEBP_QUALITY=1-100]
 # 默认使用无损 WebP，避免降低图片质量；只有 WEBP_LOSSLESS=0 时 WEBP_QUALITY 才用于有损压缩。
