@@ -53,9 +53,12 @@ The demo site is read-only, so data cannot be modified, but you can still explor
 Run the following commands locally to start the complete demo image:
 
 ```bash
+# Create a temporary directory
 mkdir linapro-demo && cd linapro-demo
+# Download the config file and Docker Compose file
 curl -o config.yaml https://raw.githubusercontent.com/linaproai/linapro/refs/heads/main/hack/deploy/config.yaml
 curl -o docker-compose.yaml https://raw.githubusercontent.com/linaproai/linapro/refs/heads/main/hack/deploy/docker-compose.yaml
+# Start the service
 docker compose up
 ```
 
@@ -207,5 +210,5 @@ Official source plugins live in `apps/lina-plugins/`, mounted as a `Git submodul
 | **Frontend framework** | `Vue 3` | Based on the Vben 5 admin template |
 | **Frontend UI** | `Ant Design Vue` | Enterprise-grade `UI` component library |
 | **Build tool** | `Vite` | Fast frontend builds |
-| **Data storage** | `PostgreSQL` / optional `SQLite` | `PostgreSQL 14+` is the default data store; `SQLite` is available for local demos or smoke testing |
+| **Data storage** | `PostgreSQL` | `PostgreSQL 14+` is the default data store |
 | **Plugin runtime** | `WebAssembly` | `tetratelabs/wazero`, powers `WASM` dynamic plugins |

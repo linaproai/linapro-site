@@ -53,9 +53,12 @@ keywords:
 可以在本地使用以下指令运行完整的演示镜像：
 
 ```bash
+# 创建临时目录
 mkdir linapro-demo && cd linapro-demo
+# 下载配置文件和 Docker Compose 文件
 curl -o config.yaml https://raw.githubusercontent.com/linaproai/linapro/refs/heads/main/hack/deploy/config.yaml
 curl -o docker-compose.yaml https://raw.githubusercontent.com/linaproai/linapro/refs/heads/main/hack/deploy/docker-compose.yaml
+# 启动服务
 docker compose up
 ```
 
@@ -207,5 +210,5 @@ graph TB
 | **前端框架** | `Vue 3` | 基于`Vben 5`管理台模板 |
 | **前端 `UI`** | `Ant Design Vue` | 企业级 `UI` 组件库 |
 | **构建工具** | `Vite` | 极速前端构建 |
-| **数据存储** | `PostgreSQL` / 可选`SQLite` | `PostgreSQL 14+`为默认数据存储；`SQLite`可用于本地演示或冒烟验证 |
+| **数据存储** | `PostgreSQL` | `PostgreSQL 14+`为默认数据存储 |
 | **插件运行时** | `WebAssembly` | `tetratelabs/wazero`，支持`WASM`动态插件 |
