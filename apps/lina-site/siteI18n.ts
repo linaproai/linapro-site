@@ -2,6 +2,14 @@ export const DEFAULT_LOCALE = 'en';
 
 export const SITE_LOCALES = ['en', 'zh-Hans'] as const;
 
+// 语言自动检测配置
+export const LOCALE_DETECTION_CONFIG = {
+  // 是否启用自动语言检测
+  enabled: true,
+  // localStorage 中存储用户语言偏好的 key
+  storageKey: 'user-locale-preference',
+} as const;
+
 type SiteLocale = (typeof SITE_LOCALES)[number];
 
 type SiteSeo = {
