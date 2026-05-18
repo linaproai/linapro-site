@@ -10,6 +10,7 @@ import {
   SITE_LOCALE_CONFIGS,
   SITE_LOCALES,
   getCurrentSiteSeo,
+  LOCALE_DETECTION_CONFIG,
 } from './siteI18n';
 
 const siteSeo = getCurrentSiteSeo();
@@ -41,6 +42,10 @@ function mermaidServerBundleAliasPlugin(): Plugin {
 // https://docusaurus.io/docs/api/plugins/@docusaurus/plugin-content-docs#markdown-front-matter
 // https://docusaurus.io/zh-CN/docs/api/docusaurus-config
 const config: Config = {
+  // 客户端模块配置
+  clientModules: LOCALE_DETECTION_CONFIG.enabled
+    ? [require.resolve('./src/clientModules/localeDetection')]
+    : [],
   title: siteSeo.title,
   tagline: siteSeo.tagline,
   favicon: '/favicon.ico',

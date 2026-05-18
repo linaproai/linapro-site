@@ -8,6 +8,7 @@
     "start-en": "cross-env NODE_OPTIONS=--max-old-space-size=8192 docusaurus start --locale en",
     "start-zh": "cross-env NODE_OPTIONS=--max-old-space-size=8192 docusaurus start --locale zh-Hans",
     "build": "cross-env NODE_OPTIONS=--max-old-space-size=8192 docusaurus build",
+    "preview": "cross-env NODE_OPTIONS=--max-old-space-size=8192 docusaurus build && docusaurus serve",
     "swizzle": "docusaurus swizzle",
     "deploy": "docusaurus deploy",
     "clear": "docusaurus clear",
