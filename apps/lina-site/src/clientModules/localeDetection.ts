@@ -138,24 +138,27 @@ function redirectToLocale(targetLocale: SupportedLocale): void {
 function initLocaleDetection(): void {
   if (!ExecutionEnvironment.canUseDOM) return;
   
+  // 获取当前页面语言
+  const currentLocale = getCurrentLocale();
+  
   // 1. 检查用户是否已有保存的语言偏好
   const savedLocale = getSavedLocalePreference();
   if (savedLocale) {
-    // 用户已有偏好，直接使用，不执行自动检测
+    // 用户有偏好，检查当前页面是否匹配，不匹配则重定向
+    if (savedLocale !== currentLocale) {
+      redirectToLocale(savedLocale);
+    }
     return;
   }
   
-  // 2. 检测浏览器语言
+  // 2. 没有保存的偏好，检测浏览器语言
   const detectedLocale = detectBrowserLocale();
   if (!detectedLocale) {
     // 无法检测到语言，使用默认语言
     return;
   }
   
-  // 3. 获取当前页面语言
-  const currentLocale = getCurrentLocale();
-  
-  // 4. 如果检测到的语言与当前语言不同，执行重定向
+  // 3. 如果检测到的语言与当前语言不同，执行重定向
   if (detectedLocale !== currentLocale) {
     // 保存检测到的语言偏好，避免重复检测
     saveLocalePreference(detectedLocale);
