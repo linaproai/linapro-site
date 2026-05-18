@@ -174,16 +174,15 @@ function setupLocaleChangeListener(): void {
   document.addEventListener('click', (event) => {
     const target = event.target as HTMLElement;
     
-    // 检查是否点击了语言切换按钮
-    // Docusaurus 的 localeDropdown 会生成带有特定属性的链接
-    const localeLink = target.closest('a[href*="/"], a[href*="/zh/"]');
+    // Docusaurus localeDropdown 链接带有 lang 属性（对应 localeConfigs.htmlLang）
+    // 英文为 en-US，中文为 zh-CN，通过 lang 属性可靠识别，不依赖 href 前缀
+    const localeLink = target.closest('a[lang]');
     if (localeLink) {
-      const href = localeLink.getAttribute('href');
-      if (href) {
-        // 根据 href 判断目标语言
-        if (href.startsWith('/zh/') || href === '/zh') {
+      const lang = localeLink.getAttribute('lang');
+      if (lang) {
+        if (lang.startsWith('zh')) {
           saveLocalePreference('zh-Hans');
-        } else if (href === '/' || href.startsWith('/en/') || href === '/en') {
+        } else if (lang.startsWith('en')) {
           saveLocalePreference('en');
         }
       }
