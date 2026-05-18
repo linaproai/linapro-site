@@ -44,16 +44,12 @@ git clone --depth 1 --branch v0.1.0 https://github.com/linaproai/linapro.git lin
 `LinaPro` uses `PostgreSQL 14+` as its default database. `make init` and `make dev` do not start or manage the database, so prepare a reachable `PostgreSQL` instance first. For local development, you can use this container:
 
 ```bash
-docker run --name linapro-postgres \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=linapro \
+docker run \
   -p 5432:5432 \
-  --health-cmd pg_isready \
-  --health-interval 10s \
-  --health-timeout 5s \
-  --health-retries 5 \
-  -d postgres:14-alpine
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_DB=linapro \
+  postgres:14-alpine
 ```
 
 If local port `5432` is already occupied, map the container to another host port, such as `15432:5432`, and update the port in `database.default.link`.
