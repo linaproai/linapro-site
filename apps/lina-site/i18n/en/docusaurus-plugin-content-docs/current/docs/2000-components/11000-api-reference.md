@@ -1,6 +1,6 @@
 ---
 slug: '/docs/api-reference'
-title: 'OpenAPI Interface Documentation'
+title: 'OpenAPI Reference'
 hide_title: true
 description: 'From a component design perspective, this page explains how LinaPro aggregates API documentation — the core host, source plugins, and WASM dynamic plugins are unified into a single OpenAPI document through g.Meta contracts, permission tags, API doc i18n resources, the in-workspace developer center debugging page, and third-party tool import.'
 keywords:
@@ -35,7 +35,7 @@ The default access path is controlled by `server.extensions.apiDocPath` in `conf
 http://localhost:8080/api.json
 ```
 
-The management workspace consumes the same document under **Developer Center → API Documentation**, providing a browsing and debugging entry point.
+The admin workspace consumes the same document under **Developer Center → API Documentation**, providing a browsing and debugging entry point.
 
 ## Aggregation Scope
 
@@ -81,7 +81,7 @@ type ArticleListRes struct {
 
 The `permission:"content-article:article:view"` here flows into the API documentation and also forms a consistent audit scope with the `RBAC` permission system. Do not use legacy or non-current permission tags to describe new interfaces.
 
-## Permission and Documentation Consistency
+## Permission and Documentation Alignment
 
 Interface permissions are not supplementary notes in the documentation — they are part of the `API` contract itself. This design provides three benefits:
 
@@ -111,7 +111,7 @@ Source plugin interfaces should follow these conventions:
 
 Dynamic plugins cannot directly modify the host route table. Which routes they expose, which host services they can access, and which database tables or external addresses they can reach are all jointly determined by the plugin manifest, artifact metadata, and the `hostServices` authorization snapshot.
 
-## API Documentation i18n
+## API Documentation Internationalization
 
 The i18n resources for API documentation are located under:
 
@@ -136,11 +136,11 @@ Plugin API translations should only maintain the plugin's own namespace — do n
 
 ## In-Browser Debugging
 
-The **Developer Center → API Documentation** page in the management workspace supports viewing request parameters, response structures, permission identifiers, and interface descriptions, and can directly send debug requests.
+The **Developer Center → API Documentation** page in the admin workspace supports viewing request parameters, response structures, permission identifiers, and interface descriptions, and can directly send debug requests.
 
 In-browser debugging uses the current logged-in user's authentication state. Debugging write operations such as `POST`, `PUT`, `PATCH`, and `DELETE` will produce real data changes — use a test environment or a clearly rollback-safe data scope.
 
-## Third-Party Tool Import
+## Importing into Third-Party Tools
 
 `/api.json` is a standard `OpenAPI 3.0` document that can be imported into common API tools:
 

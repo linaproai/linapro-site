@@ -1,6 +1,6 @@
 ---
 slug: '/docs/configuration'
-title: 'Configuration'
+title: 'Service Configuration'
 hide_title: true
 description: 'A component-level guide to LinaPro core host service configuration — how config.yaml drives HTTP server, logging, database, JWT authentication, sessions, monitoring, health probes, scheduling, internationalization, cluster coordination, file uploads, and plugin governance, with production deployment recommendations.'
 keywords:

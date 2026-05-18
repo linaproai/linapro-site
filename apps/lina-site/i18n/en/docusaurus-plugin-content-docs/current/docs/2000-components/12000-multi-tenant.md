@@ -1,6 +1,6 @@
 ---
 slug: '/docs/multi-tenant'
-title: 'Multi-Tenancy'
+title: 'Native Multi-Tenancy'
 hide_title: true
 description: 'A component-level guide to LinaPro multi-tenancy — how the host bizctx, TenantFilterService, tenant_id filtering seam, default platform tenant, official multi-tenant source plugin, tenant impersonation, plugin multi-tenant manifest fields, and the current Pool shared-database model work together.'
 keywords:
@@ -108,7 +108,7 @@ tenantID := filter.Context(ctx).TenantID
 
 Tenant-aware plugins should reuse this service rather than hand-writing `Where("tenant_id", ...)` everywhere. Otherwise, platform bypass and tenant impersonation scenarios may produce inconsistent behavior.
 
-## Pool Shared-Database Model
+## Shared-Database Pool Model
 
 The current version uses the `Pool` shared-database model: different tenants' data lives in the same database and the same set of tables, distinguished by the `tenant_id` column.
 
@@ -120,7 +120,7 @@ The current version uses the `Pool` shared-database model: different tenants' da
 
 Plugin-owned tables that need multi-tenant support should include a `tenant_id` column at creation time and build appropriate indexes for tenant filtering.
 
-## Official multi-tenant Plugin
+## Official Multi-Tenant Plugin
 
 The official `multi-tenant` plugin is a source plugin declared as a platform-level governance plugin:
 

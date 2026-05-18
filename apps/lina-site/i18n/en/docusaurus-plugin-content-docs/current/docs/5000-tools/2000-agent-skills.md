@@ -1,6 +1,6 @@
 ---
 slug: '/docs/agent-skills'
-title: 'Dev Skills'
+title: 'Agent Skills'
 hide_title: true
 description: 'A complete guide to LinaPro AI skills — the optional OpenSpec CLI, goframe-v2, and find-skills that can be installed externally, plus project-bundled skills covering frontend design, Git workflows, code review, E2E testing, performance auditing, and OpenSpec apply/archive automation. Includes installation instructions and usage guidance for every skill.'
 keywords:
@@ -104,7 +104,7 @@ npx skills add github.com/gogf/skills -g
 npx skills add find-skills -g
 ```
 
-## Project-Bundled Skills
+## Project Skills
 
 The following skills are maintained in `.agents/skills/` alongside the project source. No installation is required — they load automatically when you use an AI tool inside the project directory.
 

@@ -1,11 +1,12 @@
 ---
 slug: '/docs/admin-workspace'
-title: 'Default Management Workspace'
+title: 'Built-in Admin Workspace'
 hide_title: true
-description: 'A component-level guide to the LinaPro default management workspace lina-vben — how it serves as the standard frontend consumer of the core host service and plugin system, covering access control, system settings, job scheduling, multi-tenant management, plugin governance, developer center, and dynamic plugin pages, while maintaining consistency with backend API contracts, menu permissions, and I18N resources.'
+description: 'A component-level guide to the LinaPro built-in admin workspace, lina-vben — how it serves as the standard frontend consumer of the core host service and plugin system, covering access control, system settings, job scheduling, multi-tenant management, plugin governance, developer center, and dynamic plugin pages, while maintaining consistency with backend API contracts, menu permissions, and I18N resources.'
 keywords:
   - lina-vben
-  - management workspace
+  - admin workspace
+  - built-in admin workspace
   - Vue3
   - Vben5
   - Ant Design Vue
@@ -25,7 +26,7 @@ keywords:
 
 ## Introduction
 
-`lina-vben` is `LinaPro`'s built-in default management workspace, built on `Vue 3 + Vben5 + Ant Design Vue + TypeScript`. It is not the definer of business logic — it is the standard `UI` expression layer for the `lina-core` host `API` and all enabled plugin `APIs`.
+`lina-vben` is `LinaPro`'s built-in admin workspace, built on `Vue 3 + Vben5 + Ant Design Vue + TypeScript`. It is not the definer of business logic — it is the standard `UI` expression layer for the `lina-core` host `API` and all enabled plugin `APIs`.
 
 Developers can build business applications directly on top of it, or replace it with a custom frontend. As long as the new frontend follows the host's public `RESTful API` and permission model, it can plug into the same backend capabilities.
 
@@ -34,7 +35,7 @@ Developers can build business applications directly on top of it, or replace it 
 | Technology | Description |
 |------------|-------------|
 | `Vue 3` | Frontend framework |
-| `Vben5` | Enterprise-grade management workspace foundation |
+| `Vben5` | Enterprise-grade admin workspace foundation |
 | `Ant Design Vue` | Admin UI component library |
 | `TypeScript` | Type safety and frontend engineering quality |
 | `Vite` | Frontend build tool |
@@ -139,4 +140,4 @@ Production environments should change the default password immediately after ini
 
 ## Extension Recommendations
 
-To extend business functionality on the default workspace, prefer declaring menus, pages, and `APIs` through plugins rather than directly modifying workspace internal modules. Only modify `lina-vben` itself when you need to adjust the global layout, theme, login page, or common interaction patterns.
+To extend business functionality on the built-in workspace, prefer declaring menus, pages, and `APIs` through plugins rather than directly modifying workspace internal modules. Only modify `lina-vben` itself when you need to adjust the global layout, theme, login page, or common interaction patterns.

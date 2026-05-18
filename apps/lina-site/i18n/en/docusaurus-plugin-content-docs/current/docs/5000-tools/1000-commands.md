@@ -1,11 +1,11 @@
 ---
 slug: '/docs/commands'
-title: 'Dev Commands'
+title: 'Development Commands'
 hide_title: true
-description: 'A complete reference for the cross-platform dev command set in the LinaPro project — covering linactl, Makefile compatibility entry, Windows make.cmd wrapper, dev server management, full builds, WASM plugin builds, Docker image builds, plugin workspace management, testing, i18n validation, database initialization, and release governance on macOS, Linux, and Windows.'
+description: 'A complete reference for the cross-platform development command set in the LinaPro project — covering linactl, Makefile compatibility entry, Windows make.cmd wrapper, development server management, full builds, WASM plugin builds, Docker image builds, plugin workspace management, testing, i18n validation, database initialization, and release governance on macOS, Linux, and Windows.'
 keywords:
   - make commands
-  - dev commands
+  - development commands
   - build commands
   - LinaPro development
   - make dev
@@ -34,7 +34,7 @@ keywords:
   - cross-platform
 ---
 
-The `LinaPro` project provides a cross-platform dev command set. Long-term task orchestration lives in `hack/tools/linactl`, implemented as a `Go` program; the root `Makefile` and `make.cmd` are compatibility entries that forward to the underlying `linactl`. This means the same commands work on `macOS`, `Linux`, and `Windows`, without depending on `GNU Make` or `POSIX Shell` as the sole entry point.
+The `LinaPro` project provides a cross-platform development command set. Long-term task orchestration lives in `hack/tools/linactl`, implemented as a `Go` program; the root `Makefile` and `make.cmd` are compatibility entries that forward to the underlying `linactl`. This means the same commands work on `macOS`, `Linux`, and `Windows`, without depending on `GNU Make` or `POSIX Shell` as the sole entry point.
 
 ## Platform Notes
 
@@ -78,10 +78,10 @@ All `make <command>` examples in this document can be equivalently replaced with
 
 | Command | Category | Description |
 |---------|----------|-------------|
-| `make dev.setup` | Dev server | Install frontend dependencies and `Playwright` browsers |
-| `make dev` | Dev server | Restart frontend and backend dev servers |
-| `make stop` | Dev server | Stop frontend and backend dev servers |
-| `make status` | Dev server | Show running status and log paths for both servers |
+| `make dev.setup` | Development server | Install frontend dependencies and `Playwright` browsers |
+| `make dev` | Development server | Restart frontend and backend development servers |
+| `make stop` | Development server | Stop frontend and backend development servers |
+| `make status` | Development server | Show running status and log paths for both servers |
 | `make build` | Build | Full build: frontend, plugins, and backend binary |
 | `make pack.assets` | Build | Prepare frontend static assets and `manifest` for host embedding |
 | `make wasm` | Build | Build all or specific runtime `WASM` plugins |
@@ -103,7 +103,7 @@ All `make <command>` examples in this document can be equivalently replaced with
 | `make release.tag.check` | Release governance | Verify `release tag` matches `framework.version` in `metadata.yaml` |
 | `make help` | Other | List all available commands |
 
-## Dev Server
+## Development Server
 
 ### make dev.setup
 
@@ -222,7 +222,7 @@ Tidies `Go` module dependencies for the host, dev tools, and plugins. Useful aft
 make tidy
 ```
 
-## Image
+## Container Images
 
 ### make image
 
@@ -277,7 +277,7 @@ Prepares all image build artifacts (equivalent to running `make build`) without 
 make image.build
 ```
 
-## Test
+## Testing
 
 ### make test
 
@@ -417,7 +417,7 @@ After `make init` completes, loads optional `Mock` data for local demo and devel
 make mock confirm=mock
 ```
 
-## Other
+## Other Commands
 
 ### make help
 

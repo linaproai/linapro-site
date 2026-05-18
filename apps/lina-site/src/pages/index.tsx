@@ -109,7 +109,7 @@ const layers = [
         moduleKey: 'apps/lina-vben',
         title: (
             <Translate id="home.layer.vben.title" description="Layer 2 title">
-                Management Workspace
+                Admin Workspace
             </Translate>
         ),
         desc: (
@@ -583,7 +583,7 @@ function Modules() {
                     </h2>
                     <p className="section-lead">
                         <Translate id="home.modules.lead" description="Modules section lead">
-                            Start with a ready-to-use management workspace, then extend or replace modules as your product grows.
+                            Start with a ready-to-use admin workspace, then extend or replace modules as your product grows.
                         </Translate>
                     </p>
                     <div className="modules-preview-grid">

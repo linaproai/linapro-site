@@ -2,7 +2,7 @@
 slug: '/docs/plugin-management'
 title: 'Plugin Management'
 hide_title: true
-description: 'From a component design and operational flow perspective, this page explains LinaPro plugin management — plugin source configuration, the local plugin workspace, plugins.init, plugins.install, plugins.update, plugins.status, management workspace installation and enablement, disablement and uninstallation, dynamic plugin upload, and runtime upgrade — covering the full chain from code acquisition to runtime activation.'
+description: 'From a component design and operational flow perspective, this page explains LinaPro plugin management — plugin source configuration, the local plugin workspace, plugins.init, plugins.install, plugins.update, plugins.status, admin workspace installation and enablement, disablement and uninstallation, dynamic plugin upload, and runtime upgrade — covering the full chain from code acquisition to runtime activation.'
 keywords:
   - plugin management
   - plugin workspace
@@ -28,7 +28,7 @@ keywords:
 Plugin management connects two chains:
 
 - **Development chain**: Reads plugin sources from `hack/config.yaml` and synchronizes source plugins to the `apps/lina-plugins/` workspace.
-- **Runtime chain**: After the host scans plugin manifests, the management workspace handles discovery, installation, enablement, disablement, uninstallation, and upgrade.
+- **Runtime chain**: After the host scans plugin manifests, the admin workspace handles discovery, installation, enablement, disablement, uninstallation, and upgrade.
 
 These two chains have clear responsibilities. Code synchronization only means plugin files appear in the local workspace; whether a plugin is installed, enabled, or upgraded successfully is still determined by the host's runtime governance records.
 
@@ -116,7 +116,7 @@ make plugins.status
 
 The status output shows plugin `ID`, source, version, local installation state, local modification state, and remote sync status.
 
-## Management Workspace Lifecycle
+## Admin Workspace Lifecycle
 
 After plugin code enters the workspace, the host scans `plugin.yaml` at startup and presents the plugin as "Discovered". The administrator then performs runtime lifecycle operations in the Extension Center:
 
@@ -163,7 +163,7 @@ The specific enablement strategy is determined by the host governance records an
 
 ## Best Practices
 
-- After synchronizing plugin code during development, still install and enable the plugin in the management workspace.
+- After synchronizing plugin code during development, still install and enable the plugin in the admin workspace.
 - Check for local changes before updating plugin source code — avoid accidentally using `force=1` to overwrite development work.
 - After uploading a higher version of a dynamic plugin, do not assume the new version is active — a runtime upgrade must be performed.
 - Before uninstalling a production plugin, confirm whether to preserve data and check for reverse dependencies.

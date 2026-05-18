@@ -179,11 +179,11 @@ After code implementation is complete, `AI` usually stops the service and report
 make dev
 ```
 
-After the service starts, open the management workspace: `http://localhost:5666`
+After the service starts, open the admin workspace: `http://localhost:5666`
 
 **Install and enable the plugin:**
 
-1. Log in to the management workspace (`admin / admin123`)
+1. Log in to the admin workspace (`admin / admin123`)
 2. Go to "Extension Center -> Plugin Management"
 3. Find the `content-article` plugin and click "Install and Enable"
 

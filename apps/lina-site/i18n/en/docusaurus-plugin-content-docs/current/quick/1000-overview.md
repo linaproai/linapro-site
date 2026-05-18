@@ -19,7 +19,7 @@ keywords:
   - internationalization
   - rapid development
   - plugin ecosystem
-  - management workspace
+  - admin workspace
   - PostgreSQL
   - JWT authentication
   - multi-tenant
@@ -43,7 +43,7 @@ keywords:
 | **Official website** | https://linapro.ai/ |
 
 :::info Tip
-The demo site is read-only, so data cannot be modified, but you can still explore the full `LinaPro` feature set and the management workspace flow. To try full read/write capabilities locally, use the official demo image to deploy a complete environment quickly.
+The demo site is read-only, so data cannot be modified, but you can still explore the full `LinaPro` feature set and the admin workspace flow. To try full read/write capabilities locally, use the official demo image to deploy a complete environment quickly.
 :::
 
 ## Demo Container Image
@@ -56,10 +56,10 @@ Run the following commands locally to start the complete demo image:
 mkdir linapro-demo && cd linapro-demo
 curl -o config.yaml https://raw.githubusercontent.com/linaproai/linapro/refs/heads/main/hack/deploy/config.yaml
 curl -o docker-compose.yaml https://raw.githubusercontent.com/linaproai/linapro/refs/heads/main/hack/deploy/docker-compose.yaml
-docker compose -f docker-compose.yaml up
+docker compose up
 ```
 
-Then visit http://127.0.0.1:8080 to try the default `LinaPro` management workspace with username/password `admin/admin123`.
+Then visit http://127.0.0.1:8080 to try the built-in `LinaPro` admin workspace with username/password `admin/admin123`.
 
 :::info Tip
 The `nightly` image is a daily build intended mainly for testing. You can also switch it to a stable version tag such as `v0.2.0`.
@@ -71,7 +71,7 @@ The `nightly` image is a daily build intended mainly for testing. You can also s
 
 - **AI-native development workflow**: A built-in spec-driven AI development workflow with first-class support for the optional-but-recommended `OpenSpec`, putting AI in charge of analysis, design, and implementation. Every change is anchored to incremental specs and mandatory E2E tests, so the team stays focused on direction and decisions
 - **Rich AI skill ecosystem**: Over a dozen AI skills covering the full development lifecycle — backend development, frontend design, test authoring, code review, performance auditing, version upgrades, and more — embedded as domain knowledge in the framework's AI collaboration specs, so AI can make professionally grounded decisions in each context without needing re-briefed every session
-- **Rapid business development**: A ready-to-use management workspace and rich built-in modules that dramatically shorten time from zero to production
+- **Rapid business development**: A ready-to-use admin workspace and rich built-in modules that dramatically shorten time from zero to production
 - **Integrated full stack**: Frontend and backend designed as a unified system — API contracts, permission models, and design conventions fully aligned without the overhead of integrating two separate frameworks
 - **Complete API documentation**: Automatically aggregates host and plugin APIs with an interactive online browser and debugger
 - **Plugin ecosystem**: A dual-mode plugin system (source plugins + `WASM` dynamic plugins) — any capability can be extended or replaced via plugins. Official plugins are maintained as `submodule`s independently, pulled on demand without bloating the core framework
@@ -88,7 +88,7 @@ graph TB
         Explore["🔍 Explore"] --> Propose["📋 Propose"] --> Implement["⚙️ Implement"] --> Review["🔎 Review"] --> Archive["📦 Archive"]
     end
 
-    subgraph Frontend["Management Workspace  lina-vben"]
+    subgraph Frontend["Admin Workspace  lina-vben"]
         UI["Vue 3 + Vben5 + Ant Design"]
     end
 
@@ -143,7 +143,7 @@ graph TB
 ### Decoupled Host and UI
 
 - The core host service (`lina-core`) is a pure backend runtime, completely decoupled from any frontend implementation
-- The default management workspace (`lina-vben`) is a reference UI for the host's capabilities and can be replaced by any frontend — including mobile apps, mini-programs, or custom admin systems
+- The built-in admin workspace (`lina-vben`) is a reference UI for the host's capabilities and can be replaced by any frontend — including mobile apps, mini-programs, or custom admin systems
 - The host exposes all capabilities through a stable `RESTful API` contract, independent of any frontend
 - Multiple frontends can connect to the same host instance simultaneously
 
@@ -177,9 +177,9 @@ Official source plugins live in `apps/lina-plugins/`, mounted as a `Git submodul
 - Session management supports forced sign-out
 - Login logs capture full IP address, device information, and login result
 
-### Default Management Workspace
+### Built-in Admin Workspace
 
-`lina-vben` is the framework's built-in, fully functional management workspace. Developers can build business applications directly on top of it. Built-in modules include permission management (users, roles, menus), organization management (departments, positions), system settings (dictionaries, parameters, files), announcements, task scheduling, system monitoring (online users, service monitoring, operation and login logs), plugin management, live API documentation, and — after installing the official `multi-tenant` plugin — tenant management and tenant plugin governance, covering the common foundational scenarios of enterprise applications.
+`lina-vben` is the framework's built-in, fully functional admin workspace. Developers can build business applications directly on top of it. Built-in modules include permission management (users, roles, menus), organization management (departments, positions), system settings (dictionaries, parameters, files), announcements, task scheduling, system monitoring (online users, service monitoring, operation and login logs), plugin management, live API documentation, and — after installing the official `multi-tenant` plugin — tenant management and tenant plugin governance, covering the common foundational scenarios of enterprise applications.
 
 ### Native Multi-Tenant Support
 

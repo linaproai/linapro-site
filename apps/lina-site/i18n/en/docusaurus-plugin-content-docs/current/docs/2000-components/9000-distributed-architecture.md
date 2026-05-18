@@ -166,7 +166,7 @@ Common cache objects include:
 - Plugin frontend packages and `WASM` modules
 - Runtime language packs
 
-## Scheduled Task Scheduling
+## Scheduled Task Execution
 
 Persistent tasks support two execution scopes:
 
@@ -191,7 +191,7 @@ sequenceDiagram
     end
 ```
 
-Task execution results are written to the shared database and can be viewed from the management workspace on any node.
+Task execution results are written to the shared database and can be viewed from the admin workspace on any node.
 
 ## Scaling Process
 

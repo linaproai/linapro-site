@@ -153,7 +153,7 @@ After startup, the host automatically aggregates interfaces from the host and en
 http://localhost:8080/api.json
 ```
 
-The management workspace embeds a browsing and debugging interface in "Developer Center → API Documentation." The API documentation shows request parameters, response structures, permission identifiers, and multi-language descriptions, facilitating frontend-backend integration.
+The admin workspace embeds a browsing and debugging interface in "Developer Center → API Documentation." The API documentation shows request parameters, response structures, permission identifiers, and multi-language descriptions, facilitating frontend-backend integration.
 
 ```mermaid
 flowchart LR
@@ -177,7 +177,7 @@ The host provides a persistent scheduling subsystem where task configurations an
 | `Go` handler | Calls a handler registered by the host or a plugin | Data cleanup, statistics, synchronization |
 | `Shell` command | Executes a system command | File processing, system maintenance scripts |
 
-Source plugins can register custom task handlers through `pluginhost`, then select them as invocation targets in the management workspace. Tasks also support grouping, manual triggering, pause/resume, timeout control, and execution logs.
+Source plugins can register custom task handlers through `pluginhost`, then select them as invocation targets in the admin workspace. Tasks also support grouping, manual triggering, pause/resume, timeout control, and execution logs.
 
 In cluster mode, task scheduling behavior is controlled by execution scope:
 
@@ -265,7 +265,7 @@ The health probe returns standard `HTTP` status codes — `200` for normal, `503
 
 ## Related Components
 
-- [Default Management Workspace](/docs/admin-workspace): The standard frontend consumer of host capabilities.
+- [Built-in Admin Workspace](/docs/admin-workspace): The standard frontend consumer of host capabilities.
 - [Configuration](/docs/configuration): Host runtime configuration groups and production checklist.
 - [API Reference](/docs/api-reference): Unified `OpenAPI` documentation aggregation for host and plugins.
 - [Multi-Tenancy](/docs/multi-tenant): Host tenant context and official tenant control plane.

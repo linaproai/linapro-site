@@ -3,18 +3,19 @@ name: linasite-sync-i18n
 description: >-
   检测 apps/lina-site/docs/ 中文主稿与 apps/lina-site/i18n/en/docusaurus-plugin-content-docs/current/
   英文翻译之间的缺漏和内容差异，并进行补全修复。当 docs/ 中新增或更新了文档、或需要全量同步审查时使用。
-  翻译采用地道英文表达，绝不逐字翻译，确保英文版本在英语环境下自然流畅。
+  翻译和文档标题都必须采用地道、专业、自然的英文表达，绝不逐字翻译，确保英文版本在英语环境下自然流畅。
 ---
 
 # linasite-sync-i18n：文档 i18n 同步与翻译
 
-对中文主稿进行全面审查，确保每篇文档都有对应的地道英文翻译，并与中文内容保持同步。本技能输出自然、专业的英文文档——而非机械翻译。
+对中文主稿进行全面审查，确保每篇文档都有对应的地道英文翻译，并与中文内容保持同步。本技能输出自然、专业的英文文档和标题——而非机械翻译。
 
 **核心原则：**
 1. **路径镜像** — `docs/<path>.md` 对应 `i18n/en/docusaurus-plugin-content-docs/current/<path>.md`
 2. **slug 是唯一标识** — 每篇文档的 `slug` 字段是规范 URL，翻译时绝不修改
-3. **地道英文优先** — 先理解内容，再以英文习惯表达；绝不逐字翻译
+3. **地道英文优先** — 先理解内容，再以英文习惯表达；正文、frontmatter 标题和各级标题都绝不逐字翻译
 4. **中文主稿为准** — `docs/` 是唯一事实来源，英文版跟随中文版更新
+5. **标题质量同等重要** — 文档标题是导航、SEO 和读者第一印象的一部分，必须符合英语技术文档的命名习惯
 
 ---
 
@@ -43,6 +44,7 @@ find apps/lina-site/docs -name "*.md" | sort
 - **相对路径**（相对于 `apps/lina-site/docs/`，例如 `docs/1000-concepts/1000-ai-native.md`）
 - **期望的 i18n 路径**：`apps/lina-site/i18n/en/docusaurus-plugin-content-docs/current/<relative-path>`
 - **slug**：从 frontmatter 的 `slug:` 字段读取
+- **中文标题**：frontmatter `title` 以及正文中的 `##`/`###` 标题
 
 ---
 
@@ -54,7 +56,7 @@ find apps/lina-site/docs -name "*.md" | sort
 find apps/lina-site/i18n/en/docusaurus-plugin-content-docs/current -name "*.md" | sort
 ```
 
-对每个文件读取其 frontmatter 中的 **slug**，构建索引：`slug → i18n/en 文件路径`。
+对每个文件读取其 frontmatter 中的 **slug** 和 **title**，构建索引：`slug → i18n/en 文件路径`，并记录正文中的 `##`/`###` 标题用于自然度检查。
 
 ---
 
@@ -80,10 +82,30 @@ find apps/lina-site/i18n/en/docusaurus-plugin-content-docs/current -name "*.md" 
    - 英文文件缺少中文中存在的主要内容段落
    - 英文文件中存在大量未翻译的中文字符（代码块外）
    - 英文文件内容篇幅不足中文的 60%（排除代码块）
+   - frontmatter `title` 或正文标题明显机械直译、不符合英语技术文档习惯，或与同类页面标题风格明显不一致
 4. 判断为**基本一致**（无需操作）的条件：
    - 章节结构对应
    - 核心内容已翻译
+   - frontmatter `title` 和正文标题自然、专业、准确，符合英语技术文档命名习惯
    - 少量措辞差异属正常范围
+
+#### 标题自然度判断标准
+
+检查英文文档时，必须同时审查 frontmatter `title` 与正文 `##`/`###` 标题。标题不只是翻译结果，也是站点导航、侧边栏、搜索和 SEO 的入口。
+
+优先使用英语技术文档中自然的名词短语或动作短语：
+- 中文“开发指令”应译为 `Development Commands`，不要机械写成 `Dev Commands`，除非同一导航体系明确使用短标签。
+- 中文“OpenAPI接口文档”更自然的是 `OpenAPI Reference`，不要写成 `OpenAPI Interface Documentation`。
+- 中文“服务配置管理”应表达为 `Service Configuration` 或 `Service Configuration Management`，不要只写 `Configuration` 导致语义过泛。
+- 中文“原生多租户能力”应表达为 `Native Multi-Tenancy`，不要省略关键定位。
+- 正文标题避免重复、笨重或直译表达，例如用 `Scheduled Task Execution` 代替 `Scheduled Task Scheduling`，用 `Importing into Third-Party Tools` 代替 `Third-Party Tool Import`。
+
+标题润色原则：
+- **准确**：保留中文标题的技术指向和范围，不为了简短丢失核心限定词。
+- **自然**：优先选择英语技术文档常见说法，例如 `Reference`、`Configuration`、`Execution`、`Development`、`Internationalization`。
+- **专业**：避免口语缩写和内部简称，如 `Dev`，除非该页面是窄导航标签或同级文档统一采用该表达。
+- **一致**：同一目录下同类标题使用一致风格，例如 `Development Commands`、`Development Tools`。
+- **不过度翻译**：产品名、命令、API 名称、配置键名、插件 ID 和约定术语保持原样。
 
 ---
 
@@ -145,10 +167,10 @@ find apps/lina-site/i18n/en/docusaurus-plugin-content-docs/current -name "*.md" 
 | 自然表达 | 使用英语技术写作中惯用的句式结构 |
 | 保持技术精度 | LinaPro 专属术语、API 名称、配置键名保持原样 |
 | 匹配语气 | 概念文档保持概念性，操作指引保持步骤性 |
-| 标题与结构 | 保持相同层级结构，标题文字自然翻译 |
+| 标题与结构 | 保持相同层级结构，frontmatter `title` 和正文标题必须自然、专业、准确，必要时重写为英语技术文档习惯表达 |
 | 代码块 | 绝不翻译代码、代码注释或 CLI 命令 |
 | Mermaid 图表 | 翻译节点标签和边标签，保留图表类型和语法 |
-| Frontmatter | 翻译 `title`、`description`、`keywords`；`slug` 和 `sidebar_position` 保持不变 |
+| Frontmatter | 地道翻译 `title`、`description`、`keywords`；`slug` 和 `sidebar_position` 保持不变 |
 
 **d. Frontmatter 处理示例：**
 
@@ -174,6 +196,16 @@ keywords:                                  # ← 翻译为英文术语
   - core host
   - plugin
 ---
+```
+
+标题翻译时不要把中文词序硬搬到英文中。允许在不改变含义的前提下改写为更自然的英文技术文档标题：
+
+```yaml
+# 中文源文件
+title: 'OpenAPI接口文档'
+
+# 英文输出
+title: 'OpenAPI Reference'
 ```
 
 **e. 写入文件：**
@@ -220,6 +252,8 @@ find apps/lina-site/i18n/en/docusaurus-plugin-content-docs/current -name "*.md" 
 - [ ] 已完整阅读并理解中文文档
 - [ ] 英文读起来对母语者自然流畅
 - [ ] 技术术语与现有英文文档保持一致
+- [ ] frontmatter `title` 自然、专业、准确，不是机械直译
+- [ ] 正文 `##`/`###` 标题自然、专业、准确，与同级文档风格一致
 - [ ] 输出中不含中文字符（代码块内的中文除外）
 - [ ] `slug` 与中文源文件完全一致
 - [ ] 所有代码块内容未被修改
@@ -232,9 +266,10 @@ find apps/lina-site/i18n/en/docusaurus-plugin-content-docs/current -name "*.md" 
 
 - **严禁修改 `slug` 字段** — 这是规范 URL，必须与中文源文件保持一致
 - **通读全文再翻译** — 不允许逐段翻译，必须在理解全文后再动笔
+- **标题先理解再命名** — 标题必须传达页面定位和技术范围，必要时意译或改写为英语技术文档常用标题
 - **修改前先确认** — 展示差异报告并获得用户确认后再执行任何写入
 - **路径不匹配须人工决策** — 不得静默跳过或覆盖，必须提交用户决策
-- **禁止机械直译** — 若某句话用英文说起来不自然，重写它，只要意思相同
+- **禁止机械直译** — 若某句话或某个标题用英文说起来不自然，重写它，只要意思相同
 - **保护代码完整性** — 不得修改代码块、行内代码或 CLI 示例中的任何内容
 - **参考现有英文文档风格** — 翻译前先阅读 2～3 篇已有的 i18n/en 文档，匹配用词和语气
 - **逐文件处理** — 声明 → 翻译 → 写入 → 确认，完成后再处理下一篇

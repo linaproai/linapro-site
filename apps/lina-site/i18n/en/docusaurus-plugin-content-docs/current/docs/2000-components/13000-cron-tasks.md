@@ -28,7 +28,7 @@ keywords:
 
 Scheduled tasks are a persistent scheduling capability provided by `lina-core`. Task definitions, runtime state, and execution logs are stored in the database. After the host starts, it brings built-in host tasks, plugin-declared tasks, and administrator-created tasks into a unified scheduler.
 
-The management workspace provides task listing, group management, manual triggering, pause/resume, and execution log viewing. Source plugins and `WASM` dynamic plugins can also project their task capabilities into the same governance model.
+The admin workspace provides task listing, group management, manual triggering, pause/resume, and execution log viewing. Source plugins and `WASM` dynamic plugins can also project their task capabilities into the same governance model.
 
 ## Task Model
 
@@ -165,7 +165,7 @@ The concurrency strategy solves "overlapping execution within the same node" whi
 
 ## Manual Triggering
 
-Administrators can manually trigger tasks from the management workspace. Manual triggers still write execution logs and respect the timeout, handler availability, and concurrency strategy.
+Administrators can manually trigger tasks from the admin workspace. Manual triggers still write execution logs and respect the timeout, handler availability, and concurrency strategy.
 
 When debugging tasks, test in a staging environment first — especially for tasks that write to databases, call external systems, or execute `Shell` commands.
 

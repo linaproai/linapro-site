@@ -174,7 +174,7 @@ Pages can reuse the default workspace's frontend ecosystem and design convention
 
 Source plugins can subscribe to host events — for example, login success, plugin enablement, and system startup. Hooks can be synchronous-blocking or asynchronous, depending on the execution mode chosen at registration.
 
-Plugins can also register their own scheduled task handlers for administrators to select when creating tasks in the management workspace:
+Plugins can also register their own scheduled task handlers for administrators to select when creating tasks in the admin workspace:
 
 ```go
 plugin.Cron().RegisterCron(

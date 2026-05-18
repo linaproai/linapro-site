@@ -103,10 +103,10 @@ When the services start successfully, visit:
 
 | Service | URL |
 |---------|-----|
-| Default management workspace | `http://localhost:5666` |
+| Built-in admin workspace | `http://localhost:5666` |
 | Backend `API` service | `http://localhost:8080` |
 
-Log in to the management workspace with the default account:
+Log in to the admin workspace with the default account:
 
 | Field | Value |
 |-------|-------|
@@ -128,7 +128,7 @@ make image             # Build the Docker image
 
 ## Installation Verification
 
-After the service starts, open `http://localhost:5666` in your browser and log in with `admin / admin123`. If you can enter the management workspace normally, the installation is complete.
+After the service starts, open `http://localhost:5666` in your browser and log in with `admin / admin123`. If you can enter the admin workspace normally, the installation is complete.
 
 If you run into issues, use the following checklist:
 

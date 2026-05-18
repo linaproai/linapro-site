@@ -56,7 +56,7 @@ keywords:
 mkdir linapro-demo && cd linapro-demo
 curl -o config.yaml https://raw.githubusercontent.com/linaproai/linapro/refs/heads/main/hack/deploy/config.yaml
 curl -o docker-compose.yaml https://raw.githubusercontent.com/linaproai/linapro/refs/heads/main/hack/deploy/docker-compose.yaml
-docker compose -f docker-compose.yaml up
+docker compose up
 ```
 
 随后可以访问 http://127.0.0.1:8080 体验完整的`LinaPro`默认提供的管理工作台，账号密码`admin/admin123`。

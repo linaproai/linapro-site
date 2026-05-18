@@ -194,7 +194,7 @@ Build artifacts are output to `temp/output/<plugin-id>.wasm` and include the plu
 The runtime flow for dynamic plugins:
 
 1. Build the `.wasm` artifact.
-2. Upload the dynamic plugin package in the management workspace's Extension Center.
+2. Upload the dynamic plugin package in the admin workspace's Extension Center.
 3. The host validates the `WASM` file header, custom sections, embedded manifest, `ABI` version, and resources.
 4. The administrator confirms `hostServices` authorization.
 5. The installation `SQL` is executed and governance records are written.

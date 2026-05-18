@@ -2,12 +2,13 @@
 slug: '/docs/components'
 title: 'Component Design'
 hide_title: true
-description: 'An overview of LinaPro framework components — the core host service, default management workspace, dual-mode plugin system, source plugins, WASM dynamic plugins, plugin management, native distributed architecture, and host capabilities including configuration, API documentation, multi-tenancy, scheduled tasks, and I18N internationalization.'
+description: 'An overview of LinaPro framework components — the core host service, built-in admin workspace, dual-mode plugin system, source plugins, WASM dynamic plugins, plugin management, native distributed architecture, and host capabilities including configuration, API documentation, multi-tenancy, scheduled tasks, and I18N internationalization.'
 keywords:
   - component design
   - LinaPro components
   - core host service
-  - default management workspace
+  - built-in admin workspace
+  - admin workspace
   - dual-mode plugin system
   - source plugins
   - WASM dynamic plugins
@@ -36,7 +37,7 @@ keywords:
 | **Plugin governance** | Plugin manifests drive installation, enablement, upgrades, disablement, uninstallation, menu projection, permission resources, and lifecycle callbacks |
 | **Runtime coordination** | The host handles authentication, authorization, tenant context, configuration, scheduling, cache revision, and cluster coordination |
 
-Through these components, `LinaPro` brings the backend host, frontend workspace, business plugins, and deployment runtime under a unified governance model. Developers can extend business capabilities with plugins while keeping the host stable, and get a complete management experience through the default workspace.
+Through these components, `LinaPro` brings the backend host, frontend workspace, business plugins, and deployment runtime under a unified governance model. Developers can extend business capabilities with plugins while keeping the host stable, and get a complete management experience through the built-in admin workspace.
 
 ## Related Topics
 

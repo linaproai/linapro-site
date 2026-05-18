@@ -90,9 +90,9 @@ AI-native is not just about a development workflow — it also means the framewo
 
 | Category | Skill | Core capability |
 |----------|-------|----------------|
-| **Dev workflow** | `openspec-*` | Requirements exploration, change proposals, design document generation |
-| **Dev workflow** | `lina-review` | Code and spec compliance review — the quality gate before archiving an `OpenSpec` change |
-| **Dev workflow** | `lina-feedback` | Issue tracking, bug fixes, and E2E test coverage closure |
+| **Development workflow** | `openspec-*` | Requirements exploration, change proposals, design document generation |
+| **Development workflow** | `lina-review` | Code and spec compliance review — the quality gate before archiving an `OpenSpec` change |
+| **Development workflow** | `lina-feedback` | Issue tracking, bug fixes, and E2E test coverage closure |
 | **Backend** | `goframe-v2` | `GoFrame` development conventions, best practices for API, service, and DAO layers |
 | **Frontend** | `frontend-design` | Production-grade frontend design that avoids generic AI-generated interface patterns |
 | **Frontend** | `frontend-patterns` | Frontend development patterns: state management, performance optimization, form handling |
