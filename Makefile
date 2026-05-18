@@ -61,6 +61,59 @@ dev:
 	echo "Starting $$SITE_NAME at http://$$HOST:$$PORT$$SITE_PATH (locale=$$LOCALE, package-manager=$$PACKAGE_MANAGER)"; \
 	eval "$$START_CMD"
 
+## preview: 构建所有语言并启动预览服务（用于测试多语言切换）
+.PHONY: preview
+preview:
+	@set -e; \
+	SITE_DIR="$(SITE_DIR)"; \
+	SITE_NAME="$(SITE_NAME)"; \
+	HOST="$(strip $(or $(host),$(HOST),$(SITE_DEFAULT_HOST)))"; \
+	PORT="$(strip $(or $(port),$(PORT),$(SITE_DEFAULT_PORT)))"; \
+	[ -f "$$SITE_DIR/package.json" ] || { echo "Error: missing $$SITE_DIR/package.json"; exit 1; }; \
+	PACKAGE_MANAGER=""; \
+	INSTALL_CMD=""; \
+	BUILD_CMD=""; \
+	SERVE_CMD=""; \
+	if [ -f "$$SITE_DIR/yarn.lock" ] && command -v yarn >/dev/null 2>&1; then \
+		PACKAGE_MANAGER="yarn"; \
+		INSTALL_CMD="yarn --cwd $$SITE_DIR install"; \
+		BUILD_CMD="yarn --cwd $$SITE_DIR build"; \
+		SERVE_CMD="yarn --cwd $$SITE_DIR run serve --host $$HOST --port $$PORT"; \
+	elif [ -f "$$SITE_DIR/pnpm-lock.yaml" ] && command -v pnpm >/dev/null 2>&1; then \
+		PACKAGE_MANAGER="pnpm"; \
+		INSTALL_CMD="pnpm --dir $$SITE_DIR install"; \
+		BUILD_CMD="pnpm --dir $$SITE_DIR run build"; \
+		SERVE_CMD="pnpm --dir $$SITE_DIR run serve -- --host $$HOST --port $$PORT"; \
+	elif command -v yarn >/dev/null 2>&1; then \
+		PACKAGE_MANAGER="yarn"; \
+		INSTALL_CMD="yarn --cwd $$SITE_DIR install"; \
+		BUILD_CMD="yarn --cwd $$SITE_DIR build"; \
+		SERVE_CMD="yarn --cwd $$SITE_DIR run serve --host $$HOST --port $$PORT"; \
+	elif command -v pnpm >/dev/null 2>&1; then \
+		PACKAGE_MANAGER="pnpm"; \
+		INSTALL_CMD="pnpm --dir $$SITE_DIR install"; \
+		BUILD_CMD="pnpm --dir $$SITE_DIR run build"; \
+		SERVE_CMD="pnpm --dir $$SITE_DIR run serve -- --host $$HOST --port $$PORT"; \
+	elif command -v npm >/dev/null 2>&1; then \
+		PACKAGE_MANAGER="npm"; \
+		INSTALL_CMD="npm --prefix $$SITE_DIR install"; \
+		BUILD_CMD="npm --prefix $$SITE_DIR run build"; \
+		SERVE_CMD="npm --prefix $$SITE_DIR run serve -- --host $$HOST --port $$PORT"; \
+	else \
+		echo "Error: no supported package manager found (tried yarn, pnpm, npm)"; \
+		exit 1; \
+	fi; \
+	if [ ! -x "$$SITE_DIR/node_modules/.bin/docusaurus" ]; then \
+		echo "Installing $$SITE_NAME dependencies with $$PACKAGE_MANAGER..."; \
+		eval "$$INSTALL_CMD"; \
+	fi; \
+	echo "Building $$SITE_NAME (all locales) with $$PACKAGE_MANAGER..."; \
+	eval "$$BUILD_CMD"; \
+	echo "Starting preview server at http://$$HOST:$$PORT"; \
+	echo "  English: http://$$HOST:$$PORT/"; \
+	echo "  中文:    http://$$HOST:$$PORT/zh/"; \
+	eval "$$SERVE_CMD"
+
 ## check: 检查中文文档在所有 i18n locale 中均有对应翻译文件
 .PHONY: check
 check:
