@@ -263,14 +263,3 @@ health:
 
 健康探针返回标准`HTTP`状态码，正常为`200`，异常为`503`。
 
-## 相关组件
-
-- [默认管理工作台](/docs/admin-workspace)：宿主能力的标准前端消费者。
-- [配置管理](/docs/configuration)：宿主运行时配置分组与生产检查项。
-- [接口文档](/docs/api-reference)：宿主和插件统一`OpenAPI`文档聚合。
-- [多租户能力](/docs/multi-tenant)：宿主租户上下文和官方租户控制面。
-- [定时任务](/docs/cron-tasks)：持久化调度、内置任务和插件任务。
-- [I18N国际化](/docs/i18n)：宿主、插件和接口文档语言资源。
-- [双模式插件系统](/docs/plugin-system)：宿主如何治理源码插件和动态插件。
-- [插件管理](/docs/plugin-management)：插件代码来源和运行时管理流程。
-- [原生分布式架构](/docs/distributed-architecture)：集群模式的协调机制。
