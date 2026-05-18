@@ -53,13 +53,16 @@ keywords:
 可以在本地使用以下指令运行完整的演示镜像：
 
 ```bash
-docker run -p 8080:8080 ghcr.io/linaproai/linapro:nightly
+mkdir linapro-demo && cd linapro-demo
+curl -o config.yaml https://raw.githubusercontent.com/linaproai/linapro/refs/heads/main/hack/deploy/config.yaml
+curl -o docker-compose.yaml https://raw.githubusercontent.com/linaproai/linapro/refs/heads/main/hack/deploy/docker-compose.yaml
+docker compose -f docker-compose.yaml up
 ```
 
 随后可以访问 http://127.0.0.1:8080 体验完整的`LinaPro`默认提供的管理工作台，账号密码`admin/admin123`。
 
 :::info 提示
-其中的镜像版本为`nightly`表示每日构建镜像，主要用于测试使用，也可以修改为稳定的版本标签如`v0.1.0`等。
+其中的镜像版本为`nightly`表示每日构建镜像，主要用于测试使用，也可以修改为稳定的版本标签如`v0.2.0`等。
 :::
 
 ## 项目定位

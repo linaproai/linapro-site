@@ -2,18 +2,24 @@
 slug: '/docs/commands'
 title: 'Dev Commands'
 hide_title: true
-description: 'A complete reference for the cross-platform dev command set in the LinaPro project — covering linactl, Makefile compatibility entry, Windows make.cmd wrapper, dev server management, full builds, WASM plugin builds, Docker image builds, testing, i18n validation, plugin tools, and database initialization on macOS, Linux, and Windows.'
+description: 'A complete reference for the cross-platform dev command set in the LinaPro project — covering linactl, Makefile compatibility entry, Windows make.cmd wrapper, dev server management, full builds, WASM plugin builds, Docker image builds, plugin workspace management, testing, i18n validation, database initialization, and release governance on macOS, Linux, and Windows.'
 keywords:
   - make commands
   - dev commands
   - build commands
   - LinaPro development
   - make dev
+  - make dev.setup
   - make build
+  - make pack.assets
   - make test
   - make image
+  - make image.build
   - make init
   - make wasm
+  - make plugins.install
+  - make plugins.status
+  - make release.tag.check
   - linactl
   - development workflow
   - backend build
@@ -21,6 +27,8 @@ keywords:
   - Docker image
   - E2E testing
   - database initialization
+  - plugin workspace
+  - release governance
   - Windows support
   - make.cmd
   - cross-platform
@@ -70,52 +78,50 @@ All `make <command>` examples in this document can be equivalently replaced with
 
 | Command | Category | Description |
 |---------|----------|-------------|
-| `make dev` | Dev server | Restart the frontend and backend dev servers |
-| `make stop` | Dev server | Stop the frontend and backend dev servers |
-| `make status` | Dev server | Show the running status and log paths for both servers |
+| `make dev.setup` | Dev server | Install frontend dependencies and `Playwright` browsers |
+| `make dev` | Dev server | Restart frontend and backend dev servers |
+| `make stop` | Dev server | Stop frontend and backend dev servers |
+| `make status` | Dev server | Show running status and log paths for both servers |
 | `make build` | Build | Full build: frontend, plugins, and backend binary |
+| `make pack.assets` | Build | Prepare frontend static assets and `manifest` for host embedding |
 | `make wasm` | Build | Build all or specific runtime `WASM` plugins |
 | `make tidy` | Build | Tidy `Go` module dependencies for host, tools, and plugins |
 | `make image` | Image | Build a production `Docker` image |
-| `make image-build` | Image | Prepare image artifacts only, skip the `Docker` build step |
+| `make image.build` | Image | Prepare image artifacts only, skip the `Docker` build step |
 | `make test` | Test | Run the full `E2E` test suite |
 | `make test.go` | Test | Run `Go` unit tests |
 | `make test.host` | Test | Run host-only `E2E` tests |
 | `make test.plugins` | Test | Run official plugin `E2E` tests |
 | `make test.scripts` | Test | Run unit and smoke tests for tooling scripts |
 | `make i18n.check` | i18n | Scan for hardcoded strings and validate language pack key coverage |
+| `make plugins.init` | Plugin workspace | Convert official plugin submodules to ordinary directories |
+| `make plugins.install` | Plugin workspace | Install configured source plugins into `apps/lina-plugins` |
+| `make plugins.update` | Plugin workspace | Update source plugins in `apps/lina-plugins` |
+| `make plugins.status` | Plugin workspace | View source plugin workspace status |
 | `make init` | Database | Initialize database schema and seed data |
 | `make mock` | Database | Load demo `Mock` data |
+| `make release.tag.check` | Release governance | Verify `release tag` matches `framework.version` in `metadata.yaml` |
 | `make help` | Other | List all available commands |
-
-`linactl` also provides `plugins.init`, `plugins.install`, `plugins.update`, and `plugins.status` for advanced scenarios such as converting official plugin submodules into regular plugin directories, installing configured source plugins, or inspecting the plugin workspace state.
-
-## Plugin Mode Parameters
-
-The official plugin directory `apps/lina-plugins/` is a `Git submodule`. When this directory is initialized and contains plugin manifests, the `dev`, `build`, `image`, and related `Go` test commands automatically enter full plugin mode. A `temp/go.work.plugins` file (git-ignored) is generated from the root host-only `go.work`, and source plugin modules are resolved via `GOWORK`.
-
-If you only need to run the main framework, skip the submodule initialization or pass `plugins=0` to force host-only mode:
-
-```bash
-make dev plugins=0
-make build plugins=0
-make image plugins=0
-```
-
-Before building or testing official plugins, initialize the submodules first:
-
-```bash
-git submodule update --init --recursive
-```
 
 ## Dev Server
 
+### make dev.setup
+
+Installs all prerequisites for development and `E2E` testing, including frontend `npm` packages and `Playwright` browsers. Run once after the initial clone or in `CI` environment initialization — no need to repeat.
+
+```bash
+make dev.setup
+```
+
 ### make dev
 
-Restarts the backend and frontend dev servers. Before starting, it stops any running instances, then sequentially builds the `WASM` plugins, prepares frontend static assets, and compiles the backend. It waits for both servers to pass health checks before printing their status.
+Restarts the backend and frontend dev servers. Before starting, it stops any running instances, then sequentially builds `WASM` plugins, prepares frontend static assets, and compiles the backend. It waits for both servers to pass health checks before printing their status. Use `skip_wasm=true` to skip the `WASM` build step for faster startup.
 
 ```bash
 make dev
+
+# Skip WASM plugin build (for development scenarios not involving dynamic plugins)
+make dev skip_wasm=true
 ```
 
 The backend listens on `http://localhost:8080` by default; the frontend listens on `http://localhost:5666`. Logs are written to `temp/lina-core.log` and `temp/lina-vben.log` respectively.
@@ -139,15 +145,12 @@ make status
 Sample output:
 
 ```text
-╔══════════════════════════════════════════════╗
-║         LinaPro Framework Status             ║
-╠══════════════════════════════════════════════╣
-║  Backend:  ✓ running  http://localhost:8080  ║
-║  Frontend: ✓ running  http://localhost:5666  ║
-╠══════════════════════════════════════════════╣
-║  Backend log:   temp/lina-core.log           ║
-║  Frontend log:  temp/lina-vben.log           ║
-╚══════════════════════════════════════════════╝
++----------+---------+------------------------+-------+------------------------+--------------------+
+| Service  | Status  | URL                    | PID   | PID File               | Log File           |
++----------+---------+------------------------+-------+------------------------+--------------------+
+| Backend  | running | http://127.0.0.1:8080/ | 87739 | temp/pids/backend.pid  | temp/lina-core.log |
+| Frontend | running | http://127.0.0.1:5666/ | 87740 | temp/pids/frontend.pid | temp/lina-vben.log |
++----------+---------+------------------------+-------+------------------------+--------------------+
 ```
 
 ## Build
@@ -201,22 +204,14 @@ make wasm
 
 # Build a specific plugin (plugin-id is the plugin directory name)
 make wasm p=my-plugin
-
-# Specify output directory (linactl native command)
-cd hack/tools/linactl
-go run . wasm p=my-plugin out=../../temp/output
-
-# Dry-run: list buildable dynamic plugins (linactl native command)
-go run . wasm dry_run=true
 ```
 
-### linactl prepare-packed-assets
+### make pack.assets
 
-Prepares frontend static assets and `manifest` resources for backend embedding. Usually called automatically by `make build` or `make dev`. Run manually when you need to inspect embedded assets in isolation:
+Prepares host `manifest` assets for `Go` embedding, usually called automatically by `make build` or `make dev`. Run manually when you need to inspect or prepare embedded resources in isolation:
 
 ```bash
-cd hack/tools/linactl
-go run . prepare-packed-assets
+make pack.assets
 ```
 
 ### make tidy
@@ -274,31 +269,45 @@ image:
 | `image.baseImage` | `alpine:3.22` | Runtime base image |
 | `image.dockerfile` | `hack/docker/Dockerfile` | `Dockerfile` path, relative to the repository root |
 
-### make image-build
+### make image.build
 
 Prepares all image build artifacts (equivalent to running `make build`) without executing the `Docker build` step. Useful when you need to inspect artifacts manually or customize the image build process.
 
 ```bash
-make image-build
+make image.build
 ```
 
 ## Test
 
 ### make test
 
-Runs the full `Playwright E2E` test suite under `hack/tests/`. Make sure the dev servers are running via `make dev` before executing.
+Runs the full `Playwright E2E` test suite. Make sure the dev servers are running via `make dev` before executing. Use the `scope` parameter to narrow the test scope:
+
+| `scope` value | Description |
+|---------------|-------------|
+| `full` (default) | Run all `E2E` tests |
+| `host` | Run host-only tests |
+| `plugins` | Run all official plugin tests |
+| `plugin:<id>` | Run tests for a specific plugin |
 
 ```bash
 make test
+
+# Host tests only
+make test scope=host
+
+# Specific plugin tests only
+make test scope=plugin:multi-tenant
 ```
 
 ### make test.go
 
-Runs unit tests for all maintained `Go` modules. Pass `plugins=0` to force host-only mode.
+Runs unit tests for all maintained `Go` modules with race detection enabled. Pass `plugins=0` to force host-only mode, or `race=false` to disable race detection.
 
 ```bash
 make test.go
 make test.go plugins=0
+make test.go race=false
 ```
 
 ### make test.host
@@ -335,15 +344,49 @@ Scans runtime-visible code paths for hardcoded strings not covered by the i18n s
 make i18n.check
 ```
 
-## Plugin Tools
+## Plugin Workspace
 
-### linactl plugins.status
+The `apps/lina-plugins/` directory holds official plugins — it can be either a `Git submodule` or managed as a source plugin directory through the plugin workspace commands. The following commands provide full lifecycle management of the plugin workspace:
 
-View the current official plugin workspace status. Advanced developers can also use `plugins.init`, `plugins.install`, and `plugins.update` to manage source plugin workspaces in non-submodule form.
+### make plugins.init
+
+Converts `apps/lina-plugins` from a `Git submodule` to an ordinary plugin directory while preserving the plugin code. After conversion, you can freely modify plugin code and commit changes without submodule constraints.
 
 ```bash
-cd hack/tools/linactl
-go run . plugins.status
+make plugins.init
+```
+
+### make plugins.install
+
+Clones configured plugins from remote repositories into `apps/lina-plugins/` based on the `plugins.sources` configuration in `hack/config.yaml`. Supports `p=<plugin-id>` to install a single plugin and `source=<name>` to process only a specific source.
+
+```bash
+# Install all configured source plugins
+make plugins.install
+
+# Install a specific plugin only
+make plugins.install p=multi-tenant
+
+# Force-overwrite existing plugin directories
+make plugins.install force=1
+```
+
+### make plugins.update
+
+Updates configured source plugins in `apps/lina-plugins/`, pulling the latest version from the remote. Plugins with uncommitted local changes are blocked from updating unless `force=1` is passed.
+
+```bash
+make plugins.update
+make plugins.update p=multi-tenant
+make plugins.update force=1
+```
+
+### make plugins.status
+
+Views the current official plugin workspace status, including configured plugin versions, local changes, and remote update state.
+
+```bash
+make plugins.status
 ```
 
 ## Database

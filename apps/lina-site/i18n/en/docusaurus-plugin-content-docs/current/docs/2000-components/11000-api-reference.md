@@ -1,163 +1,161 @@
 ---
 slug: '/docs/api-reference'
-title: 'API Reference'
+title: 'OpenAPI Interface Documentation'
 hide_title: true
-description: 'How LinaPro automatically aggregates host and plugin API documentation — the OpenAPI endpoint, in-workspace API explorer, the declarative interface definition model, RBAC permission integration, multi-language API doc translation, in-browser debugging, and how to import the spec into Apifox, Postman, and other tools.'
+description: 'From a component design perspective, this page explains how LinaPro aggregates API documentation — the core host, source plugins, and WASM dynamic plugins are unified into a single OpenAPI document through g.Meta contracts, permission tags, API doc i18n resources, the in-workspace developer center debugging page, and third-party tool import.'
 keywords:
   - API reference
   - OpenAPI
   - API documentation
-  - API aggregation
-  - in-browser debugging
-  - API multi-language
-  - developer center
-  - LinaPro
-  - GoFrame
-  - API contracts
-  - interface permissions
-  - interface definitions
-  - route registration
-  - plugin interfaces
-  - documentation aggregation
   - api.json
+  - g.Meta
+  - permission
+  - API contract
+  - source plugin API
+  - WASM dynamic plugin API
+  - API aggregation
+  - API i18n
+  - apidoc
+  - developer center
+  - in-browser debugging
+  - RBAC permissions
+  - GoFrame
+  - pluginhost
+  - pluginbridge
+  - LinaPro
 ---
 
 ## Overview
 
-`LinaPro` includes built-in API documentation. At host service startup, it automatically scans all `API` definitions and aggregates the host interfaces and all enabled plugin interfaces into a single `OpenAPI`-format document. No manual documentation maintenance is required.
+The API documentation is the unified view through which `lina-core` exposes its `API` contracts. Rather than asking developers to maintain documentation files separately, the host generates `OpenAPI 3.0` documentation at runtime based on host routes, source plugin routes, and dynamic plugin routes.
 
-## Accessing the Documentation
-
-**API JSON endpoint:**
+The default access path is controlled by `server.extensions.apiDocPath` in `config.yaml`:
 
 ```text
 http://localhost:8080/api.json
 ```
 
-This is a standard `OpenAPI 3.0` JSON document, directly importable into `Swagger UI`, `Apifox`, `Postman`, and other compatible tools.
+The management workspace consumes the same document under **Developer Center → API Documentation**, providing a browsing and debugging entry point.
 
-**Embedded in the management workspace:**
+## Aggregation Scope
 
-After signing in to the management workspace, navigate to **Developer Center → API Docs** to browse all interfaces and send debug requests directly from the workspace.
+The API documentation aggregates three types of sources:
 
-## Automatic API Aggregation
-
-At startup, the host scans and aggregates interfaces in the following order:
+| Source | Integration method | Documentation content |
+|--------|---------|----------------------|
+| Core host | `g.Meta` contracts and bound routes in the host `api/` directory | Platform base interfaces: authentication, permissions, configuration, tasks, plugin governance, etc. |
+| Source plugins | Source plugin route bindings recorded by `pluginhost` | Plugin-specific `API`, request/response structures, and permission identifiers |
+| Dynamic plugins | Route contracts and runtime projections from dynamic plugin artifacts | Routes, methods, and descriptions exposed by dynamic plugins |
 
 ```mermaid
 flowchart LR
-    A["Host scans its own API definitions\n(g.Meta structs in api/ directory)"]
-    B["Scan enabled source plugins\n(routes in backend/api/ directory)"]
-    C["Load enabled dynamic plugins\n(routes registered by WASM plugins)"]
-    D["Aggregate into unified OpenAPI document\n(/api.json)"]
-
-    A --> D
-    B --> D
-    C --> D
+    Host["Host API contracts"] --> Builder["OpenAPI builder"]
+    Source["Source plugin route bindings"] --> Builder
+    Wasm["Dynamic plugin route contracts"] --> Builder
+    I18N["apidoc i18n resources"] --> Builder
+    Builder --> JSON["/api.json"]
+    JSON --> Workbench["Developer center API docs"]
+    JSON --> Tools["Apifox, Postman, Swagger UI"]
 ```
 
-When a plugin is enabled or disabled, the API documentation updates automatically on the next request — no service restart needed.
+After a plugin is enabled, disabled, or upgraded, the documentation updates as the runtime projection changes. The API documentation reflects the set of interfaces currently accessible from the host — not every interface that might exist in the source repository.
 
-## Interface Definition Model
+## API Contract Declaration
 
-The host and source plugins use `g.Meta` struct tags to declare interface contracts. All interface metadata — path, method, permissions, documentation, parameters — is centralized in `Go` code:
+The host and source plugins use `GoFrame`'s `g.Meta` struct tags to declare interface contracts. Path, method, tag, summary, description, and permission identifier are all written on the request struct:
 
 ```go
-// Example: article list interface definition
 type ArticleListReq struct {
-    g.Meta   `path:"/article" method:"get" tags:"Article Management" summary:"Article list"`
-    Page     int    `json:"page"     v:"min:1"          dc:"Page number"`
-    PageSize int    `json:"pageSize" v:"min:1,max:100"  dc:"Page size"`
-    Status   string `json:"status"   v:"in:draft,published" dc:"Filter by article status"`
+    g.Meta  `path:"/plugins/content-article/articles" method:"get" tags:"Content Article" summary:"List articles" dc:"Query article records by page." permission:"content-article:article:view"`
+    Page    int    `json:"page" v:"min:1" dc:"Page number"`
+    Size    int    `json:"size" v:"min:1,max:100" dc:"Page size"`
+    Keyword string `json:"keyword" dc:"Title keyword"`
 }
 
 type ArticleListRes struct {
     g.Meta `mime:"application/json"`
-    List   []*Article `json:"list"  dc:"Article list"`
-    Total  int        `json:"total" dc:"Total count"`
+    List   []*ArticleItem `json:"list" dc:"Article list"`
+    Total  int            `json:"total" dc:"Total records"`
 }
 ```
 
-This declarative approach provides several advantages:
+The `permission:"content-article:article:view"` here flows into the API documentation and also forms a consistent audit scope with the `RBAC` permission system. Do not use legacy or non-current permission tags to describe new interfaces.
 
-- **Single source of truth**: path, parameters, and documentation are all in one place — implementation and documentation can never diverge
-- **Permissions bound to interfaces**: permission identifiers are declared in the `g.Meta` tag and visible directly in the API documentation
-- **Automatic generation**: the framework parses struct tags at runtime — no additional tooling needed
+## Permission and Documentation Consistency
 
-## Permission Integration
+Interface permissions are not supplementary notes in the documentation — they are part of the `API` contract itself. This design provides three benefits:
 
-Each interface's permission identifier is declared via the `g.Meta` `middleware` tag and automatically integrates with the `RBAC` system:
+| Design point | Value |
+|--------------|-------|
+| Permission identifier lives near the route declaration | Easier to spot omissions or spelling inconsistencies during development |
+| Documentation directly displays the permission identifier | Frontend integration and role configuration can quickly identify authorization requirements |
+| Menu button permissions and interface permissions share a namespace | Platform administrators can audit page entry points against actual write operations |
 
-```go
-type ArticleCreateReq struct {
-    g.Meta `path:"/article" method:"post" tags:"Article Management" summary:"Create article" middleware:"AuthMiddleware,PermMiddleware" perm:"content-article:article:create"`
-    // Request body fields...
-}
-```
+Button permissions in the workspace come from menu governance data; interface permissions come from `g.Meta` contracts. Both should use the same business semantics, but do not assume that "seeing a button" guarantees the interface permission check can be bypassed.
 
-The permission identifier declared in the `perm` tag is visible in the API documentation, making it easy for administrators to assign the corresponding permission to roles.
+## Source Plugin Interfaces
 
-## Multi-Language API Documentation
+Source plugins define `DTO`s in their own `backend/api/` directory and register routes through `pluginhost` in `backend/plugin.go`. The host records these route bindings and projects interfaces that match the `GoFrame` handler shape into the unified `OpenAPI` document.
 
-API documentation descriptions support multi-language display. Translation files are located in the `manifest/i18n/<locale>/apidoc/` directory of the host and plugins:
+Source plugin interfaces should follow these conventions:
+
+- Paths use the plugin namespace, e.g. `/plugins/content-article/articles`.
+- `tags` uses a stable business module name — avoid changing the grouping on every version bump.
+- `summary` should be a short phrase; `dc` is for a more complete description.
+- `permission` must be consistent with the permission resources declared in the plugin's `plugin.yaml`.
+- Request and response fields should use `dc` to describe business meaning — avoid relying on field names alone.
+
+## Dynamic Plugin Interfaces
+
+`WASM` dynamic plugin interfaces are carried by the plugin artifact as route contracts. The host reads and projects them into the API documentation upon installation, enablement, and upgrade. Dynamic plugins run on top of `pluginbridge`; interface requests still pass through the host's authentication, permission, and tenant context processing before entering the `WASM` sandbox.
+
+Dynamic plugins cannot directly modify the host route table. Which routes they expose, which host services they can access, and which database tables or external addresses they can reach are all jointly determined by the plugin manifest, artifact metadata, and the `hostServices` authorization snapshot.
+
+## API Documentation i18n
+
+The i18n resources for API documentation are located under:
 
 ```text
-manifest/i18n/
-  zh-CN/
-    apidoc/
-      core-api-article.json   # Chinese translations for article-related interfaces
-  en-US/
-    apidoc/
-      core-api-article.json   # English translations (can be left empty)
+manifest/i18n/<locale>/apidoc/
 ```
 
-Translation file structure:
+Runtime UI language packs and API documentation language packs use different loading modes: `JSON` files directly under `manifest/i18n/<locale>/` are for runtime UI copy, while the `apidoc/` subdirectory is for API documentation translations and is loaded recursively by subdirectory.
 
-```json
-{
-  "core": {
-    "article": {
-      "list": {
-        "summary": "Article list",
-        "description": "Paginated article list with optional status filter"
-      },
-      "create": {
-        "summary": "Create article",
-        "description": "Create a new article record"
-      }
-    }
-  }
-}
+Example:
+
+```text
+apps/lina-core/manifest/i18n/zh-CN/apidoc/
+├── common.json
+└── core-api-auth.json
+
+apps/lina-plugins/content-notice/manifest/i18n/zh-CN/apidoc/
+└── plugin-api-notice.json
 ```
+
+Plugin API translations should only maintain the plugin's own namespace — do not write plugin copy into the host API documentation resources. The `en-US` API documentation resources can remain as empty placeholders, with English metadata in the source code serving as the default copy.
 
 ## In-Browser Debugging
 
-The API documentation page in the management workspace supports:
+The **Developer Center → API Documentation** page in the management workspace supports viewing request parameters, response structures, permission identifiers, and interface descriptions, and can directly send debug requests.
 
-- Viewing the complete request and response structure for each interface
-- Filling in request parameters and sending live `HTTP` requests
-- Viewing the response body and `HTTP` status code
+In-browser debugging uses the current logged-in user's authentication state. Debugging write operations such as `POST`, `PUT`, `PATCH`, and `DELETE` will produce real data changes — use a test environment or a clearly rollback-safe data scope.
 
-:::tip
-In-browser debugging uses the current logged-in user's auth token. Write operations (`POST`, `PUT`, `DELETE`) will produce real data changes — use a test environment for these.
-:::
+## Third-Party Tool Import
 
-## Importing into Third-Party Tools
+`/api.json` is a standard `OpenAPI 3.0` document that can be imported into common API tools:
 
-### Apifox
+| Tool | Usage |
+|------|-------|
+| `Apifox` | Create a new project, select **Import OpenAPI/Swagger**, and enter `http://localhost:8080/api.json` |
+| `Postman` | Use **Import** with the **Link** method to import `/api.json` |
+| `Swagger UI` | Point to the host-exposed `/api.json` URL |
+| `curl` | Download with `curl -o api.json http://localhost:8080/api.json` |
 
-1. Create a new project, select **Import data**
-2. Choose `OpenAPI/Swagger` format, enter the document URL: `http://localhost:8080/api.json`
-3. Confirm — interfaces are imported automatically
+## Troubleshooting
 
-### Postman
-
-1. Click **Import**
-2. Select **Link**, enter `http://localhost:8080/api.json`
-3. Confirm — a collection is created automatically
-
-### curl (direct download)
-
-```bash
-curl -o api.json http://localhost:8080/api.json
-```
+| Symptom | Investigation direction |
+|---------|------------------------|
+| Plugin interfaces missing from documentation | Confirm the plugin is installed and enabled; verify source plugin routes are registered through `pluginhost` |
+| Permission identifier is empty | Check whether `g.Meta` declares a `permission` tag |
+| Documentation language not changing | Check whether `manifest/i18n/<locale>/apidoc/` exists and whether the runtime cache has been refreshed |
+| Dynamic plugin interfaces missing | Check whether the `.wasm` artifact contains route contracts and whether the plugin is in a valid enabled version |

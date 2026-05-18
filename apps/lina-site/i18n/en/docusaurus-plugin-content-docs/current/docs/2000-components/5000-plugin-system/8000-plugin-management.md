@@ -2,56 +2,53 @@
 slug: '/docs/plugin-management'
 title: 'Plugin Management'
 hide_title: true
-description: 'A practical guide to daily LinaPro plugin operations, including how to configure plugin sources in hack/config.yaml, use make commands to install, upgrade, and check plugin status, filter target plugins with p and source parameters, force-overwrite local changes, and perform plugin enablement, disablement, and uninstallation through the management workspace UI.'
+description: 'From a component design and operational flow perspective, this page explains LinaPro plugin management — plugin source configuration, the local plugin workspace, plugins.init, plugins.install, plugins.update, plugins.status, management workspace installation and enablement, disablement and uninstallation, dynamic plugin upload, and runtime upgrade — covering the full chain from code acquisition to runtime activation.'
 keywords:
   - plugin management
+  - plugin workspace
+  - plugins.init
   - plugins.install
   - plugins.update
   - plugins.status
-  - plugins.init
   - hack/config.yaml
-  - plugin configuration
-  - official plugins
-  - source plugins
+  - plugin source
   - plugin installation
   - plugin upgrade
   - plugin status
-  - plugin workspace
-  - plugin source
-  - force parameter
-  - plugin filtering
-  - plugin enable
+  - dynamic plugin upload
+  - runtime upgrade
   - plugin disable
-  - LinaPro
+  - plugin uninstall
+  - apps/lina-plugins
+  - LinaPro plugins
 ---
 
-## Overview
+## Component Positioning
 
-`LinaPro` provides a complete set of plugin lifecycle management tools covering the full chain from code download to feature go-live. Plugin sources are configured centrally in `hack/config.yaml`, `make` commands synchronize plugin code to the local workspace, and the management workspace UI handles runtime enablement, disablement, and uninstallation.
+Plugin management connects two chains:
 
-## Configuring Plugin Sources
+- **Development chain**: Reads plugin sources from `hack/config.yaml` and synchronizes source plugins to the `apps/lina-plugins/` workspace.
+- **Runtime chain**: After the host scans plugin manifests, the management workspace handles discovery, installation, enablement, disablement, uninstallation, and upgrade.
 
-Plugin sources are configured in the `plugins.sources` section of `hack/config.yaml` at the repository root:
+These two chains have clear responsibilities. Code synchronization only means plugin files appear in the local workspace; whether a plugin is installed, enabled, or upgraded successfully is still determined by the host's runtime governance records.
 
-```yaml
-plugins:
-  sources:
-    official:                                              # Source name (custom), used for --source filtering
-      repo: "https://github.com/linaproai/official-plugins.git"  # Plugin Git repository URL
-      root: "."                                           # Sub-path within the repo where plugins live
-      ref: "main"                                         # Branch, tag, or commit to pull
-      items:                                              # List of plugins to install
-        - "*"                                             # "*" installs all plugin directories under root
+```mermaid
+flowchart LR
+    Config["hack/config.yaml<br/>Plugin sources"]
+    Workspace["apps/lina-plugins<br/>Local plugin workspace"]
+    Host["Host scans plugin.yaml"]
+    Govern["Plugin governance records<br/>Discovery, installation, enablement"]
+    Runtime["Runtime projection<br/>Menus, routes, hooks, cron"]
+
+    Config -->|"plugins.install / update"| Workspace
+    Workspace --> Host
+    Host --> Govern
+    Govern --> Runtime
 ```
 
-The `items` list accepts two formats:
+## Plugin Source Configuration
 
-| Format | Description |
-|--------|-------------|
-| `"*"` | Install all plugin directories under `root` |
-| `"org-center"` | Install only the plugin with the specified `ID` |
-
-You can configure multiple sources, each with an independent name, for selective operations via `source=<name>`:
+Plugin sources are configured in the `plugins.sources` section of `hack/config.yaml` at the repository root:
 
 ```yaml
 plugins:
@@ -61,122 +58,113 @@ plugins:
       root: "."
       ref: "main"
       items:
-        - "multi-tenant"
-        - "org-center"
-    internal:
-      repo: "https://git.example.com/my-company/lina-plugins.git"
-      root: "plugins"
-      ref: "release/1.0"
-      items:
         - "*"
 ```
 
-## Initializing the Plugin Workspace
+| Field | Description |
+|-------|-------------|
+| `repo` | Plugin source repository URL |
+| `root` | Root path within the source repository where plugins live |
+| `ref` | Branch, tag, or `commit` |
+| `items` | List of plugins to install; `"*"` means all plugins |
 
-`apps/lina-plugins/` is the fixed local plugin workspace. If this directory currently exists as a `Git` submodule, you must first convert it to a regular directory before performing plugin management operations:
+You can configure multiple sources, e.g. an official plugin source and an internal enterprise source. Commands support filtering via `source=<name>`.
+
+:::info Note
+The current version only supports open repositories as plugin sources. Private repository and dynamic plugin source installation will be supported in the future.
+:::
+
+## Plugin Workspace
+
+`apps/lina-plugins/` is the fixed plugin workspace. Official plugins are typically mounted as a `Git submodule`; if the project wants to manage plugin source code independently, it can first convert to an ordinary directory:
 
 ```bash
 make plugins.init
 ```
 
-This command disassociates the submodule while preserving existing plugin code — no local content is lost. If the directory does not exist, it is created automatically.
+This command disassociates the submodule while preserving existing plugin code. If the directory does not exist, it creates an empty workspace.
 
-## Installing Plugins
+:::info Note
+This command is optional — the directory conversion is performed automatically during installation. After execution, `apps/lina-plugins/` becomes an ordinary directory where you can directly add, modify, or delete plugin source code.
+:::
 
-Pull plugin code into `apps/lina-plugins/` according to the configuration in `hack/config.yaml`:
+## Installing and Updating Source Plugins
+
+Install plugins:
 
 ```bash
 make plugins.install
 ```
 
-After installation, corresponding plugin directories appear under `apps/lina-plugins/`, each containing a `plugin.yaml` manifest and complete frontend/backend code. The tool also writes `.linapro-plugins.lock.yaml` to record installation state for change detection during upgrades.
-
-## Upgrading Plugins
-
-Update installed plugins to the latest version pointed to by the source repository's current `ref`:
+Update plugins:
 
 ```bash
 make plugins.update
 ```
 
-Before upgrading, the tool checks for uncommitted local changes. If the plugin directory has local modifications, the upgrade is blocked by default to prevent accidental overwrites:
+Before updating, the tool checks for uncommitted local changes in the plugin directory. By default, local modifications block the update to prevent overwriting developer changes. If you need to force the update:
 
 ```bash
-# Force-overwrite local changes and upgrade directly
 make plugins.update force=1
 ```
 
-## Checking Plugin Status
-
-View the installation status, version information, and local modification state of configured plugins in the current workspace:
+Check status:
 
 ```bash
 make plugins.status
 ```
 
-Example output:
+The status output shows plugin `ID`, source, version, local installation state, local modification state, and remote sync status.
 
-```text
-Plugin workspace: apps/lina-plugins (ordinary)
-Querying configured plugin sources...
-Rendering status for 3 configured plugin(s)...
+## Management Workspace Lifecycle
 
-Plugin          Source    Version  Installed  Dirty  Remote
-multi-tenant    official  v0.1.0   true       false  up-to-date
-org-center      official  v0.1.0   true       true   up-to-date
-content-notice  official  v0.1.0   false      -      up-to-date
-```
+After plugin code enters the workspace, the host scans `plugin.yaml` at startup and presents the plugin as "Discovered". The administrator then performs runtime lifecycle operations in the Extension Center:
 
-Column descriptions:
+| Operation | Runtime behavior |
+|-----------|-----------------|
+| **Install** | Check dependencies, run installation `SQL`, write plugin governance records |
+| **Enable** | Project menus, permissions, routes, hooks, scheduled tasks, and frontend resources |
+| **Disable** | Hide menus and business routes; preserve data and governance records |
+| **Uninstall** | Clean up governance records; optionally preserve or clean up plugin-owned data |
+| **Upgrade** | Preview, confirm, migrate, switch version, and invalidate cache for the target plugin |
 
-| Column | Description |
-|--------|-------------|
-| `Plugin` | Plugin `ID` |
-| `Source` | Source name (corresponds to the key in `hack/config.yaml`) |
-| `Version` | Locally installed version (from `plugin.yaml`) |
-| `Installed` | Whether the plugin directory exists |
-| `Dirty` | Whether there are uncommitted local changes |
-| `Remote` | Sync status with the source repository's current `ref` |
+The distinction between disable and uninstall is important: disable only removes the runtime entry point while data remains; uninstall enters a cleanup flow, and if data cleanup is chosen, plugin-owned data may be unrecoverable.
 
-## Enabling Plugins in the Management Workspace
+## Dynamic Plugin Upload
 
-After plugin code is synchronized to `apps/lina-plugins/` and the host is restarted, the host automatically scans and discovers new plugins. Navigate to the **Extension Management** page in the management workspace:
+`WASM` dynamic plugins do not depend on the source workspace for delivery. The build artifact is a `.wasm` file; after the administrator uploads it in the Extension Center, the host validates the artifact and reads the embedded manifest, routes, resources, and authorization declarations.
 
-1. Find the target plugin in the plugin list — its status will be **Discovered**
-2. Click **Install** — the host runs dependency checks and executes installation `SQL`
-3. After successful installation, click **Enable** — the host registers menus, routes, and hooks, and the functionality takes effect immediately
+During dynamic plugin installation, the administrator must confirm `hostServices` authorization. Only after authorization confirmation does the host allow the plugin to access the corresponding host services and resource scope through `pluginbridge`.
 
-No host restart is required — menus and routes become visible in real time after enablement.
+## Runtime Upgrade
 
-## Disable and Uninstall
+After plugin files are updated, the host may detect that the "effective version" and the "discovered version" are inconsistent. At this point the plugin enters a runtime upgrade state:
 
-Find the enabled plugin on the **Extension Management** page in the management workspace:
+| State | Description |
+|-------|-------------|
+| `normal` | Effective version matches discovered version |
+| `pending_upgrade` | A higher version has been discovered, awaiting explicit administrator upgrade |
+| `upgrade_running` | Upgrade in progress |
+| `upgrade_failed` | Upgrade failed; the old effective version is retained with diagnostics recorded |
+| `abnormal` | File version is lower than the effective version or state is anomalous, requiring manual intervention |
 
-- **Disable**: Hides the plugin's menus and routes. Plugin data is fully preserved and can be re-enabled at any time.
-- **Uninstall**: The system prompts whether to also clean up plugin-owned data. Choosing cleanup runs uninstallation `SQL` and the data cannot be recovered; choosing preserve only removes governance records while data tables remain intact, allowing data reuse on reinstallation.
+Before upgrading, you can view a preview including version diff, dependency check, `SQL` count, `hostServices` diff, and risk warnings. During upgrade execution, the host performs confirmation validation, acquires the runtime upgrade lock, runs lifecycle callbacks, executes upgrade `SQL`, synchronizes governance resources, switches the effective version, and refreshes the cache.
 
-## Using a Custom Configuration File
+## Multi-Tenant Governance
 
-By default, `make` commands read `hack/config.yaml`. To use a configuration file at a different path, specify it with the `config` parameter:
+Tenant-aware plugins can choose between global enablement or tenant-scoped enablement:
 
-```bash
-make plugins.install config=hack/config.staging.yaml
-```
+| Mode | Behavior |
+|------|----------|
+| `global` | Plugin is installed and enabled once, effective for the platform or all tenants |
+| `tenant_scoped` | Plugin can be enabled or disabled per tenant |
 
-## Plugin Sources and Workspace Relationship
+The specific enablement strategy is determined by the host governance records and the `multi-tenant` plugin, not by the frontend alone.
 
-```mermaid
-flowchart LR
-    Config["hack/config.yaml<br/>Declares plugin sources"]
-    Workspace["apps/lina-plugins/<br/>Local source workspace"]
-    Host["Host startup<br/>Auto-scans plugin.yaml"]
-    Govern["Plugin governance plane<br/>Discovered"]
-    Lifecycle["Install → Enable<br/>Disable → Uninstall"]
+## Best Practices
 
-    Config -->|"make plugins.install<br/>make plugins.update"| Workspace
-    Workspace -->|"Compiled with the host"| Host
-    Host -->|"Enters"| Govern
-    Govern -->|"Management workspace ops"| Lifecycle
-```
-
-For the plugin system architecture design and dual-mode differences, see [Dual-Mode Plugin System](/docs/plugin-system). For declaring multi-tenant fields in the plugin manifest, see [Multi-Tenancy](/docs/multi-tenant).
+- After synchronizing plugin code during development, still install and enable the plugin in the management workspace.
+- Check for local changes before updating plugin source code — avoid accidentally using `force=1` to overwrite development work.
+- After uploading a higher version of a dynamic plugin, do not assume the new version is active — a runtime upgrade must be performed.
+- Before uninstalling a production plugin, confirm whether to preserve data and check for reverse dependencies.
+- Pin plugin sources to stable branches, tags, or `commits` — avoid using uncontrolled floating versions in production.
