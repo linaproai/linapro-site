@@ -262,15 +262,3 @@ health:
 ```
 
 The health probe returns standard `HTTP` status codes — `200` for normal, `503` for abnormal.
-
-## Related Components
-
-- [Built-in Admin Workspace](/docs/admin-workspace): The standard frontend consumer of host capabilities.
-- [Configuration](/docs/configuration): Host runtime configuration groups and production checklist.
-- [API Reference](/docs/api-reference): Unified `OpenAPI` documentation aggregation for host and plugins.
-- [Multi-Tenancy](/docs/multi-tenant): Host tenant context and official tenant control plane.
-- [Scheduled Tasks](/docs/cron-tasks): Persistent scheduling, built-in tasks, and plugin tasks.
-- [I18N Internationalization](/docs/i18n): Host, plugin, and API documentation language resources.
-- [Dual-Mode Plugin System](/docs/plugin-system): How the host governs source and dynamic plugins.
-- [Plugin Management](/docs/plugin-management): Plugin code sources and runtime management flow.
-- [Native Distributed Architecture](/docs/distributed-architecture): Cluster mode coordination mechanisms.

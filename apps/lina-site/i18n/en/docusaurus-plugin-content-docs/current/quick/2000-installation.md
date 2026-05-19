@@ -81,6 +81,12 @@ After the config is ready, run the following command to create the database sche
 make init confirm=init
 ```
 
+If you use `PowerShell` on `Windows`, run:
+
+```powershell
+.\make init confirm=init
+```
+
 After initialization, the database contains the basic table structure and default configuration data required by the system.
 
 ### Load Demo Data (Optional)
