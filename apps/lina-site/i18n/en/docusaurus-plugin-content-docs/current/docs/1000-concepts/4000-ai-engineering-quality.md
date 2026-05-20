@@ -103,31 +103,29 @@ Spec-driven development improves quality in several ways:
 | Quality dimension | Traditional approach | SDD approach |
 |-------------------|----------------------|--------------|
 | **Architectural consistency** | Depends on developer memory and oral knowledge transfer | Spec documents act as the constraint baseline, and `AI` starts from them every time |
-| **Change traceability** | Commit history rarely captures design intent clearly | Every change has corresponding `proposal` and `design` documents |
+| **Change traceability** | Commit history rarely captures design intent clearly | Every change has corresponding `proposal.md` and `design.md` |
 | **Cross-session consistency** | `AI` starts over in each conversation | Specs provide stable cross-session context anchors |
 | **Architectural drift detection** | Usually found only through code review | `E2E` tests act as a hard gate; drift causes failure |
 
-`LinaPro` implements the `SDD` workflow through `OpenSpec`. The tool provides four stage commands, `/opsx:explore`, `/opsx:propose`, `/opsx:apply`, and `/opsx:archive`, supporting a complete five-stage development loop. For details, see [AI Spec-Driven Development](/docs/spec-driven-development).
+`LinaPro` implements the `SDD` workflow through `OpenSpec`, supporting a complete five-stage development loop. For details, see [AI Spec-Driven Development](/docs/spec-driven-development).
 
 ### Dimension 2: Two Layers of Project Specification Constraints
 
 `LinaPro` uses two complementary kinds of specification files to cover the full constraint surface of `AI` coding behavior. One is a set of **resident constraint files** loaded at the start of every `AI` session and applied across the whole project. The other is a set of **capability-domain baseline specs** that evolve with features and define precise acceptance scenarios. They serve different roles and work together as a complete specification constraint system.
 
-#### Resident Constraint Files: AGENTS.md / CLAUDE.md
+#### Resident Constraint Files: AGENTS.md
 
-`AGENTS.md`, which is also linked as `CLAUDE.md`, is the **project-level specification file** that `AI` coding agents in `LinaPro` must read first at the beginning of every session. Unlike capability-domain specs under `openspec/specs/`, `AGENTS.md`/`CLAUDE.md` is a set of **resident, cross-iteration global constraints**. No matter which feature the current iteration touches, these constraints remain in force.
+`AGENTS.md`, which is also linked as `CLAUDE.md`, is the **project-level specification file** that `AI` coding agents in `LinaPro` must read first at the beginning of every session. Unlike capability-domain specs under `openspec/specs/`, `AGENTS.md` is a set of **resident, cross-iteration global constraints**. No matter which feature the current iteration touches, these constraints remain in force.
 
-`AGENTS.md`/`CLAUDE.md` covers the following core constraint dimensions:
+`AGENTS.md` covers the following core constraint dimensions:
 
-- **Architecture constraints**: Defines the project positioning as an AI-native full-stack framework for sustainable delivery. It specifies the boundary of the `lina-core` host: the core host must not be tightly coupled to the admin workspace presentation structure, and workspace-layer changes must be handled in the adaptation layer rather than pushed down into core domain contracts.
-
-- **Module design rules**: Requires every business module to support on-demand disabling. When disabled, related frontend `UI` elements must be hidden together. Data permission integration must be explicitly evaluated, and read APIs must inject filters at the database query layer instead of relying on in-memory filtering. Source plugin directory structure is fixed; business `service` code must not be placed in non-standard locations such as `backend/service/`.
-
-- **Interface design constraints**: Enforces `RESTful` semantics. `GET`, `POST`, `PUT`, and `DELETE` must strictly match operation semantics. Action-style path names are prohibited, and resource-oriented path naming must remain consistent across the repository.
-
-- **Compilation and testing gates**: Any task that adds or modifies production `Go` code must run a `go test` smoke test covering the changed package before it can be marked complete. Changes involving controller construction, route binding, or `API` signatures must also run startup and binding package tests. Backend changes cannot be considered compilable based only on static analysis or historical assumptions.
-
-- **Continuous governance requirements**: Every functional change must evaluate its impact on `i18n` and explicitly decide whether translation keys need to be added, modified, or removed. Cache-related designs must distinguish single-node and clustered deployments; when `cluster.enabled=true`, they must not fall back to local-only cache behavior visible only on the current node. Bug fixes must add or update automated tests that prove the fix works, and behavior defects cannot be marked complete without tests.
+- **Architecture constraints**: Defines the project positioning and the `lina-core` host boundary, preventing tight coupling between the core domain and workspace presentation structure.
+- **Module design rules**: Business modules must support on-demand disabling with coordinated frontend hiding; data permission filtering must happen at the database query layer; source plugin directory layout is fixed.
+- **Interface design constraints**: Enforces `RESTful` semantics throughout the repository; action-style path names are prohibited.
+- **Backend code quality rules**: Runtime dependencies must be injected through constructors; errors must be wrapped with `bizerr`; logging must pass `ctx` along the call chain; cached state must be coordinated across instances in cluster mode.
+- **API response contracts**: Time-point fields must return Unix millisecond integers (`int64`); `DTO` fields must carry English documentation tags; development tools must be cross-platform executable.
+- **Compilation and testing gates**: Production `Go` code changes must pass a `go test` smoke test, and interface signature changes must also pass startup binding tests, before being marked complete.
+- **Continuous governance requirements**: Every change must assess `i18n` impact; cache design must distinguish single-node from cluster deployments; bug fixes must be accompanied by automated tests.
 
 These constraints are not suggestions. They are the **behavioral rules** for `AI` agents. Before generating code, `AI` must make decisions against these rules, and any deviation is called out during code review. This means that even in a brand-new session, `AI` does not produce output that drifts from project style simply because it "does not know the project conventions." **The specification file itself is `AI`'s memory.**
 
@@ -137,20 +135,13 @@ These constraints apply at the repository level, covering both framework code an
 
 Under `LinaPro`'s `openspec/specs/` directory, baseline spec files cover the system's capability domains. These are not abstract vision documents. They are engineering constraints written down to scenario-level precision: each requirement uses explicit `SHALL`/`MUST NOT` semantics, and each `Scenario` describes concrete acceptance conditions.
 
-For example, the backend consistency spec explicitly constrains behavior such as:
-
-- Controller dependencies must be injected explicitly through constructors and must not be created implicitly inside request paths
-- Service components must be split into separate files by responsibility, and large files must not accumulate multiple responsibilities
-- Database operations must pass data through `DO` objects and must not manually maintain time fields managed by the framework
-- Runtime errors must be returned as `error` values to callers, and business paths must not use `panic` as a substitute for error handling
-
-These spec files provide context for `AI` code generation and comparison targets for code review. When a piece of `AI`-generated code does not comply with a spec, the issue can be identified explicitly instead of depending on the reviewer's subjective judgment.
+The backend consistency spec, for example, covers dependency injection patterns, service component granularity, database operation conventions, and error handling rules down to scenario-level precision. These spec files provide context for `AI` code generation and serve as concrete reference points for code review. When a piece of `AI`-generated code does not comply with a spec, the issue can be identified explicitly instead of depending on the reviewer's subjective judgment.
 
 #### How the Two Layers Divide Responsibilities
 
 | Specification layer | Files | Scope | When updated |
 |---------------------|-------|-------|--------------|
-| **Resident constraints** | `AGENTS.md` / `CLAUDE.md` | Whole project, all iterations, every `AI` session | Revised when architectural decisions change |
+| **Resident constraints** | `AGENTS.md` | Whole project, all iterations, every `AI` session | Revised when architectural decisions change |
 | **Capability baselines** | `openspec/specs/<domain>/spec.md` | Acceptance scenarios for a specific capability domain | Consolidated after each feature iteration is archived |
 
 The two layers constrain `AI` coding behavior at different levels of granularity. Resident constraints provide the global baseline, ensuring that `AI` output in any session does not violate the project's fundamental design principles. Capability baselines provide local precision, ensuring that the implementation details of each concrete feature satisfy that capability's acceptance expectations.
@@ -232,7 +223,7 @@ flowchart LR
     A["Requirement intent"] -->|"SDD workflow"| B["Spec documents<br/>(proposal + design)"]
     B -->|"Spec constraints"| C["AI code implementation"]
     C -->|"API contract tests"| D["Safe API boundaries"]
-    C -->|"Backend consistency specs"| E["Consistent code style"]
+    C -->|"Code consistency specs"| E["Consistent code style"]
     C -->|"Unit tests"| F["Correct service behavior"]
     C -->|"E2E tests"| G["End-to-end functionality"]
     D & E & F & G --> H["Spec archival<br/>quality consolidation"]
@@ -247,4 +238,4 @@ For teams using `LinaPro`, this means:
 - Any implementation that deviates from the specs has explicit documents to compare against, giving reviewers concrete evidence
 - Every design decision produced during an iteration is preserved through spec archival instead of disappearing when the conversation ends
 
-This is `LinaPro`'s systematic answer to the problem of "`AI` engineering quality": **not only "write faster," but "write correctly, write steadily, and pass acceptance."**
+In the `AI` era, speed is the starting point, not the destination. `LinaPro`'s goal is to keep quality from falling behind while `AI` moves at full speed.

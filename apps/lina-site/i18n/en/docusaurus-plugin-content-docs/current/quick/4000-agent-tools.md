@@ -50,6 +50,8 @@ Today, `AI Coding` tools are highly diverse. Each tool may read skills directori
 
 ## Recommended Mainstream Tools
 
+> The following tools are commonly used by community team members in `AI Coding` practice.
+
 | Tool | Skills Directory | Project Instructions | Integration Guidance |
 |------|------------------|----------------------|----------------------|
 | Claude Code | `.claude/skills/` | ✅ Supported | Reads `CLAUDE.md` by default; LinaPro already supports this through a symlink |
@@ -61,6 +63,8 @@ Today, `AI Coding` tools are highly diverse. Each tool may read skills directori
 | GitHub Copilot | ✅ Supported | ✅ Supported | Also supports `.github/copilot-instructions.md` configuration |
 
 ## Complete Tool Matrix
+
+> If anything is missing or inaccurate, please submit a `PR` or `Issue` to help update it.
 
 | Tool | Skills Directory | Project Instructions | Integration Guidance |
 |----------------------|----------|--------------|------------------|
