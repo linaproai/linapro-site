@@ -284,3 +284,16 @@ npx playwright install --with-deps chromium
 ```
 
 **使用方式**：描述需要执行的浏览器操作，或使用`/playwright-cli`命令触发。
+
+## 项目 Agent 软链管理
+
+`.agents/skills/`是技能内容的唯一源目录，但不同`AI Coding`工具默认从各自专属项目路径（如`.claude/skills/`、`.codebuddy/skills/`、`.windsurf/skills/`等）发现技能。`LinaPro`提供仓库内置的`make skills`命令体系，统一管理这些项目级软链：
+
+```bash
+make skills                      # 终端下进入交互式操作菜单
+make skills.link AGENT=qoder     # 为指定 Agent 创建软链
+make skills.link AGENT=all       # 为所有 link 类 Agent 创建软链
+make skills.unlink AGENT=qoder   # 移除受管软链
+```
+
+完整的工具映射表与 Agent 分类说明请参考[AI 工具集成](../quick/agent-tools)。
