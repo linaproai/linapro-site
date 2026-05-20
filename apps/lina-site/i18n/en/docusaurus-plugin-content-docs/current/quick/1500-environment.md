@@ -236,5 +236,5 @@ npx skills add github.com/gogf/skills -g
 `find-skills` is an `AI` skill marketplace search tool that helps developers quickly find and evaluate `AI` skills suited to the project, improving skill selection efficiency.
 
 ```bash
-npx skills add find-skills -g
+npx skills add vercel-labs/skills --skill find-skills -g
 ```
