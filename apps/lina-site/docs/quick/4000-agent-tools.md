@@ -2,7 +2,7 @@
 slug: '/quick/agent-tools'
 title: 'AI工具集成'
 hide_title: true
-description: '本文介绍当前主流 AI Coding 工具对 LinaPro 框架中 .agents/skills/ 技能目录、AGENTS.md 项目规范文件以及 CLAUDE.md 等工具专属规范文件的支持情况，并提供 LinaPro 统一的 make skills 软链管理命令，帮助团队判断 Claude Code、OpenAI Codex、Cursor、GitHub Copilot、Gemini CLI、Windsurf、Amp、OpenCode、Devin、Qoder、CodeBuddy、Roo Code 等工具如何快速接入 LinaPro 的 AI 原生研发规范。'
+description: '本文介绍当前主流 AI Coding 工具对 LinaPro 框架中 .agents/skills/ 技能目录、AGENTS.md 项目规范文件以及 CLAUDE.md 等工具专属规范文件的支持情况，并提供 LinaPro 统一的 make agents 软链管理命令，帮助团队判断 Claude Code、OpenAI Codex、Cursor、GitHub Copilot、Gemini CLI、Windsurf、Amp、OpenCode、Devin、Qoder、CodeBuddy、Roo Code 等工具如何快速接入 LinaPro 的 AI 原生研发规范。'
 keywords:
   - LinaPro
   - AI工具集成
@@ -24,7 +24,7 @@ keywords:
   - Roo Code
   - vercel-labs
   - skills CLI
-  - make skills
+  - make agents
   - .agents/skills
   - AI Coding工具
   - 项目规范
@@ -53,11 +53,11 @@ keywords:
 
 | 工具名称 | 技能目录 | 项目规范 | 集成建议 |
 |---------|---------|---------|---------|
-| Claude Code | `.claude/skills/` | ✅ 支持 | 默认读取`CLAUDE.md`，已做软连支持；可执行`make skills.link AGENT=claude-code` |
+| Claude Code | `.claude/skills/` | ✅ 支持 | 默认读取`CLAUDE.md`，已做软连支持；可执行`make agents.skills.link AGENT=claude-code` |
 | OpenAI Codex | ✅ 支持 | ✅ 支持 | 原生匹配`LinaPro`当前目录结构 |
 | Cursor | ✅ 支持 | ✅ 支持 | 简单规范放`AGENTS.md`，复杂规则放`.cursor/rules/` |
 | OpenCode | ✅ 支持 | ✅ 支持 | 同时支持`AGENTS.md`与 `Claude Code` 兼容文件 |
-| Windsurf | `.windsurf/skills/` | ✅ 支持 | 执行`make skills.link AGENT=windsurf` |
+| Windsurf | `.windsurf/skills/` | ✅ 支持 | 执行`make agents.skills.link AGENT=windsurf` |
 | Cline | ✅ 支持 | ✅ 支持 | 共享规范放`AGENTS.md`，`Cline` 专属规则放`.clinerules/` |
 | GitHub Copilot | ✅ 支持 | ✅ 支持 | 也支持`.github/copilot-instructions.md`配置 |
 
@@ -67,58 +67,66 @@ keywords:
 |----------------------|----------|--------------|------------------|
 | Amp | ✅ 支持 | ✅ 支持 | 直接复用当前`AGENTS.md`和标准技能目录 |
 | Antigravity | ✅ 支持 | ⚠️ 待确认 | 可先复用标准技能目录，项目规范读取需实测 |
-| Claude Code | ✅ 支持 | ✅ 支持 | 默认读取`CLAUDE.md`，已做软连支持；执行`make skills.link AGENT=claude-code` |
-| OpenClaw | `skills/` | ⚠️ 待确认 | 与仓库根 `skills/` 冲突，需显式 `make skills.link AGENT=openclaw FORCE=1`，规范文件读取需实测 |
+| Claude Code | ✅ 支持 | ✅ 支持 | 默认读取`CLAUDE.md`，已做软连支持；执行`make agents.skills.link AGENT=claude-code` |
+| OpenClaw | `skills/` | ⚠️ 待确认 | 与仓库根 `skills/` 冲突，需显式 `make agents.skills.link AGENT=openclaw FORCE=1`，规范文件读取需实测 |
 | Cline | ✅ 支持 | ✅ 支持 | 共享规范放`AGENTS.md`，`Cline` 专属规则放`.clinerules/` |
-| CodeBuddy | `.codebuddy/skills/` | ⚠️ 待确认 | 执行`make skills.link AGENT=codebuddy`，规范文件读取需实测 |
+| CodeBuddy | `.codebuddy/skills/` | ⚠️ 待确认 | 执行`make agents.skills.link AGENT=codebuddy`，规范文件读取需实测 |
 | OpenAI Codex | ✅ 支持 | ✅ 支持 | 原生兼容当前`LinaPro`规范 |
 | Cursor | ✅ 支持 | ✅ 支持 | 简单规则用`AGENTS.md`，范围规则用`.cursor/rules/` |
 | Deep Agents | ✅ 支持 | ⚠️ 待确认 | 可先复用标准技能目录，项目规范读取需实测 |
-| Devin | `.devin/skills/` | ✅ 支持 | 执行`make skills.link AGENT=devin` |
+| Devin | `.devin/skills/` | ✅ 支持 | 执行`make agents.skills.link AGENT=devin` |
 | Dexto | ✅ 支持 | ⚠️ 待确认 | 可先复用标准技能目录，项目规范读取需实测 |
-| Droid | `.factory/skills/` | ✅ 支持 | 执行`make skills.link AGENT=droid` |
+| Droid | `.factory/skills/` | ✅ 支持 | 执行`make agents.skills.link AGENT=droid` |
 | Firebender | ✅ 支持 | ⚠️ 待确认 | 可先复用标准技能目录，项目规范读取需实测 |
-| ForgeCode | `.forge/skills/` | ⚠️ 待确认 | 执行`make skills.link AGENT=forgecode`，规范文件读取需实测 |
-| Gemini CLI | ✅ 支持 | ⚙️ 可配置 | 建议软连`ln -s AGENTS.md GEMINI.md` |
+| ForgeCode | `.forge/skills/` | ⚠️ 待确认 | 执行`make agents.skills.link AGENT=forgecode`，规范文件读取需实测 |
+| Gemini CLI | ✅ 支持 | ⚙️ 可配置 | 执行`make agents.md.link AGENT=gemini-cli`创建`GEMINI.md` → `AGENTS.md`软链 |
 | GitHub Copilot | ✅ 支持 | ✅ 支持 | 也支持`.github/copilot-instructions.md`配置  |
-| Goose | `.goose/skills/` | ✅ 支持 | 执行`make skills.link AGENT=goose` |
-| Hermes Agent | `.hermes/skills/` | ⚠️ 待确认 | 执行`make skills.link AGENT=hermes-agent`，规范文件读取需实测 |
+| Goose | `.goose/skills/` | ✅ 支持 | 执行`make agents.skills.link AGENT=goose` |
+| Hermes Agent | `.hermes/skills/` | ⚠️ 待确认 | 执行`make agents.skills.link AGENT=hermes-agent`，规范文件读取需实测 |
 | Kimi Code CLI | ✅ 支持 | ⚠️ 待确认 | 可先复用标准技能目录，项目规范读取需实测 |
 | OpenCode | ✅ 支持 | ✅ 支持 | 原生读取`AGENTS.md`，也能迁移 `Claude Code` 项目 |
-| Pi | `.pi/skills/` | ⚠️ 待确认 | 执行`make skills.link AGENT=pi`，规范文件读取需实测 |
-| Qoder | `.qoder/skills/` | ✅ 支持 | 执行`make skills.link AGENT=qoder` |
-| Qwen Code | `.qwen/skills/` | ⚠️ 待确认 | 执行`make skills.link AGENT=qwen-code`；如需规范文件兼容可附加`ln -s AGENTS.md QWEN.md` |
+| Pi | `.pi/skills/` | ⚠️ 待确认 | 执行`make agents.skills.link AGENT=pi`，规范文件读取需实测 |
+| Qoder | `.qoder/skills/` | ✅ 支持 | 执行`make agents.skills.link AGENT=qoder` |
+| Qwen Code | `.qwen/skills/` | ⚠️ 待确认 | 执行`make agents.skills.link AGENT=qwen-code`；如需规范文件兼容可执行`make agents.md.link AGENT=qwen-code` |
 | Replit | ✅ 支持 | ⚠️ 待确认 | 可先复用标准技能目录，项目规范读取需实测 |
-| Rovo Dev | `.rovodev/skills/` | ⚠️ 待确认 | 执行`make skills.link AGENT=rovodev`，规范文件读取需实测 |
-| Roo Code | `.roo/skills/` | ✅ 支持 | 执行`make skills.link AGENT=roo` |
-| Trae | `.trae/skills/` | ⚠️ 待确认 | 执行`make skills.link AGENT=trae`，规范文件读取需实测 |
+| Rovo Dev | `.rovodev/skills/` | ⚠️ 待确认 | 执行`make agents.skills.link AGENT=rovodev`，规范文件读取需实测 |
+| Roo Code | `.roo/skills/` | ✅ 支持 | 执行`make agents.skills.link AGENT=roo` |
+| Trae | `.trae/skills/` | ⚠️ 待确认 | 执行`make agents.skills.link AGENT=trae`，规范文件读取需实测 |
 | Warp | ✅ 支持 | ✅ 支持 | 可先复用标准技能目录，项目规范读取需实测 |
-| Windsurf | `.windsurf/skills/` | ✅ 支持 | 执行`make skills.link AGENT=windsurf` |
+| Windsurf | `.windsurf/skills/` | ✅ 支持 | 执行`make agents.skills.link AGENT=windsurf` |
 | Universal | ✅ 支持 | 取决于目标工具 | 用于未显式列出的`AGENTS.md`兼容工具 |
 
 ## 使用 LinaPro 统一管理命令
 
-`LinaPro`提供了仓库内置的`make skills`命令体系，统一管理上述工具的`Agent`项目路径软链，避免开发者手写`ln -s`，并保证`Windows`/`Linux`/`macOS`三端一致行为。命令仅在仓库根目录范围内操作，不会修改`HOME`目录或任何系统全局路径。
+`LinaPro`提供了仓库内置的`make agents.<resource>.<action>`命令树，统一管理三类资源的项目级软链，避免开发者手写`ln -s`，并保证`Windows`/`Linux`/`macOS`三端一致行为。命令仅在仓库根目录范围内操作，不会修改`HOME`目录或任何系统全局路径。
+
+支持的资源：
+
+- **`skills`**：目录级软链，`.<tool>/skills` → `.agents/skills`，对应上文的工具兼容性矩阵。
+- **`prompts`**：目录级软链，`.<tool>/.../opsx` → `.agents/prompts/opsx`（每个 Agent 显式声明源路径），管理斜杠命令/`prompts`类资源。
+- **`md`**：单文件软链，`.<tool>.md`（如`CLAUDE.md`、`GEMINI.md`）→ 仓库根`AGENTS.md`，让仅读取私有规范文件名的 Agent 复用同一份 `AGENTS.md`。
 
 ```bash
-# 终端下进入交互式操作菜单（link / unlink / quit）
-make skills
+# 终端下进入资源 → 动作 → Agent 三层交互菜单
+make agents
 
-# 终端下交互式选择要链接的 Agent；CI 或管道下显示只读状态列表
-make skills.link
+# skills：本节工具兼容性矩阵涉及的目录级软链
+make agents.skills.link                            # 终端下交互式选择；CI/管道下只读列表
+make agents.skills.link AGENT=claude-code          # 非交互式：为单个 Agent 创建软链
+make agents.skills.link AGENT=claude-code,codebuddy,qoder
+make agents.skills.link AGENT=all                  # 为所有 link 类 Agent 创建软链
+make agents.skills.link AGENT=all FORCE=1          # 强制重建指向错误源的旧软链
+make agents.skills.unlink AGENT=claude-code        # 移除受管软链
+make agents.skills.unlink AGENT=all
 
-# 非交互式：为指定 Agent 创建软链
-make skills.link AGENT=claude-code
-make skills.link AGENT=claude-code,codebuddy,qoder
-make skills.link AGENT=all                # 为所有 link 类 Agent 创建软链
-make skills.link AGENT=all FORCE=1        # 强制重建指向错误源的旧软链
+# prompts：管理 Agent 的斜杠命令/prompts 目录（首批支持 claude-code / cursor / codex / gemini-cli）
+make agents.prompts.link AGENT=claude-code
+make agents.prompts.unlink AGENT=claude-code
 
-# 终端下交互式选择要移除的受管软链
-make skills.unlink
-
-# 非交互式：移除指定 Agent 的受管软链
-make skills.unlink AGENT=claude-code
-make skills.unlink AGENT=all
+# md：让 Agent 通过私有规范文件读取 AGENTS.md
+make agents.md.link AGENT=claude-code              # 创建 CLAUDE.md -> AGENTS.md 软链
+make agents.md.link AGENT=all                      # 一次性为所有 link 类 Agent 创建私有规范文件软链
+make agents.md.unlink AGENT=claude-code
 ```
 
 **Agent 分类**（与[`vercel-labs/skills`](https://github.com/vercel-labs/skills#supported-agents)官方项目路径表对齐）：
@@ -133,7 +141,7 @@ make skills.unlink AGENT=all
 - `FORCE=1`仅作用于"已是软链但指向非`.agents/skills`"的情况。
 - 所有 Agent 软链目录已在`.gitignore`中忽略，本地创建不会污染仓库。
 
-终端下`make skills.link`的交互式列表使用 3 列网格 + 状态符号布局：
+终端下`make agents.skills.link`的交互式列表使用 3 列网格 + 状态符号布局：
 
 - `[+]` linked — 已指向`.agents/skills`
 - `[~]` mismatch — 软链存在但指向其他位置
