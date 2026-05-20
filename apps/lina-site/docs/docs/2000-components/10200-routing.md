@@ -167,7 +167,7 @@ type UserListReq struct {
 
 ## API 标签一体化管理
 
-`lina-core`基于`GoFrame`的`g.Meta`机制，将接口的所有属性——路径、方法、分组标签、摘要、描述、权限、`MIME`类型等——全部内联在请求`DTO`的结构体标签中，实现**代码与文档同源**。
+`lina-core`基于`g.Meta`机制，将接口的所有属性——路径、方法、分组标签、摘要、描述、权限、`MIME`类型等——全部内联在请求`DTO`的结构体标签中，实现**代码与文档同源**。
 
 ### 主框架接口标签示例
 
@@ -181,7 +181,7 @@ type CreateRecordReq struct {
 
 ### 动态插件接口标签示例
 
-动态插件使用`gmeta.Meta`（而非`g.Meta`），标签内额外增加`access`和`operLog`字段：
+动态插件使用`gmeta.Meta`（而非`g.Meta`，沙箱环境的组件依赖缘故），标签内额外增加`access`和`operLog`字段：
 
 ```go
 type CreateDemoRecordReq struct {

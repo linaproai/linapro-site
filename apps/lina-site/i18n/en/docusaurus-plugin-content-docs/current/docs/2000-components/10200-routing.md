@@ -167,7 +167,7 @@ For a detailed treatment of authentication (JWT issuance, session management, RB
 
 ## Inline API Attribute Management
 
-`lina-core` uses GoFrame's `g.Meta` mechanism to declare all API attributes — path, method, grouping tags, summary, description, permission, MIME type, and more — inline in the request DTO's struct tags, achieving **code and documentation from a single source of truth**.
+`lina-core` uses the `g.Meta` mechanism to declare all API attributes — path, method, grouping tags, summary, description, permission, MIME type, and more — inline in the request DTO's struct tags, achieving **code and documentation from a single source of truth**.
 
 ### Host Endpoint Tag Example
 
@@ -181,7 +181,7 @@ type CreateRecordReq struct {
 
 ### Dynamic Plugin Endpoint Tag Example
 
-Dynamic plugins use `gmeta.Meta` instead of `g.Meta`, with additional `access` and `operLog` fields:
+Dynamic plugins use `gmeta.Meta` instead of `g.Meta` because of component dependencies in the sandboxed environment, with additional `access` and `operLog` fields:
 
 ```go
 type CreateDemoRecordReq struct {
