@@ -1,15 +1,15 @@
 ---
 slug: '/quick/installation'
-title: 'Installation'
+title: 'Quick Installation'
 hide_title: true
-description: 'How to install and initialize LinaPro in a few minutes — cloning the repository, configuring the database connection, initializing the database schema, loading demo data, and starting the development service. Complete the environment setup before cloning.'
+description: 'This guide explains how to install and initialize the LinaPro framework in a few minutes. It covers cloning the source repository with Git, initializing official plugin submodules when needed, preparing the default PostgreSQL database, copying and adjusting the configuration file, initializing the database through the cross-platform linactl or compatible make entry, loading demo data, starting the development service, integrating AI Coding tools, and verifying that the installation is working correctly.'
 keywords:
   - LinaPro
   - framework installation
   - quick start
   - git clone
   - clone repository
-  - source code
+  - source download
   - stable release
   - config.yaml
   - database configuration
@@ -21,6 +21,8 @@ keywords:
   - environment setup
   - demo data
   - make mock
+  - linactl
+  - official plugin submodules
 ---
 
 Before cloning the repository, read [Environment Setup](/quick/environment) and make sure required components such as `Go`, `Node.js`, `pnpm`, and `PostgreSQL` are installed correctly.
@@ -37,7 +39,7 @@ git clone --depth 1 https://github.com/linaproai/linapro.git linapro
 git clone --depth 1 --branch v0.1.0 https://github.com/linaproai/linapro.git linapro
 ```
 
-## Starting the Service
+## Start the Services
 
 ### Prepare PostgreSQL
 
@@ -52,7 +54,7 @@ docker run \
   postgres:14-alpine
 ```
 
-If local port `5432` is already occupied, map the container to another host port, such as `15432:5432`, and update the port in `database.default.link`.
+If local port `5432` is already occupied, map the container to another host port, such as `15432:5432`, and update the port in `database.default.link` accordingly.
 
 ### Configure the Database Connection
 
@@ -97,7 +99,21 @@ After the config is ready, run the following command to load the official demo d
 make mock confirm=mock
 ```
 
-### Start the Development Service
+### Check the Environment (Optional)
+
+Run the following command to check whether the current development environment meets the requirements:
+
+```bash
+make env.check
+```
+
+If requirements are missing, you can install the complete development environment resources with the following command. This may take some time:
+
+```bash
+make env.setup
+```
+
+### Start the Development Services
 
 Run the following command to start both frontend and backend services:
 
@@ -109,7 +125,7 @@ When the services start successfully, visit:
 
 | Service | URL |
 |---------|-----|
-| Built-in admin workspace | `http://localhost:5666` |
+| Default admin workspace | `http://localhost:5666` |
 | Backend `API` service | `http://localhost:8080` |
 
 Log in to the admin workspace with the default account:
@@ -119,18 +135,31 @@ Log in to the admin workspace with the default account:
 | Account | `admin` |
 | Password | `admin123` |
 
-## Common Commands
+## Tool Integration
+
+Today's `AI Coding` tools use different conventions for storing skills, project rules, and prompt files. LinaPro provides a general interactive terminal command that integrates the framework's `Skills`, project conventions, and prompts into the `AI Coding` tool you already use, reducing the amount of setup you need to remember.
 
 ```bash
-make dev               # Start frontend and backend services
-make stop              # Stop all local services
-make status            # Check service status
-make init confirm=init # Reinitialize the database
-make mock confirm=mock # Reload demo data
-make test              # Run the full E2E test suite
-make build             # Build a production-ready binary
-make image             # Build the Docker image
+make agents
 ```
+
+:::info Tip
+Run this before code development so your `AI Coding` tool can work with higher-quality project context.
+:::
+
+## Common Commands
+
+The following commands are used frequently during development. For the complete development command set, see [Development Commands](../docs/5000-tools/1000-commands.md).
+
+```bash
+make dev          # Start frontend and backend services
+make stop         # Stop all local services
+make status       # Check service status
+make build        # Build distributable binary/WASM artifacts
+make image        # Build the Docker image
+```
+
+> `Windows cmd.exe` can run `make <command>` directly. In `PowerShell`, use `.\make <command>` or `.\make.cmd <command>`.
 
 ## Installation Verification
 

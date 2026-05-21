@@ -2,7 +2,7 @@
 slug: '/quick/environment'
 title: 'Environment Setup'
 hide_title: true
-description: 'This guide covers every environment dependency required to run LinaPro from source, including Git, Go (>= 1.23), Node.js (>= 20.19), pnpm (>= 10.0), PostgreSQL (14+), Make, and the recommended AI-native workflow tools Claude Code, OpenSpec CLI, and the goframe-v2 skill. It also provides installation guidance for macOS, Linux, and Windows (WSL / Git Bash) so you can prepare your local machine before installing LinaPro.'
+description: 'This guide explains every dependency required to run LinaPro from source, including Git, Go (1.25+), Node.js (20.19+), pnpm (10.0+), PostgreSQL 14+, the cross-platform linactl development command entry, and the recommended AI-native workflow tools and skills such as Claude Code, OpenSpec CLI, goframe-v2, and find-skills. It also provides installation guidance for macOS, Linux, and Windows so developers can prepare a local development environment before installing LinaPro.'
 keywords:
   - LinaPro
   - environment setup
@@ -13,7 +13,8 @@ keywords:
   - pnpm
   - PostgreSQL
   - Git
-  - Make
+  - linactl
+  - Redis
   - Claude Code
   - OpenSpec
   - goframe-v2
@@ -32,11 +33,11 @@ import TabItem from '@theme/TabItem';
 
 ## Environment Components
 
-LinaPro depends on the following components during source development. Install them locally before continuing.
+`LinaPro` depends on the following components during source development. Install them locally before continuing.
 
 | Component | Version requirement | Notes |
-|-----------|--------------------|-------|
-| `Git` | - | Version control; required by the install script |
+|-----------|---------------------|-------|
+| `Git` | - | Version control; required by installation scripts |
 | `Go` | `1.25+` | Backend service runtime |
 | `Node.js` | `20.19+` | Frontend build environment |
 | `pnpm` | `10.0+` | Frontend package manager |
@@ -61,16 +62,16 @@ sudo yum install git
 ```
 
 </TabItem>
-<TabItem value="windows" label="Windows (Git Bash / WSL)">
+<TabItem value="windows" label="Windows">
 
-Download and install `Git for Windows` from [git-scm.com](https://git-scm.com/download/win). After installation, run all subsequent commands in `Git Bash`.
+Download and install `Git for Windows` from [git-scm.com](https://git-scm.com/download/win). After installation, you can use the `git` command in `cmd.exe`, `PowerShell`, `Git Bash`, or `WSL`.
 
 </TabItem>
 </Tabs>
 
 ### Go
 
-`Go 1.23` or later is required. Run `go version` to check your current version.
+`Go 1.25` or later is required. Run `go version` to check your current version.
 
 <Tabs groupId="platform">
 <TabItem value="mac-linux" label="macOS / Linux" default>
@@ -86,9 +87,9 @@ echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc && source ~/.bashrc
 ```
 
 </TabItem>
-<TabItem value="windows" label="Windows (WSL)">
+<TabItem value="windows" label="Windows">
 
-Install it inside `WSL` using the `Linux` steps, or download the `Windows` installer (`.msi`) from [go.dev/dl](https://go.dev/dl/) and complete the graphical setup.
+Download the `Windows` installer (`.msi`) from [go.dev/dl](https://go.dev/dl/) and complete the graphical setup, or install `Go` inside `WSL` using the `Linux` steps.
 
 </TabItem>
 </Tabs>
@@ -112,9 +113,9 @@ brew install node
 ```
 
 </TabItem>
-<TabItem value="windows" label="Windows (WSL)">
+<TabItem value="windows" label="Windows">
 
-Install `nvm` inside `WSL` using the `Linux` steps, or download the `Windows` build from [nodejs.org](https://nodejs.org/) and use it together with `WSL`.
+Use [nvm-windows](https://github.com/coreybutler/nvm-windows), or download the `Windows` build from [nodejs.org](https://nodejs.org/). You can also install `nvm` inside `WSL` using the `Linux` steps.
 
 </TabItem>
 </Tabs>
@@ -123,7 +124,7 @@ After installation, run `node --version` and confirm that the output is at least
 
 ### pnpm
 
-`pnpm` is the package manager used by LinaPro's frontend project. Do not replace it with `npm` or `yarn`.
+`pnpm` is the package manager specified for LinaPro's frontend project. Do not replace it with `npm` or `yarn`.
 
 ```bash
 npm install -g pnpm
@@ -161,49 +162,23 @@ If `Docker` is already installed locally, you can start a local `PostgreSQL` con
 ```bash
 docker run \
   -p 5432:5432 \
-  -e POSTGRES_PASSWORD=12345678 \
+  -e POSTGRES_PASSWORD=postgres \
   -e POSTGRES_USER=postgres \
   -e POSTGRES_DB=linapro \
   postgres:14-alpine
 ```
 
-This example connects to the `linapro` database with `postgres:12345678@127.0.0.1:5432`. If you keep this password, update `database.default.link` in the project's `config.yaml` to `pgsql:postgres:12345678@tcp(127.0.0.1:5432)/linapro?sslmode=disable`.
+This example connects to the `linapro` database with `postgres:postgres@127.0.0.1:5432`. If you keep this password, update `database.default.link` in the project's `config.yaml` to `pgsql:postgres:postgres@tcp(127.0.0.1:5432)/linapro?sslmode=disable`.
 
 </TabItem>
-<TabItem value="windows" label="Windows (WSL)">
+<TabItem value="windows" label="Windows">
 
-Install `PostgreSQL` inside `WSL` using the `Linux` steps, or install it on the `Windows` side with the [PostgreSQL Windows installer](https://www.postgresql.org/download/windows/) and connect from `WSL` through `127.0.0.1`.
+Install it on the `Windows` side with the [PostgreSQL Windows installer](https://www.postgresql.org/download/windows/), or run the `PostgreSQL` container above with `Docker Desktop`. If you use `WSL`, you can connect from `WSL` to the `Windows` database through `127.0.0.1`, or install `PostgreSQL` directly inside your `WSL` distribution.
 
 </TabItem>
 </Tabs>
 
 By default, LinaPro connects to the `linapro` database with `postgres:postgres@127.0.0.1:5432`, using the link `pgsql:postgres:postgres@tcp(127.0.0.1:5432)/linapro?sslmode=disable`. You can change the connection settings in the project's `config.yaml`.
-
-### Make
-
-`Make` is usually built into `macOS` and `Linux`. If it is not installed:
-
-<Tabs groupId="platform">
-<TabItem value="mac-linux" label="macOS / Linux" default>
-
-```bash
-# macOS (also installs Git and other command-line tools)
-xcode-select --install
-
-# Ubuntu / Debian
-sudo apt install build-essential
-
-# CentOS / RHEL
-sudo yum groupinstall "Development Tools"
-```
-
-</TabItem>
-<TabItem value="windows" label="Windows (WSL)">
-
-Install it inside `WSL` using the command for your Linux distribution.
-
-</TabItem>
-</Tabs>
 
 ## Development Skills (Agent Skills)
 
@@ -211,13 +186,13 @@ LinaPro recommends installing the following `Agent Skills`:
 
 | Skill | Required | Purpose |
 |-------|:--------:|---------|
-| `OpenSpec` | Recommended | Optional spec-driven workflow tool — recommended for the best experience |
-| `goframe-v2` | Recommended | GoFrame-specific `AI` skill that provides code generation, diagnostics, and performance optimization guidance to improve generated `Go` code quality |
+| `OpenSpec` | Recommended | Optional spec-driven workflow tool, recommended for the best experience |
+| `goframe-v2` | Recommended | `GoFrame`-specific `AI` skill that provides code generation, diagnostics, and performance optimization guidance to improve generated `Go` framework code quality |
 | `find-skills` | Recommended | `AI` skill marketplace search tool for quickly finding and evaluating skills that fit the project |
 
 ### OpenSpec
 
-`OpenSpec` is an optional spec-driven workflow command-line tool. Install it to unlock the full spec-driven workflow experience. Once installed, workflow skills such as `/opsx:explore`, `/opsx:propose`, `/opsx:apply`, and `/opsx:archive` will automatically use it as their underlying engine.
+`OpenSpec` is an optional spec-driven workflow command-line tool. Install it to unlock the full spec-driven workflow experience. Once installed, workflow skills such as `/opsx:explore`, `/opsx:propose`, `/opsx:apply`, and `/opsx:archive` will automatically use `OpenSpec` as their underlying engine.
 
 ```bash
 npm install -g @fission-ai/openspec@latest

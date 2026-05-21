@@ -169,7 +169,7 @@ docker run \
   postgres:14-alpine
 ```
 
-该示例使用`postgres:12345678@127.0.0.1:5432`连接`linapro`数据库。如果沿用这个密码，请将项目`config.yaml`中的`database.default.link`改为`pgsql:postgres:12345678@tcp(127.0.0.1:5432)/linapro?sslmode=disable`。
+该示例使用`postgres:postgres@127.0.0.1:5432`连接`linapro`数据库。如果沿用这个密码，请将项目`config.yaml`中的`database.default.link`改为`pgsql:postgres:postgres@tcp(127.0.0.1:5432)/linapro?sslmode=disable`。
 
 </TabItem>
 <TabItem value="windows" label="Windows">
@@ -180,32 +180,6 @@ docker run \
 </Tabs>
 
 `LinaPro`默认使用`postgres:postgres@127.0.0.1:5432`连接`linapro`数据库，对应连接串为`pgsql:postgres:postgres@tcp(127.0.0.1:5432)/linapro?sslmode=disable`，可在项目的`config.yaml`中修改连接配置。
-
-### Make
-
-`macOS`和`Linux`系统通常已内置了`make`工具。如未安装：
-
-<Tabs groupId="platform">
-<TabItem value="mac-linux" label="macOS / Linux" default>
-
-```bash
-# macOS（同时会安装 Git 等命令行工具）
-xcode-select --install
-
-# Ubuntu / Debian
-sudo apt install build-essential
-
-# CentOS / RHEL
-sudo yum groupinstall "Development Tools"
-```
-
-</TabItem>
-<TabItem value="windows" label="Windows">
-
-`Windows`不要求安装`GNU Make`。仓库根目录提供`make.cmd`薄包装入口，`cmd.exe`中可以直接执行`make help`，`PowerShell`中使用`.\make help`或`.\make.cmd help`。
-
-</TabItem>
-</Tabs>
 
 ## 开发技能(Agent Skills)
 

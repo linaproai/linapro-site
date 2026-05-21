@@ -99,6 +99,22 @@ make init confirm=init
 make mock confirm=mock
 ```
 
+### 运行环境检查（可选）
+
+执行以下命令检查当前开发环境是否满足要求：
+
+```bash
+make env.check
+```
+
+如果不满足，则可通过以下指令安装完整的开发环境资源，可能需要较长时间：
+
+```bash
+make env.setup
+```
+
+
+
 ### 启动开发服务
 
 执行以下命令启动前后端服务：
@@ -121,21 +137,33 @@ make dev
 | 账号 | `admin` |
 | 密码 | `admin123` |
 
-## 常用命令
+## 工具集成
 
+由于当前`AI Coding`工具百花齐放，且各个工具的技能、规范、提示词文件存储路径不尽相同，因此我们提供了一个通用的终端交互式指令，帮助大家将框架提供的`Skills`、项目规范和提示词快速集成到自己熟悉的`AI Coding`工具中，以减少大家的心智负担。 
 
 ```bash
-make dev               # 启动前后端服务
-make stop              # 停止所有本地服务
-make status            # 查看服务运行状态
-make init confirm=init # 重新初始化数据库
-make mock confirm=mock # 重新加载演示数据
-make test              # 运行完整 E2E 测试套件
-make build             # 编译生成可发布的二进制文件
-make image             # 构建 Docker 镜像
+make agents
+```
+
+:::info 提示
+需要在进行代码开发之前执行，以便驱动你的`AI Coding`工具能够更高质量地工作。
+:::
+
+## 常用命令
+
+以下为开发过程中较频繁使用的指令（完整的开发工具指令集请参考[开发指令](../docs/5000-tools/1000-commands.md)章节）：
+
+```bash
+make dev          # 启动前后端服务
+make stop         # 停止所有本地服务
+make status       # 查看服务运行状态
+make build        # 编译生成可发布的二进制/WASM文件
+make image        # 构建 Docker 镜像
 ```
 
 > `Windows cmd.exe`可直接使用`make <指令>`；`PowerShell`使用`.\make <指令>`或`.\make.cmd <指令>`。
+
+
 
 ## 安装验证
 

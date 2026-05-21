@@ -35,9 +35,15 @@ keywords:
 
 整个开发过程全程由`Claude Code`通过规范驱动工作流驱动，预计用时 `30` 分钟左右。
 
-:::info 提示
-我们推荐使用`Claude Code`，因为它（目前）被认为是行业内最强大的`AI Coding`工具，其他的工具如`Codex CLI`、`Cursor`等也表现不错，大家在这里选择任意自己擅长的`AI Coding`工具即可。
-:::
+## 工具集成
+
+本示例我们使用了`Claude Code`，因为它（目前）被认为是行业内最强大的`AI Coding`工具，其他的工具如`Codex CLI`、`Cursor`等也表现不错，大家开发中可以选择任意自己熟悉的`AI Coding`工具。
+
+执行以下指令，通过终端交互的方式，可以将框架提供的`Skills`、项目规范和提示词集成到自己熟悉的`AI Coding`工具中：
+
+```bash
+make agents
+```
 
 ## 前置准备
 
