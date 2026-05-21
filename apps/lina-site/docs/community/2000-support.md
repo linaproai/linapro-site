@@ -24,15 +24,28 @@ keywords:
 
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
+## 捐赠方式
+
 我们当前接受来自微信或支付宝的捐赠。捐赠时请备注自己的`GitHub`或`Gitee`账号名称，便于我们整理捐赠记录并致谢。
 
-## 支付宝
-
-<img src={useBaseUrl('/img/donate-alipay.webp')} style={{ width: '300px', maxWidth: '100%' }} alt="支付宝捐赠二维码" />
-
-## 微信
-
-<img src={useBaseUrl('/img/donate-wechat.webp')} style={{ width: '300px', maxWidth: '100%' }} alt="微信捐赠二维码" />
+<table>
+  <thead>
+    <tr>
+      <th>支付宝</th>
+      <th>微信</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>
+        <img src={useBaseUrl('/img/donate-alipay.webp')} style={{ width: '280px', maxWidth: '100%' }} alt="支付宝捐赠二维码" />
+      </td>
+      <td>
+        <img src={useBaseUrl('/img/donate-wechat.webp')} style={{ width: '280px', maxWidth: '100%' }} alt="微信捐赠二维码" />
+      </td>
+    </tr>
+  </tbody>
+</table>
 
 ## 捐赠记录
 

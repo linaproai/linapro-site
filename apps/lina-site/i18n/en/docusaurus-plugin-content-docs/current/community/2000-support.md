@@ -24,15 +24,28 @@ keywords:
 
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
+## Donation Methods
+
 We currently accept donations through WeChat Pay and Alipay. Please include your GitHub or Gitee account name in the donation note so we can keep an accurate donation record and acknowledge your support.
 
-## Alipay
-
-<img src={useBaseUrl('/img/donate-alipay.webp')} style={{ width: '300px', maxWidth: '100%' }} alt="Alipay donation QR code" />
-
-## WeChat Pay
-
-<img src={useBaseUrl('/img/donate-wechat.webp')} style={{ width: '300px', maxWidth: '100%' }} alt="WeChat Pay donation QR code" />
+<table>
+  <thead>
+    <tr>
+      <th>Alipay</th>
+      <th>WeChat Pay</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>
+        <img src={useBaseUrl('/img/donate-alipay.webp')} style={{ width: '280px', maxWidth: '100%' }} alt="Alipay donation QR code" />
+      </td>
+      <td>
+        <img src={useBaseUrl('/img/donate-wechat.webp')} style={{ width: '280px', maxWidth: '100%' }} alt="WeChat Pay donation QR code" />
+      </td>
+    </tr>
+  </tbody>
+</table>
 
 ## Donation Records
 
