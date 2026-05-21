@@ -2,14 +2,15 @@
 slug: '/docs/commands'
 title: '开发指令'
 hide_title: true
-description: '本文介绍 LinaPro 项目中跨平台开发指令集的作用、支持的参数选项和使用示例，涵盖 linactl、Makefile 兼容入口、Windows make.cmd 包装入口、开发服务管理、完整构建、WASM 插件构建、Docker 镜像构建、插件工作区管理、测试验证、国际化检查、数据库初始化和发布治理等场景，帮助开发者在 macOS、Linux 和 Windows 上稳定使用同一套项目工具链。'
+description: '本文介绍 LinaPro 项目中跨平台开发指令集的作用、支持的参数选项和使用示例，涵盖 linactl、Makefile 兼容入口、Windows make.cmd 包装入口、本地环境检查与初始化、开发服务管理、完整构建、WASM 插件构建、Docker 镜像构建、插件工作区管理、智能体资源软链管理、测试验证、国际化检查、数据库初始化和发布治理等场景，帮助开发者在 macOS、Linux 和 Windows 上稳定使用同一套项目工具链。'
 keywords:
   - make指令
   - 开发指令
   - 构建命令
   - LinaPro开发
+  - make env.check
+  - make env.setup
   - make dev
-  - make dev.setup
   - make build
   - make pack.assets
   - make test
@@ -19,6 +20,10 @@ keywords:
   - make wasm
   - make plugins.install
   - make plugins.status
+  - make agents
+  - make agents.skills.link
+  - make agents.prompts.link
+  - make agents.md.link
   - make release.tag.check
   - linactl
   - 开发工作流
@@ -72,13 +77,14 @@ make help
 .\make dev
 ```
 
-后续文档中所有`make <指令>`示例，都可以等价替换为`cd hack/tools/linactl && go run . <指令>`，参数格式保持一致。
+后续文档中所有`make <指令>`示例，都可以等价替换为`cd hack/tools/linactl && go run . <指令>`，参数格式保持一致。`make`兼容入口会转发常用变量；如果需要使用`linactl`专属参数，可直接调用`go run . <指令>`。
 
 ## 指令总览
 
 | 指令 | 分类 | 说明 |
 |------|------|------|
-| `make dev.setup` | 开发服务 | 安装前端依赖和`Playwright`浏览器 |
+| `make env.check` | 环境 | 检查本地开发工具、项目本地前端工具和`PostgreSQL`版本 |
+| `make env.setup` | 环境 | 安装前端依赖和`Playwright Chromium`浏览器及系统依赖 |
 | `make dev` | 开发服务 | 重启前后端开发服务器 |
 | `make stop` | 开发服务 | 停止前后端开发服务器 |
 | `make status` | 开发服务 | 查看前后端运行状态及日志路径 |
@@ -98,34 +104,72 @@ make help
 | `make plugins.install` | 插件工作区 | 安装配置中的源码插件到`apps/lina-plugins` |
 | `make plugins.update` | 插件工作区 | 更新`apps/lina-plugins`中的源码插件 |
 | `make plugins.status` | 插件工作区 | 查看源码插件工作区状态 |
+| `make agents` | 智能体资源 | 为单个智能体一键创建或移除技能、提示词和`AGENTS.md`相关软链 |
+| `make agents.skills.link` | 智能体资源 | 将支持的智能体项目技能目录软链到`.agents/skills` |
+| `make agents.skills.unlink` | 智能体资源 | 移除由`agents.skills.link`管理的技能目录软链 |
+| `make agents.prompts.link` | 智能体资源 | 将支持的智能体命令或提示词目录软链到`.agents/prompts/...` |
+| `make agents.prompts.unlink` | 智能体资源 | 移除由`agents.prompts.link`管理的提示词目录软链 |
+| `make agents.md.link` | 智能体资源 | 将支持的智能体私有规则文件软链到根目录`AGENTS.md` |
+| `make agents.md.unlink` | 智能体资源 | 移除由`agents.md.link`管理的`AGENTS.md`规则文件软链 |
 | `make init` | 数据库 | 初始化数据库表结构和种子数据 |
 | `make mock` | 数据库 | 加载演示`Mock`数据 |
 | `make release.tag.check` | 发布治理 | 校验`release tag`与`metadata.yaml`中`framework.version`一致 |
 | `make help` | 其他 | 查看所有可用指令 |
 
 
-## 开发服务
+## 环境管理
 
-### make dev.setup
+### make env.check
 
-安装开发与`E2E`测试所需的全部前置依赖，包括前端`npm`包和`Playwright`浏览器。在首次克隆仓库或`CI`环境初始化时执行一次即可，后续不需要重复运行。
+检查本地开发环境是否满足默认开发工作流要求。该命令只读取工具版本和数据库连接信息，不修改工作区。除`Vite`和`Playwright`使用项目本地依赖外，`PostgreSQL`版本会通过`apps/lina-core/manifest/config/config.yaml`中的`database.default.link`连接数据库后查询。
 
 ```bash
-make dev.setup
+make env.check
 ```
+
+当前检查项如下：
+
+| 检查项 | 最低版本 | 说明 |
+|--------|----------|------|
+| `Go` | `1.25.0` | 后端、工具链和`WASM`插件构建使用的`Go`工具链 |
+| `Node.js` | `20.19.0` | 前端开发和构建所需的`Node.js`运行时 |
+| `pnpm` | `10.0.0` | 前端依赖管理工具 |
+| `Vite` | `7.3.1` | 项目本地前端构建工具，缺失时先执行`make env.setup` |
+| `Playwright` | `1.58.2` | `E2E`测试运行器，缺失时先执行`make env.setup` |
+| `PostgreSQL` | `14.0.0` | 通过`database.default.link`探测服务端版本 |
+
+### make env.setup
+
+安装开发与`E2E`测试所需的前端依赖、`Playwright Chromium`浏览器和浏览器运行所需系统依赖。在首次克隆仓库或`CI`环境初始化时执行一次即可，后续通常不需要重复运行。
+
+```bash
+make env.setup
+```
+
+## 开发服务
 
 ### make dev
 
-重启后端和前端开发服务器。执行前会先停止已有服务，依次完成`WASM`插件构建、前端静态资源准备和后端编译，等待两端健康检查通过后打印运行状态。支持通过`skip_wasm=true`跳过`WASM`构建步骤以加快启动速度。
+重启后端和前端开发服务器。执行前会先校验命令参数中的`backend_port`、后端`server.address`和前端`Vite proxy target`是否一致，避免端口错配后才暴露为健康检查超时或接口错误。随后命令会停止已有服务，按插件模式决定是否构建`WASM`插件，准备前端静态资源，编译后端并等待两端健康检查通过。
 
 ```bash
 make dev
 
-# 跳过 WASM 插件构建（适用于不涉及动态插件的开发场景）
-make dev skip_wasm=true
+# 强制宿主模式，跳过官方源码插件和 WASM 插件构建
+make dev plugins=0
+
+# 强制启用官方源码插件模式
+make dev plugins=1
 ```
 
-后端默认监听`http://localhost:8080`，前端默认监听`http://localhost:5666`。运行日志分别写入`temp/lina-core.log`和`temp/lina-vben.log`。
+`plugins=auto`是默认模式：当`apps/lina-plugins/`中存在可用插件`manifest`时自动启用官方插件模式，否则使用宿主模式。直接调用`linactl dev`时还可以传入`skip_wasm=true`只跳过`WASM`构建步骤。
+
+```bash
+cd hack/tools/linactl
+go run . dev skip_wasm=true
+```
+
+后端默认监听`http://localhost:9120`，前端默认监听`http://localhost:5666`。运行日志分别写入`temp/lina-core.log`和`temp/lina-vben.log`。
 
 ### make stop
 
@@ -149,23 +193,32 @@ make status
 +----------+---------+------------------------+-------+------------------------+--------------------+
 | Service  | Status  | URL                    | PID   | PID File               | Log File           |
 +----------+---------+------------------------+-------+------------------------+--------------------+
-| Backend  | running | http://127.0.0.1:8080/ | 87739 | temp/pids/backend.pid  | temp/lina-core.log |
+| Backend  | running | http://127.0.0.1:9120/ | 87739 | temp/pids/backend.pid  | temp/lina-core.log |
 | Frontend | running | http://127.0.0.1:5666/ | 87740 | temp/pids/frontend.pid | temp/lina-vben.log |
 +----------+---------+------------------------+-------+------------------------+--------------------+
 ```
 
-## 构建
+## 代码构建
 
 ### make build
 
-完整构建流程，依次执行：前端静态资源构建、嵌入到后端的`manifest`资源准备、所有`WASM`插件构建，最后编译后端宿主二进制。构建产物输出到`temp/output/`目录。
+完整构建流程，依次执行：前端静态资源构建、嵌入到后端的静态资源和`manifest`资源准备、按插件模式构建动态`WASM`插件，最后编译后端宿主二进制。构建产物输出到`temp/output/`目录。
 
 ```bash
 # 默认构建（当前平台）
 make build
 
+# 强制宿主模式，不构建官方源码插件
+make build plugins=0
+
 # 指定目标平台（交叉编译）
 make build platforms=linux/amd64,linux/arm64
+
+# 覆盖构建产物目录和二进制名称
+make build output_dir=temp/release binary_name=linapro
+
+# 覆盖配置文件
+make build config=hack/config.yaml
 
 # 开启详细日志
 make build verbose=1
@@ -195,9 +248,17 @@ build:
 | `build.outputDir` | `temp/output` | 构建产物输出路径，相对于仓库根目录 |
 | `build.binaryName` | `lina` | 宿主二进制文件名 |
 
+插件构建模式通过`plugins`参数控制：
+
+| `plugins`值 | 说明 |
+|-------------|------|
+| `auto`（默认） | 当`apps/lina-plugins/`存在可用插件`manifest`时启用官方源码插件模式 |
+| `0` | 强制宿主模式，移除官方插件构建标签并跳过官方插件`WASM`构建 |
+| `1` | 强制启用官方源码插件模式；如果插件工作区不可用，命令会快速失败 |
+
 ### make wasm
 
-单独构建运行时`WASM`插件。`make wasm`是兼容入口，默认把产物输出到`temp/output/`，支持使用`p=<plugin-id>`只构建指定插件。需要覆盖输出目录或只做构建探测时，直接使用`linactl wasm`。
+单独构建运行时`WASM`插件。`make wasm`是兼容入口，默认把产物输出到`temp/output/`，支持使用`p=<plugin-id>`只构建指定插件，并可通过`dry_run=true`只检查可构建插件而不写产物。需要构建任意路径下的单个插件目录时，直接使用`linactl wasm plugin_dir=<path>`。
 
 ```bash
 # 构建所有 WASM 插件
@@ -205,11 +266,18 @@ make wasm
 
 # 只构建指定插件（plugin-id 为插件目录名）
 make wasm p=my-plugin
+
+# 只检查构建计划
+make wasm dry_run=true
+
+# 直接构建指定插件目录
+cd hack/tools/linactl
+go run . wasm plugin_dir=../../apps/lina-plugins/my-plugin out=../../temp/output
 ```
 
 ### make pack.assets
 
-准备宿主`manifest`资产，用于`Go`嵌入，通常由`make build`或`make dev`自动调用。需要单独检查或准备嵌入资源时可以手动执行：
+准备宿主`manifest`资产，用于`Go`嵌入。该命令会刷新`apps/lina-core/internal/packed/manifest/`下的`config`、`sql`和`i18n`资源，通常由`make build`或`make dev`自动调用。需要单独检查或准备嵌入资源时可以手动执行：
 
 ```bash
 make pack.assets
@@ -223,11 +291,11 @@ make pack.assets
 make tidy
 ```
 
-## 镜像
+## 镜像编译
 
 ### make image
 
-完整的`Docker`镜像构建流程：先执行`make build`生成所有构建产物，再调用`hack/tools/image-builder`封装成镜像。镜像名称、标签、镜像仓库地址等均通过参数配置。
+完整的`Docker`镜像构建流程：先执行镜像构建预检，再执行`make build`生成所有构建产物，最后调用`hack/tools/image-builder`封装成镜像。镜像名称、标签、镜像仓库地址、基础镜像和插件构建模式等均通过参数配置。
 
 ```bash
 # 使用默认配置构建镜像
@@ -241,6 +309,9 @@ make image tag=v0.6.0 registry=ghcr.io/linaproai push=1
 
 # 多平台构建
 make image platforms=linux/amd64,linux/arm64 tag=v0.6.0
+
+# 覆盖运行时基础镜像并使用宿主模式
+make image base_image=alpine:3.22 plugins=0
 ```
 
 镜像构建的默认值同样由`hack/config.yaml`管理，命令行参数可覆盖本次执行。
@@ -272,13 +343,13 @@ image:
 
 ### make image.build
 
-仅准备镜像构建的所有产物（等价于先执行`make build`），不执行`Docker build`步骤。适用于需要手动检查产物或自定义镜像构建步骤的场景。
+仅准备镜像构建的所有产物（等价于先执行`make build`并生成镜像构建上下文），不执行`Docker build`步骤。适用于需要手动检查产物或自定义镜像构建步骤的场景。
 
 ```bash
 make image.build
 ```
 
-## 测试
+## 测试管理
 
 ### make test
 
@@ -303,12 +374,13 @@ make test scope=plugin:multi-tenant
 
 ### make test.go
 
-运行所有受维护`Go`模块的单元测试，并启用竞态检测。支持通过`plugins=0`强制宿主模式，或通过`race=false`关闭竞态检测。
+运行所有受维护`Go`模块的单元测试，并默认启用竞态检测和详细日志。命令会先发现当前`Go workspace`中的模块，把有测试文件的包作为真实测试执行，把没有测试文件的包作为编译冒烟检查执行，并按模块输出汇总。支持通过`plugins=0`强制宿主模式，或通过`race=false`关闭竞态检测。
 
 ```bash
 make test.go
 make test.go plugins=0
 make test.go race=false
+make test.go verbose=false
 ```
 
 ### make test.host
@@ -335,17 +407,7 @@ make test.plugins
 make test.scripts
 ```
 
-## 国际化
-
-### make i18n.check
-
-扫描运行时可见的代码路径，检测未被纳入国际化体系的硬编码文案，并校验宿主和各插件运行时语言包的消息`key`覆盖情况。适合在提交新功能前进行`i18n`合规自查。
-
-```bash
-make i18n.check
-```
-
-## 插件工作区
+## 插件管理
 
 `apps/lina-plugins/`目录用于存放官方插件，既可以是`Git submodule`，也可以通过插件工作区命令管理为源码插件。以下命令提供对插件工作区的完整生命周期管理：
 
@@ -390,6 +452,118 @@ make plugins.update force=1
 make plugins.status
 ```
 
+## I18N国际化
+
+### make i18n.check
+
+扫描运行时可见的代码路径，检测未被纳入国际化体系的硬编码文案，并校验宿主和各插件运行时语言包的消息`key`覆盖情况。适合在提交新功能前进行`i18n`合规自查。
+
+```bash
+make i18n.check
+```
+
+
+## AI工具集成
+
+`agents`系列命令用于管理仓库内面向不同`AI Coding Agent`的资源软链。仓库以`.agents/skills`、`.agents/prompts/`和根目录`AGENTS.md`作为统一资源来源，再按不同工具的约定路径创建软链，例如`.claude/skills`、`.codex/prompts/opsx`、`CLAUDE.md`或`GEMINI.md`。
+
+这些命令只管理自己创建的软链；移除命令不会删除真实目录或文件，也不会移除指向外部目标的非托管软链。遇到已存在但目标不一致的软链时，通常需要传入`FORCE=1`才会重建。
+
+### make agents
+
+推荐使用的聚合入口。无参数且连接到交互式终端时，会先用方向键选择智能体，再选择`link`或`unlink`操作；在非交互环境中，通过`AGENT=<name>`指定单个智能体。聚合入口会对该智能体支持的所有资源类型执行同一操作，不支持`AGENT=all`或逗号列表。
+
+```bash
+# 交互式选择智能体和操作
+make agents
+
+# 为单个智能体创建所有可用资源软链
+make agents AGENT=claude-code
+
+# 移除单个智能体的托管软链
+make agents AGENT=claude-code ACTION=unlink
+
+# 重建目标不一致的托管软链
+make agents AGENT=claude-code FORCE=1
+```
+
+如果智能体原生读取某类资源，例如原生读取`AGENTS.md`，聚合入口会跳过该资源并在汇总中说明原因。
+
+### make agents.skills.link
+
+将支持的智能体项目技能目录软链到统一来源`.agents/skills`。不传`AGENT`时，非交互环境会输出支持状态和提示；交互式终端会进入选择流程。支持`AGENT=<name|all|csv>`批量处理多个智能体。
+
+```bash
+# 查看技能软链状态
+make agents.skills.link
+
+# 为指定智能体创建技能软链
+make agents.skills.link AGENT=claude-code
+
+# 为所有可软链的智能体创建技能软链
+make agents.skills.link AGENT=all
+
+# 重建目标不一致的技能软链
+make agents.skills.link AGENT=claude-code FORCE=1
+```
+
+### make agents.skills.unlink
+
+移除由`agents.skills.link`管理的技能目录软链。非交互环境必须显式传入`AGENT=<name|all|csv>`；交互式终端可以从当前已托管软链中选择。
+
+```bash
+make agents.skills.unlink AGENT=claude-code
+make agents.skills.unlink AGENT=all
+```
+
+### make agents.prompts.link
+
+将支持的智能体命令或提示词目录软链到`.agents/prompts/`下的规范来源。当前主要用于把`.agents/prompts/opsx`桥接到各工具自己的命令目录，例如`.claude/commands/opsx`、`.cursor/commands/opsx`、`.codex/prompts/opsx`或`.gemini/commands/opsx`。
+
+```bash
+# 查看提示词软链状态
+make agents.prompts.link
+
+# 为指定智能体创建提示词软链
+make agents.prompts.link AGENT=codex
+
+# 批量创建提示词软链
+make agents.prompts.link AGENT=claude-code,codex,cursor,gemini-cli
+```
+
+### make agents.prompts.unlink
+
+移除由`agents.prompts.link`管理的提示词目录软链，不删除真实提示词目录。
+
+```bash
+make agents.prompts.unlink AGENT=codex
+make agents.prompts.unlink AGENT=all
+```
+
+### make agents.md.link
+
+将支持的智能体私有规则文件软链到根目录`AGENTS.md`。例如，`claude-code`对应`CLAUDE.md`，`gemini-cli`对应`GEMINI.md`，`qwen-code`对应`QWEN.md`，`junie`对应`.junie/guidelines.md`。原生读取`AGENTS.md`的智能体只会在状态中展示，不需要创建软链。
+
+```bash
+# 查看 AGENTS.md 规则文件软链状态
+make agents.md.link
+
+# 为指定智能体创建规则文件软链
+make agents.md.link AGENT=claude-code
+
+# 为所有可软链的智能体创建规则文件软链
+make agents.md.link AGENT=all
+```
+
+### make agents.md.unlink
+
+移除由`agents.md.link`管理的规则文件软链。该命令不会删除手写的`CLAUDE.md`、`GEMINI.md`等真实文件。
+
+```bash
+make agents.md.unlink AGENT=claude-code
+make agents.md.unlink AGENT=all
+```
+
 ## 数据库
 
 :::caution 破坏性操作
@@ -400,7 +574,7 @@ make plugins.status
 
 ### make init
 
-初始化数据库的表结构（`DDL`）和系统必需的种子数据。后端会按`config.yaml`中`database.default.link`的配置自动选择`PostgreSQL`或`SQLite`方言，其中`PostgreSQL 14+`是默认数据存储，`SQLite`仅用于本地演示或冒烟验证。
+初始化数据库的表结构（`DDL`）和系统必需的种子数据。命令读取`apps/lina-core/manifest/config/config.yaml`中的`database.default.link`，当前仅支持`PostgreSQL 14+`方言；`sqlite:`、`mysql:`或未知链接会在方言解析阶段快速失败，不会创建本地数据库文件或继续执行`SQL`。
 
 ```bash
 # 仅初始化（保留现有数据）
@@ -409,6 +583,8 @@ make init confirm=init
 # 重建数据库（清空后重新初始化）
 make init confirm=init rebuild=true
 ```
+
+如果`PostgreSQL`无法连接，命令会提示先启动`PostgreSQL`，并输出本地`docker run`示例。`rebuild=true`会先终止目标数据库连接，再执行`DROP DATABASE IF EXISTS`和`CREATE DATABASE`，只应在确认可以清空目标库时使用。
 
 ### make mock
 
@@ -422,8 +598,19 @@ make mock confirm=mock
 
 ### make help
 
-打印根`Makefile`及所有引入目标文件中的可用指令列表，输出按指令名称排序。
+打印默认可用的跨平台开发指令列表，输出按指令名称排序。`linactl`内部还注册了`cli`、`cli.install`、`ctrl`和`dao`等维护命令，默认帮助不会展示；只有直接执行`go run . help --all`时才会列出。
 
 ```bash
 make help
+```
+
+### make release.tag.check
+
+校验发布标签是否与`apps/lina-core/manifest/config/metadata.yaml`中的`framework.version`一致。未显式传入`tag`时，命令会读取`GITHUB_REF_NAME`，适合在发布流水线中校验标签和框架元数据是否同步。
+
+```bash
+make release.tag.check tag=v0.6.0
+
+# 只打印 metadata.yaml 中的 framework.version
+make release.tag.check print_version=1
 ```

@@ -1,11 +1,11 @@
 ---
 slug: '/docs/agent-skills'
-title: 'Agent Skills'
+title: 'Development Skills'
 hide_title: true
-description: 'A complete guide to LinaPro AI skills — the optional OpenSpec CLI, goframe-v2, and find-skills that can be installed externally, plus project-bundled skills covering frontend design, Git workflows, code review, E2E testing, performance auditing, and OpenSpec apply/archive automation. Includes installation instructions and usage guidance for every skill.'
+description: 'This page introduces LinaPro''s AI-focused skill system, including the optional externally installed OpenSpec CLI, goframe-v2, and find-skills tools or skills, plus project-bundled skills for frontend design, Git workflows, code review, E2E testing, performance auditing, OpenSpec implementation and archiving, and other workflows that load automatically in the project. It also notes that source plugin upgrade scenarios may depend on the lina-upgrade skill provided by the AI tool environment, helping developers understand what each skill does, how to install it, and how to invoke it.'
 keywords:
   - AI skills
-  - dev skills
+  - development skills
   - LinaPro skills
   - Claude Code skills
   - OpenSpec
@@ -13,64 +13,60 @@ keywords:
   - find-skills
   - skill installation
   - frontend design skill
-  - E2E test skill
+  - E2E testing skill
   - performance audit skill
   - code review skill
-  - git commit skill
+  - Git commit skill
   - Playwright skill
   - AI collaboration
-  - skills library
+  - skill system
   - framework skills
 ---
 
-`LinaPro`'s AI skill library consists of two categories:
+`LinaPro`'s `AI` skill system has two categories:
 
-- **Externally installed skills**: Installed globally via `npm`/`npx` and available across all projects — `OpenSpec`, `goframe-v2`, and `find-skills`.
-- **Project-bundled skills**: Shipped with the project source under `.agents/skills/`, loaded automatically when you work inside the project directory with `Claude Code` or another compatible AI tool.
+- **Externally installed skills**: Installed manually with `npm`/`npx` commands. Once installed, they apply globally across projects, such as `OpenSpec`, `goframe-v2`, and `find-skills`.
+- **Project-bundled skills**: Stored with the project source under `.agents/skills/`. They require no extra installation and are loaded automatically when you work in the project directory with `AI` tools such as `Claude Code`.
 
 ## Skills Overview
 
 | Skill | Use case | Prerequisites |
 |-------|----------|---------------|
-| `openspec` | Optional spec-driven workflow tool — recommended for AI dev workflows | Recommended |
-| `goframe-v2` | GoFrame-specific AI skill for higher-quality backend code | Recommended |
-| `find-skills` | AI skill marketplace search to help select the right skills | Recommended |
-| `frontend-design` | Create distinctive, high-quality frontend interfaces | None |
-| `frontend-patterns` | React / frontend best practices and design patterns | None |
-| `git-commit-push` | Generate a conventional commit message and push | None |
-| `git-worktree` | Create an isolated Git worktree for a task | None |
-| `karpathy-guidelines` | Behavioral guardrails to reduce AI coding mistakes | None |
-| `lina-archive-consolidate` | Consolidate archived OpenSpec iterations | None |
-| `lina-auto-archive` | Automatically scan and archive completed OpenSpec changes | OpenSpec CLI required |
-| `lina-e2e` | E2E test case naming conventions and management | Playwright required |
-| `lina-feedback` | Track and fix issues reported after an OpenSpec change | None |
-| `lina-perf-audit` | Comprehensive backend API performance audit (manual only) | Running LinaPro environment |
-| `lina-review` | Structured code and spec review | None |
-| `openspec-explore` | Thinking-partner mode for exploring ideas and problems | None |
-| `openspec-propose` | Generate a complete OpenSpec change proposal in one step | None |
-| `openspec-apply-change` | Implement changes per an OpenSpec task list | OpenSpec CLI recommended |
-| `openspec-archive-change` | Archive completed OpenSpec changes | OpenSpec CLI recommended |
-| `playwright-cli` | Browser automation and Playwright test authoring | Playwright required |
-
-:::info Note
-The `lina-upgrade` skill referenced in source and ops documentation handles framework and source-plugin upgrade governance. The repository prompts you to invoke it via your AI tool when an installed source plugin has a pending upgrade, but this skill is not bundled in the `.agents/skills/` project directory — consult your AI tool's own skill configuration.
-:::
+| `openspec` | Optional spec-driven workflow tool, recommended for this project | Recommended |
+| `goframe-v2` | `GoFrame`-specific `AI` skill that improves backend code generation quality | Recommended |
+| `find-skills` | `AI` skill marketplace search tool for choosing suitable skills | Recommended |
+| `frontend-design` | Create high-quality, distinctive frontend interfaces | None |
+| `frontend-patterns` | `React` / frontend development best practices and patterns | None |
+| `git-commit-push` | Generate a conventional commit message and push to the remote | None |
+| `git-worktree` | Create an isolated `Git` worktree for a development task | None |
+| `karpathy-guidelines` | Behavioral guardrails that reduce `AI` coding mistakes | None |
+| `lina-archive-consolidate` | Consolidate archived `OpenSpec` iterations into unified directories, typically for `CI` automation | None |
+| `lina-auto-archive` | Automatically scan and archive completed `OpenSpec` changes, typically for `CI` automation | Requires `OpenSpec CLI` |
+| `lina-e2e` | `E2E` test case naming and management standards | Requires `Playwright` |
+| `lina-feedback` | Track and fix issues reported after `OpenSpec` changes | None |
+| `lina-perf-audit` | Comprehensive backend `API` performance audit, manually triggered | Requires a running `LinaPro` service |
+| `lina-review` | Structured code and specification review | None |
+| `openspec-explore` | Thinking-partner mode for requirement exploration and problem analysis | None |
+| `openspec-propose` | Generate a complete `OpenSpec` change proposal in one step | None |
+| `openspec-apply-change` | Implement work according to an `OpenSpec` task list | Requires `OpenSpec CLI` |
+| `openspec-archive-change` | Archive completed `OpenSpec` changes | Requires `OpenSpec CLI` |
+| `playwright-cli` | Browser automation and `Playwright` testing | Requires `Playwright` |
 
 ## How to Use Skills
 
-**Externally installed skills**: Install them globally using the commands in each skill's section. Once installed, `Claude Code` automatically recognizes and applies them in the relevant contexts.
+**Externally installed skills**: Follow each skill's installation command. After installation, `Claude Code` recognizes and applies the skill automatically in matching scenarios.
 
-**Project-bundled skills**: Loaded automatically when an AI tool runs inside the project directory — no setup needed. Invoke a skill by describing your scenario in the conversation, or use a slash command (e.g. `/git-commit-push`) to trigger it explicitly.
+**Project-bundled skills**: `AI` tools automatically load all skills under `.agents/skills/` when running in the project directory. To use a skill, describe the scenario directly in the conversation, or invoke it explicitly with a slash command such as `/git-commit-push`.
 
 ## Externally Installed Skills
 
-These three skills must be installed manually. Once installed, they take effect globally across all your projects.
+The following three skills require manual installation. After installation, they apply globally across all projects.
 
 ### openspec
 
-`OpenSpec` is the recommended command-line tool for `LinaPro`'s spec-driven development workflow. Once installed, workflow skills such as `/opsx:explore`, `/opsx:propose`, `/opsx:apply`, and `/opsx:archive` will automatically use it as their underlying engine. It is **recommended** for the `LinaPro` AI dev workflow.
+`OpenSpec` is the recommended command-line tool for `LinaPro`'s spec-driven workflow. After installation, workflow skills such as `/opsx:explore`, `/opsx:propose`, `/opsx:apply`, and `/opsx:archive` automatically use it as the underlying engine. It is a **recommended** part of the `LinaPro AI` development workflow.
 
-**When to use**: Running any step of the `OpenSpec` workflow — exploration, proposals, implementation, and archiving.
+**When to use**: Running the full `OpenSpec` workflow, including exploration, proposal creation, implementation, and archiving.
 
 **Installation**:
 
@@ -78,13 +74,13 @@ These three skills must be installed manually. Once installed, they take effect 
 npm install -g @fission-ai/openspec@latest
 ```
 
-Verify the installation with `opsx --version`.
+After installation, run `opsx --version` to confirm it is available.
 
 ### goframe-v2
 
-`goframe-v2` is a `Claude Code` skill purpose-built for `LinaPro` backend `Go` code. It embeds `GoFrame` coding conventions, `ORM` usage patterns, and best-practice examples. The skill activates automatically when you write or modify backend `Go` files, implement service interfaces, create APIs, or work with data access layers — improving code generation quality and keeping output aligned with framework conventions.
+`goframe-v2` is a `Claude Code` skill tailored for `LinaPro` backend `Go` code. It includes `GoFrame` coding conventions, `ORM` usage patterns, and best-practice examples. When writing or modifying backend `Go` files, implementing service interfaces, creating `API`s, or working on database operations, the skill activates automatically and improves alignment with framework conventions through code generation, error diagnosis, and performance optimization guidance.
 
-**When to use**: Developing `lina-core` backend code, implementing business interfaces, or writing the data access layer.
+**When to use**: Developing `lina-core` backend code, implementing business interfaces, or writing data access layers.
 
 **Installation**:
 
@@ -94,9 +90,9 @@ npx skills add github.com/gogf/skills -g
 
 ### find-skills
 
-`find-skills` is an AI skill marketplace search tool that helps you quickly discover and evaluate skills suited to your project. When you need to extend your AI toolchain and aren't sure what already exists, `find-skills` makes the selection process much faster.
+`find-skills` is an `AI` skill marketplace search tool that helps developers quickly discover and evaluate skills suited to the current project. When you need to introduce new `AI` assistance capabilities but are unsure whether an existing skill is available, `find-skills` makes skill selection more efficient.
 
-**When to use**: Looking for new AI skills to bring into the project or evaluating the available skill ecosystem.
+**When to use**: Introducing new `AI` skills into the project or evaluating the current skill ecosystem.
 
 **Installation**:
 
@@ -104,79 +100,87 @@ npx skills add github.com/gogf/skills -g
 npx skills add vercel-labs/skills --skill find-skills -g
 ```
 
-## Project Skills
+## Project-Bundled Skills
 
-The following skills are maintained in `.agents/skills/` alongside the project source. No installation is required — they load automatically when you use an AI tool inside the project directory.
+The following skills are maintained with the project source under `.agents/skills/`. They require no installation and load automatically when an `AI` tool is used in the project directory.
 
 ### frontend-design
 
-Guides the AI toward creating distinctive, production-grade frontend interfaces rather than generic "AI slop" aesthetics. Covers design intent analysis (page purpose, tone, differentiation), typography and color palettes, motion design, spatial composition, and background / visual detail treatment.
+High-quality frontend interface design guidance. This skill helps `AI` avoid generic interface output and produce frontend pages with a recognizable visual direction and stronger design quality.
 
-**When to use**: Building a new page, redesigning an existing interface, or whenever you want frontend work to have a considered visual direction.
+It covers design intent analysis, including page purpose, tone, and differentiation; typography and color selection; motion and spatial composition; background and visual detail treatment; and the definition and precise execution of interface concepts.
 
-**How to invoke**: Describe what you want to build and the AI applies these guidelines automatically, or use `/frontend-design`.
+**When to use**: Building a new page, redesigning an existing interface, or needing visual style guidance for frontend work.
+
+**How to invoke**: Describe the interface requirement in the conversation and the `AI` applies the design guidance automatically, or invoke `/frontend-design` explicitly.
 
 ### frontend-patterns
 
-Provides the AI with a comprehensive reference for modern frontend development: component composition, compound components, render props, custom hooks, `Context + Reducer` state management, memoization, code splitting, virtualization, form validation, error boundaries, `Framer Motion` animations, and keyboard accessibility patterns.
+Best practices and design patterns for `React` and modern frontend development. This skill gives the `AI` guidance for component composition, custom `Hook`s, state management, performance optimization, form handling, error boundaries, motion, and related frontend concerns.
 
-**When to use**: Implementing frontend components, choosing a state management approach, optimizing performance, or adding accessibility support.
+**When to use**: Building frontend components, choosing a state management approach, implementing performance optimizations, or improving accessibility.
 
-**How to invoke**: Activates automatically in frontend development contexts, or use `/frontend-patterns`.
+**How to invoke**: Activates automatically during frontend development work, or invoke `/frontend-patterns` explicitly.
 
 ### git-commit-push
 
-Reviews the current `Git` workspace, generates a conventional commit message from the actual diff following the repository's commit format (with type prefixes like `fix`, `feat`, `build`, `docs`), stages all changes, commits, and pushes to `origin`.
+Reviews the current `Git` workspace changes, generates a repository-compliant commit message, commits all changes to the current branch, and pushes the branch to `origin`.
 
-**When to use**: After finishing a feature or fix and ready to commit and push.
+Commit messages follow the conventional commit format, supporting type prefixes such as `fix`, `feat`, `build`, and `docs`, and the summary is derived from the actual `diff`.
 
-**How to invoke**: Say "commit and push" or use `/git-commit-push`.
+**When to use**: After completing feature development or a fix and needing to commit and push code.
+
+**How to invoke**: Tell the `AI` to "commit the code" or "commit and push", or invoke `/git-commit-push`.
 
 ### git-worktree
 
-Creates a dedicated `Git` worktree so the AI continues work in a fresh, isolated directory without touching the current checkout. Especially useful when juggling multiple feature branches in parallel.
+Creates an isolated `Git` worktree so the `AI` can continue work in a separate directory without affecting the state of the current checkout.
 
-**When to use**: Isolating a development task from the main working tree, or working on multiple branches simultaneously.
+This is especially useful for handling multiple feature branches in parallel or exploring a new approach without disturbing the main working directory.
 
-**How to invoke**: Use `/git-worktree` — the AI derives a branch name from the task description automatically.
+**When to use**: Isolating a task-specific development environment or working on multiple branches in parallel.
+
+**How to invoke**: Invoke `/git-worktree`; the `AI` derives a task identifier for the worktree branch name.
 
 ### karpathy-guidelines
 
-A set of behavioral guardrails that reduce common LLM coding mistakes, inspired by Andrej Karpathy's observations on LLM coding behavior.
+A set of behavioral guardrails for reducing common `AI` coding mistakes, inspired by `Andrej Karpathy`'s observations about `LLM` coding behavior.
 
-Four core principles: **Think before coding** (state assumptions and tradeoffs explicitly), **Simplicity first** (write the minimal code that solves the problem), **Surgical changes** (only touch what is necessary), **Goal-driven execution** (define verifiable success criteria and loop until verified).
+The four principles are: think before coding (state assumptions and tradeoffs explicitly), simplicity first (solve the problem with minimal code), surgical changes (change only what is necessary), and goal-driven execution (define verifiable completion criteria and iterate until they pass).
 
-**When to use**: All coding tasks — these guidelines act as a baseline behavioral constraint for AI-assisted development.
+**When to use**: All coding tasks, as a baseline constraint for `AI`-assisted development.
 
-**How to invoke**: Applied automatically as a baseline; rarely needs explicit triggering.
+**How to invoke**: Applied automatically as a baseline guardrail; explicit invocation is rarely needed.
 
 ### lina-archive-consolidate
 
-Reads archived `OpenSpec` iterations from `openspec/changes/archive/`, groups them by functional responsibility, and performs semantic merging — combining multiple iterations into a single cohesive archive while preserving all design decisions and implementation details. When the archive count reaches 8 or more, it automatically enters the full `OpenSpec` workflow (explore → propose → apply).
+Consolidates multiple archived `OpenSpec` iterations under `openspec/changes/archive/` into unified archive directories grouped by functional responsibility.
 
-**When to use**: The archive directory has accumulated many scattered iteration records and needs periodic cleanup.
+During semantic consolidation, it preserves the design decisions and implementation details from every iteration while compressing multiple iterations into one cohesive archive, reducing historical directory noise. When the archive count reaches `8` or more, it automatically enters the full `OpenSpec` workflow: exploration, proposal, and implementation.
 
-**How to invoke**: Use `/lina-archive-consolidate`.
+**When to use**: The archive directory has accumulated many scattered iteration records that should be periodically merged.
+
+**How to invoke**: Invoke `/lina-archive-consolidate`.
 
 ### lina-auto-archive
 
-Automatically scans the `openspec/changes/` directory and batch-archives all completed active changes, then summarizes the results.
+Automatically scans `openspec/changes/`, batch-archives active changes that are complete, and summarizes the result.
 
-The skill strictly checks each change's completion status — only changes where the `OpenSpec` status is complete and all tasks are done are eligible for archiving. Any incomplete items are skipped; nothing is force-passed or bypassed. After archiving, it reports the list of successfully archived changes and the reasons for any skipped changes.
+The skill strictly checks each change's completion status: both the `OpenSpec` status and every task must be complete before archiving is allowed. Incomplete changes are skipped rather than forced through, and the final report lists successful archives and reasons for skipped changes in Chinese.
 
-**When to use**: Batch-cleaning completed changes or periodically tidying the active changes directory.
+**When to use**: Batch-cleaning completed changes or periodically tidying the active change directory.
 
-**Prerequisites**: Requires `OpenSpec CLI` (`npm install -g @fission-ai/openspec@latest`).
+**Prerequisite**: Install `OpenSpec CLI` with `npm install -g @fission-ai/openspec@latest`.
 
-**How to invoke**: Use `/lina-auto-archive`.
+**How to invoke**: Invoke `/lina-auto-archive`.
 
 ### lina-e2e
 
-Defines the project's `Playwright E2E` test case management standards: file naming (globally unique `TC{NNNN}` IDs that are never reused), module-based directory layout, test file templates, independence requirements (one test per file, fully self-contained), and page object model usage.
+Naming conventions, directory structure, and management standards for `Playwright E2E` test cases. This skill defines test case `ID` allocation (`TC{NNNN}`, globally unique and never reused), module-based organization, test file templates, independence requirements, and page object model usage.
 
-**When to use**: Writing, maintaining, or reviewing E2E test cases.
+**When to use**: Writing, maintaining, or reviewing `E2E` test cases.
 
-**Prerequisites**: Install `Playwright` and its test dependencies first:
+**Prerequisites**: Install `Playwright` and test dependencies:
 
 ```bash
 cd hack/tests
@@ -184,85 +188,91 @@ pnpm install
 npx playwright install --with-deps chromium
 ```
 
-**How to invoke**: The AI applies these standards automatically when writing E2E tests, or use `/lina-e2e`.
+**How to invoke**: The `AI` applies these standards automatically when writing `E2E` tests, or invoke `/lina-e2e`.
 
 ### lina-feedback
 
-A structured workflow for capturing and resolving issues reported after an `OpenSpec` change lands. Covers problem classification by type (bug / missing / UX / test gap), incremental spec updates, task organization in `tasks.md`, fix execution loops, regression analysis, and pre-completion verification.
+A structured issue tracking and remediation workflow for `bug`s, missing functionality, experience problems, and test gaps reported after an `OpenSpec` change has been implemented.
 
-**When to use**: After an `OpenSpec` change has been implemented and feedback reports need systematic triaging and fixing.
+The workflow covers target change identification, issue classification (`bug` / missing / UX / test gap), incremental spec updates, task list organization, iterative fixes, regression analysis, and comprehensive verification before completion.
 
-**How to invoke**: Use `/lina-feedback` and describe the feedback to address.
+**When to use**: Feedback is reported after an `OpenSpec` change and needs to be handled systematically.
+
+**How to invoke**: Invoke `/lina-feedback` and describe the feedback to address.
 
 ### lina-perf-audit
 
-A comprehensive `LinaPro` backend API performance audit workflow (**manual trigger only**). Audits for N+1 queries, missing indexes, unbounded list responses, redundant reads, mergeable SQL calls, blocking operations inside loops, and write SQL executed inside read endpoints.
+A comprehensive `LinaPro` backend `API` performance audit workflow, **manual trigger only**. It audits for `N+1` queries, missing indexes, unbounded list responses, duplicate reads, mergeable `SQL` calls, blocking operations inside loops, and write `SQL` executed from read endpoints.
 
-The audit runs in three phases: Phase 0 (environment setup — database reset, service restart, plugin installation, load-test data seeding), Phase 1 (concurrent sub-agent audits per module), Phase 2 (aggregation — summary report and persistent issue cards under `perf-issues/`).
+The audit runs in three phases: phase `0`, environment preparation with database reset, service restart, plugin installation, and load-test data seeding; phase `1`, concurrent sub-agent audits for each module; phase `2`, report aggregation and persistent issue card generation.
 
-:::caution Heads up
+:::caution Note
 
-This skill resets the database, restarts services, and spawns multiple sub-agents. It takes tens of minutes to several hours and consumes significant token budget. Only trigger it when you explicitly need a full performance audit.
+This skill resets the database, restarts services, can take a long time from tens of minutes to hours, and consumes significant `Token` budget. Use it only when a full performance audit is explicitly needed.
 
 :::
 
-**When to use**: When you explicitly need a systematic performance audit of all backend APIs.
+**When to use**: Explicitly requested systematic performance auditing for all backend `API`s.
 
-**Prerequisites**: A running `LinaPro` dev environment started with `make dev`.
+**Prerequisite**: A running `LinaPro` development environment started with `make dev`.
 
-**How to invoke**: Explicitly say "run `lina-perf-audit`" or "run a full backend API performance audit" in the conversation.
+**How to invoke**: Say "run `lina-perf-audit`" or "run a full backend `API` performance audit" in the conversation.
 
 ### lina-review
 
-A structured code and spec review workflow, triggered after `OpenSpec` apply or feedback tasks complete and before archiving. Covers backend code review (`GoFrame` conventions, API i18n compliance, distributed cache consistency), RESTful API review, SQL review, E2E test review, and report generation. `AGENTS.md` is the single source of truth for all review standards.
+A structured code and specification review workflow triggered after `OpenSpec` implementation or feedback work is complete and before archiving, ensuring code quality and spec consistency.
 
-**When to use**: After an `OpenSpec` change has been implemented, as the quality gate before archiving.
+Review scope includes backend code review (`GoFrame` conventions, `API` i18n compliance, distributed cache consistency), `RESTful API` review, `SQL` review, `E2E` test review, and final report generation. `AGENTS.md` is the single source of truth for all review standards.
 
-**How to invoke**: Use `/lina-review` — the AI determines the review scope automatically based on the change.
+**When to use**: After an `OpenSpec` change is implemented and before it is archived as a quality gate.
+
+**How to invoke**: Invoke `/lina-review`; the `AI` determines the review scope from the change.
 
 ### openspec-explore
 
-Thinking-partner mode for exploring ideas, investigating problems, and clarifying requirements. The AI approaches problems with curiosity and without preconceptions — it reads files, probes the codebase, compares options, draws ASCII diagrams, and surfaces risks and unknowns.
+Explore mode is an `AI` thinking-partner mode for requirement analysis and problem investigation. It helps clarify the problem space, investigate the codebase, compare approaches, visualize architecture, and identify risks and unknowns with a curious, non-presumptive approach.
 
-Explore mode is for **thinking and investigation**, not implementation. It can produce `OpenSpec` artifacts (proposals, designs) as outputs of the thinking process, but it does not implement production features.
+Explore mode focuses on **thinking and investigation** rather than implementation: it may read files, inspect the codebase, visualize with `ASCII` diagrams, and produce thinking artifacts such as `OpenSpec` proposals, but it does not directly implement production functionality.
 
-**When to use**: Before starting a complex task, or whenever you need to think through requirements or architectural options.
+**When to use**: Before starting a complex task, or when requirements or technical direction need clarification.
 
-**How to invoke**: Use `/openspec-explore` and describe what you want to explore.
+**How to invoke**: Invoke `/openspec-explore` and describe the problem or direction to explore.
 
 ### openspec-propose
 
-Generates a complete `OpenSpec` change with all required artifacts in a single step: `proposal.md`, `design.md`, `tasks.md`, and any `specs/` files. The AI creates artifacts in dependency order to keep design docs and task lists internally consistent.
+Generates a complete `OpenSpec` change proposal in one step, automatically creating the change directory with `proposal.md`, `design.md`, `tasks.md`, and `specs/`.
 
-**When to use**: Kicking off a new feature or change that needs a full `OpenSpec` proposal.
+The `AI` generates artifacts in dependency order so the design document and task list remain internally consistent, avoiding manual assembly of the full change file set.
 
-**How to invoke**: Use `/openspec-propose` and describe the change you want to make.
+**When to use**: Creating a full `OpenSpec` proposal for a new feature or change.
+
+**How to invoke**: Invoke `/openspec-propose` and describe the change you want to implement.
 
 ### openspec-apply-change
 
-Implements code, documentation, and test changes according to the `tasks.md` in an `OpenSpec` change directory. This skill is typically triggered after the proposal and design are complete, responsible for taking the change from spec to runnable implementation.
+Implements code, documentation, and test changes according to `tasks.md` in an `OpenSpec` change directory. This skill is usually triggered after the proposal and design are complete, and is responsible for moving the change from specification to runnable implementation.
 
-**When to use**: An `openspec/changes/<change-id>/` directory already exists and you need to start or continue implementing tasks.
+**When to use**: An `openspec/changes/<change-id>/` directory already exists and you need to start or continue implementation.
 
-**Prerequisites**: `OpenSpec CLI` recommended.
+**Prerequisite**: `OpenSpec CLI` is recommended.
 
-**How to invoke**: Use `/openspec-apply-change`, or simply tell the AI to continue implementing the current `OpenSpec` change.
+**How to invoke**: Invoke `/openspec-apply-change`, or tell the `AI` to continue implementing the current `OpenSpec` change.
 
 ### openspec-archive-change
 
-Archives a completed `OpenSpec` change by merging incremental specs into the baseline spec and moving the change directory to the archive area.
+Archives a completed `OpenSpec` change by merging incremental specifications into baseline specifications and moving the change directory into the archive area.
 
-**When to use**: The change implementation, review, and verification are all done and it needs to be consolidated into the long-term baseline.
+**When to use**: The change implementation, review, and verification are complete and should be consolidated into the long-term baseline.
 
-**Prerequisites**: `OpenSpec CLI` recommended.
+**Prerequisite**: `OpenSpec CLI` is recommended.
 
-**How to invoke**: Use `/openspec-archive-change`, or ask the AI to archive the current completed change.
+**How to invoke**: Invoke `/openspec-archive-change`, or ask the `AI` to archive the completed change.
 
 ### playwright-cli
 
-A comprehensive `Playwright` CLI command reference for browser automation: navigating to URLs, clicking, typing, form submission, multi-tab workflows, cookie / `localStorage` / `sessionStorage` operations, network route interception, and `DevTools` integration.
+A `Playwright` browser automation `CLI` command set covering navigation, clicks, typing, form submission, multi-tab management, `Cookie` / `localStorage` / `sessionStorage` operations, network route interception, `DevTools`, and other browser automation workflows.
 
-**When to use**: Automating browser interactions, writing Playwright tests, or debugging browser-based workflows.
+**When to use**: Automating browser interactions, writing tests, or debugging `Playwright` tests.
 
 **Prerequisites**: Install `Playwright` and the required browsers:
 
@@ -272,27 +282,4 @@ pnpm install
 npx playwright install --with-deps chromium
 ```
 
-**How to invoke**: Describe the browser interactions you need, or use `/playwright-cli`.
-
-## Project Agent Symlink Management
-
-`.agents/skills/` is the single source of truth for skill content, but different `AI Coding` tools discover skills from their own project paths by default (`.claude/skills/`, `.codebuddy/skills/`, `.windsurf/skills/`, and so on). LinaPro ships a built-in `make agents` one-shot command that automatically wires up every applicable symlink for the chosen agent across skills/prompts/md, alongside a per-resource `make agents.<resource>.<action>` advanced command tree:
-
-```bash
-# Interactive (TTY): arrow-key pick agent, then arrow-key pick link / unlink
-make agents
-
-# One-shot mode (works in any environment, including CI):
-make agents AGENT=claude-code                 # link claude-code across every applicable resource
-make agents AGENT=claude-code FORCE=1         # rebuild mismatched links during the same run
-make agents AGENT=claude-code ACTION=unlink   # remove every managed symlink for claude-code
-
-# Advanced per-resource subcommands (still available, support AGENT=all and CSV)
-make agents.skills.link AGENT=qoder            # create a skills symlink for a specific agent
-make agents.skills.link AGENT=all              # link every link-class agent's skills directory
-make agents.skills.unlink AGENT=qoder          # remove a managed symlink
-make agents.prompts.link AGENT=claude-code     # link an agent's prompts/commands directory
-make agents.md.link AGENT=claude-code          # link CLAUDE.md -> AGENTS.md (single file)
-```
-
-For the full tool mapping and agent category reference, see [AI Tool Integration](../quick/agent-tools).
+**How to invoke**: Describe the browser operation you need, or invoke `/playwright-cli`.
