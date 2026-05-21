@@ -98,7 +98,7 @@ keywords:
 
 ## 统一管理命令
 
-`LinaPro`提供了仓库内置的`make agents.<resource>.<action>`命令树，统一管理三类资源的项目级软链，避免开发者手写`ln -s`，并保证`Windows`/`Linux`/`macOS`三端一致行为。命令仅在仓库根目录范围内操作，不会修改`HOME`目录或任何系统全局路径。
+`LinaPro`提供了仓库内置的`make agents`一键命令，自动为指定`Agent`配置 skills/prompts/md 三类资源中所有适用的项目级软链；同时保留按资源批量操作的`make agents.<resource>.<action>`高级子命令树。命令仅在仓库根目录范围内操作，不会修改`HOME`目录或任何系统全局路径，并保证`Windows`/`Linux`/`macOS`三端一致行为。
 
 支持的资源：
 
@@ -107,7 +107,70 @@ keywords:
 - **`md`**：单文件软链，`.<tool>.md`（如`CLAUDE.md`、`GEMINI.md`）→ 仓库根`AGENTS.md`，让仅读取私有规范文件名的 Agent 复用同一份 `AGENTS.md`。
 
 ```bash
-# 终端下进入资源 → 动作 → Agent 三层交互菜单
+# 推荐用法：聚合一键命令，按 Agent 维度操作所有适用资源
+
+# 交互模式（终端下）：
+#   第 1 步：方向键选择 Agent（可输入字符过滤）
+#   第 2 步：方向键选择 link 或 unlink
 make agents
+
+# 一键模式（CI/管道也可用）：
+make agents AGENT=claude-code                 # 一次为 claude-code 在 skills + md 建立软链（prompts 按注册表跳过）
+make agents AGENT=claude-code FORCE=1         # 同时重建指向错误源的旧软链
+make agents AGENT=claude-code ACTION=unlink   # 移除 claude-code 所有受管软链
+
+# 高级用法：按资源批量操作（聚合命令显式不支持 AGENT=all 与逗号列表，请走子命令）
+
+# skills：本节工具兼容性矩阵涉及的目录级软链
+make agents.skills.link                            # 终端下交互式选择；CI/管道下只读列表
+make agents.skills.link AGENT=claude-code          # 非交互式：为单个 Agent 创建软链
+make agents.skills.link AGENT=claude-code,codebuddy,qoder
+make agents.skills.link AGENT=all                  # 为所有 link 类 Agent 创建软链
+make agents.skills.link AGENT=all FORCE=1          # 强制重建指向错误源的旧软链
+make agents.skills.unlink AGENT=claude-code        # 移除受管软链
+make agents.skills.unlink AGENT=all
+
+# prompts：管理 Agent 的斜杠命令/prompts 目录（首批支持 claude-code / cursor / codex / gemini-cli）
+make agents.prompts.link AGENT=claude-code
+make agents.prompts.unlink AGENT=claude-code
+
+# md：让 Agent 通过私有规范文件读取 AGENTS.md
+make agents.md.link AGENT=claude-code              # 创建 CLAUDE.md -> AGENTS.md 软链
+make agents.md.link AGENT=all                      # 一次性为所有 link 类 Agent 创建私有规范文件软链
+make agents.md.unlink AGENT=claude-code
 ```
+
+**Agent 分类**（与[`vercel-labs/skills`](https://github.com/vercel-labs/skills#supported-agents)官方项目路径表对齐）：
+
+- `native`：项目路径本身就是`.agents/skills`（如`cursor`、`gemini-cli`、`codex`、`amp`、`opencode`、`cline`、`github-copilot`等），无需软链。
+- `link`：项目路径是`.<tool>/skills`（如`claude-code` → `.claude/skills`、`codebuddy` → `.codebuddy/skills`、`windsurf` → `.windsurf/skills`），按需创建相对软链指向`.agents/skills`。
+- `rootCollision`：项目路径是仓库根的`skills/`（目前仅`openclaw`），默认跳过；显式`AGENT=openclaw FORCE=1`才会创建。
+
+**冲突保护规则**：
+
+- 任何情况下命令都不会自动删除已存在的真实目录或文件，包含`FORCE=1`时也不会。
+- `FORCE=1`仅作用于"已是软链但指向非`.agents/skills`"的情况。
+- 所有 Agent 软链目录已在`.gitignore`中忽略，本地创建不会污染仓库。
+
+**聚合命令安全护栏**：
+
+- 聚合命令`make agents`仅接受单个 Agent 名称。`AGENT=all` 与逗号列表会被显式拒绝（避免误操作），批量场景请走上方按资源的高级子命令。
+- 未传`AGENT`且非终端环境时，命令会打印用法指引而不会阻塞等待输入。
+- 选定的 Agent 在某资源上为`native`或未注册时会自动跳过，并在最终摘要中显式标注原因。
+
+所有交互入口（聚合命令与按资源子命令）均基于[`charmbracelet/huh`](https://github.com/charmbracelet/huh)的方向键交互：使用 **方向键** 移动、**空格** 切换多选行、**回车** 确认、**直接输入字符** 快速过滤、**Esc** / **Ctrl+C** 取消。候选项标题根据交互场景采用不同约定：
+
+- 聚合命令 `make agents` 的"选 Agent"是跨资源单选，每个选项标题嵌入 Agent 名称与 **带运行时状态符号的资源角色摘要**（形如 `claude-code (Claude Code) — skills: link[+], prompts: link[!], md: link[+]`），便于在选择前看清该 Agent 在 skills/prompts/md 三类资源中分别会执行 `link` 还是被作为 `native` / 未注册自动跳过，同时直接看清当前每类资源是否已经建好软链。`link` 类资源附带运行时状态符号；`native` 资源不带符号（无需操作）；未注册资源直接省略。
+- 各资源子命令 `make agents.<resource>.<action>` 仅作用于单个资源，标题嵌入 **单字符状态符号** 与简短状态说明（形如 `[~] claude-code  (mismatch)`），便于直接看清当前绑定状态。
+
+各资源子命令选项标题中嵌入的状态符号：
+
+- `[+]` linked — 已指向`.agents/skills`
+- `[~]` mismatch — 软链存在但指向其他位置
+- `[.]` absent — 尚未建立软链
+- `[!]` conflict — 真实目录或文件阻止建立软链
+- `[*]` root-collision — Agent 使用仓库根`skills/`路径
+- `[?]` error — 检测失败，详情请运行非交互列表
+
+更多细节请参考[`linactl` 工具中文文档](https://github.com/linaproai/linapro/blob/main/hack/tools/linactl/README.zh-CN.md)。
 
