@@ -122,7 +122,7 @@ Spec-driven development improves quality in several ways:
 - **Architecture constraints**: Defines the project positioning and the `lina-core` host boundary, preventing tight coupling between the core domain and workspace presentation structure.
 - **Module design rules**: Business modules must support on-demand disabling with coordinated frontend hiding; data permission filtering must happen at the database query layer; source plugin directory layout is fixed.
 - **Interface design constraints**: Enforces `RESTful` semantics throughout the repository; action-style path names are prohibited.
-- **Backend code quality rules**: Runtime dependencies must be injected through constructors; errors must be wrapped with `bizerr`; logging must pass `ctx` along the call chain; cached state must be coordinated across instances in cluster mode.
+- **Code quality rules**: Runtime dependencies must be injected through constructors; errors must be wrapped with `bizerr`; logging must pass `ctx` along the call chain; cached state must be coordinated across instances in cluster mode.
 - **API response contracts**: Time-point fields must return Unix millisecond integers (`int64`); `DTO` fields must carry English documentation tags; development tools must be cross-platform executable.
 - **Compilation and testing gates**: Production `Go` code changes must pass a `go test` smoke test, and interface signature changes must also pass startup binding tests, before being marked complete.
 - **Continuous governance requirements**: Every change must assess `i18n` impact; cache design must distinguish single-node from cluster deployments; bug fixes must be accompanied by automated tests.

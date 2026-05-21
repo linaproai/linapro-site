@@ -29,7 +29,7 @@ keywords:
 
 `lina-core` is `LinaPro`'s backend host and the stable foundation for all general platform capabilities. Built in `Go`, it provides `RESTful API` contracts, authentication, authorization, runtime configuration, API documentation, scheduling, internationalization, multi-tenant context, plugin lifecycle management, and cluster coordination.
 
-The host's design principle: **the host provides general capabilities; business domains extend through plugins**. Therefore, `lina-core` does not bundle specific business modules directly — instead, it exposes stable extension seams for source plugins and `WASM` dynamic plugins to plug into.
+The host's design principle: **the host provides general capabilities; business domains extend through plugins**. Therefore, `lina-core` does not bundle specific business modules directly — instead, it exposes stable extension interfaces for source plugins and `WASM` dynamic plugins to plug into.
 
 ## Directory Structure
 
@@ -54,7 +54,7 @@ apps/lina-core/
 │   ├── i18n/                # Host runtime language packs
 │   └── sql/                 # Host DDL and seed data
 └── pkg/
-    ├── pluginhost/          # Source plugin extension seams
+    ├── pluginhost/          # Source plugin extension interfaces
     ├── pluginbridge/        # WASM dynamic plugin bridge protocol
     ├── pluginservice/       # Host service contracts published to source plugins
     └── sourceupgrade/       # Source plugin runtime upgrade facade
@@ -217,11 +217,11 @@ See [I18N Internationalization](/docs/i18n) for language pack directories, runti
 
 ## Multi-Tenant Foundation
 
-The host natively embeds multi-tenant foundation seams, but the full tenant control plane is provided by the official `multi-tenant` source plugin. When that plugin is not enabled, the system defaults to the `tenant_id = 0` platform tenant context, maintaining a single-tenant out-of-the-box experience.
+The host natively embeds multi-tenant foundation support, but the full tenant control plane is provided by the official `multi-tenant` source plugin. When that plugin is not enabled, the system defaults to the `tenant_id = 0` platform tenant context, maintaining a single-tenant out-of-the-box experience.
 
 | Layer | Responsibility |
 |-------|---------------|
-| Host | `bizctx` request context, identity snapshots, `tenant_id` filtering seam, plugin multi-tenant metadata |
+| Host | `bizctx` request context, identity snapshots, `tenant_id` filtering interface, plugin multi-tenant metadata |
 | `multi-tenant` plugin | Tenant entities, membership, tenant resolution, tenant impersonation, tenant plugin governance |
 | Tenant-aware plugins | Declare multi-tenant capabilities in their manifest and isolate data by `tenant_id` in their own tables |
 

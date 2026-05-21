@@ -137,7 +137,7 @@ hostServices:
 
 ### pluginhost
 
-`pluginhost` is the stable extension seam used by **source plugins**. Source plugins register through it:
+`pluginhost` is the stable extension interface used by **source plugins**. Source plugins register through it:
 
 | Interface | Capability |
 |-----------|-----------|

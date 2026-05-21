@@ -2,7 +2,7 @@
 slug: '/docs/multi-tenant'
 title: '原生多租户能力'
 hide_title: true
-description: '本文从组件设计角度介绍 LinaPro 多租户能力，说明宿主 bizctx、TenantFilterService、tenant_id 过滤接缝、默认平台租户、官方 multi-tenant 源码插件、租户代管、插件多租户清单字段和当前 Pool 共享表模型之间如何协作。'
+description: '本文从组件设计角度介绍 LinaPro 多租户能力，说明宿主 bizctx、TenantFilterService、tenant_id 过滤接口、默认平台租户、官方 multi-tenant 源码插件、租户代管、插件多租户清单字段和当前 Pool 共享表模型之间如何协作。'
 keywords:
   - 多租户
   - tenant_id
@@ -28,7 +28,7 @@ keywords:
 
 ## 基本介绍
 
-`LinaPro`把多租户能力拆成“宿主基础接缝”和“官方租户控制面”两层。宿主负责在请求上下文、插件服务契约和数据过滤中提供稳定基础；官方`multi-tenant`源码插件负责租户主体、成员关系、租户解析、租户代管和租户级插件治理。
+`LinaPro`把多租户能力拆成“宿主基础支撑”和“官方租户控制面”两层。宿主负责在请求上下文、插件服务契约和数据过滤中提供稳定基础；官方`multi-tenant`源码插件负责租户主体、成员关系、租户解析、租户代管和租户级插件治理。
 
 未安装或未启用`multi-tenant`插件时，框架仍以单租户方式开箱运行。此时宿主默认使用`tenant_id = 0`表示平台租户，已有项目无需为了未来多租户演进而提前改变部署模型。
 
@@ -36,7 +36,7 @@ keywords:
 
 | 层级 | 位置 | 职责 |
 |------|------|------|
-| **宿主基础能力** | `apps/lina-core` | 请求级`bizctx`、身份快照、`tenant_id`过滤接缝、平台绕过策略、插件多租户元数据 |
+| **宿主基础能力** | `apps/lina-core` | 请求级`bizctx`、身份快照、`tenant_id`过滤接口、平台绕过策略、插件多租户元数据 |
 | **租户控制面** | `apps/lina-plugins/multi-tenant` | 租户生命周期、成员关系、租户解析、租户切换、租户代管、租户插件治理 |
 | **租户感知插件** | `apps/lina-plugins/<plugin-id>` | 声明多租户能力，在自有表中使用`tenant_id`隔离数据 |
 

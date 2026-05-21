@@ -156,7 +156,7 @@ graph TB
 
 - **API contract layer**: Complete `RESTful API` definitions covering system management, plugin governance, and shared platform capabilities
 - **Service layer**: Unified implementations of core services including authentication, permissions, users, roles, menus, dictionaries, configuration, and file management
-- **Plugin runtime**: Loads source plugins and `WASM` dynamic plugins, coordinates their full lifecycle, and provides stable extension points
+- **Plugin runtime**: Loads source plugins and `WASM` dynamic plugins, coordinates their full lifecycle, and provides stable extension interfaces
 - **Governance capabilities**: Built-in `JWT` authentication, declarative `RBAC`, operation auditing, session management, and other enterprise-grade governance features
 - **Task scheduling**: A built-in `Cron` subsystem with task groups, execution records, and error tracking
 - **Infrastructure**: Distributed locks, key-value cache, `i18n`, database migrations, and other foundational capabilities
@@ -188,7 +188,7 @@ Official source plugins live in `apps/lina-plugins/`, mounted as a `Git submodul
 
 `LinaPro` has native multi-tenant capabilities built into the framework, with an official `multi-tenant` management plugin:
 
-- The host includes built-in tenant middleware and a `bizctx` tenant identity seam as a stable foundation
+- The host includes built-in tenant middleware and a `bizctx` tenant identity foundation as a stable capability
 - The `multi-tenant` plugin provides complete tenant management: lifecycle management, user membership, and tenant resolution strategies
 - When the plugin is not installed or not enabled, the host automatically falls back to single-tenant mode where `tenant_id = 0` — the out-of-box experience is unaffected
 - Supports a pool-shared database model based on the `tenant_id` column; a single user can belong to multiple tenants

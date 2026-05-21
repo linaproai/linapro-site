@@ -2,7 +2,7 @@
 slug: '/docs/multi-tenant'
 title: 'Native Multi-Tenancy'
 hide_title: true
-description: 'A component-level guide to LinaPro multi-tenancy — how the host bizctx, TenantFilterService, tenant_id filtering seam, default platform tenant, official multi-tenant source plugin, tenant impersonation, plugin multi-tenant manifest fields, and the current Pool shared-database model work together.'
+description: 'A component-level guide to LinaPro multi-tenancy — how the host bizctx, TenantFilterService, tenant_id filtering interface, default platform tenant, official multi-tenant source plugin, tenant impersonation, plugin multi-tenant manifest fields, and the current Pool shared-database model work together.'
 keywords:
   - multi-tenancy
   - tenant_id
@@ -27,7 +27,7 @@ keywords:
 
 ## Introduction
 
-`LinaPro` splits multi-tenancy into two layers: host-level foundation seams and an official tenant control plane. The host provides a stable foundation across request context, plugin service contracts, and data filtering. The official `multi-tenant` source plugin handles tenant entities, membership, tenant resolution, tenant impersonation, and tenant-scoped plugin governance.
+`LinaPro` splits multi-tenancy into two layers: host-level foundation support and an official tenant control plane. The host provides a stable foundation across request context, plugin service contracts, and data filtering. The official `multi-tenant` source plugin handles tenant entities, membership, tenant resolution, tenant impersonation, and tenant-scoped plugin governance.
 
 When the `multi-tenant` plugin is not installed or not enabled, the framework runs in single-tenant mode out of the box. The host uses `tenant_id = 0` to represent the platform tenant, so existing projects do not need to change their deployment model in anticipation of future multi-tenant evolution.
 
@@ -35,7 +35,7 @@ When the `multi-tenant` plugin is not installed or not enabled, the framework ru
 
 | Layer | Location | Responsibility |
 |-------|----------|---------------|
-| **Host foundation** | `apps/lina-core` | Request-scoped `bizctx`, identity snapshots, `tenant_id` filtering seam, platform bypass policy, plugin multi-tenant metadata |
+| **Host foundation** | `apps/lina-core` | Request-scoped `bizctx`, identity snapshots, `tenant_id` filtering interface, platform bypass policy, plugin multi-tenant metadata |
 | **Tenant control plane** | `apps/lina-plugins/multi-tenant` | Tenant lifecycle, membership, tenant resolution, tenant switching, tenant impersonation, tenant plugin governance |
 | **Tenant-aware plugins** | `apps/lina-plugins/<plugin-id>` | Declare multi-tenant capabilities and isolate data by `tenant_id` in their own tables |
 

@@ -2,7 +2,7 @@
 slug: '/docs/modular-design'
 title: 'Modular Design'
 hide_title: true
-description: 'An exploration of LinaPro modular design — how the leanness principle (keep the core minimal, extend through plugins), domain-bounded built-in capabilities, a first-class plugin system, stable extension seams, and real-world examples like cloud storage and LDAP/OIDC authentication let developers assemble systems from proven building blocks rather than building everything from scratch.'
+description: 'An exploration of LinaPro modular design — how the leanness principle (keep the core minimal, extend through plugins), domain-bounded built-in capabilities, a first-class plugin system, stable extension interfaces, and real-world examples like cloud storage and LDAP/OIDC authentication let developers assemble systems from proven building blocks rather than building everything from scratch.'
 keywords:
   - modular design
   - leanness principle
@@ -19,7 +19,7 @@ keywords:
   - LinaPro
   - AI-native
   - modular architecture
-  - extension seams
+  - extension interfaces
   - sustainable delivery
 ---
 
@@ -39,7 +39,7 @@ Each module is a complete, self-contained functional unit that can be installed,
 
 - **Frontend and backend are modularized together**: Each plugin ships its own backend service, frontend pages, database resources, and permission declarations as a single, coherent module unit — not as two separate halves. Installing a plugin means installing a fully self-contained capability.
 
-- **Stable extension seams**: The host exposes well-defined extension points to plugins. Plugins can only interact with the host through these seams — registering routes, responding to events, filtering menus, and so on — and can never reach into the host's internal implementation. This boundary design keeps inter-module dependencies clear and controlled, so the host can evolve internally without accidentally breaking existing plugins.
+- **Stable extension interfaces**: The host exposes well-defined extension points to plugins. Plugins can interact with the host only through these extension interfaces — registering routes, responding to events, filtering menus, and so on — and can never reach into the host's internal implementation. This boundary design keeps inter-module dependencies clear and controlled, so the host can evolve internally without accidentally breaking existing plugins.
 
 ## The Leanness Principle
 

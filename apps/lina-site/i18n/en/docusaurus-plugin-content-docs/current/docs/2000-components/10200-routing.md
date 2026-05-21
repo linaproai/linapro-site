@@ -28,7 +28,7 @@ keywords:
 
 ## Overview
 
-The routing system of `lina-core` is built on top of GoFrame's `ghttp.Server`, organized around four dimensions: **version prefixes**, **middleware chains**, **permission declarations**, and **plugin extension points**. The host manages its own API versions under the `/api/v1` prefix, enforces CORS, authentication, and permission governance through an ordered middleware chain, maintains all API attributes inline with code via `g.Meta` struct tags, and provides differentiated routing strategies for the two plugin types.
+The routing system of `lina-core` is built on top of GoFrame's `ghttp.Server`, organized around four dimensions: **version prefixes**, **middleware chains**, **permission declarations**, and **plugin extension interfaces**. The host manages its own API versions under the `/api/v1` prefix, enforces CORS, authentication, and permission governance through an ordered middleware chain, maintains all API attributes inline with code via `g.Meta` struct tags, and provides differentiated routing strategies for the two plugin types.
 
 ## API Version Management
 

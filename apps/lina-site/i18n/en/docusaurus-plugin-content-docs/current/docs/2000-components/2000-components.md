@@ -2,13 +2,14 @@
 slug: '/docs/components'
 title: 'Component Design'
 hide_title: true
-description: 'An overview of LinaPro framework components — the core host service, built-in admin workspace, dual-mode plugin system, source plugins, WASM dynamic plugins, plugin management, native distributed architecture, and host capabilities including configuration, API documentation, multi-tenancy, scheduled tasks, and I18N internationalization.'
+description: 'An overview of the LinaPro component design philosophy: separating a stable platform foundation from pluggable business extensions, replacing implicit coupling with explicit contracts, and delivering capabilities as self-contained, composable units. Authentication, RBAC, multi-tenancy, scheduling, i18n, cluster coordination, and API documentation are built into the host; business capabilities are delivered as independent plugins; the frontend and backend are decoupled through public API contracts.'
 keywords:
   - component design
   - LinaPro components
-  - core host service
-  - built-in admin workspace
-  - admin workspace
+  - stable foundation
+  - plugin extensibility
+  - explicit contracts
+  - self-contained capabilities
   - dual-mode plugin system
   - source plugins
   - WASM dynamic plugins
@@ -21,23 +22,29 @@ keywords:
   - I18N internationalization
   - lina-core
   - lina-vben
+  - lina-plugins
   - pluginhost
   - pluginbridge
-  - hostServices
+  - component boundaries
+  - architecture
+  - extensibility
+  - runtime governance
+  - component collaboration
 ---
 
+## Design Philosophy
 
-## Component Collaboration
+`LinaPro`'s component design centers on one principle: **stable foundation, extend on demand**. Platform-level capabilities are built into the host; business capabilities are delivered as self-contained components; components collaborate through explicit contracts with no hidden coupling.
 
-`LinaPro` components collaborate around three main threads:
+This approach yields several key characteristics:
 
-| Thread | Description |
-|--------|-------------|
-| **API contracts** | The host and plugins declare APIs; the workspace consumes them and supports debugging through the API documentation |
-| **Plugin governance** | Plugin manifests drive installation, enablement, upgrades, disablement, uninstallation, menu projection, permission resources, and lifecycle callbacks |
-| **Runtime coordination** | The host handles authentication, authorization, tenant context, configuration, scheduling, cache revision, and cluster coordination |
+**Clear boundaries, independently replaceable.** The frontend workspace, backend host, and plugin system each have a well-defined scope of responsibility. The workspace depends only on the host's public API; plugins depend only on the stable extension interfaces the host publishes. Any layer can be upgraded or replaced without breaking the others.
 
-Through these components, `LinaPro` brings the backend host, frontend workspace, business plugins, and deployment runtime under a unified governance model. Developers can extend business capabilities with plugins while keeping the host stable, and get a complete management experience through the built-in admin workspace.
+**Self-contained capabilities, opt-in delivery.** Each business component (plugin) encapsulates its own API routes, database resources, frontend pages, menu permissions, language packs, and scheduled tasks — installed and uninstalled through the plugin lifecycle without touching host code. Official capabilities ship as independent plugins, so unused features never enter the deployment artifact.
+
+**Platform capabilities out of the box.** Authentication, RBAC, multi-tenancy, scheduling, i18n, cluster coordination, and API documentation are all built into the host. Business plugins consume these directly without reimplementing them.
+
+**Dual-mode plugins balance flexibility and performance.** Long-lived business modules use source plugins compiled into the host for native Go performance. When hot-loading or commercial binary distribution is required, WASM dynamic plugins fill that role — both modes share a single governance surface.
 
 ## Related Topics
 
