@@ -98,7 +98,7 @@ npx skills add github.com/gogf/skills -g
 **安装方法**：
 
 ```bash
-npx skills add find-skills -g
+npx skills add vercel-labs/skills --skill find-skills -g
 ```
 
 ## 项目内置技能

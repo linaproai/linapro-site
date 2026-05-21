@@ -74,7 +74,7 @@ Today, `AI Coding` tools are highly diverse. Each tool may read skills directori
 | Claude Code | ✅ Supported | ✅ Supported | Reads `CLAUDE.md` by default; LinaPro already supports this through a symlink. Run `make agents.skills.link AGENT=claude-code` |
 | OpenClaw | `skills/` | ⚠️ To be confirmed | Conflicts with the repo-root `skills/` path; explicitly opt in via `make agents.skills.link AGENT=openclaw FORCE=1`. Validate instruction file loading behavior |
 | Cline | ✅ Supported | ✅ Supported | Put shared guidance in `AGENTS.md` and `Cline`-specific rules in `.clinerules/` |
-| CodeBuddy | `.codebuddy/skills/` | ⚠️ To be confirmed | Run `make agents.skills.link AGENT=codebuddy`; validate instruction file loading behavior |
+| CodeBuddy | `.codebuddy/skills/` | ✅ Supported | Prefers `CODEBUDDY.md` and falls back to `AGENTS.md` automatically when `CODEBUDDY.md` is absent (per Tencent's official docs); run `make agents.skills.link AGENT=codebuddy` to wire the skills directory — no `md` symlink required |
 | OpenAI Codex | ✅ Supported | ✅ Supported | Natively compatible with the current `LinaPro` conventions |
 | Cursor | ✅ Supported | ✅ Supported | Put simple rules in `AGENTS.md` and scoped rules in `.cursor/rules/` |
 | Deep Agents | ✅ Supported | ⚠️ To be confirmed | Reuse the standard skills directory first; validate project instruction loading behavior |

@@ -70,7 +70,7 @@ keywords:
 | Claude Code | ✅ 支持 | ✅ 支持 | 默认读取`CLAUDE.md`，已做软连支持；执行`make agents.skills.link AGENT=claude-code` |
 | OpenClaw | `skills/` | ⚠️ 待确认 | 与仓库根 `skills/` 冲突，需显式 `make agents.skills.link AGENT=openclaw FORCE=1`，规范文件读取需实测 |
 | Cline | ✅ 支持 | ✅ 支持 | 共享规范放`AGENTS.md`，`Cline` 专属规则放`.clinerules/` |
-| CodeBuddy | `.codebuddy/skills/` | ⚠️ 待确认 | 执行`make agents.skills.link AGENT=codebuddy`，规范文件读取需实测 |
+| CodeBuddy | `.codebuddy/skills/` | ✅ 支持 | 优先读取`CODEBUDDY.md`，缺失时自动 fallback 读取`AGENTS.md`（腾讯官方文档）；执行`make agents.skills.link AGENT=codebuddy`接入技能目录，无需建`md`软链 |
 | OpenAI Codex | ✅ 支持 | ✅ 支持 | 原生兼容当前`LinaPro`规范 |
 | Cursor | ✅ 支持 | ✅ 支持 | 简单规则用`AGENTS.md`，范围规则用`.cursor/rules/` |
 | Deep Agents | ✅ 支持 | ⚠️ 待确认 | 可先复用标准技能目录，项目规范读取需实测 |
