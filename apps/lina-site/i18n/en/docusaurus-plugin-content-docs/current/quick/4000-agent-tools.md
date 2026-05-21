@@ -102,7 +102,7 @@ Today, `AI Coding` tools are highly diverse. Each tool may read skills directori
 
 ## Using LinaPro's Unified Management Commands
 
-`LinaPro` ships a built-in `make agents.<resource>.<action>` command tree that unifies symlink management for three resource types, removing the need for hand-written `ln -s` invocations and guaranteeing consistent behavior across `Windows`, `Linux` and `macOS`. The commands operate strictly inside the repository root and never touch `HOME` directories or any system-global paths.
+`LinaPro` ships a built-in `make agents` one-shot command that automatically wires up every applicable symlink for the chosen agent across skills/prompts/md, alongside a per-resource `make agents.<resource>.<action>` advanced command tree for batch flows. The commands operate strictly inside the repository root and never touch `HOME` directories or any system-global paths, and guarantee consistent behavior across `Windows`, `Linux` and `macOS`.
 
 Supported resources:
 
@@ -111,8 +111,20 @@ Supported resources:
 - **`md`**: single-file bridge from `.<tool>.md` (e.g. `CLAUDE.md`, `GEMINI.md`) to the repo-root `AGENTS.md`, so agents that only read a private guide file name can reuse the same `AGENTS.md`.
 
 ```bash
-# Three-level interactive menu on a TTY: resource -> action -> agent
+# Recommended: agent-first one-shot command that touches every applicable resource
+
+# Interactive mode (TTY only):
+#   Step 1: arrow-key pick the agent (filter by typing).
+#   Step 2: arrow-key pick `link` or `unlink`.
 make agents
+
+# One-shot mode (works in any environment, including CI):
+make agents AGENT=claude-code                 # link claude-code across skills + md (prompts skipped per registry)
+make agents AGENT=claude-code FORCE=1         # rebuild mismatched links during the same run
+make agents AGENT=claude-code ACTION=unlink   # remove every managed symlink for claude-code
+
+# Advanced: per-resource subcommands (used when the aggregate command intentionally
+# does not support a flow, in particular AGENT=all and comma-separated lists)
 
 # skills: directory bridge for the tool compatibility matrix above
 make agents.skills.link                            # interactive selection on a TTY; read-only listing on CI/pipes
@@ -145,7 +157,18 @@ make agents.md.unlink AGENT=claude-code
 - `FORCE=1` only rebuilds symlinks that already exist but point at a non-managed target.
 - All per-tool symlink directories are listed in `.gitignore`, so creating them locally never pollutes the repository.
 
-The interactive `make agents.skills.link` selection uses a 3-column grid with status glyphs:
+**Aggregate command safety guards**:
+
+- `make agents` accepts a single agent name only. `AGENT=all` and comma-separated lists are explicitly rejected (use the per-resource subcommands above for batch flows).
+- Without `AGENT`, non-TTY invocations print a usage hint instead of blocking on input.
+- Resources where the chosen agent is `native` or unregistered are skipped automatically with an explicit reason in the final summary.
+
+All interactive entry points (the aggregate command and every per-resource subcommand) are powered by [charmbracelet/huh](https://github.com/charmbracelet/huh): use the **arrow keys** to navigate, **space** to toggle multi-select rows, **enter** to confirm, **type** to filter, and **Esc** / **Ctrl+C** to cancel. Option labels follow two different conventions depending on the prompt:
+
+- The aggregate `make agents` command's "pick an agent" step is a single-select across the cross-resource registry. Each option embeds the agent name plus a **resource roles summary with runtime status glyphs** (e.g. `claude-code (Claude Code) — skills: link[+], prompts: link[!], md: link[+]`) so you can see at a glance which resource types the chosen agent will touch and whether each one is already linked. Link-class resources show the runtime glyph; `native` resources are listed without a glyph (no work needed); unregistered resources are omitted.
+- Per-resource subcommands `make agents.<resource>.<action>` operate within a single resource and embed a **single-character status glyph** plus a short descriptor (e.g. `[~] claude-code  (mismatch)`) so you can see each candidate's current binding state without leaving the prompt.
+
+Status glyphs embedded in per-resource option labels:
 
 - `[+]` linked — already pointing at `.agents/skills`
 - `[~]` mismatch — symlink exists but targets another location

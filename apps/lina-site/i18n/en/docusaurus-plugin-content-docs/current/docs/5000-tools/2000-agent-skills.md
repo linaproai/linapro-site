@@ -276,10 +276,18 @@ npx playwright install --with-deps chromium
 
 ## Project Agent Symlink Management
 
-`.agents/skills/` is the single source of truth for skill content, but different `AI Coding` tools discover skills from their own project paths by default (`.claude/skills/`, `.codebuddy/skills/`, `.windsurf/skills/`, and so on). LinaPro ships a built-in `make agents.<resource>.<action>` command tree that unifies symlink management across three resource types:
+`.agents/skills/` is the single source of truth for skill content, but different `AI Coding` tools discover skills from their own project paths by default (`.claude/skills/`, `.codebuddy/skills/`, `.windsurf/skills/`, and so on). LinaPro ships a built-in `make agents` one-shot command that automatically wires up every applicable symlink for the chosen agent across skills/prompts/md, alongside a per-resource `make agents.<resource>.<action>` advanced command tree:
 
 ```bash
-make agents                                    # three-level interactive menu on a TTY: resource -> action -> agent
+# Interactive (TTY): arrow-key pick agent, then arrow-key pick link / unlink
+make agents
+
+# One-shot mode (works in any environment, including CI):
+make agents AGENT=claude-code                 # link claude-code across every applicable resource
+make agents AGENT=claude-code FORCE=1         # rebuild mismatched links during the same run
+make agents AGENT=claude-code ACTION=unlink   # remove every managed symlink for claude-code
+
+# Advanced per-resource subcommands (still available, support AGENT=all and CSV)
 make agents.skills.link AGENT=qoder            # create a skills symlink for a specific agent
 make agents.skills.link AGENT=all              # link every link-class agent's skills directory
 make agents.skills.unlink AGENT=qoder          # remove a managed symlink
