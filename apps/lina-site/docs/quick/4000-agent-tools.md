@@ -96,7 +96,7 @@ keywords:
 | Windsurf | `.windsurf/skills/` | ✅ 支持 | 执行`make agents.skills.link AGENT=windsurf` |
 | Universal | ✅ 支持 | 取决于目标工具 | 用于未显式列出的`AGENTS.md`兼容工具 |
 
-## 使用 LinaPro 统一管理命令
+## 统一管理命令
 
 `LinaPro`提供了仓库内置的`make agents.<resource>.<action>`命令树，统一管理三类资源的项目级软链，避免开发者手写`ln -s`，并保证`Windows`/`Linux`/`macOS`三端一致行为。命令仅在仓库根目录范围内操作，不会修改`HOME`目录或任何系统全局路径。
 
@@ -109,45 +109,5 @@ keywords:
 ```bash
 # 终端下进入资源 → 动作 → Agent 三层交互菜单
 make agents
-
-# skills：本节工具兼容性矩阵涉及的目录级软链
-make agents.skills.link                            # 终端下交互式选择；CI/管道下只读列表
-make agents.skills.link AGENT=claude-code          # 非交互式：为单个 Agent 创建软链
-make agents.skills.link AGENT=claude-code,codebuddy,qoder
-make agents.skills.link AGENT=all                  # 为所有 link 类 Agent 创建软链
-make agents.skills.link AGENT=all FORCE=1          # 强制重建指向错误源的旧软链
-make agents.skills.unlink AGENT=claude-code        # 移除受管软链
-make agents.skills.unlink AGENT=all
-
-# prompts：管理 Agent 的斜杠命令/prompts 目录（首批支持 claude-code / cursor / codex / gemini-cli）
-make agents.prompts.link AGENT=claude-code
-make agents.prompts.unlink AGENT=claude-code
-
-# md：让 Agent 通过私有规范文件读取 AGENTS.md
-make agents.md.link AGENT=claude-code              # 创建 CLAUDE.md -> AGENTS.md 软链
-make agents.md.link AGENT=all                      # 一次性为所有 link 类 Agent 创建私有规范文件软链
-make agents.md.unlink AGENT=claude-code
 ```
 
-**Agent 分类**（与[`vercel-labs/skills`](https://github.com/vercel-labs/skills#supported-agents)官方项目路径表对齐）：
-
-- `native`：项目路径本身就是`.agents/skills`（如`cursor`、`gemini-cli`、`codex`、`amp`、`opencode`、`cline`、`github-copilot`等），无需软链。
-- `link`：项目路径是`.<tool>/skills`（如`claude-code` → `.claude/skills`、`codebuddy` → `.codebuddy/skills`、`windsurf` → `.windsurf/skills`），按需创建相对软链指向`.agents/skills`。
-- `rootCollision`：项目路径是仓库根的`skills/`（目前仅`openclaw`），默认跳过；显式`AGENT=openclaw FORCE=1`才会创建。
-
-**冲突保护规则**：
-
-- 任何情况下命令都不会自动删除已存在的真实目录或文件，包含`FORCE=1`时也不会。
-- `FORCE=1`仅作用于"已是软链但指向非`.agents/skills`"的情况。
-- 所有 Agent 软链目录已在`.gitignore`中忽略，本地创建不会污染仓库。
-
-终端下`make agents.skills.link`的交互式列表使用 3 列网格 + 状态符号布局：
-
-- `[+]` linked — 已指向`.agents/skills`
-- `[~]` mismatch — 软链存在但指向其他位置
-- `[.]` absent — 尚未建立软链
-- `[!]` conflict — 真实目录或文件阻止建立软链
-- `[*]` root-collision — Agent 使用仓库根`skills/`路径
-- `[?]` error — 检测失败，详情请运行非交互列表
-
-更多细节请参考[`linactl` 工具中文文档](https://github.com/linaproai/linapro/blob/main/hack/tools/linactl/README.zh-CN.md)。
