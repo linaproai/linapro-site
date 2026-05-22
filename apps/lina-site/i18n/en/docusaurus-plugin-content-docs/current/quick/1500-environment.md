@@ -13,6 +13,7 @@ keywords:
   - pnpm
   - PostgreSQL
   - Git
+  - Make
   - linactl
   - Redis
   - Claude Code
@@ -82,7 +83,9 @@ brew install go
 
 # Linux — download the official prebuilt package and replace the version with the latest stable release
 # Latest versions: https://go.dev/dl/
-sudo tar -C /usr/local -xzf go*.linux-amd64.tar.gz
+# Example for Linux amd64 go1.25.10:
+wget https://go.dev/dl/go1.25.10.linux-amd64.tar.gz
+sudo tar -C /usr/local -xzf go1.25.10.linux-amd64.tar.gz
 echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc && source ~/.bashrc
 ```
 
@@ -200,7 +203,7 @@ npm install -g @fission-ai/openspec@latest
 
 ### goframe-v2
 
-`goframe-v2` is a `Claude Code` skill tailored for LinaPro's backend `Go` code. It includes `GoFrame` coding rules, `ORM` usage patterns, and best-practice examples. The skill activates automatically when you write or modify backend `Go` code.
+`goframe-v2` is an `Agent Skill` built specifically for the `GoFrame` development framework. It includes `GoFrame` coding rules, `ORM` usage patterns, and best-practice examples. The skill activates automatically when you write or modify backend `Go` code.
 
 ```bash
 npx skills add github.com/gogf/skills -g

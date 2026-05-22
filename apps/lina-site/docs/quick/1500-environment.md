@@ -83,7 +83,9 @@ brew install go
 
 # Linux — 下载官方预编译包，将版本号替换为最新稳定版
 # 最新版本列表：https://go.dev/dl/
-sudo tar -C /usr/local -xzf go*.linux-amd64.tar.gz
+# 以 Linux amd64 go1.25.10 为例：
+wget https://go.dev/dl/go1.25.10.linux-amd64.tar.gz
+sudo tar -C /usr/local -xzf go1.25.10.linux-amd64.tar.gz
 echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc && source ~/.bashrc
 ```
 
@@ -201,7 +203,7 @@ npm install -g @fission-ai/openspec@latest
 
 ### goframe-v2
 
-`goframe-v2`是专为`LinaPro`后端`Go`代码定制的`Claude Code`技能，内置`GoFrame`编码规范、`ORM`使用模式和最佳实践示例。编写或修改后端`Go`代码时，该技能将自动激活。
+`goframe-v2`是专为`GoFrame`开发框架提供的`Agent Skill`，内置`GoFrame`编码规范、`ORM`使用模式和最佳实践示例。编写或修改后端`Go`代码时，该技能将自动激活。
 
 ```bash
 npx skills add github.com/gogf/skills -g
@@ -209,7 +211,7 @@ npx skills add github.com/gogf/skills -g
 
 ### find-skills
 
-`find-skills`是`AI`技能市场搜索工具，帮助开发者快速查找和评估适合项目的`AI`技能，提升技能选型效率。
+`find-skills`是`Agent`技能市场搜索工具，帮助开发者快速查找和评估适合项目的`Agent Skills`，提升技能选型效率。
 
 ```bash
 npx skills add vercel-labs/skills --skill find-skills -g

@@ -1,8 +1,8 @@
 ---
 slug: '/docs/capability-boundary'
-title: 'Host and Plugin Capability Boundaries'
+title: 'Framework and Plugin Capability Boundaries'
 hide_title: true
-description: 'This page explains how LinaPro defines capability boundaries between the main framework and plugins. It covers the default admin workspace, host control-plane APIs, the unified plugin API namespace, public plugin asset hosting, source-plugin HTTP routes, and the division of responsibility between source plugins and dynamic plugins. It also describes how plugins access host capabilities through stable extension interfaces, and how plugin menus, permissions, public pages, and public_assets declarations are governed so developers can understand exactly how the host and plugins collaborate without leaking responsibilities into each other.'
+description: 'This page explains how LinaPro defines capability boundaries between the main framework and plugins. It covers the default admin workspace, host control-plane APIs, the unified plugin API namespace, public plugin asset hosting, source-plugin HTTP routes, and the division of responsibility between source plugins and dynamic plugins. It also explains how APIPrefix, route contracts, public_assets, source, mount, and index are implemented across source plugins and dynamic plugins, so developers can understand exactly how the host and plugins collaborate without leaking responsibilities into each other.'
 keywords:
   - host capability boundary
   - plugin capability boundary
@@ -15,6 +15,9 @@ keywords:
   - /x prefix
   - /x-assets
   - public_assets
+  - public_assets index
+  - source
+  - mount
   - /admin
   - static asset governance
   - Go Embed
@@ -97,13 +100,24 @@ flowchart LR
 
 Source plugins use `pluginhost` at compile time to register routes, hooks, scheduled tasks, lifecycle callbacks, and governance logic. Dynamic plugins use `pluginbridge` at runtime to access host capabilities through sandbox communication. The two interfaces differ in capability scope, but both plugin types are governed transparently by the main framework.
 
-## Default Admin Workspace
+## Admin Workspace Responsibility Boundaries
 
 `LinaPro` includes a default admin workspace built on `Vue 3 + Vben5`. By default, it is served under the `/admin` route. The workspace provides visual management for system modules and is the standard `UI` expression layer for host APIs and plugin APIs.
 
 `/admin` is the entry boundary of the default admin workspace, not the boundary of all frontend capability in the system. The workspace `SPA` static asset service and refresh `fallback` serve only `/admin` and its subpaths. They do not occupy the root path `/` by default. Therefore, the root path, portal pages, plugin-managed static assets, and other non-reserved public paths can be registered by source plugins in code. If no host or plugin route matches a request, the request should return an unmatched result instead of falling back to the admin workspace `index.html`.
 
-The workspace entry path is configurable, but it must not be the root path. The configuration must not use `/`, an empty value, a wildcard, a relative path, or any reserved host namespace such as the host control-plane `/api/v1`, the unified plugin API namespace `/x`, or the plugin asset namespace `/x-assets`.
+### Workspace Entry Route Configuration
+
+The admin workspace entry is controlled by the host static configuration key `workspace.basePath`, which defaults to `/admin`. This configuration is evaluated during startup and determines which browser path serves the built-in workspace `SPA` static assets and refresh `fallback`:
+
+```yaml
+workspace:
+  basePath: "/admin"
+```
+
+For a normal single-domain deployment, keeping `/admin` is recommended so the root path and other public paths remain available for portal pages, source-plugin-owned pages, or static assets. When the admin workspace uses a dedicated domain, `workspace.basePath` may also be set to `/`, allowing the whole domain to serve only the admin workspace.
+
+Whichever entry path you use, it must not occupy a host-reserved namespace such as the host control plane `/api`, the unified plugin `API` namespace `/x`, the public plugin asset namespace `/x-assets`, the legacy plugin asset namespace `/plugin-assets`, or any other reserved path. This configuration is a startup-scoped routing boundary, so host restart is required after changing it.
 
 ### How the Workspace Connects to Plugins
 
@@ -149,34 +163,42 @@ Workspace page paths, host control-plane APIs, and plugin APIs are three separat
 |----------|--------------|-------------|
 | Default admin workspace | `/admin` | Admin workspace `SPA` entry and refresh `fallback` boundary |
 | Host control-plane `API` | `/api/v1/...` | Built-in host governance APIs for users, permissions, configuration, and related system capabilities |
-| Unified plugin `API` | `/x/{plugin-id}/api/v1/...` | Shared plugin `API` namespace for source plugins and dynamic plugins |
+| Unified plugin `API` | `/x/{plugin-id}/...` | Shared plugin `API` namespace for source plugins and dynamic plugins; `/api/v1` is the internal version group used by the official examples |
 
 ## Plugin Capability Boundaries
 
 ### Dynamic Routes
 
-The two plugin types differ clearly in route registration capability, but their externally exposed plugin `API` paths are unified.
+The two plugin types differ clearly in route registration capability, but their plugin APIs must enter the same host-reserved namespace:
+
+```text
+/x/{plugin-id}/...
+```
+
+Here, `/x` is the unified plugin `API` namespace, `{plugin-id}` isolates each plugin, and the remaining path segments are owned by the plugin. Official plugins usually continue with `/api/v1` as an internal version group, so their public paths commonly look like `/x/{plugin-id}/api/v1/...`. The boundary enforced by the host, however, is `/x/{plugin-id}`, not a fixed `/api/v1` child path.
 
 **Source plugins** can register non-reserved `HTTP` route paths freely. A plugin declares a route registration callback during `init()`, and the host triggers it during startup. A plugin can register `/`, `/portal/...`, `/assets/...`, or other non-reserved public paths for pages, portals, static assets, custom `fallback` behavior, or other `HTTP` responses. This flexibility is useful, but it also creates a risk: **if multiple source plugins register the same route path, route conflicts cause service startup to fail**. For example, if more than one plugin registers the same `GET /` root route, the `HTTP Server` router reports a duplicate route and the process exits.
 
-Plugin APIs for source plugins must not use arbitrary public paths. They must use the unified plugin `API` namespace. `HTTPRegistrar` provides `APIPrefix()` or an equivalent method that returns the current plugin's API prefix:
+Plugin APIs for source plugins must not use arbitrary public paths. They must use the unified plugin `API` namespace. `RouteRegistrar` provides `APIPrefix()`, which returns the plugin namespace assigned to the current plugin:
 
 ```text
-/x/{plugin-id}/api/v1
+/x/{plugin-id}
 ```
 
 :::info Tip
 `x` stands for `eXtension`. It is the conventional namespace prefix that marks the path as a plugin extension `API`, not a host control-plane endpoint.
 :::
 
-Source plugin business APIs should be mounted under that prefix, for example:
+Source plugin business APIs should be mounted under that prefix. The recommended pattern is to add an internal API version group, for example:
 
 ```text
 /x/linapro-demo-source/api/v1/demo-records
 /x/linapro-demo-source/api/v1/demo-records/{id}
 ```
 
-**Dynamic plugins** run inside a `WASM` sandbox and cannot directly access the `HTTP Server` route registration mechanism. Dynamic plugins still declare their internal `path`, `method`, `access`, and `permission` through a `route contract`. The host projects those contracts into the same unified plugin `API` namespace:
+Source plugins must not register another plugin's path under `/x`. To keep boundaries clear, public pages, portal entries, static assets, health checks, and other non-API routes should not live under `/x/{plugin-id}`. Public pages and plugin-managed static assets should continue to use `/`, `/portal/...`, `/assets/...`, or another non-reserved path.
+
+**Dynamic plugins** run inside a `WASM` sandbox and cannot directly access the `HTTP Server` route registration mechanism. Dynamic plugins declare their internal `path`, `method`, `access`, and `permission` through build-time `RegisterRoutes` metadata and the generated `route contract`. At runtime, the host owns only the `/x/{plugin-id}` prefix; the remaining path comes from the dynamic plugin's route contract. The official dynamic plugin example also declares `/api/v1` as its internal route group, producing public paths such as:
 
 ```text
 /x/linapro-demo-dynamic/api/v1/demo-records
@@ -184,13 +206,13 @@ Source plugin business APIs should be mounted under that prefix, for example:
 /x/linapro-demo-dynamic/api/v1/backend-summary
 ```
 
-Here, `/x` represents the unified plugin `API` namespace. Source plugin requests are handled by the source plugin's `HTTP Server handler`; dynamic plugin requests are bridged by the host to the matching runtime based on the `route contract`. Host control-plane APIs still use `/api/v1/...`; source plugin APIs should no longer be mounted under the host control-plane namespace.
+Source plugin requests are handled by the `HTTP Server` handlers registered by source plugins. Dynamic plugin requests are bridged by the host to the matching runtime based on the `route contract`. Host control-plane APIs still use `/api/v1/...`; neither source plugins nor dynamic plugins should mount plugin business APIs under the host control-plane namespace.
 
 | Plugin Type | Route Registration | Path Constraint | Conflict Risk |
 |-------------|--------------------|-----------------|---------------|
-| Source plugin `API` | `pluginhost.HTTPRegistrar` | Must use `/x/{plugin-id}/api/v1/...` | Isolated by plugin, no conflict risk |
-| Source plugin<br/>custom routes | `pluginhost.HTTPRegistrar` | Can register non-reserved paths | Startup fails if they conflict with host, workspace, or other plugin routes |
-| Dynamic plugin `API` | Host dispatches by `route contract` | Public path uses `/x/{plugin-id}/api/v1/...` | Avoided by host isolation through plugin `ID` and contract |
+| Source plugin `API` | `pluginhost.RouteRegistrar` | Must use the `/x/{plugin-id}` namespace returned by `APIPrefix()`; remaining segments are plugin-defined | Isolated by plugin `ID`, so it does not conflict with another plugin's `/x` namespace |
+| Source plugin custom routes | `pluginhost.RouteRegistrar` | Can register non-reserved paths such as `/portal/...` or `/assets/...` | Startup fails if they conflict with host, workspace, or other plugin routes |
+| Dynamic plugin `API` | Host dispatches by `route contract` | Host combines `/x/{plugin-id}` with the contract's internal path; official examples use `/api/v1/...` | Avoided by host isolation through plugin `ID`, active artifact, and route contract |
 
 ### Static Assets
 
@@ -201,25 +223,50 @@ The main framework manages its own static assets through `Go Embed` and provides
 /x-assets/linapro-demo-dynamic/v0.1.0/css/main.css
 ```
 
-Each declaration uses `source` to point to a plugin-relative directory or a dynamic `artifact asset` prefix, and optional `mount` to specify its relative mount path under `/x-assets/{plugin-id}/{version}/`. If `mount` is empty or `/`, files in the declared directory are mounted directly at the version root:
+Each declaration uses `source` to point to a plugin-relative directory or a dynamic `artifact frontend asset` prefix, optional `mount` to specify its relative mount path under `/x-assets/{plugin-id}/{version}/`, and optional `index` to select the default file returned when the mount directory itself is requested. If `mount` is empty or `/`, files in the declared directory are mounted directly at the version root. If `index` is omitted, the host defaults to `index.html`.
 
 ```yaml
 public_assets:
-    # source points to the plugin directory that should be publicly exposed.
+  # source points to the plugin directory that should be publicly exposed.
   - source: frontend/public
     # mount is the path under /x-assets/{plugin-id}/{version}/.
     # / means the files are mounted directly at the version root.
     mount: /
-    # Another asset group can be mounted under a subpath for pages, styles, or other groups.
+    # index is the default file used when the mount directory itself is requested.
+    # When omitted, it defaults to index.html.
+    index: index.html
+  # Another asset group can be mounted under a subpath for pages, styles, or other groups.
   - source: frontend/pages
-    mount: /pages
+    mount: pages
+    index: standalone.html
 ```
 
-When a source plugin registers an `embedded filesystem` through `plugin.Assets().UseEmbeddedFiles(...)`, the host exposes files only from directories declared in `public_assets`. For example, `source: frontend/public` and `mount: /` maps `frontend/public/logo.png` to `/x-assets/{plugin-id}/{version}/logo.png`. Files outside declared directories are not exposed simply because they exist in the `embedded filesystem`.
+When a source plugin registers an `embedded filesystem` through `plugin.Assets().UseEmbeddedFiles(...)`, the host exposes files only from directories declared in `public_assets`. For example:
 
-Dynamic plugin `frontend assets` must also use the same declarative model. The host no longer exposes dynamic `artifact` frontend assets automatically just because they exist. Only asset sets matching `public_assets` declarations are served through `/x-assets/{plugin-id}/{version}/...`. This design does not preserve the old `/plugin-assets` compatibility entry.
+| source | mount | File inside the plugin | Public URL |
+|--------|-------|------------------------|------------|
+| `frontend/public` | `/` | `frontend/public/logo.png` | `/x-assets/{plugin-id}/{version}/logo.png` |
+| `frontend/pages` | `pages` | `frontend/pages/standalone.html` | `/x-assets/{plugin-id}/{version}/pages/standalone.html` |
+
+Files outside declared directories are not exposed simply because they exist in the `embedded filesystem`.
+
+Dynamic plugin `frontend assets` must also use the same declarative model. The host no longer exposes dynamic `artifact` frontend assets automatically just because they exist. Only asset sets matching `public_assets` declarations are served through `/x-assets/{plugin-id}/{version}/...`.
 
 `/x-assets` is an optional hosted entry, not a mandatory frontend mechanism for source plugins. Source plugins can still return pages, file streams, static assets, or `SPA fallback` behavior through their own `HTTP` routes. Those routes are fully maintained by plugin code. The host does not infer `HTTP` routes from `public_assets`, and it does not infer asset directories from `HTTP` routes.
+
+For dynamic plugins, workspace menus may reference assets hosted under `/x-assets`, but the menu path does not become the workspace route directly. The current embedded-mount mode usually uses `component: system/plugin/dynamic-page`, points the menu `path` at a `.js` or `.mjs` entry asset, and declares `pluginAccessMode: embedded-mount` in `query`. The host then forwards the hosted asset URL to the dynamic page shell as `embeddedSrc`.
+
+```yaml
+menus:
+  - key: plugin:linapro-demo-dynamic:main-entry
+    name: Dynamic Plugin Demo
+    path: /x-assets/linapro-demo-dynamic/v0.1.0/mount.js
+    component: system/plugin/dynamic-page
+    perms: linapro-demo-dynamic:view
+    type: M
+    query:
+      pluginAccessMode: embedded-mount
+```
 
 Plugins can also expose static asset access through dynamic routes, but this is **not recommended**. The unified host asset entry provides governance capabilities that would otherwise need to be rebuilt:
 
@@ -228,20 +275,25 @@ Plugins can also expose static asset access through dynamic routes, but this is 
 | Plugin enablement coupling, returning `404` automatically when disabled | Plugin must implement enablement checks itself |
 | Automatic `MIME` type derivation | Plugin must maintain its own `Content-Type` map |
 | In-memory caching and on-demand serving | Plugin must implement caching itself |
-| Version path isolation through `/version/...` | Plugin must design its own versioning strategy |
+| Version path isolation through `/{version}/...` | Plugin must design its own versioning strategy |
 | Consistent priority rules with host asset routes | Custom implementation may conflict with host route ordering |
 
-`public_assets` declarations can expose only explicitly public frontend static resources. The following resources are governance resources or backend implementation resources and must not be exposed through `/x-assets`:
+`public_assets` is an explicit publication boundary set by the plugin author. As long as the declaration points to a real directory in the plugin-owned resource set or a dynamic artifact frontend asset prefix, the host treats it as ordinary public static content. For that reason, plugin authors must declare only files that are safe for anonymous access. Do not put governance metadata, installation scripts, private configuration, tenant-specific files, or user-specific files into `public_assets`.
 
-| Resource That Must Not Be Public | Reason |
-|----------------------------------|--------|
-| `plugin.yaml` | Plugin governance metadata; contains dependencies, permissions, and lifecycle information |
-| `manifest/sql` | Installation and uninstallation `SQL`, consumed only by plugin lifecycle flows |
-| `manifest/i18n`, `manifest/apidoc` | Runtime translations and API documentation resources, loaded by their corresponding governance flows |
-| `backend` | Source plugin backend implementation, not frontend static assets |
-| Paths containing `../` | May escape the plugin resource boundary |
+The host still applies strict path validation. The following declarations are rejected:
 
-A `public asset URL` uses `{plugin-id, version}` as the cache boundary. Asset content under the same plugin version must remain stable. If asset content changes, the plugin should upgrade its `plugin.yaml` version or introduce an equivalent content versioning mechanism. When a plugin is not installed, not enabled, or not available to the current tenant, `/x-assets/{plugin-id}/{version}/...` returns `404` by default.
+| Invalid Configuration | Reason |
+|-----------------------|--------|
+| Empty `source` | No clear publication boundary can be formed |
+| Absolute paths or `URL`s | They may escape the plugin-owned resource set |
+| Paths that normalize to `../` traversal | They may escape the declared directory or plugin root |
+| Paths containing wildcards, query strings, or fragments | They cannot be mapped to a stable static directory |
+| Duplicate or overlapping `mount` values | A single public URL could map to multiple sources |
+| Missing `source` directory or prefix | Source plugin directories and dynamic frontend asset prefixes must exist |
+| Symlinks that escape the plugin root | They may read files outside the plugin |
+| `index` values that are not plain file names | Directory defaults must be safe relative file names |
+
+A `public asset URL` uses `{plugin-id, version}` as the cache boundary. Asset content under the same plugin version must remain stable. If asset content changes, the plugin should upgrade its `plugin.yaml` version or introduce an equivalent content versioning mechanism. When a plugin is not installed, not enabled, or not available to the current tenant, `/x-assets/{plugin-id}/{version}/...` returns `404` by default. Dynamic plugins may continue serving installed or active versioned assets while the plugin remains enabled; source plugins resolve declared resources from the plugin assets compiled into the host or from the plugin directory.
 
 ### Foundational Capabilities
 
@@ -324,7 +376,7 @@ When implementing business capabilities, plugins often need two kinds of interfa
 | **Interface semantics** | Content viewing and business operations | Data management and configuration changes |
 | **Menu mounting** | Not necessarily mounted in the workspace | Usually accessed through workspace menus |
 
-The main framework does not interpret a plugin's internal route grouping and does not distinguish the plugin's control plane from its data plane. Plugins own this internal grouping entirely. Note that `/x/{plugin-id}/api/v1` carries only plugin APIs. Public pages, portal entries, static assets, or custom `fallback` routes for source plugins should continue to use non-reserved paths such as `/portal/*` or `/assets/*`. The following example shows a source plugin registering a public portal entry, portal APIs, and admin APIs together:
+The main framework does not interpret a plugin's internal route grouping and does not distinguish the plugin's control plane from its data plane. Plugins own this internal grouping entirely. Note that `/x/{plugin-id}` carries the plugin `API` namespace only. If a plugin uses `/api/v1` as its internal version group, portal APIs and admin APIs can live under `/x/{plugin-id}/api/v1/...`. Public pages, portal entries, static assets, or custom `fallback` routes for source plugins are not plugin APIs and should continue to use non-reserved paths such as `/portal/*` or `/assets/*`. The following example shows a source plugin registering a public portal entry, portal APIs, and admin APIs together:
 
 ```go
 func registerRoutes(ctx context.Context, registrar pluginhost.HTTPRegistrar) error {
@@ -333,44 +385,47 @@ func registerRoutes(ctx context.Context, registrar pluginhost.HTTPRegistrar) err
         middlewares = routes.Middlewares()
         apiPrefix   = registrar.APIPrefix()
     )
-    // Plugin APIs: both source plugins and dynamic plugins must use /x/{plugin-id}/api/v1.
+    // Plugin APIs: both source plugins and dynamic plugins must enter the
+    // /x/{plugin-id} namespace. Here, /api/v1 is the plugin's internal API version group.
     routes.Group(apiPrefix, func(group pluginhost.RouteGroup) {
-        group.Middleware(
-            middlewares.NeverDoneCtx(),
-            middlewares.HandlerResponse(),
-            middlewares.CORS(),
-            middlewares.RequestBodyLimit(),
-            middlewares.Ctx(),
-        )
-
-        // Portal API (data plane): for frontend users; some endpoints can be anonymous.
-        // Full path example: /x/my-plugin/api/v1/portal/articles.
-        group.Group("/portal", func(group pluginhost.RouteGroup) {
-            // Public endpoint: no login required.
-            group.Bind(
-                portalArticleCtrl,
+        group.Group("/api/v1", func(group pluginhost.RouteGroup) {
+            group.Middleware(
+                middlewares.NeverDoneCtx(),
+                middlewares.HandlerResponse(),
+                middlewares.CORS(),
+                middlewares.RequestBodyLimit(),
+                middlewares.Ctx(),
             )
-            // Login endpoint: requires authentication but not admin permission.
-            group.Group("/", func(group pluginhost.RouteGroup) {
+
+            // Portal API (data plane): for frontend users; some endpoints can be anonymous.
+            // Full path example: /x/my-plugin/api/v1/portal/articles.
+            group.Group("/portal", func(group pluginhost.RouteGroup) {
+                // Public endpoint: no login required.
+                group.Bind(
+                    portalArticleCtrl,
+                )
+                // Login endpoint: requires authentication but not admin permission.
+                group.Group("/", func(group pluginhost.RouteGroup) {
+                    group.Middleware(
+                        middlewares.Auth(),
+                    )
+                    group.POST("/comments", commentCtrl.Create)
+                })
+            })
+
+            // Admin API (control plane): for the admin workspace; requires full auth and permission checks.
+            // Full path example: /x/my-plugin/api/v1/admin/articles.
+            group.Group("/admin", func(group pluginhost.RouteGroup) {
                 group.Middleware(
                     middlewares.Auth(),
+                    middlewares.Tenancy(),
+                    middlewares.Permission(),
                 )
-                group.POST("/comments", commentCtrl.Create)
+                group.Bind(
+                    adminArticleCtrl,
+                    adminCommentCtrl,
+                )
             })
-        })
-
-        // Admin API (control plane): for the admin workspace; requires full auth and permission checks.
-        // Full path example: /x/my-plugin/api/v1/admin/articles.
-        group.Group("/admin", func(group pluginhost.RouteGroup) {
-            group.Middleware(
-                middlewares.Auth(),
-                middlewares.Tenancy(),
-                middlewares.Permission(),
-            )
-            group.Bind(
-                adminArticleCtrl,
-                adminCommentCtrl,
-            )
         })
     })
 
