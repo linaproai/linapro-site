@@ -469,49 +469,49 @@ These commands manage only the symlinks they create. Unlink commands do not dele
 
 ### make agents
 
-Recommended aggregate entry. When called without arguments from an interactive terminal, it first lets you choose an agent with arrow keys, then choose the `link` or `unlink` action. In non-interactive environments, specify a single agent with `AGENT=<name>`. The aggregate entry applies the same action to every resource type supported by that agent; it does not support `AGENT=all` or comma-separated lists.
+Recommended aggregate entry. When called without arguments from an interactive terminal, it first lets you choose an agent with arrow keys, then choose the `link` or `unlink` action. In non-interactive environments, specify a single agent with `agent=<name>`. The aggregate entry applies the same action to every resource type supported by that agent; it does not support `agent=all` or comma-separated lists.
 
 ```bash
 # Choose agent and action interactively
 make agents
 
 # Create every available resource symlink for one agent
-make agents AGENT=claude-code
+make agents agent=claude-code
 
 # Remove managed symlinks for one agent
-make agents AGENT=claude-code ACTION=unlink
+make agents agent=claude-code action=unlink
 
 # Rebuild managed symlinks that point to the wrong target
-make agents AGENT=claude-code FORCE=1
+make agents agent=claude-code force=1
 ```
 
 If an agent natively reads a resource type, such as `AGENTS.md`, the aggregate entry skips that resource and explains why in the summary.
 
 ### make agents.skills.link
 
-Symlinks supported agents' project skill directories to the canonical `.agents/skills` source. Without `AGENT`, a non-interactive environment prints support status and guidance, while an interactive terminal opens the selection flow. Use `AGENT=<name|all|csv>` to process one or more agents.
+Symlinks supported agents' project skill directories to the canonical `.agents/skills` source. Without `agent`, a non-interactive environment prints support status and guidance, while an interactive terminal opens the selection flow. Use `agent=<name|all|csv>` to process one or more agents.
 
 ```bash
 # Show skill symlink status
 make agents.skills.link
 
 # Create the skill symlink for one agent
-make agents.skills.link AGENT=claude-code
+make agents.skills.link agent=claude-code
 
 # Create skill symlinks for every symlink-capable agent
-make agents.skills.link AGENT=all
+make agents.skills.link agent=all
 
 # Rebuild a skill symlink that points to the wrong target
-make agents.skills.link AGENT=claude-code FORCE=1
+make agents.skills.link agent=claude-code force=1
 ```
 
 ### make agents.skills.unlink
 
-Removes skill directory symlinks managed by `agents.skills.link`. Non-interactive environments must pass `AGENT=<name|all|csv>` explicitly; interactive terminals can choose from existing managed symlinks.
+Removes skill directory symlinks managed by `agents.skills.link`. Non-interactive environments must pass `agent=<name|all|csv>` explicitly; interactive terminals can choose from existing managed symlinks.
 
 ```bash
-make agents.skills.unlink AGENT=claude-code
-make agents.skills.unlink AGENT=all
+make agents.skills.unlink agent=claude-code
+make agents.skills.unlink agent=all
 ```
 
 ### make agents.prompts.link
@@ -523,10 +523,10 @@ Symlinks supported agents' command or prompt directories to canonical sources un
 make agents.prompts.link
 
 # Create prompt symlinks for one agent
-make agents.prompts.link AGENT=codex
+make agents.prompts.link agent=codex
 
 # Create prompt symlinks in batches
-make agents.prompts.link AGENT=claude-code,codex,cursor,gemini-cli
+make agents.prompts.link agent=claude-code,codex,cursor,gemini-cli
 ```
 
 ### make agents.prompts.unlink
@@ -534,8 +534,8 @@ make agents.prompts.link AGENT=claude-code,codex,cursor,gemini-cli
 Removes prompt directory symlinks managed by `agents.prompts.link` without deleting the real prompt directories.
 
 ```bash
-make agents.prompts.unlink AGENT=codex
-make agents.prompts.unlink AGENT=all
+make agents.prompts.unlink agent=codex
+make agents.prompts.unlink agent=all
 ```
 
 ### make agents.md.link
@@ -547,10 +547,10 @@ Symlinks supported agents' private rule files to the root `AGENTS.md`. For examp
 make agents.md.link
 
 # Create the rule-file symlink for one agent
-make agents.md.link AGENT=claude-code
+make agents.md.link agent=claude-code
 
 # Create rule-file symlinks for every supported agent
-make agents.md.link AGENT=all
+make agents.md.link agent=all
 ```
 
 ### make agents.md.unlink
@@ -558,8 +558,8 @@ make agents.md.link AGENT=all
 Removes rule-file symlinks managed by `agents.md.link`. This command does not delete real hand-written files such as `CLAUDE.md` or `GEMINI.md`.
 
 ```bash
-make agents.md.unlink AGENT=claude-code
-make agents.md.unlink AGENT=all
+make agents.md.unlink agent=claude-code
+make agents.md.unlink agent=all
 ```
 
 ## Database

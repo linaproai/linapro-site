@@ -471,49 +471,49 @@ make i18n.check
 
 ### make agents
 
-推荐使用的聚合入口。无参数且连接到交互式终端时，会先用方向键选择智能体，再选择`link`或`unlink`操作；在非交互环境中，通过`AGENT=<name>`指定单个智能体。聚合入口会对该智能体支持的所有资源类型执行同一操作，不支持`AGENT=all`或逗号列表。
+推荐使用的聚合入口。无参数且连接到交互式终端时，会先用方向键选择智能体，再选择`link`或`unlink`操作；在非交互环境中，通过`agent=<name>`指定单个智能体。聚合入口会对该智能体支持的所有资源类型执行同一操作，不支持`agent=all`或逗号列表。
 
 ```bash
 # 交互式选择智能体和操作
 make agents
 
 # 为单个智能体创建所有可用资源软链
-make agents AGENT=claude-code
+make agents agent=claude-code
 
 # 移除单个智能体的托管软链
-make agents AGENT=claude-code ACTION=unlink
+make agents agent=claude-code action=unlink
 
 # 重建目标不一致的托管软链
-make agents AGENT=claude-code FORCE=1
+make agents agent=claude-code force=1
 ```
 
 如果智能体原生读取某类资源，例如原生读取`AGENTS.md`，聚合入口会跳过该资源并在汇总中说明原因。
 
 ### make agents.skills.link
 
-将支持的智能体项目技能目录软链到统一来源`.agents/skills`。不传`AGENT`时，非交互环境会输出支持状态和提示；交互式终端会进入选择流程。支持`AGENT=<name|all|csv>`批量处理多个智能体。
+将支持的智能体项目技能目录软链到统一来源`.agents/skills`。不传`agent`时，非交互环境会输出支持状态和提示；交互式终端会进入选择流程。支持`agent=<name|all|csv>`批量处理多个智能体。
 
 ```bash
 # 查看技能软链状态
 make agents.skills.link
 
 # 为指定智能体创建技能软链
-make agents.skills.link AGENT=claude-code
+make agents.skills.link agent=claude-code
 
 # 为所有可软链的智能体创建技能软链
-make agents.skills.link AGENT=all
+make agents.skills.link agent=all
 
 # 重建目标不一致的技能软链
-make agents.skills.link AGENT=claude-code FORCE=1
+make agents.skills.link agent=claude-code force=1
 ```
 
 ### make agents.skills.unlink
 
-移除由`agents.skills.link`管理的技能目录软链。非交互环境必须显式传入`AGENT=<name|all|csv>`；交互式终端可以从当前已托管软链中选择。
+移除由`agents.skills.link`管理的技能目录软链。非交互环境必须显式传入`agent=<name|all|csv>`；交互式终端可以从当前已托管软链中选择。
 
 ```bash
-make agents.skills.unlink AGENT=claude-code
-make agents.skills.unlink AGENT=all
+make agents.skills.unlink agent=claude-code
+make agents.skills.unlink agent=all
 ```
 
 ### make agents.prompts.link
@@ -525,10 +525,10 @@ make agents.skills.unlink AGENT=all
 make agents.prompts.link
 
 # 为指定智能体创建提示词软链
-make agents.prompts.link AGENT=codex
+make agents.prompts.link agent=codex
 
 # 批量创建提示词软链
-make agents.prompts.link AGENT=claude-code,codex,cursor,gemini-cli
+make agents.prompts.link agent=claude-code,codex,cursor,gemini-cli
 ```
 
 ### make agents.prompts.unlink
@@ -536,8 +536,8 @@ make agents.prompts.link AGENT=claude-code,codex,cursor,gemini-cli
 移除由`agents.prompts.link`管理的提示词目录软链，不删除真实提示词目录。
 
 ```bash
-make agents.prompts.unlink AGENT=codex
-make agents.prompts.unlink AGENT=all
+make agents.prompts.unlink agent=codex
+make agents.prompts.unlink agent=all
 ```
 
 ### make agents.md.link
@@ -549,10 +549,10 @@ make agents.prompts.unlink AGENT=all
 make agents.md.link
 
 # 为指定智能体创建规则文件软链
-make agents.md.link AGENT=claude-code
+make agents.md.link agent=claude-code
 
 # 为所有可软链的智能体创建规则文件软链
-make agents.md.link AGENT=all
+make agents.md.link agent=all
 ```
 
 ### make agents.md.unlink
@@ -560,8 +560,8 @@ make agents.md.link AGENT=all
 移除由`agents.md.link`管理的规则文件软链。该命令不会删除手写的`CLAUDE.md`、`GEMINI.md`等真实文件。
 
 ```bash
-make agents.md.unlink AGENT=claude-code
-make agents.md.unlink AGENT=all
+make agents.md.unlink agent=claude-code
+make agents.md.unlink agent=all
 ```
 
 ## 数据库
