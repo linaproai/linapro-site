@@ -137,7 +137,7 @@ Review the documents — pay particular attention to the database design soundne
 - [x] 3.3 Wire up backend API
 
 ## 4. i18n
-- [x] 4.1 Update host/plugin language packs
+- [x] 4.1 Update core framework/plugin language packs
 
 ## 5. Testing
 - [x] 5.1 Write E2E test cases

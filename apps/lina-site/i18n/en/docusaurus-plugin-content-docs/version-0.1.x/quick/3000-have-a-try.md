@@ -137,7 +137,7 @@ Works through the task list in `tasks.md` and completes the following implementa
 6. Implement controllers (backend/internal/controller/)
 7. Implement business service layer (backend/internal/service/)
 8. Write plugin registration entry (backend/plugin.go)
-9. Wire the new plugin into the host plugin registry file
+9. Wire the new plugin into the core framework plugin registry file
 ```
 
 **Frontend implementation (`frontend/`):**

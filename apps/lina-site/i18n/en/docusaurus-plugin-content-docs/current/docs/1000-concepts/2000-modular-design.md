@@ -33,19 +33,19 @@ Each module is a complete, self-contained functional unit that can be installed,
 
 `LinaPro` treats modularity as a core principle from day one, not as a bolt-on extension added after the framework took shape.
 
-- **Built-in capabilities are split by domain boundary**: Each capability domain of the host (`lina-core`) — authentication, authorization, users, menus, dictionaries, parameters, files, scheduling, plugin governance — is designed independently and evolves independently, with no cross-domain leakage. Each domain has a clear entry point and contract; external consumers can only access it through its public interface and cannot bypass the boundary to reach its internal implementation.
+- **Built-in capabilities are split by domain boundary**: Each capability domain of the core framework (`lina-core`) — authentication, authorization, users, menus, dictionaries, parameters, files, scheduling, plugin governance — is designed independently and evolves independently, with no cross-domain leakage. Each domain has a clear entry point and contract; external consumers can only access it through its public interface and cannot bypass the boundary to reach its internal implementation.
 
-- **The plugin system is a first-class citizen**: Plugins are not an afterthought — they are the core of the framework's extension mechanism. From the very beginning of the project, the plugin runtime was designed alongside the host service with full lifecycle management and governance. Every official business capability is delivered under the same module specification as any third-party plugin.
+- **The plugin system is a first-class citizen**: Plugins are not an afterthought — they are the core of the framework's extension mechanism. From the very beginning of the project, the plugin runtime was designed alongside the core framework service with full lifecycle management and governance. Every official business capability is delivered under the same module specification as any third-party plugin.
 
 - **Frontend and backend are modularized together**: Each plugin ships its own backend service, frontend pages, database resources, and permission declarations as a single, coherent module unit — not as two separate halves. Installing a plugin means installing a fully self-contained capability.
 
-- **Stable extension interfaces**: The host exposes well-defined extension points to plugins. Plugins can interact with the host only through these extension interfaces — registering routes, responding to events, filtering menus, and so on — and can never reach into the host's internal implementation. This boundary design keeps inter-module dependencies clear and controlled, so the host can evolve internally without accidentally breaking existing plugins.
+- **Stable extension interfaces**: The core framework exposes well-defined extension points to plugins. Plugins can interact with the core framework only through these extension interfaces — registering routes, responding to events, filtering menus, and so on — and can never reach into the core framework's internal implementation. This boundary design keeps inter-module dependencies clear and controlled, so the core framework can evolve internally without accidentally breaking existing plugins.
 
 ## The Leanness Principle
 
 `LinaPro`'s core framework follows one simple design rule: **only keep what is truly core and universal — anything that can be provided by a plugin should be provided by a plugin**.
 
-The main framework is not a container for features; it is a stable capability foundation. As business requirements grow, the path forward is to enrich the plugin ecosystem with new plugins — not to pile new implementations into the framework itself. This keeps the framework lean, its core logic manageable, and its external evolution predictable.
+The core framework is not a container for features; it is a stable capability foundation. As business requirements grow, the path forward is to enrich the plugin ecosystem with new plugins — not to pile new implementations into the framework itself. This keeps the framework lean, its core logic manageable, and its external evolution predictable.
 
 **Cloud storage is a practical example**: to integrate Qiniu Cloud or `AWS S3` object storage, the concrete integration logic does not live inside the framework. Instead, a dedicated storage plugin provides the implementation. Once the plugin is enabled, file writes are automatically routed to the cloud; the framework's only role in this is **defining the storage interface abstraction**. That abstraction layer lets different storage backends be swapped in seamlessly, with callers completely unaware of the underlying change.
 
@@ -65,7 +65,7 @@ Mature building blocks are naturally more stable and predictable than freshly bu
 
 `LinaPro` provides two categories of building blocks:
 
-- **Host built-in modules**: Capabilities available out of the box from the core service — user and permission systems, dictionaries and parameter management, file storage, job scheduling, plugin governance, and more. These modules ship with the framework and require no additional installation; they form the stable foundation of every project.
+- **Core framework built-in modules**: Capabilities available out of the box from the core framework service — user and permission systems, dictionaries and parameter management, file storage, job scheduling, plugin governance, and more. These modules ship with the framework and require no additional installation; they form the stable foundation of every project.
 
 - **Official plugin ecosystem**: Extension capabilities delivered as standalone plugins — covering common business domains (organization management, content management, monitoring and auditing, etc.) and vertical-industry use cases. The official plugin ecosystem will continue to grow, covering more and more common business scenarios. In the future, developers will be able to combine official plugins to quickly assemble a fully functional business system at minimal cost.
 

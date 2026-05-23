@@ -13,7 +13,7 @@
 
 #### Scenario: 用户进入文档站
 - **WHEN** 用户打开文档首页或侧边栏
-- **THEN** 文档信息架构至少覆盖 `Introduction`、`Getting Started`、`Architecture`、`Core Host`、`Web Workspace`、`Plugins`、`OpenSpec Workflow`
+- **THEN** 文档信息架构至少覆盖 `Introduction`、`Getting Started`、`Architecture`、`Core Framework`、`Web Workspace`、`Plugins`、`OpenSpec Workflow`
 - **AND** 文档层级允许后续继续扩展部署、治理或 FAQ 等补充板块
 
 ### Requirement: 博客一期内容范围必须聚焦项目演进与实践

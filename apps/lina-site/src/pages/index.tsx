@@ -95,7 +95,7 @@ const layers = [
         moduleKey: 'apps/lina-core',
         title: (
             <Translate id="home.layer.core.title" description="Layer 1 title">
-                Core Host Service
+                Core Framework Service
             </Translate>
         ),
         desc: (
@@ -128,7 +128,7 @@ const layers = [
         ),
         desc: (
             <Translate id="home.layer.plugins.desc" description="Layer 3 description">
-                Hot-loadable source plugins and WASM runtime plugins, each sandboxed with namespaced database and filesystem access — extend or replace anything without touching the host.
+                Hot-loadable source plugins and WASM runtime plugins, each sandboxed with namespaced database and filesystem access — extend or replace anything without touching the core framework.
             </Translate>
         ),
     },
@@ -434,7 +434,7 @@ const strengths = [
         ),
         desc: (
             <Translate id="home.strength.i18n.desc" description="Strength localization desc">
-                Host, plugins, and API docs share language packs, checks, and runtime caches.
+                The core framework, plugins, and API docs share language packs, checks, and runtime caches.
             </Translate>
         ),
     },

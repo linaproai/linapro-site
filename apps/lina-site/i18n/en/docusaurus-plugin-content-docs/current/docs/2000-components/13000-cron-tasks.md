@@ -26,7 +26,7 @@ keywords:
 
 ## Introduction
 
-Scheduled tasks are a persistent scheduling capability provided by `lina-core`. Task definitions, runtime state, and execution logs are stored in the database. After the host starts, it brings built-in host tasks, plugin-declared tasks, and administrator-created tasks into a unified scheduler.
+Scheduled tasks are a persistent scheduling capability provided by `lina-core`. Task definitions, runtime state, and execution logs are stored in the database. After the core framework starts, it brings built-in core framework tasks, plugin-declared tasks, and administrator-created tasks into a unified scheduler.
 
 The admin workspace provides task listing, group management, manual triggering, pause/resume, and execution log viewing. Source plugins and `WASM` dynamic plugins can also project their task capabilities into the same governance model.
 
@@ -59,10 +59,10 @@ scheduler:
 
 | Type | Value | Description | Use Case |
 |------|-------|-------------|----------|
-| **Handler task** | `handler` | Calls a `Go` handler registered by the host or a plugin | Data cleanup, statistics, synchronization, plugin business tasks |
-| **Shell task** | `shell` | Executes a system command within the host process context | Script tasks, file processing, operational maintenance |
+| **Handler task** | `handler` | Calls a `Go` handler registered by the core framework or a plugin | Data cleanup, statistics, synchronization, plugin business tasks |
+| **Shell task** | `shell` | Executes a system command within the core framework process context | Script tasks, file processing, operational maintenance |
 
-Handler tasks are better suited for business logic because they can reuse host services, database connections, permission context, and plugin governance information. `Shell` tasks run with host process privileges — production environments should strictly limit creation permissions and set reasonable timeouts.
+Handler tasks are better suited for business logic because they can reuse core framework services, database connections, permission context, and plugin governance information. `Shell` tasks run with core framework process privileges — production environments should strictly limit creation permissions and set reasonable timeouts.
 
 ## Cron Expressions
 
@@ -76,7 +76,7 @@ Common expression examples:
 | `0 9 * * 1-5` | Weekdays at 9:00 AM |
 | `0 0 1 * *` | First day of each month at midnight |
 
-Built-in host tasks may also use internal expressions with second-level semantics, such as `# 17 3 * * *` to stagger maintenance tasks to a fixed second offset. When creating tasks in the workspace, rely on the expression format and preview shown in the UI.
+Built-in core framework tasks may also use internal expressions with second-level semantics, such as `# 17 3 * * *` to stagger maintenance tasks to a fixed second offset. When creating tasks in the workspace, rely on the expression format and preview shown in the UI.
 
 ## Task Groups and Logs
 
@@ -96,7 +96,7 @@ Common log statuses:
 
 ## Built-in Tasks
 
-The host projects built-in maintenance tasks as persistent tasks for unified observability and governance:
+The core framework projects built-in maintenance tasks as persistent tasks for unified observability and governance:
 
 | Handler | Default Scope | Description |
 |---------|--------------|-------------|
@@ -123,7 +123,7 @@ plugin.Cron().RegisterCron(
 )
 ```
 
-Dynamic plugins declare their task capabilities through the plugin manifest and `hostServices` authorization. The host converts plugin tasks into unified handler references and pauses related tasks when the plugin is unavailable, disabled, or has upgrade anomalies — preventing scheduling to non-executable targets.
+Dynamic plugins declare their task capabilities through the plugin manifest and `hostServices` authorization. The core framework converts plugin tasks into unified handler references and pauses related tasks when the plugin is unavailable, disabled, or has upgrade anomalies — preventing scheduling to non-executable targets.
 
 ## Execution Scope
 
@@ -171,7 +171,7 @@ When debugging tasks, test in a staging environment first — especially for tas
 
 ## Shell Task Security
 
-`Shell` tasks run system commands with the host service process's privileges. Follow these principles in production:
+`Shell` tasks run system commands with the core framework service process's privileges. Follow these principles in production:
 
 - Only allow trusted administrators to create and modify `Shell` tasks.
 - Set reasonable timeouts to avoid long-running resource occupation.
@@ -186,5 +186,5 @@ When debugging tasks, test in a staging environment first — especially for tas
 | Globally unique tasks | Use `master_only` and `singleton` |
 | Maintenance actions every node needs | Use `all_node` and `singleton` |
 | Parallelizable data processing | Use `parallel` with a clear `maxConcurrency` |
-| Plugin-bundled tasks | Register handlers in the plugin; let the host project and govern them |
+| Plugin-bundled tasks | Register handlers in the plugin; let the core framework project and govern them |
 | Long-running business processes | Prefer handler tasks for testable, auditable code structure |

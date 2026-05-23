@@ -83,14 +83,14 @@ make help
 | `make stop` | 开发服务 | 停止前后端开发服务器 |
 | `make status` | 开发服务 | 查看前后端运行状态及日志路径 |
 | `make build` | 构建 | 完整构建前端、插件和后端二进制 |
-| `make pack.assets` | 构建 | 准备宿主嵌入所需的前端静态资源和`manifest` |
+| `make pack.assets` | 构建 | 准备主框架嵌入所需的前端静态资源和`manifest` |
 | `make wasm` | 构建 | 构建所有或指定运行时`WASM`插件 |
-| `make tidy` | 构建 | 整理宿主、工具和插件相关`Go`模块依赖 |
+| `make tidy` | 构建 | 整理主框架、工具和插件相关`Go`模块依赖 |
 | `make image` | 镜像 | 构建生产`Docker`镜像 |
 | `make image.build` | 镜像 | 仅准备镜像产物，不执行`Docker`构建 |
 | `make test` | 测试 | 运行完整`E2E`测试套件 |
 | `make test.go` | 测试 | 运行`Go`单元测试 |
-| `make test.host` | 测试 | 只运行宿主自有`E2E`测试 |
+| `make test.host` | 测试 | 只运行主框架自有`E2E`测试 |
 | `make test.plugins` | 测试 | 运行官方插件自有`E2E`测试 |
 | `make test.scripts` | 测试 | 运行工具脚本的单元与`smoke`测试 |
 | `make i18n.check` | 国际化 | 扫描运行时硬编码文案并校验语言包`key`覆盖 |
@@ -158,7 +158,7 @@ make status
 
 ### make build
 
-完整构建流程，依次执行：前端静态资源构建、嵌入到后端的`manifest`资源准备、所有`WASM`插件构建，最后编译后端宿主二进制。构建产物输出到`temp/output/`目录。
+完整构建流程，依次执行：前端静态资源构建、嵌入到后端的`manifest`资源准备、所有`WASM`插件构建，最后编译后端主框架二进制。构建产物输出到`temp/output/`目录。
 
 ```bash
 # 默认构建（当前平台）
@@ -193,7 +193,7 @@ build:
 | `build.platforms` | `["auto"]` | 目标平台列表，使用`goos/goarch`格式，`auto`表示`linux/<当前架构>`，`make build platforms=...`可覆盖 |
 | `build.cgoEnabled` | `false` | 是否启用`CGO` |
 | `build.outputDir` | `temp/output` | 构建产物输出路径，相对于仓库根目录 |
-| `build.binaryName` | `lina` | 宿主二进制文件名 |
+| `build.binaryName` | `lina` | 主框架二进制文件名 |
 
 ### make wasm
 
@@ -209,7 +209,7 @@ make wasm p=my-plugin
 
 ### make pack.assets
 
-准备宿主`manifest`资产，用于`Go`嵌入，通常由`make build`或`make dev`自动调用。需要单独检查或准备嵌入资源时可以手动执行：
+准备主框架`manifest`资产，用于`Go`嵌入，通常由`make build`或`make dev`自动调用。需要单独检查或准备嵌入资源时可以手动执行：
 
 ```bash
 make pack.assets
@@ -217,7 +217,7 @@ make pack.assets
 
 ### make tidy
 
-整理宿主、开发工具和插件相关`Go`模块依赖，适合在升级依赖或初始化插件完整模式后执行：
+整理主框架、开发工具和插件相关`Go`模块依赖，适合在升级依赖或初始化插件完整模式后执行：
 
 ```bash
 make tidy
@@ -287,14 +287,14 @@ make image.build
 | `scope`值 | 说明 |
 |-----------|------|
 | `full`（默认） | 运行全部`E2E`测试 |
-| `host` | 仅运行宿主自有测试 |
+| `host` | 仅运行主框架自有测试 |
 | `plugins` | 仅运行所有官方插件测试 |
 | `plugin:<id>` | 仅运行指定插件测试 |
 
 ```bash
 make test
 
-# 只运行宿主测试
+# 只运行主框架测试
 make test scope=host
 
 # 只运行指定插件测试
@@ -303,7 +303,7 @@ make test scope=plugin:multi-tenant
 
 ### make test.go
 
-运行所有受维护`Go`模块的单元测试，并启用竞态检测。支持通过`plugins=0`强制宿主模式，或通过`race=false`关闭竞态检测。
+运行所有受维护`Go`模块的单元测试，并启用竞态检测。支持通过`plugins=0`强制主框架模式，或通过`race=false`关闭竞态检测。
 
 ```bash
 make test.go
@@ -313,7 +313,7 @@ make test.go race=false
 
 ### make test.host
 
-只运行宿主自有`Playwright E2E`测试，不要求初始化官方插件子模块。
+只运行主框架自有`Playwright E2E`测试，不要求初始化官方插件子模块。
 
 ```bash
 make test.host
@@ -339,7 +339,7 @@ make test.scripts
 
 ### make i18n.check
 
-扫描运行时可见的代码路径，检测未被纳入国际化体系的硬编码文案，并校验宿主和各插件运行时语言包的消息`key`覆盖情况。适合在提交新功能前进行`i18n`合规自查。
+扫描运行时可见的代码路径，检测未被纳入国际化体系的硬编码文案，并校验主框架和各插件运行时语言包的消息`key`覆盖情况。适合在提交新功能前进行`i18n`合规自查。
 
 ```bash
 make i18n.check

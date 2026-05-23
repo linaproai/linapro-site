@@ -24,7 +24,7 @@ keywords:
 
 ## Introduction
 
-Source plugins are `LinaPro`'s recommended default extension method. They are compiled and deployed together with the host as `Go` source code, using `pluginhost` to register routes, hooks, scheduled tasks, lifecycle callbacks, and governance logic. They are suited for long-term business modules that require high performance and a complete engineering experience.
+Source plugins are `LinaPro`'s recommended default extension method. They are compiled and deployed together with the core framework as `Go` source code, using `pluginhost` to register routes, hooks, scheduled tasks, lifecycle callbacks, and governance logic. They are suited for long-term business modules that require high performance and a complete engineering experience.
 
 Official source plugins live in `apps/lina-plugins/`. The main repository mounts the official plugin workspace through this directory. User projects also maintain their own business plugins here.
 
@@ -33,8 +33,8 @@ Official source plugins live in `apps/lina-plugins/`. The main repository mounts
 | Scenario | Recommended? | Reason |
 |----------|-------------|--------|
 | Long-term business modules | Yes | Testable, auditable, best performance |
-| Organization, content, monitoring capabilities | Yes | Tight integration with host permissions, menus, scheduling, and multi-tenancy |
-| Runtime hot-loading | Not preferred | Source plugins require rebuilding and redeploying the host |
+| Organization, content, monitoring capabilities | Yes | Tight integration with core framework permissions, menus, scheduling, and multi-tenancy |
+| Runtime hot-loading | Not preferred | Source plugins require rebuilding and redeploying the core framework |
 | Commercial binary distribution | Not preferred | Source plugins typically expose source code |
 
 ## Standard Directory Structure
@@ -127,7 +127,7 @@ type ArticleListReq struct {
 }
 ```
 
-The service layer accesses the database through the plugin's own `DAO`. When tenant isolation is needed, use the host-published `TenantFilterService` to append tenant conditions rather than hand-writing inconsistent filter rules.
+The service layer accesses the database through the plugin's own `DAO`. When tenant isolation is needed, use the core framework-published `TenantFilterService` to append tenant conditions rather than hand-writing inconsistent filter rules.
 
 ## Registration Entry
 
@@ -158,21 +158,21 @@ func init() {
 }
 ```
 
-The host generates an aggregation entry in plugin-complete mode, blank-importing configured plugins so their `init()` registration logic enters the host process.
+The core framework generates an aggregation entry in plugin-complete mode, blank-importing configured plugins so their `init()` registration logic enters the core framework process.
 
 ## Frontend Pages
 
-Source plugin frontend pages live in `frontend/pages/` and are loaded by the host workspace's dynamic page shell. The `component` field in plugin menus typically uses:
+Source plugin frontend pages live in `frontend/pages/` and are loaded by the core framework workspace's dynamic page shell. The `component` field in plugin menus typically uses:
 
 ```yaml
 component: system/plugin/dynamic-page
 ```
 
-Pages can reuse the default workspace's frontend ecosystem and design conventions. When a plugin is disabled, the host menu API no longer returns that plugin's entry, and the workspace sidebar hides it automatically.
+Pages can reuse the default workspace's frontend ecosystem and design conventions. When a plugin is disabled, the core framework menu API no longer returns that plugin's entry, and the workspace sidebar hides it automatically.
 
 ## Event Hooks and Scheduled Tasks
 
-Source plugins can subscribe to host events — for example, login success, plugin enablement, and system startup. Hooks can be synchronous-blocking or asynchronous, depending on the execution mode chosen at registration.
+Source plugins can subscribe to core framework events — for example, login success, plugin enablement, and system startup. Hooks can be synchronous-blocking or asynchronous, depending on the execution mode chosen at registration.
 
 Plugins can also register their own scheduled task handlers for administrators to select when creating tasks in the admin workspace:
 
@@ -189,7 +189,7 @@ plugin.Cron().RegisterCron(
 
 ## Runtime Upgrade
 
-After source plugin files are updated, the host compares the active version in the database with the currently discovered version. When a higher version is found, the plugin enters the `pending_upgrade` runtime state. Host base governance capabilities remain available, while plugin business entry points enter a controlled state.
+After source plugin files are updated, the core framework compares the active version in the database with the currently discovered version. When a higher version is found, the plugin enters the `pending_upgrade` runtime state. Core framework base governance capabilities remain available, while plugin business entry points enter a controlled state.
 
 The administrator executes an explicit runtime upgrade in the plugin management page. The upgrade flow re-reads the active and target manifests, runs dependency checks, `BeforeUpgrade` callbacks, plugin custom upgrade logic, upgrade `SQL`, governance resource synchronization, active version switching, and cache invalidation. On failure, it enters `upgrade_failed` — diagnostics can be reviewed and the upgrade retried.
 
@@ -200,7 +200,7 @@ This model prevents file overwrites from being mistaken for completed data and g
 - Use `kebab-case` for plugin `ID` and the corresponding `snake_case` for database table prefixes.
 - Installation and upgrade `SQL` must be idempotent — avoid failures when reinstalling with retained data.
 - Place service logic in `backend/internal/service/`.
-- Use only stable contracts like `pluginhost` and `pluginservice` — do not depend on host `internal/` packages directly.
-- Reserve a `tenant_id` column in multi-tenant plugin tables and use the host tenant filter service.
+- Use only stable contracts like `pluginhost` and `pluginservice` — do not depend on the core framework's `internal/` packages directly.
+- Reserve a `tenant_id` column in multi-tenant plugin tables and use the core framework tenant filter service.
 - Declare menus and button permissions together to avoid pages being visible but operations lacking permission.
 - Distinguish governance records, database data, and file data during uninstallation to avoid accidental deletion.

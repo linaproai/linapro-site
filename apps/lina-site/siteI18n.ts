@@ -55,7 +55,7 @@ const SITE_SEO = {
       'LinaPro.AI - AI-native full-stack framework for sustainable delivery',
     tagline: 'AI-native full-stack framework for sustainable delivery',
     description:
-      'LinaPro makes AI a core engine of delivery: AI leads analysis, design, and implementation while teams set direction and make the critical calls. With a core host service, admin workspace, plugin runtime, and spec-driven AI-native R&D workflow built in, teams can ship production-grade applications quickly while keeping architecture, testing, and governance ready to evolve.',
+      'LinaPro makes AI a core engine of delivery: AI leads analysis, design, and implementation while teams set direction and make the critical calls. With a core framework service, admin workspace, plugin runtime, and spec-driven AI-native R&D workflow built in, teams can ship production-grade applications quickly while keeping architecture, testing, and governance ready to evolve.',
     keywords:
       'LinaPro,AI-native full-stack framework,sustainable delivery,AI-driven development,Go framework,Vue 3 admin,WASM plugins,RBAC,specification-driven,OpenSpec,AI-native R&D workflow,lina-core,lina-vben,lina-plugins,enterprise governance',
   },

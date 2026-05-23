@@ -13,7 +13,7 @@
 ## 3. 内容架构与文档整理
 
 - [x] 3.1 根据 LinaPro 主仓库 README、插件 README 和 OpenSpec 规范整理首页与文档内容来源清单
-- [x] 3.2 建立文档信息架构，至少落地 `Introduction`、`Getting Started`、`Architecture`、`Core Host`、`Web Workspace`、`Plugins`、`OpenSpec Workflow`
+- [x] 3.2 建立文档信息架构，至少落地 `Introduction`、`Getting Started`、`Architecture`、`Core Framework`、`Web Workspace`、`Plugins`、`OpenSpec Workflow`
 - [x] 3.3 梳理并标记安装与运行要求中的版本冲突项，仅将已确认口径写入正式文档
 - [x] 3.4 初始化博客栏目和首批文章主题骨架，使内容范围聚焦 LinaPro 的版本演进、架构设计、插件机制和 OpenSpec 实践
 

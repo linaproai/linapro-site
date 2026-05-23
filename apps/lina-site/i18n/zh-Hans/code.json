@@ -20,7 +20,7 @@
     "description": "Hero secondary CTA"
   },
   "home.layer.core.title": {
-    "message": "核心宿主服务",
+    "message": "主框架服务",
     "description": "Layer 1 title"
   },
   "home.layer.core.desc": {
@@ -40,7 +40,7 @@
     "description": "Layer 3 title"
   },
   "home.layer.plugins.desc": {
-    "message": "源码插件无限扩展与WASM动态热加载，内置沙箱安全权限控制，资源严格隔离；无需触碰宿主，即可扩展或覆盖任意能力。",
+    "message": "源码插件无限扩展与WASM动态热加载，内置沙箱安全权限控制，资源严格隔离；无需触碰主框架，即可扩展或覆盖任意能力。",
     "description": "Layer 3 description"
   },
   "home.layer.openspec.title": {
@@ -152,7 +152,7 @@
     "description": "Strength localization title"
   },
   "home.strength.i18n.desc": {
-    "message": "宿主、插件与接口文档共用翻译资源，内置缺失检查、来源诊断与运行时缓存。",
+    "message": "主框架、插件与接口文档共用翻译资源，内置缺失检查、来源诊断与运行时缓存。",
     "description": "Strength localization desc"
   },
   "home.strength.distributed.title": {
@@ -168,7 +168,7 @@
     "description": "Strength multitenant title"
   },
   "home.strength.multitenant.desc": {
-    "message": "租户中间件与治理接缝内置宿主核心，支持完整生命周期管理，可自动回退单租户。",
+    "message": "租户中间件与治理接缝内置主框架核心，支持完整生命周期管理，可自动回退单租户。",
     "description": "Strength multitenant desc"
   },
   "home.strength.builtin.title": {

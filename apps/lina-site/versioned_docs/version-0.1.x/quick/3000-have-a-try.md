@@ -137,7 +137,7 @@ claude
 6. 实现控制器（backend/internal/controller/）
 7. 实现业务服务层（backend/internal/service/）
 8. 编写插件注册入口（backend/plugin.go）
-9. 在宿主插件注册文件中接线新插件
+9. 在主框架插件注册文件中接线新插件
 ```
 
 **前端实现（`frontend/`）：**
@@ -250,4 +250,4 @@ flowchart LR
 - **每次迭代都有完整记录**，架构不会随时间漂移
 - **插件采用松耦合设计**，可以随时单独禁用或卸载，不影响其他模块
 
-接下来，你可以阅读[组件设计](/docs/components)建立整体组件地图，再深入查看[源码插件](/docs/source-plugins)、[WASM动态插件](/docs/wasm-plugins)和[核心宿主服务](/docs/core-host)等页面，理解框架的扩展方式和架构边界。
+接下来，你可以阅读[组件设计](/docs/components)建立整体组件地图，再深入查看[源码插件](/docs/source-plugins)、[WASM动态插件](/docs/wasm-plugins)和[主框架服务](/docs/core-host)等页面，理解框架的扩展方式和架构边界。

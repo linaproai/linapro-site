@@ -2,7 +2,7 @@
 slug: '/docs/permission'
 title: '权限管理策略'
 hide_title: true
-description: '本文从组件设计角度介绍 LinaPro 核心主框架服务的权限管理策略，涵盖 JWT 双 Token 的签发、解析与吊销机制，Access Token 与 Refresh Token 的生命周期管理，基于会话热状态的在线 Session 管理，RBAC 角色权限模型的设计思路（角色→菜单→权限的三层关系），Token 级别的访问上下文缓存与版本修订同步，API 权限的声明式管理方式（g.Meta 标签内联声明与 Permission 中间件的校验流程），以及菜单权限的管理机制（菜单类型、角色菜单关联、权限树与数据范围控制），帮助开发者全面理解框架鉴权与权限体系并遵循最佳实践。'
+description: '本文从组件设计角度介绍 LinaPro 主框架服务的权限管理策略，涵盖 JWT 双 Token 的签发、解析与吊销机制，Access Token 与 Refresh Token 的生命周期管理，基于会话热状态的在线 Session 管理，RBAC 角色权限模型的设计思路（角色→菜单→权限的三层关系），Token 级别的访问上下文缓存与版本修订同步，API 权限的声明式管理方式（g.Meta 标签内联声明与 Permission 中间件的校验流程），以及菜单权限的管理机制（菜单类型、角色菜单关联、权限树与数据范围控制），帮助开发者全面理解框架鉴权与权限体系并遵循最佳实践。'
 keywords:
   - 权限管理
   - JWT认证

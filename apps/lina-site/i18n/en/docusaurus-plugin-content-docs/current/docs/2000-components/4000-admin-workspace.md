@@ -2,7 +2,7 @@
 slug: '/docs/admin-workspace'
 title: 'Built-in Admin Workspace'
 hide_title: true
-description: 'A component-level guide to the LinaPro built-in admin workspace, lina-vben — how it serves as the standard frontend consumer of the core host service and plugin system, covering access control, system settings, job scheduling, multi-tenant management, plugin governance, developer center, and dynamic plugin pages, while maintaining consistency with backend API contracts, menu permissions, and I18N resources.'
+description: 'A component-level guide to the LinaPro built-in admin workspace, lina-vben — how it serves as the standard frontend consumer of the core framework service and plugin system, covering access control, system settings, job scheduling, multi-tenant management, plugin governance, developer center, and dynamic plugin pages, while maintaining consistency with backend API contracts, menu permissions, and I18N resources.'
 keywords:
   - lina-vben
   - admin workspace
@@ -26,9 +26,9 @@ keywords:
 
 ## Introduction
 
-`lina-vben` is `LinaPro`'s built-in admin workspace, built on `Vue 3 + Vben5 + Ant Design Vue + TypeScript`. It is not the definer of business logic — it is the standard `UI` expression layer for the `lina-core` host `API` and all enabled plugin `APIs`.
+`lina-vben` is `LinaPro`'s built-in admin workspace, built on `Vue 3 + Vben5 + Ant Design Vue + TypeScript`. It is not the definer of business logic — it is the standard `UI` expression layer for the `lina-core` API and all enabled plugin APIs.
 
-Developers can build business applications directly on top of it, or replace it with a custom frontend. As long as the new frontend follows the host's public `RESTful API` and permission model, it can plug into the same backend capabilities.
+Developers can build business applications directly on top of it, or replace it with a custom frontend. As long as the new frontend follows the core framework's public `RESTful API` and permission model, it can plug into the same backend capabilities.
 
 ## Technology Stack
 
@@ -46,11 +46,11 @@ Developers can build business applications directly on top of it, or replace it 
 
 ### The workspace consumes contracts, not defines them
 
-The workspace reads menus, permissions, users, roles, configuration, tasks, plugin status, and API documentation from the host. Interface behavior is defined by backend `API` contracts — the workspace only organizes the interaction experience.
+The workspace reads menus, permissions, users, roles, configuration, tasks, plugin status, and API documentation from the core framework. Interface behavior is defined by backend `API` contracts — the workspace only organizes the interaction experience.
 
-### Menus come from host governance data
+### Menus come from core framework governance data
 
-The sidebar is not a pure frontend hardcode. When the host returns the menu tree, it merges built-in menus with menus declared by enabled plugins, and filters based on the current user's permissions. When a plugin is disabled, its menu and route entries disappear automatically.
+The sidebar is not a pure frontend hardcode. When the core framework returns the menu tree, it merges built-in menus with menus declared by enabled plugins, and filters based on the current user's permissions. When a plugin is disabled, its menu and route entries disappear automatically.
 
 ### Plugin pages load through a dynamic page shell
 
@@ -58,19 +58,19 @@ Both source plugins and dynamic plugins can declare frontend pages. The workspac
 
 ## Functional Modules
 
-The workspace provides visual entry points for host and plugin capabilities. Different modules have different backend owners, but users get a unified experience in the interface.
+The workspace provides visual entry points for core framework and plugin capabilities. Different modules have different backend owners, but users get a unified experience in the interface.
 
 | Module | Key Capabilities | Source |
 |--------|-----------------|--------|
-| **Access control** | Users, roles, menus, button permissions, permission assignment | Host |
-| **System settings** | Dictionaries, parameters, file management, runtime configuration | Host |
-| **Job scheduling** | Tasks, groups, execution logs, manual triggers | Host |
+| **Access control** | Users, roles, menus, button permissions, permission assignment | Core framework |
+| **System settings** | Dictionaries, parameters, file management, runtime configuration | Core framework |
+| **Job scheduling** | Tasks, groups, execution logs, manual triggers | Core framework |
 | **Multi-tenant management** | Tenants, membership, tenant switching, tenant plugin governance | `multi-tenant` plugin |
 | **Organization management** | Departments, positions | `org-center` plugin |
 | **Content management** | Notices and announcements | `content-notice` plugin |
 | **System monitoring** | Online users, service monitoring, operation logs, login logs | `monitor-*` plugins |
-| **Extension center** | Plugin discovery, installation, enablement, disablement, upgrade, uninstallation | Host and plugin system |
-| **Developer center** | API documentation, system information | Host |
+| **Extension center** | Plugin discovery, installation, enablement, disablement, upgrade, uninstallation | Core framework and plugin system |
+| **Developer center** | API documentation, system information | Core framework |
 
 ## Access Control Experience
 
@@ -85,7 +85,7 @@ graph LR
     Check --> Perm
 ```
 
-User management, role management, and menu management handle accounts, authorization sets, and permission tree maintenance respectively. After a role selects menu or button permissions, the permission topology takes effect quickly. In cluster mode, the host notifies other nodes to refresh through a cache revision mechanism.
+User management, role management, and menu management handle accounts, authorization sets, and permission tree maintenance respectively. After a role selects menu or button permissions, the permission topology takes effect quickly. In cluster mode, the core framework notifies other nodes to refresh through a cache revision mechanism.
 
 ## Dynamic Plugin Menu Injection
 
@@ -98,14 +98,14 @@ sequenceDiagram
     participant Plugin as Enabled Plugins
 
     UI->>Core: GET /api/v1/menu
-    Core->>Core: Read host menus and user permissions
+    Core->>Core: Read core framework menus and user permissions
     Core->>Plugin: Project plugin menu declarations
     Plugin-->>Core: Return plugin menus and button permissions
     Core-->>UI: Return complete menu tree
     UI->>UI: Render sidebar and dynamic routes
 ```
 
-This design lets plugin enablement, disablement, and permission changes be driven by host governance data, without the workspace needing to change code for each plugin.
+This design lets plugin enablement, disablement, and permission changes be driven by core framework governance data, without the workspace needing to change code for each plugin.
 
 ## Extension Center
 
@@ -124,7 +124,7 @@ Common operations:
 
 ## Developer Center
 
-The Developer Center aggregates host and plugin API documentation. Developers can view `OpenAPI` documents, request parameters, response structures, and permission identifiers, and issue debug requests directly. Online debugging uses the current logged-in user's authentication state — write operations produce real data changes and should be used cautiously in test environments.
+The Developer Center aggregates core framework and plugin API documentation. Developers can view `OpenAPI` documents, request parameters, response structures, and permission identifiers, and issue debug requests directly. Online debugging uses the current logged-in user's authentication state — write operations produce real data changes and should be used cautiously in test environments.
 
 ## Default Account
 

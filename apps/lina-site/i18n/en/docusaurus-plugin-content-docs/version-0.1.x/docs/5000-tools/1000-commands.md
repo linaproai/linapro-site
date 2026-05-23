@@ -83,14 +83,14 @@ All `make <command>` examples in this document can be equivalently replaced with
 | `make stop` | Development server | Stop frontend and backend development servers |
 | `make status` | Development server | Show running status and log paths for both servers |
 | `make build` | Build | Full build: frontend, plugins, and backend binary |
-| `make pack.assets` | Build | Prepare frontend static assets and `manifest` for host embedding |
+| `make pack.assets` | Build | Prepare frontend static assets and `manifest` for core framework embedding |
 | `make wasm` | Build | Build all or specific runtime `WASM` plugins |
-| `make tidy` | Build | Tidy `Go` module dependencies for host, tools, and plugins |
+| `make tidy` | Build | Tidy `Go` module dependencies for the core framework, tools, and plugins |
 | `make image` | Image | Build a production `Docker` image |
 | `make image.build` | Image | Prepare image artifacts only, skip the `Docker` build step |
 | `make test` | Test | Run the full `E2E` test suite |
 | `make test.go` | Test | Run `Go` unit tests |
-| `make test.host` | Test | Run host-only `E2E` tests |
+| `make test.host` | Test | Run core framework-only `E2E` tests |
 | `make test.plugins` | Test | Run official plugin `E2E` tests |
 | `make test.scripts` | Test | Run unit and smoke tests for tooling scripts |
 | `make i18n.check` | i18n | Scan for hardcoded strings and validate language pack key coverage |
@@ -157,7 +157,7 @@ Sample output:
 
 ### make build
 
-Runs the full build pipeline in order: frontend static asset build, `manifest` resource preparation for backend embedding, all `WASM` plugin builds, and finally compilation of the backend host binary. Build artifacts are written to `temp/output/`.
+Runs the full build pipeline in order: frontend static asset build, `manifest` resource preparation for backend embedding, all `WASM` plugin builds, and finally compilation of the backend core framework binary. Build artifacts are written to `temp/output/`.
 
 ```bash
 # Default build (current platform)
@@ -183,7 +183,7 @@ build:
   cgoEnabled: false
   # Build output path, relative to the repository root
   outputDir: "temp/output"
-  # Filename of the compiled host binary
+  # Filename of the compiled core framework binary
   binaryName: "lina"
 ```
 
@@ -192,7 +192,7 @@ build:
 | `build.platforms` | `["auto"]` | Target platform list in `goos/goarch` format; `auto` means `linux/<current-arch>`; override with `make build platforms=...` |
 | `build.cgoEnabled` | `false` | Whether to enable `CGO` |
 | `build.outputDir` | `temp/output` | Build output path, relative to the repository root |
-| `build.binaryName` | `lina` | Host binary filename |
+| `build.binaryName` | `lina` | Core framework binary filename |
 
 ### make wasm
 
@@ -208,7 +208,7 @@ make wasm p=my-plugin
 
 ### make pack.assets
 
-Prepares host `manifest` assets for `Go` embedding, usually called automatically by `make build` or `make dev`. Run manually when you need to inspect or prepare embedded resources in isolation:
+Prepares core framework `manifest` assets for `Go` embedding, usually called automatically by `make build` or `make dev`. Run manually when you need to inspect or prepare embedded resources in isolation:
 
 ```bash
 make pack.assets
@@ -216,7 +216,7 @@ make pack.assets
 
 ### make tidy
 
-Tidies `Go` module dependencies for the host, dev tools, and plugins. Useful after upgrading dependencies or initializing full plugin mode:
+Tidies `Go` module dependencies for the core framework, dev tools, and plugins. Useful after upgrading dependencies or initializing full plugin mode:
 
 ```bash
 make tidy
@@ -286,14 +286,14 @@ Runs the full `Playwright E2E` test suite. Make sure the dev servers are running
 | `scope` value | Description |
 |---------------|-------------|
 | `full` (default) | Run all `E2E` tests |
-| `host` | Run host-only tests |
+| `host` | Run core framework-only tests |
 | `plugins` | Run all official plugin tests |
 | `plugin:<id>` | Run tests for a specific plugin |
 
 ```bash
 make test
 
-# Host tests only
+# Core framework tests only
 make test scope=host
 
 # Specific plugin tests only
@@ -302,7 +302,7 @@ make test scope=plugin:multi-tenant
 
 ### make test.go
 
-Runs unit tests for all maintained `Go` modules with race detection enabled. Pass `plugins=0` to force host-only mode, or `race=false` to disable race detection.
+Runs unit tests for all maintained `Go` modules with race detection enabled. Pass `plugins=0` to force core framework-only mode, or `race=false` to disable race detection.
 
 ```bash
 make test.go
@@ -312,7 +312,7 @@ make test.go race=false
 
 ### make test.host
 
-Runs only the host's own `Playwright E2E` tests. Does not require the official plugin submodules to be initialized.
+Runs only the core framework-owned `Playwright E2E` tests. Does not require the official plugin submodules to be initialized.
 
 ```bash
 make test.host
@@ -338,7 +338,7 @@ make test.scripts
 
 ### make i18n.check
 
-Scans runtime-visible code paths for hardcoded strings not covered by the i18n system, and validates message key coverage across the host and plugin runtime language packs. Run this before committing new features to catch compliance issues early.
+Scans runtime-visible code paths for hardcoded strings not covered by the i18n system, and validates message key coverage across the core framework and plugin runtime language packs. Run this before committing new features to catch compliance issues early.
 
 ```bash
 make i18n.check

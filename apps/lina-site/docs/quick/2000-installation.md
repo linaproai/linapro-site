@@ -29,14 +29,16 @@ keywords:
 
 ## 克隆仓库
 
-使用以下命令获取框架源码：
+使用以下命令获取框架源码。
+
+安装最新实验版本：
 
 ```bash
-# 安装最新实验版本
 git clone --depth 1 https://github.com/linaproai/linapro.git linapro
-
-# 或者指定稳定发布版本，如 v0.1.0
-git clone --depth 1 --branch v0.1.0 https://github.com/linaproai/linapro.git linapro
+```
+或者指定稳定发布版本，如 v0.1.0：
+```bash
+git clone --depth 1 https://github.com/linaproai/linapro.git linapro --branch v0.1.0
 ```
 
 ## 启动服务
@@ -65,7 +67,7 @@ cd linapro
 cp apps/lina-core/manifest/config/config.template.yaml apps/lina-core/manifest/config/config.yaml
 ```
 
-用编辑器打开`config.yaml`，找到数据库连接部分，将其修改为你本地`PostgreSQL`的实际连接信息：
+默认配置使用`postgres:postgres@127.0.0.1:5432`连接`linapro`数据库，如果你的`PostgreSQL`使用了不同的用户名、密码、主机、端口或数据库名，请在此处更新。用编辑器打开`config.yaml`，找到数据库连接部分，将其修改为你本地`PostgreSQL`的实际连接信息：
 
 ```yaml title="apps/lina-core/manifest/config/config.yaml"
 database:
@@ -73,7 +75,7 @@ database:
     link: "pgsql:postgres:postgres@tcp(127.0.0.1:5432)/linapro?sslmode=disable"
 ```
 
-默认配置使用`postgres:postgres@127.0.0.1:5432`连接`linapro`数据库，如果你的`PostgreSQL`使用了不同的用户名、密码、主机、端口或数据库名，请在此处更新。
+
 
 ### 初始化数据库
 
@@ -139,7 +141,7 @@ make dev
 
 ## 工具集成
 
-由于当前`AI Coding`工具百花齐放，且各个工具的技能、规范、提示词文件存储路径不尽相同，因此我们提供了一个通用的终端交互式指令，帮助大家将框架提供的`Skills`、项目规范和提示词快速集成到自己熟悉的`AI Coding`工具中，以减少大家的心智负担。 
+由于当前`AI Coding`工具百花齐放，且各个工具的技能、规范、提示词文件存储路径不尽相同，因此我们提供了一个通用的终端交互式指令，帮助大家将框架提供的`Skills`、项目规范和提示词快速集成到自己熟悉的`AI Coding`工具中，以降低大家的心智负担。
 
 ```bash
 make agents

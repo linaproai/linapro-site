@@ -2,7 +2,7 @@
 slug: '/docs/api-reference'
 title: 'OpenAPI Reference'
 hide_title: true
-description: 'From a component design perspective, this page explains how LinaPro aggregates API documentation — the core host, source plugins, and WASM dynamic plugins are unified into a single OpenAPI document through g.Meta contracts, permission tags, API doc i18n resources, the in-workspace developer center debugging page, and third-party tool import.'
+description: 'From a component design perspective, this page explains how LinaPro aggregates API documentation — the core framework, source plugins, and WASM dynamic plugins are unified into a single OpenAPI document through g.Meta contracts, permission tags, API doc i18n resources, the in-workspace developer center debugging page, and third-party tool import.'
 keywords:
   - API reference
   - OpenAPI
@@ -27,7 +27,7 @@ keywords:
 
 ## Overview
 
-The API documentation is the unified view through which `lina-core` exposes its `API` contracts. Rather than asking developers to maintain documentation files separately, the host generates `OpenAPI 3.0` documentation at runtime based on host routes, source plugin routes, and dynamic plugin routes.
+The API documentation is the unified view through which `lina-core` exposes its `API` contracts. Rather than asking developers to maintain documentation files separately, the core framework generates `OpenAPI 3.0` documentation at runtime based on core framework routes, source plugin routes, and dynamic plugin routes.
 
 The default access path is controlled by `server.extensions.apiDocPath` in `config.yaml`:
 
@@ -43,13 +43,13 @@ The API documentation aggregates three types of sources:
 
 | Source | Integration method | Documentation content |
 |--------|---------|----------------------|
-| Core host | `g.Meta` contracts and bound routes in the host `api/` directory | Platform base interfaces: authentication, permissions, configuration, tasks, plugin governance, etc. |
+| Core framework | `g.Meta` contracts and bound routes in the core framework's `api/` directory | Platform base interfaces: authentication, permissions, configuration, tasks, plugin governance, etc. |
 | Source plugins | Source plugin route bindings recorded by `pluginhost` | Plugin-specific `API`, request/response structures, and permission identifiers |
 | Dynamic plugins | Route contracts and runtime projections from dynamic plugin artifacts | Routes, methods, and descriptions exposed by dynamic plugins |
 
 ```mermaid
 flowchart LR
-    Host["Host API contracts"] --> Builder["OpenAPI builder"]
+    Host["Core framework API contracts"] --> Builder["OpenAPI builder"]
     Source["Source plugin route bindings"] --> Builder
     Wasm["Dynamic plugin route contracts"] --> Builder
     I18N["apidoc i18n resources"] --> Builder
@@ -58,11 +58,11 @@ flowchart LR
     JSON --> Tools["Apifox, Postman, Swagger UI"]
 ```
 
-After a plugin is enabled, disabled, or upgraded, the documentation updates as the runtime projection changes. The API documentation reflects the set of interfaces currently accessible from the host — not every interface that might exist in the source repository.
+After a plugin is enabled, disabled, or upgraded, the documentation updates as the runtime projection changes. The API documentation reflects the set of interfaces currently accessible from the core framework — not every interface that might exist in the source repository.
 
 ## API Contract Declaration
 
-The host and source plugins use `GoFrame`'s `g.Meta` struct tags to declare interface contracts. Path, method, tag, summary, description, and permission identifier are all written on the request struct:
+The core framework and source plugins use `GoFrame`'s `g.Meta` struct tags to declare interface contracts. Path, method, tag, summary, description, and permission identifier are all written on the request struct:
 
 ```go
 type ArticleListReq struct {
@@ -95,7 +95,7 @@ Button permissions in the workspace come from menu governance data; interface pe
 
 ## Source Plugin Interfaces
 
-Source plugins define `DTO`s in their own `backend/api/` directory and register routes through `pluginhost` in `backend/plugin.go`. The host records these route bindings and projects interfaces that match the `GoFrame` handler shape into the unified `OpenAPI` document.
+Source plugins define `DTO`s in their own `backend/api/` directory and register routes through `pluginhost` in `backend/plugin.go`. The core framework records these route bindings and projects interfaces that match the `GoFrame` handler shape into the unified `OpenAPI` document.
 
 Source plugin interfaces should follow these conventions:
 
@@ -107,9 +107,9 @@ Source plugin interfaces should follow these conventions:
 
 ## Dynamic Plugin Interfaces
 
-`WASM` dynamic plugin interfaces are carried by the plugin artifact as route contracts. The host reads and projects them into the API documentation upon installation, enablement, and upgrade. Dynamic plugins run on top of `pluginbridge`; interface requests still pass through the host's authentication, permission, and tenant context processing before entering the `WASM` sandbox.
+`WASM` dynamic plugin interfaces are carried by the plugin artifact as route contracts. The core framework reads and projects them into the API documentation upon installation, enablement, and upgrade. Dynamic plugins run on top of `pluginbridge`; interface requests still pass through the core framework's authentication, permission, and tenant context processing before entering the `WASM` sandbox.
 
-Dynamic plugins cannot directly modify the host route table. Which routes they expose, which host services they can access, and which database tables or external addresses they can reach are all jointly determined by the plugin manifest, artifact metadata, and the `hostServices` authorization snapshot.
+Dynamic plugins cannot directly modify the core framework route table. Which routes they expose, which core framework services they can access, and which database tables or external addresses they can reach are all jointly determined by the plugin manifest, artifact metadata, and the `hostServices` authorization snapshot.
 
 ## API Documentation Internationalization
 
@@ -132,7 +132,7 @@ apps/lina-plugins/content-notice/manifest/i18n/zh-CN/apidoc/
 └── plugin-api-notice.json
 ```
 
-Plugin API translations should only maintain the plugin's own namespace — do not write plugin copy into the host API documentation resources. The `en-US` API documentation resources can remain as empty placeholders, with English metadata in the source code serving as the default copy.
+Plugin API translations should only maintain the plugin's own namespace — do not write plugin copy into the core framework API documentation resources. The `en-US` API documentation resources can remain as empty placeholders, with English metadata in the source code serving as the default copy.
 
 ## In-Browser Debugging
 
@@ -148,7 +148,7 @@ In-browser debugging uses the current logged-in user's authentication state. Deb
 |------|-------|
 | `Apifox` | Create a new project, select **Import OpenAPI/Swagger**, and enter `http://localhost:8080/api.json` |
 | `Postman` | Use **Import** with the **Link** method to import `/api.json` |
-| `Swagger UI` | Point to the host-exposed `/api.json` URL |
+| `Swagger UI` | Point to the core framework-exposed `/api.json` URL |
 | `curl` | Download with `curl -o api.json http://localhost:8080/api.json` |
 
 ## Troubleshooting

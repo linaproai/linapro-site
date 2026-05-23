@@ -28,15 +28,15 @@ keywords:
 Plugin management connects two chains:
 
 - **Development chain**: Reads plugin sources from `hack/config.yaml` and synchronizes source plugins to the `apps/lina-plugins/` workspace.
-- **Runtime chain**: After the host scans plugin manifests, the admin workspace handles discovery, installation, enablement, disablement, uninstallation, and upgrade.
+- **Runtime chain**: After the core framework scans plugin manifests, the admin workspace handles discovery, installation, enablement, disablement, uninstallation, and upgrade.
 
-These two chains have clear responsibilities. Code synchronization only means plugin files appear in the local workspace; whether a plugin is installed, enabled, or upgraded successfully is still determined by the host's runtime governance records.
+These two chains have clear responsibilities. Code synchronization only means plugin files appear in the local workspace; whether a plugin is installed, enabled, or upgraded successfully is still determined by the core framework runtime governance records.
 
 ```mermaid
 flowchart LR
     Config["hack/config.yaml<br/>Plugin sources"]
     Workspace["apps/lina-plugins<br/>Local plugin workspace"]
-    Host["Host scans plugin.yaml"]
+    Host["Core framework scans plugin.yaml"]
     Govern["Plugin governance records<br/>Discovery, installation, enablement"]
     Runtime["Runtime projection<br/>Menus, routes, hooks, cron"]
 
@@ -118,7 +118,7 @@ The status output shows plugin `ID`, source, version, local installation state, 
 
 ## Admin Workspace Lifecycle
 
-After plugin code enters the workspace, the host scans `plugin.yaml` at startup and presents the plugin as "Discovered". The administrator then performs runtime lifecycle operations in the Extension Center:
+After plugin code enters the workspace, the core framework scans `plugin.yaml` at startup and presents the plugin as "Discovered". The administrator then performs runtime lifecycle operations in the Extension Center:
 
 | Operation | Runtime behavior |
 |-----------|-----------------|
@@ -132,13 +132,13 @@ The distinction between disable and uninstall is important: disable only removes
 
 ## Dynamic Plugin Upload
 
-`WASM` dynamic plugins do not depend on the source workspace for delivery. The build artifact is a `.wasm` file; after the administrator uploads it in the Extension Center, the host validates the artifact and reads the embedded manifest, routes, resources, and authorization declarations.
+`WASM` dynamic plugins do not depend on the source workspace for delivery. The build artifact is a `.wasm` file; after the administrator uploads it in the Extension Center, the core framework validates the artifact and reads the embedded manifest, routes, resources, and authorization declarations.
 
-During dynamic plugin installation, the administrator must confirm `hostServices` authorization. Only after authorization confirmation does the host allow the plugin to access the corresponding host services and resource scope through `pluginbridge`.
+During dynamic plugin installation, the administrator must confirm `hostServices` authorization. Only after authorization confirmation does the core framework allow the plugin to access the corresponding core framework services and resource scope through `pluginbridge`.
 
 ## Runtime Upgrade
 
-After plugin files are updated, the host may detect that the "effective version" and the "discovered version" are inconsistent. At this point the plugin enters a runtime upgrade state:
+After plugin files are updated, the core framework may detect that the "effective version" and the "discovered version" are inconsistent. At this point the plugin enters a runtime upgrade state:
 
 | State | Description |
 |-------|-------------|
@@ -148,7 +148,7 @@ After plugin files are updated, the host may detect that the "effective version"
 | `upgrade_failed` | Upgrade failed; the old effective version is retained with diagnostics recorded |
 | `abnormal` | File version is lower than the effective version or state is anomalous, requiring manual intervention |
 
-Before upgrading, you can view a preview including version diff, dependency check, `SQL` count, `hostServices` diff, and risk warnings. During upgrade execution, the host performs confirmation validation, acquires the runtime upgrade lock, runs lifecycle callbacks, executes upgrade `SQL`, synchronizes governance resources, switches the effective version, and refreshes the cache.
+Before upgrading, you can view a preview including version diff, dependency check, `SQL` count, `hostServices` diff, and risk warnings. During upgrade execution, the core framework performs confirmation validation, acquires the runtime upgrade lock, runs lifecycle callbacks, executes upgrade `SQL`, synchronizes governance resources, switches the effective version, and refreshes the cache.
 
 ## Multi-Tenant Governance
 
@@ -159,7 +159,7 @@ Tenant-aware plugins can choose between global enablement or tenant-scoped enabl
 | `global` | Plugin is installed and enabled once, effective for the platform or all tenants |
 | `tenant_scoped` | Plugin can be enabled or disabled per tenant |
 
-The specific enablement strategy is determined by the host governance records and the `multi-tenant` plugin, not by the frontend alone.
+The specific enablement strategy is determined by the core framework governance records and the `multi-tenant` plugin, not by the frontend alone.
 
 ## Best Practices
 

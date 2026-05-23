@@ -143,7 +143,7 @@ Works through the task list in `tasks.md` and completes the following implementa
 6. Implement controllers (backend/internal/controller/)
 7. Implement business service layer (backend/internal/service/)
 8. Write plugin registration entry (backend/plugin.go)
-9. Wire the new plugin into the host plugin registry file
+9. Wire the new plugin into the core framework plugin registry file
 ```
 
 **Frontend implementation (`frontend/`):**
@@ -256,4 +256,4 @@ flowchart LR
 - **Every iteration has a complete record**, so the architecture does not drift over time
 - **Plugins use a loosely coupled design**, so they can be disabled or uninstalled independently without affecting other modules
 
-Next, read [Components](/docs/components) to build a map of the overall component architecture, then continue with [Source Plugins](/docs/source-plugins), [WASM Dynamic Plugins](/docs/wasm-plugins), and [Core Host Service](/docs/core-host) to understand the framework's extension model and architecture boundaries.
+Next, read [Components](/docs/components) to build a map of the overall component architecture, then continue with [Source Plugins](/docs/source-plugins), [WASM Dynamic Plugins](/docs/wasm-plugins), and [Core Framework Service](/docs/core-host) to understand the framework's extension model and architecture boundaries.

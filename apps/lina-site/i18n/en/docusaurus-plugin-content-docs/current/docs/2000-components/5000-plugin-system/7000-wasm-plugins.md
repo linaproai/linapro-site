@@ -31,9 +31,9 @@ keywords:
 
 ## Introduction
 
-Dynamic plugins are `LinaPro`'s runtime-extensible plugin form. They compile plugins into `.wasm` artifacts that can be uploaded, installed, enabled, disabled, uninstalled, and explicitly upgraded at runtime — without recompiling the host.
+Dynamic plugins are `LinaPro`'s runtime-extensible plugin form. They compile plugins into `.wasm` artifacts that can be uploaded, installed, enabled, disabled, uninstalled, and explicitly upgraded at runtime — without recompiling the core framework.
 
-Dynamic plugins run inside a `WASM` sandbox. They cannot directly access the host's filesystem, network, or database; all host capability access must go through `pluginbridge` and `hostServices` authorization.
+Dynamic plugins run inside a `WASM` sandbox. They cannot directly access the core framework's filesystem, network, or database; all core framework capability access must go through `pluginbridge` and `hostServices` authorization.
 
 ### When to Use
 
@@ -52,13 +52,13 @@ Long-term core business capabilities should still prefer source plugins. Dynamic
 
 - **Cross-platform**: `WASM` modules are platform-agnostic binaries. The same `.wasm` artifact runs on `Linux`, `macOS`, `Windows`, and across `x86` and `ARM` instruction sets without recompilation.
 
-- **Secure sandbox**: `WASM` runs in a strictly isolated sandbox. By default, it cannot access the host's filesystem, network, memory, or system calls. Every host capability must be explicitly authorized through an interface, fundamentally limiting the blast radius of malicious code or vulnerabilities.
+- **Secure sandbox**: `WASM` runs in a strictly isolated sandbox. By default, it cannot access the core framework's filesystem, network, memory, or system calls. Every core framework capability must be explicitly authorized through an interface, fundamentally limiting the blast radius of malicious code or vulnerabilities.
 
 - **Near-native performance**: `WASM` uses a compact binary format that can be JIT-compiled to native machine code at runtime, achieving near-native execution efficiency while maintaining sandbox isolation.
 
-- **Hot-loading support**: `WASM` modules can be dynamically loaded and unloaded at runtime without restarting the host process. This provides a natural hot-update capability for plugin systems — new versions can go live or roll back without affecting overall system operation.
+- **Hot-loading support**: `WASM` modules can be dynamically loaded and unloaded at runtime without restarting the core framework process. This provides a natural hot-update capability for plugin systems — new versions can go live or roll back without affecting overall system operation.
 
-- **Multi-language ecosystem**: Mainstream languages including `Go`, `Rust`, `C/C++`, and `AssemblyScript` can all compile to `WASM`. Plugin developers are not locked into a single tech stack. `LinaPro` currently uses `Go` as the primary plugin development language, extending the sandbox and host service communication contract based on `WASI` (WebAssembly System Interface).
+- **Multi-language ecosystem**: Mainstream languages including `Go`, `Rust`, `C/C++`, and `AssemblyScript` can all compile to `WASM`. Plugin developers are not locked into a single tech stack. `LinaPro` currently uses `Go` as the primary plugin development language, extending the sandbox and core framework service communication contract based on `WASI` (WebAssembly System Interface).
 
 ## Runtime Model
 
@@ -68,21 +68,21 @@ sequenceDiagram
     participant Core as lina-core
     participant Wasm as WASM Plugin
     participant Bridge as pluginbridge
-    participant HostSvc as Host Service
+    participant HostSvc as Core Framework Service
 
     Browser->>Core: Request plugin route
     Core->>Core: Auth, permissions, tenant validation
     Core->>Wasm: BridgeRequestEnvelopeV1
     Wasm->>Bridge: host_call (optional)
     Bridge->>Bridge: Validate hostServices authorization
-    Bridge->>HostSvc: Call authorized host service
+    Bridge->>HostSvc: Call authorized core framework service
     HostSvc-->>Bridge: Return result
     Bridge-->>Wasm: Return host_call response
     Wasm-->>Core: BridgeResponseEnvelopeV1
     Core-->>Browser: HTTP response
 ```
 
-The host completes authentication, authorization, and tenant context handling before passing a request snapshot into the `WASM` instance. Dynamic plugins see a structured request envelope — not a raw host internal object.
+The core framework completes authentication, authorization, and tenant context handling before passing a request snapshot into the `WASM` instance. Dynamic plugins see a structured request envelope — not a raw core framework internal object.
 
 ## Directory Structure
 
@@ -113,7 +113,7 @@ apps/lina-plugins/<plugin-id>/
 
 ## WASM Entry Point
 
-Dynamic plugins must export host-conventioned functions. Here is an official example:
+Dynamic plugins must export core framework-conventioned functions. Here is an official example:
 
 ```go
 var guestRuntime = pluginbridge.NewGuestRuntime(dynamicbackend.HandleRequest)
@@ -147,7 +147,7 @@ Business routing is typically delegated to `pluginbridge.MustNewGuestControllerR
 
 ## hostServices Authorization
 
-Dynamic plugins must declare the host services, methods, and resource scopes they need in `plugin.yaml`. When a plugin is installed or enabled, the host writes the authorization into a release snapshot. At runtime, any unauthorized call is rejected.
+Dynamic plugins must declare the core framework services, methods, and resource scopes they need in `plugin.yaml`. When a plugin is installed or enabled, the core framework writes the authorization into a release snapshot. At runtime, any unauthorized call is rejected.
 
 | Service | Typical Capabilities |
 |---------|---------------------|
@@ -159,7 +159,7 @@ Dynamic plugins must declare the host services, methods, and resource scopes the
 | `lock` | Distributed lock acquisition, renewal, and release |
 | `cron` | Built-in task registration for dynamic plugins |
 | `config` | Plugin configuration reading |
-| `notify` | Host notification capability |
+| `notify` | Core framework notification capability |
 
 Example:
 
@@ -195,21 +195,21 @@ The runtime flow for dynamic plugins:
 
 1. Build the `.wasm` artifact.
 2. Upload the dynamic plugin package in the admin workspace's Extension Center.
-3. The host validates the `WASM` file header, custom sections, embedded manifest, `ABI` version, and resources.
+3. The core framework validates the `WASM` file header, custom sections, embedded manifest, `ABI` version, and resources.
 4. The administrator confirms `hostServices` authorization.
 5. The installation `SQL` is executed and governance records are written.
-6. Once enabled, the host loads the `WASM` sandbox and projects routes, menus, and resources.
+6. Once enabled, the core framework loads the `WASM` sandbox and projects routes, menus, and resources.
 
-When a higher version is uploaded, the host does not immediately switch the active version. Instead, it marks the plugin as `pending_upgrade`. The administrator previews the diff in the plugin management page and explicitly executes the runtime upgrade. If the upgrade fails, the previous active version is retained and failure diagnostics are recorded for retry after fixing.
+When a higher version is uploaded, the core framework does not immediately switch the active version. Instead, it marks the plugin as `pending_upgrade`. The administrator previews the diff in the plugin management page and explicitly executes the runtime upgrade. If the upgrade fails, the previous active version is retained and failure diagnostics are recorded for retry after fixing.
 
 ## Key Differences from Source Plugins
 
 | Dimension | Source Plugin | `WASM` Dynamic Plugin |
 |-----------|--------------|----------------------|
-| Delivery | Source code compiled with the host | `.wasm` runtime artifact |
-| Hot-loading | Requires new host deployment | Supports runtime upload and enablement |
+| Delivery | Source code compiled with the core framework | `.wasm` runtime artifact |
+| Hot-loading | Requires new core framework deployment | Supports runtime upload and enablement |
 | Performance | Native `Go` performance | Sandbox and bridge overhead |
-| Host capability access | `pluginhost` stable contract | `hostServices` authorized bridge |
+| Core framework capability access | `pluginhost` stable contract | `hostServices` authorized bridge |
 | Isolation strength | Namespace isolation | `WASM` sandbox isolation |
 | Debugging | Standard `Go` debug toolchain | More reliant on logs and bridge diagnostics |
 | Best for | Long-term business modules | Commercial distribution, hot-loading, temporary extensions |
@@ -217,7 +217,7 @@ When a higher version is uploaded, the host does not immediately switch the acti
 ## Best Practices
 
 - Only request the `hostServices` methods and resource scopes you actually need.
-- Use the plugin `ID` namespace for database tables to avoid conflicts with the host or other plugins.
+- Use the plugin `ID` namespace for database tables to avoid conflicts with the core framework or other plugins.
 - Be explicit about target addresses for outbound network access; avoid broad authorization.
 - Prepare rollback-friendly, idempotent upgrade `SQL` for runtime upgrades.
 - Promote long-running, high-frequency business logic to source plugins; use dynamic plugins for hot-loading and isolation scenarios.

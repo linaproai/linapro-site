@@ -2,7 +2,7 @@
 slug: '/docs/api-reference'
 title: 'OpenAPI接口文档'
 hide_title: true
-description: '本文从组件设计角度介绍 LinaPro 的接口文档能力，说明核心宿主、源码插件和WASM动态插件如何被聚合为统一的 OpenAPI 文档，g.Meta 契约、permission 权限标签、接口多语言资源、开发中心调试页面和第三方工具导入之间如何协作。'
+description: '本文从组件设计角度介绍 LinaPro 的接口文档能力，说明主框架、源码插件和WASM动态插件如何被聚合为统一的 OpenAPI 文档，g.Meta 契约、permission 权限标签、接口多语言资源、开发中心调试页面和第三方工具导入之间如何协作。'
 keywords:
   - 接口文档
   - OpenAPI
@@ -27,7 +27,7 @@ keywords:
 
 ## 基本介绍
 
-接口文档是`lina-core`对外暴露`API`契约的统一视图。宿主不会要求开发者单独维护文档文件，而是在运行时根据宿主路由、源码插件路由和动态插件路由生成`OpenAPI 3.0`文档。
+接口文档是`lina-core`对外暴露`API`契约的统一视图。主框架不会要求开发者单独维护文档文件，而是在运行时根据主框架路由、源码插件路由和动态插件路由生成`OpenAPI 3.0`文档。
 
 默认访问路径由`config.yaml`中的`server.extensions.apiDocPath`控制，默认值为：
 
@@ -43,13 +43,13 @@ http://localhost:8080/api.json
 
 | 来源 | 接入方式 | 文档内容 |
 |------|----------|----------|
-| 核心宿主 | 宿主`api/`目录中的`g.Meta`契约和绑定路由 | 平台基础接口、认证、权限、配置、任务、插件治理等接口 |
+| 主框架 | 主框架`api/`目录中的`g.Meta`契约和绑定路由 | 平台基础接口、认证、权限、配置、任务、插件治理等接口 |
 | 源码插件 | `pluginhost`记录的源码插件路由绑定 | 插件自己的`API`、请求响应结构和权限标识 |
 | 动态插件 | 动态插件产物中的路由契约和运行时投影 | 动态插件公开的路由、方法和描述信息 |
 
 ```mermaid
 flowchart LR
-    Host["宿主 API 契约"] --> Builder["OpenAPI 构建器"]
+    Host["主框架 API 契约"] --> Builder["OpenAPI 构建器"]
     Source["源码插件路由绑定"] --> Builder
     Wasm["动态插件路由契约"] --> Builder
     I18N["apidoc 多语言资源"] --> Builder
@@ -58,11 +58,11 @@ flowchart LR
     JSON --> Tools["Apifox、Postman、Swagger UI"]
 ```
 
-插件启用、禁用或升级后，文档会随运行时投影变化而更新。接口文档展示的是当前宿主可访问的接口集合，而不是源码仓库中所有可能存在的接口。
+插件启用、禁用或升级后，文档会随运行时投影变化而更新。接口文档展示的是当前主框架可访问的接口集合，而不是源码仓库中所有可能存在的接口。
 
 ## API契约声明
 
-宿主和源码插件使用`GoFrame`的`g.Meta`结构体标签声明接口契约。路径、方法、标签、摘要、描述和权限标识都写在请求结构体上：
+主框架和源码插件使用`GoFrame`的`g.Meta`结构体标签声明接口契约。路径、方法、标签、摘要、描述和权限标识都写在请求结构体上：
 
 ```go
 type ArticleListReq struct {
@@ -95,7 +95,7 @@ type ArticleListRes struct {
 
 ## 源码插件接口
 
-源码插件在自己的`backend/api/`目录定义`DTO`，在`backend/plugin.go`中通过`pluginhost`注册路由。宿主会记录这些路由绑定，并把符合`GoFrame`处理器形态的接口投影到统一`OpenAPI`文档。
+源码插件在自己的`backend/api/`目录定义`DTO`，在`backend/plugin.go`中通过`pluginhost`注册路由。主框架会记录这些路由绑定，并把符合`GoFrame`处理器形态的接口投影到统一`OpenAPI`文档。
 
 源码插件接口建议遵守这些规则：
 
@@ -107,13 +107,13 @@ type ArticleListRes struct {
 
 ## 动态插件接口
 
-`WASM`动态插件的接口由插件产物携带路由契约，宿主在安装、启用和升级时读取并投影到接口文档。动态插件运行在`pluginbridge`之上，接口请求进入宿主后仍会先经过认证、权限和租户上下文处理，再传入`WASM`沙箱。
+`WASM`动态插件的接口由插件产物携带路由契约，主框架在安装、启用和升级时读取并投影到接口文档。动态插件运行在`pluginbridge`之上，接口请求进入主框架后仍会先经过认证、权限和租户上下文处理，再传入`WASM`沙箱。
 
-动态插件不能直接修改宿主路由表。它公开哪些路由、能访问哪些宿主服务、能触达哪些数据表或外部地址，都由插件清单、产物元数据和`hostServices`授权快照共同决定。
+动态插件不能直接修改主框架路由表。它公开哪些路由、能访问哪些主框架服务、能触达哪些数据表或外部地址，都由插件清单、产物元数据和`hostServices`授权快照共同决定。
 
 ## 接口多语言
 
-接口文档的多语言资源位于宿主和插件的：
+接口文档的多语言资源位于主框架和插件的：
 
 ```text
 manifest/i18n/<locale>/apidoc/
@@ -132,7 +132,7 @@ apps/lina-plugins/content-notice/manifest/i18n/zh-CN/apidoc/
 └── plugin-api-notice.json
 ```
 
-插件接口翻译应只维护自己的插件命名空间，避免把插件文案写入宿主接口文档资源中。`en-US`接口文档资源可以保持为空占位，由源码中的英文元数据提供默认文案。
+插件接口翻译应只维护自己的插件命名空间，避免把插件文案写入主框架接口文档资源中。`en-US`接口文档资源可以保持为空占位，由源码中的英文元数据提供默认文案。
 
 ## 在线调试
 
@@ -148,7 +148,7 @@ apps/lina-plugins/content-notice/manifest/i18n/zh-CN/apidoc/
 |------|----------|
 | `Apifox` | 新建项目后选择导入`OpenAPI/Swagger`，填写`http://localhost:8080/api.json` |
 | `Postman` | 使用`Import`的`Link`方式导入`/api.json` |
-| `Swagger UI` | 指向宿主暴露的`/api.json`地址 |
+| `Swagger UI` | 指向主框架暴露的`/api.json`地址 |
 | `curl` | 使用`curl -o api.json http://localhost:8080/api.json`下载文档 |
 
 ## 常见问题

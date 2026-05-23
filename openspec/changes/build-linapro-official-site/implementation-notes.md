@@ -4,7 +4,7 @@
   `/Users/john/Workspace/github/gqcn/linapro/README.md`
 - Chinese mirror wording and terminology alignment:
   `/Users/john/Workspace/github/gqcn/linapro/README.zh_CN.md`
-- Core host responsibilities:
+- Core framework responsibilities:
   `/Users/john/Workspace/github/gqcn/linapro/apps/lina-core/README.md`
 - Default workspace responsibilities:
   `/Users/john/Workspace/github/gqcn/linapro/apps/lina-vben/apps/web-antd/README.md`
@@ -17,7 +17,7 @@
   `/Users/john/Workspace/github/gqcn/linapro/apps/lina-plugins/monitor-server/README.md`
   `/Users/john/Workspace/github/gqcn/linapro/apps/lina-plugins/monitor-operlog/README.md`
   `/Users/john/Workspace/github/gqcn/linapro/apps/lina-plugins/monitor-loginlog/README.md`
-- OpenSpec and host/plugin boundary narrative:
+- OpenSpec and core framework/plugin boundary narrative:
   `/Users/john/Workspace/github/gqcn/linapro/openspec/changes/host-plugin-boundary-modularization/proposal.md`
   `/Users/john/Workspace/github/gqcn/linapro/openspec/changes/host-plugin-boundary-modularization/design.md`
 

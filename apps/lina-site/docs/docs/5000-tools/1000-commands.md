@@ -89,14 +89,14 @@ make help
 | `make stop` | 开发服务 | 停止前后端开发服务器 |
 | `make status` | 开发服务 | 查看前后端运行状态及日志路径 |
 | `make build` | 构建 | 完整构建前端、插件和后端二进制 |
-| `make pack.assets` | 构建 | 准备宿主嵌入所需的前端静态资源和`manifest` |
+| `make pack.assets` | 构建 | 准备主框架嵌入所需的前端静态资源和`manifest` |
 | `make wasm` | 构建 | 构建所有或指定运行时`WASM`插件 |
-| `make tidy` | 构建 | 整理宿主、工具和插件相关`Go`模块依赖 |
+| `make tidy` | 构建 | 整理主框架、工具和插件相关`Go`模块依赖 |
 | `make image` | 镜像 | 构建生产`Docker`镜像 |
 | `make image.build` | 镜像 | 仅准备镜像产物，不执行`Docker`构建 |
 | `make test` | 测试 | 运行完整`E2E`测试套件 |
 | `make test.go` | 测试 | 运行`Go`单元测试 |
-| `make test.host` | 测试 | 只运行宿主自有`E2E`测试 |
+| `make test.host` | 测试 | 只运行主框架自有`E2E`测试 |
 | `make test.plugins` | 测试 | 运行官方插件自有`E2E`测试 |
 | `make test.scripts` | 测试 | 运行工具脚本的单元与`smoke`测试 |
 | `make i18n.check` | 国际化 | 扫描运行时硬编码文案并校验语言包`key`覆盖 |
@@ -155,14 +155,14 @@ make env.setup
 ```bash
 make dev
 
-# 强制宿主模式，跳过官方源码插件和 WASM 插件构建
+# 强制主框架模式，跳过官方源码插件和 WASM 插件构建
 make dev plugins=0
 
 # 强制启用官方源码插件模式
 make dev plugins=1
 ```
 
-`plugins=auto`是默认模式：当`apps/lina-plugins/`中存在可用插件`manifest`时自动启用官方插件模式，否则使用宿主模式。直接调用`linactl dev`时还可以传入`skip_wasm=true`只跳过`WASM`构建步骤。
+`plugins=auto`是默认模式：当`apps/lina-plugins/`中存在可用插件`manifest`时自动启用官方插件模式，否则使用主框架模式。直接调用`linactl dev`时还可以传入`skip_wasm=true`只跳过`WASM`构建步骤。
 
 ```bash
 cd hack/tools/linactl
@@ -202,13 +202,13 @@ make status
 
 ### make build
 
-完整构建流程，依次执行：前端静态资源构建、嵌入到后端的静态资源和`manifest`资源准备、按插件模式构建动态`WASM`插件，最后编译后端宿主二进制。构建产物输出到`temp/output/`目录。
+完整构建流程，依次执行：前端静态资源构建、嵌入到后端的静态资源和`manifest`资源准备、按插件模式构建动态`WASM`插件，最后编译后端主框架二进制。构建产物输出到`temp/output/`目录。
 
 ```bash
 # 默认构建（当前平台）
 make build
 
-# 强制宿主模式，不构建官方源码插件
+# 强制主框架模式，不构建官方源码插件
 make build plugins=0
 
 # 指定目标平台（交叉编译）
@@ -246,14 +246,14 @@ build:
 | `build.platforms` | `["auto"]` | 目标平台列表，使用`goos/goarch`格式，`auto`表示`linux/<当前架构>`，`make build platforms=...`可覆盖 |
 | `build.cgoEnabled` | `false` | 是否启用`CGO` |
 | `build.outputDir` | `temp/output` | 构建产物输出路径，相对于仓库根目录 |
-| `build.binaryName` | `lina` | 宿主二进制文件名 |
+| `build.binaryName` | `lina` | 主框架二进制文件名 |
 
 插件构建模式通过`plugins`参数控制：
 
 | `plugins`值 | 说明 |
 |-------------|------|
 | `auto`（默认） | 当`apps/lina-plugins/`存在可用插件`manifest`时启用官方源码插件模式 |
-| `0` | 强制宿主模式，移除官方插件构建标签并跳过官方插件`WASM`构建 |
+| `0` | 强制主框架模式，移除官方插件构建标签并跳过官方插件`WASM`构建 |
 | `1` | 强制启用官方源码插件模式；如果插件工作区不可用，命令会快速失败 |
 
 ### make wasm
@@ -277,7 +277,7 @@ go run . wasm plugin_dir=../../apps/lina-plugins/my-plugin out=../../temp/output
 
 ### make pack.assets
 
-准备宿主`manifest`资产，用于`Go`嵌入。该命令会刷新`apps/lina-core/internal/packed/manifest/`下的`config`、`sql`和`i18n`资源，通常由`make build`或`make dev`自动调用。需要单独检查或准备嵌入资源时可以手动执行：
+准备主框架`manifest`资产，用于`Go`嵌入。该命令会刷新`apps/lina-core/internal/packed/manifest/`下的`config`、`sql`和`i18n`资源，通常由`make build`或`make dev`自动调用。需要单独检查或准备嵌入资源时可以手动执行：
 
 ```bash
 make pack.assets
@@ -285,7 +285,7 @@ make pack.assets
 
 ### make tidy
 
-整理宿主、开发工具和插件相关`Go`模块依赖，适合在升级依赖或初始化插件完整模式后执行：
+整理主框架、开发工具和插件相关`Go`模块依赖，适合在升级依赖或初始化插件完整模式后执行：
 
 ```bash
 make tidy
@@ -310,7 +310,7 @@ make image tag=v0.6.0 registry=ghcr.io/linaproai push=1
 # 多平台构建
 make image platforms=linux/amd64,linux/arm64 tag=v0.6.0
 
-# 覆盖运行时基础镜像并使用宿主模式
+# 覆盖运行时基础镜像并使用主框架模式
 make image base_image=alpine:3.22 plugins=0
 ```
 
@@ -358,14 +358,14 @@ make image.build
 | `scope`值 | 说明 |
 |-----------|------|
 | `full`（默认） | 运行全部`E2E`测试 |
-| `host` | 仅运行宿主自有测试 |
+| `host` | 仅运行主框架自有测试 |
 | `plugins` | 仅运行所有官方插件测试 |
 | `plugin:<id>` | 仅运行指定插件测试 |
 
 ```bash
 make test
 
-# 只运行宿主测试
+# 只运行主框架测试
 make test scope=host
 
 # 只运行指定插件测试
@@ -374,7 +374,7 @@ make test scope=plugin:multi-tenant
 
 ### make test.go
 
-运行所有受维护`Go`模块的单元测试，并默认启用竞态检测和详细日志。命令会先发现当前`Go workspace`中的模块，把有测试文件的包作为真实测试执行，把没有测试文件的包作为编译冒烟检查执行，并按模块输出汇总。支持通过`plugins=0`强制宿主模式，或通过`race=false`关闭竞态检测。
+运行所有受维护`Go`模块的单元测试，并默认启用竞态检测和详细日志。命令会先发现当前`Go workspace`中的模块，把有测试文件的包作为真实测试执行，把没有测试文件的包作为编译冒烟检查执行，并按模块输出汇总。支持通过`plugins=0`强制主框架模式，或通过`race=false`关闭竞态检测。
 
 ```bash
 make test.go
@@ -385,7 +385,7 @@ make test.go verbose=false
 
 ### make test.host
 
-只运行宿主自有`Playwright E2E`测试，不要求初始化官方插件子模块。
+只运行主框架自有`Playwright E2E`测试，不要求初始化官方插件子模块。
 
 ```bash
 make test.host
@@ -456,7 +456,7 @@ make plugins.status
 
 ### make i18n.check
 
-扫描运行时可见的代码路径，检测未被纳入国际化体系的硬编码文案，并校验宿主和各插件运行时语言包的消息`key`覆盖情况。适合在提交新功能前进行`i18n`合规自查。
+扫描运行时可见的代码路径，检测未被纳入国际化体系的硬编码文案，并校验主框架和各插件运行时语言包的消息`key`覆盖情况。适合在提交新功能前进行`i18n`合规自查。
 
 ```bash
 make i18n.check

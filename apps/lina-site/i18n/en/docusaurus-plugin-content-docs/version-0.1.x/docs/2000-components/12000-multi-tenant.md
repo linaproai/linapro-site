@@ -2,7 +2,7 @@
 slug: '/docs/multi-tenant'
 title: 'Native Multi-Tenancy'
 hide_title: true
-description: 'A component-level guide to LinaPro multi-tenancy — how the host bizctx, TenantFilterService, tenant_id filtering seam, default platform tenant, official multi-tenant source plugin, tenant impersonation, plugin multi-tenant manifest fields, and the current Pool shared-database model work together.'
+description: 'A component-level guide to LinaPro multi-tenancy — how the core framework bizctx, TenantFilterService, tenant_id filtering seam, default platform tenant, official multi-tenant source plugin, tenant impersonation, plugin multi-tenant manifest fields, and the current Pool shared-database model work together.'
 keywords:
   - multi-tenancy
   - tenant_id
@@ -27,32 +27,32 @@ keywords:
 
 ## Introduction
 
-`LinaPro` splits multi-tenancy into two layers: host-level foundation seams and an official tenant control plane. The host provides a stable foundation across request context, plugin service contracts, and data filtering. The official `multi-tenant` source plugin handles tenant entities, membership, tenant resolution, tenant impersonation, and tenant-scoped plugin governance.
+`LinaPro` splits multi-tenancy into two layers: core framework foundation seams and an official tenant control plane. The core framework provides a stable foundation across request context, plugin service contracts, and data filtering. The official `multi-tenant` source plugin handles tenant entities, membership, tenant resolution, tenant impersonation, and tenant-scoped plugin governance.
 
-When the `multi-tenant` plugin is not installed or not enabled, the framework runs in single-tenant mode out of the box. The host uses `tenant_id = 0` to represent the platform tenant, so existing projects do not need to change their deployment model in anticipation of future multi-tenant evolution.
+When the `multi-tenant` plugin is not installed or not enabled, the framework runs in single-tenant mode out of the box. The core framework uses `tenant_id = 0` to represent the platform tenant, so existing projects do not need to change their deployment model in anticipation of future multi-tenant evolution.
 
 ## Capability Layers
 
 | Layer | Location | Responsibility |
 |-------|----------|---------------|
-| **Host foundation** | `apps/lina-core` | Request-scoped `bizctx`, identity snapshots, `tenant_id` filtering seam, platform bypass policy, plugin multi-tenant metadata |
+| **Core framework foundation** | `apps/lina-core` | Request-scoped `bizctx`, identity snapshots, `tenant_id` filtering seam, platform bypass policy, plugin multi-tenant metadata |
 | **Tenant control plane** | `apps/lina-plugins/multi-tenant` | Tenant lifecycle, membership, tenant resolution, tenant switching, tenant impersonation, tenant plugin governance |
 | **Tenant-aware plugins** | `apps/lina-plugins/<plugin-id>` | Declare multi-tenant capabilities and isolate data by `tenant_id` in their own tables |
 
-This layering ensures the host remains stable while tenant business rules can be extended through official or business plugins.
+This layering ensures the core framework remains stable while tenant business rules can be extended through official or business plugins.
 
 ## Default Platform Tenant
 
 In the default context, `tenant_id = 0` represents the `PLATFORM` tenant:
 
 - Single-tenant projects can run directly on the platform tenant.
-- Both host base tables and plugin tables can retain the `tenant_id` column, leaving room for future multi-tenant evolution.
-- Whether platform requests bypass tenant filtering is controlled by host policy — plugins should not hardcode this.
+- Both core framework base tables and plugin tables can retain the `tenant_id` column, leaving room for future multi-tenant evolution.
+- Whether platform requests bypass tenant filtering is controlled by core framework policy — plugins should not hardcode this.
 - When the `multi-tenant` plugin is enabled, users can enter a specific tenant context, and platform administrators can perform tenant impersonation.
 
 ## Request Context
 
-The host exposes a read-only request snapshot to source plugins through `bizctx`. Key fields include:
+The core framework exposes a read-only request snapshot to source plugins through `bizctx`. Key fields include:
 
 | Field | Description |
 |-------|-------------|
@@ -64,11 +64,11 @@ The host exposes a read-only request snapshot to source plugins through `bizctx`
 | `IsImpersonation` | Whether the current token represents an impersonation request |
 | `PlatformBypass` | Whether the current request is under a platform bypass policy |
 
-Plugins do not need to access host internal context objects — they read the necessary information through the contracts published by `pluginservice`.
+Plugins do not need to access core framework internal context objects — they read the necessary information through the contracts published by `pluginservice`.
 
 ## Tenant Filter Service
 
-The host publishes `TenantFilterService` to source plugins for appending tenant filter conditions to plugin-owned tables. The default filter column is defined by `TenantFilterColumn`:
+The core framework publishes `TenantFilterService` to source plugins for appending tenant filter conditions to plugin-owned tables. The default filter column is defined by `TenantFilterColumn`:
 
 ```go
 const TenantFilterColumn = "tenant_id"
@@ -162,7 +162,7 @@ supports_multi_tenant: true
 default_install_mode: tenant_scoped
 ```
 
-The host uses these manifest fields in startup consistency checks and plugin governance flows. When the field combination is invalid, the host exposes a clear error at startup or during plugin scanning.
+The core framework uses these manifest fields in startup consistency checks and plugin governance flows. When the field combination is invalid, the core framework exposes a clear error at startup or during plugin scanning.
 
 ## Plugin Enablement Modes
 
@@ -171,7 +171,7 @@ The host uses these manifest fields in startup consistency checks and plugin gov
 | `global` | Installed and enabled once, effective for the platform or all tenants | Platform-wide capabilities, global monitoring, unified notifications |
 | `tenant_scoped` | Can be independently enabled or disabled per tenant | Content, audit, business modules, optional tenant capabilities |
 
-Whether a new tenant automatically gets a plugin is not decided by `plugin.yaml` directly — it is maintained by host governance records and the `multi-tenant` plugin's provisioning policy.
+Whether a new tenant automatically gets a plugin is not decided by `plugin.yaml` directly — it is maintained by core framework governance records and the `multi-tenant` plugin's provisioning policy.
 
 ## Tenant Impersonation
 

@@ -89,14 +89,14 @@ Every `make <command>` example below can be replaced with `cd hack/tools/linactl
 | `make stop` | Development server | Stop the backend and frontend development servers |
 | `make status` | Development server | Show backend/frontend running status and log paths |
 | `make build` | Build | Fully build the frontend, plugins, and backend binary |
-| `make pack.assets` | Build | Prepare frontend static assets and `manifest` resources for host embedding |
+| `make pack.assets` | Build | Prepare frontend static assets and `manifest` resources for core framework embedding |
 | `make wasm` | Build | Build all or selected runtime `WASM` plugins |
-| `make tidy` | Build | Tidy `Go` module dependencies for the host, tools, and plugins |
+| `make tidy` | Build | Tidy `Go` module dependencies for the core framework, tools, and plugins |
 | `make image` | Image | Build a production `Docker` image |
 | `make image.build` | Image | Prepare image artifacts only, without running the `Docker` build |
 | `make test` | Test | Run the full `E2E` test suite |
 | `make test.go` | Test | Run `Go` unit tests |
-| `make test.host` | Test | Run only the host-owned `E2E` tests |
+| `make test.host` | Test | Run only the core framework-owned `E2E` tests |
 | `make test.plugins` | Test | Run the official plugins' own `E2E` tests |
 | `make test.scripts` | Test | Run unit and smoke tests for tooling scripts |
 | `make i18n.check` | i18n | Scan runtime hardcoded text and validate language pack key coverage |
@@ -154,14 +154,14 @@ Restarts the backend and frontend development servers. Before starting, it check
 ```bash
 make dev
 
-# Force host mode and skip official source plugins and WASM plugin builds
+# Force core framework-only mode and skip official source plugins and WASM plugin builds
 make dev plugins=0
 
 # Force official source plugin mode
 make dev plugins=1
 ```
 
-`plugins=auto` is the default mode: if `apps/lina-plugins/` contains usable plugin `manifest` files, official plugin mode is enabled automatically; otherwise host mode is used. When invoking `linactl dev` directly, you can also pass `skip_wasm=true` to skip only the `WASM` build step.
+`plugins=auto` is the default mode: if `apps/lina-plugins/` contains usable plugin `manifest` files, official plugin mode is enabled automatically; otherwise core framework-only mode is used. When invoking `linactl dev` directly, you can also pass `skip_wasm=true` to skip only the `WASM` build step.
 
 ```bash
 cd hack/tools/linactl
@@ -201,13 +201,13 @@ Sample output:
 
 ### make build
 
-Runs the full build pipeline: frontend static asset build, static asset and `manifest` preparation for backend embedding, dynamic `WASM` plugin builds based on plugin mode, and finally compilation of the backend host binary. Build artifacts are written to `temp/output/`.
+Runs the full build pipeline: frontend static asset build, static asset and `manifest` preparation for backend embedding, dynamic `WASM` plugin builds based on plugin mode, and finally compilation of the backend core framework binary. Build artifacts are written to `temp/output/`.
 
 ```bash
 # Default build for the current platform
 make build
 
-# Force host mode without building official source plugins
+# Force core framework-only mode without building official source plugins
 make build plugins=0
 
 # Target specific platforms through cross-compilation
@@ -245,14 +245,14 @@ build:
 | `build.platforms` | `["auto"]` | Target platform list in `goos/goarch` format; `auto` means `linux/<current-arch>`; override with `make build platforms=...` |
 | `build.cgoEnabled` | `false` | Whether to enable `CGO` |
 | `build.outputDir` | `temp/output` | Build output path, relative to the repository root |
-| `build.binaryName` | `lina` | Host binary filename |
+| `build.binaryName` | `lina` | Core framework binary filename |
 
 Plugin build mode is controlled by the `plugins` argument:
 
 | `plugins` value | Description |
 |-----------------|-------------|
 | `auto` (default) | Enable official source plugin mode when `apps/lina-plugins/` contains usable plugin `manifest` files |
-| `0` | Force host mode, remove official plugin build tags, and skip official plugin `WASM` builds |
+| `0` | Force core framework-only mode, remove official plugin build tags, and skip official plugin `WASM` builds |
 | `1` | Force official source plugin mode; fail fast if the plugin workspace is unavailable |
 
 ### make wasm
@@ -276,7 +276,7 @@ go run . wasm plugin_dir=../../apps/lina-plugins/my-plugin out=../../temp/output
 
 ### make pack.assets
 
-Prepares host `manifest` assets for `Go` embedding. This command refreshes `config`, `sql`, and `i18n` resources under `apps/lina-core/internal/packed/manifest/`. It is normally called automatically by `make build` or `make dev`, but can be run manually when you need to inspect or prepare embedded resources in isolation:
+Prepares core framework `manifest` assets for `Go` embedding. This command refreshes `config`, `sql`, and `i18n` resources under `apps/lina-core/internal/packed/manifest/`. It is normally called automatically by `make build` or `make dev`, but can be run manually when you need to inspect or prepare embedded resources in isolation:
 
 ```bash
 make pack.assets
@@ -284,7 +284,7 @@ make pack.assets
 
 ### make tidy
 
-Tidies `Go` module dependencies for the host, development tools, and plugins. Run it after dependency upgrades or after initializing full plugin mode:
+Tidies `Go` module dependencies for the core framework, development tools, and plugins. Run it after dependency upgrades or after initializing full plugin mode:
 
 ```bash
 make tidy
@@ -309,7 +309,7 @@ make image tag=v0.6.0 registry=ghcr.io/linaproai push=1
 # Multi-platform build
 make image platforms=linux/amd64,linux/arm64 tag=v0.6.0
 
-# Override the runtime base image and use host mode
+# Override the runtime base image and use core framework-only mode
 make image base_image=alpine:3.22 plugins=0
 ```
 
@@ -357,14 +357,14 @@ Runs the full `Playwright E2E` test suite. Make sure the development services ha
 | `scope` value | Description |
 |---------------|-------------|
 | `full` (default) | Run all `E2E` tests |
-| `host` | Run only host-owned tests |
+| `host` | Run only core framework-owned tests |
 | `plugins` | Run all official plugin tests |
 | `plugin:<id>` | Run tests for a specific plugin |
 
 ```bash
 make test
 
-# Run only host tests
+# Run only core framework tests
 make test scope=host
 
 # Run only tests for a specific plugin
@@ -373,7 +373,7 @@ make test scope=plugin:multi-tenant
 
 ### make test.go
 
-Runs unit tests for all maintained `Go` modules with race detection and verbose logs enabled by default. The command first discovers modules in the current `Go workspace`, runs real tests for packages that contain test files, performs compile smoke checks for packages without test files, and prints a per-module summary. Use `plugins=0` to force host mode, or `race=false` to disable race detection.
+Runs unit tests for all maintained `Go` modules with race detection and verbose logs enabled by default. The command first discovers modules in the current `Go workspace`, runs real tests for packages that contain test files, performs compile smoke checks for packages without test files, and prints a per-module summary. Use `plugins=0` to force core framework-only mode, or `race=false` to disable race detection.
 
 ```bash
 make test.go
@@ -384,7 +384,7 @@ make test.go verbose=false
 
 ### make test.host
 
-Runs only the host-owned `Playwright E2E` tests and does not require official plugin submodules to be initialized.
+Runs only the core framework-owned `Playwright E2E` tests and does not require official plugin submodules to be initialized.
 
 ```bash
 make test.host
@@ -455,7 +455,7 @@ make plugins.status
 
 ### make i18n.check
 
-Scans runtime-visible code paths for hardcoded text that has not been added to the internationalization system, and validates message `key` coverage across host and plugin runtime language packs. Run it before submitting new features to check i18n compliance.
+Scans runtime-visible code paths for hardcoded text that has not been added to the internationalization system, and validates message `key` coverage across core framework and plugin runtime language packs. Run it before submitting new features to check i18n compliance.
 
 ```bash
 make i18n.check

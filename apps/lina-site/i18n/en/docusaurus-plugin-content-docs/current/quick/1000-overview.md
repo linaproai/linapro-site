@@ -76,7 +76,7 @@ The `nightly` image is a daily build intended mainly for testing. You can also s
 - **Rich AI skill ecosystem**: Over a dozen AI skills covering the full development lifecycle — backend development, frontend design, test authoring, code review, performance auditing, version upgrades, and more — embedded as domain knowledge in the framework's AI collaboration specs, so AI can make professionally grounded decisions in each context without needing re-briefed every session
 - **Rapid business development**: A ready-to-use admin workspace and rich built-in modules that dramatically shorten time from zero to production
 - **Integrated full stack**: Frontend and backend designed as a unified system — API contracts, permission models, and design conventions fully aligned without the overhead of integrating two separate frameworks
-- **Complete API documentation**: Automatically aggregates host and plugin APIs with an interactive online browser and debugger
+- **Complete API documentation**: Automatically aggregates core framework and plugin APIs with an interactive online browser and debugger
 - **Plugin ecosystem**: A dual-mode plugin system (source plugins + `WASM` dynamic plugins) — any capability can be extended or replaced via plugins. Official plugins are maintained as `submodule`s independently, pulled on demand without bloating the core framework
 - **Multi-tenant support**: Native multi-tenant capabilities built into the framework, with an official multi-tenant management plugin. Automatically falls back to single-tenant mode when disabled, with zero migration cost
 - **Enterprise governance**: `JWT` authentication paired with declarative `RBAC`, with permissions declared at the API definition layer for natural auditability. Built-in operation logs, login logs, and session management
@@ -95,7 +95,7 @@ graph TB
         UI["Vue 3 + Vben5 + Ant Design"]
     end
 
-    subgraph Host["Core Host Service  lina-core"]
+    subgraph Host["Core Framework Service  lina-core"]
         direction TB
         API["API Layer\n(g.Meta route definitions + DTO)"]
         Ctrl["Controller Layer\n(HTTP request handling)"]
@@ -111,7 +111,7 @@ graph TB
 
     subgraph Plugins["Plugin System  apps/lina-plugins"]
         direction LR
-        Source["Source Plugins\nCompiled with host"]
+        Source["Source Plugins\nCompiled with core framework"]
         Dynamic["WASM Dynamic Plugins\nHot-loaded at runtime"]
     end
 
@@ -143,14 +143,14 @@ graph TB
 
 `LinaPro` ships with over a dozen AI skills covering the full development lifecycle — backend development, frontend design, testing, code review, performance auditing, and version management. These skills are embedded as domain knowledge in the framework's AI collaboration specs. No installation required — AI tools activate them automatically in the right contexts, making accurate, framework-aware decisions without requiring the developer to re-explain project conventions in every session.
 
-### Decoupled Host and UI
+### Decoupled Core Framework and UI
 
-- The core host service (`lina-core`) is a pure backend runtime, completely decoupled from any frontend implementation
-- The built-in admin workspace (`lina-vben`) is a reference UI for the host's capabilities and can be replaced by any frontend — including mobile apps, mini-programs, or custom admin systems
-- The host exposes all capabilities through a stable `RESTful API` contract, independent of any frontend
-- Multiple frontends can connect to the same host instance simultaneously
+- The core framework service (`lina-core`) is a pure backend runtime, completely decoupled from any frontend implementation
+- The built-in admin workspace (`lina-vben`) is a reference UI for core framework capabilities and can be replaced by any frontend — including mobile apps, mini-programs, or custom admin systems
+- The core framework exposes all capabilities through a stable `RESTful API` contract, independent of any frontend
+- Multiple frontends can connect to the same core framework instance simultaneously
 
-### Core Host Service
+### Core Framework Service
 
 `lina-core` is the stable foundation of the entire framework, providing:
 
@@ -165,12 +165,12 @@ graph TB
 
 Plugins are `LinaPro`'s primary extension mechanism — each plugin is a self-contained module package:
 
-- **Source plugins**: Compiled and deployed alongside the host at build time. Ideal for long-lived core business modules with no runtime overhead
-- **`WASM` dynamic plugins**: Hot-loaded at runtime, supporting online install, enable, disable, and uninstall — all without restarting the host
+- **Source plugins**: Compiled and deployed alongside the core framework at build time. Ideal for long-lived core business modules with no runtime overhead
+- **`WASM` dynamic plugins**: Hot-loaded at runtime, supporting online install, enable, disable, and uninstall — all without restarting the core framework service
 - Plugins run in isolated sandboxes; database and file access are namespace-isolated so plugins cannot interfere with each other
 - Each plugin independently declares its API routes, business logic, database schema, frontend pages, and menus — fully self-contained and non-intrusive
 
-Official source plugins live in `apps/lina-plugins/`, mounted as a `Git submodule`. When the submodule is not initialized, the main framework still runs in host mode. Pull official plugin content on demand with `git submodule update --init --recursive`.
+Official source plugins live in `apps/lina-plugins/`, mounted as a `Git submodule`. When the submodule is not initialized, the core framework still runs independently. Pull official plugin content on demand with `git submodule update --init --recursive`.
 
 ### Enterprise-Level Permission Governance
 
@@ -188,9 +188,9 @@ Official source plugins live in `apps/lina-plugins/`, mounted as a `Git submodul
 
 `LinaPro` has native multi-tenant capabilities built into the framework, with an official `multi-tenant` management plugin:
 
-- The host includes built-in tenant middleware and a `bizctx` tenant identity foundation as a stable capability
+- The core framework includes built-in tenant middleware and a `bizctx` tenant identity foundation as a stable capability
 - The `multi-tenant` plugin provides complete tenant management: lifecycle management, user membership, and tenant resolution strategies
-- When the plugin is not installed or not enabled, the host automatically falls back to single-tenant mode where `tenant_id = 0` — the out-of-box experience is unaffected
+- When the plugin is not installed or not enabled, the core framework automatically falls back to single-tenant mode where `tenant_id = 0` — the out-of-box experience is unaffected
 - Supports a pool-shared database model based on the `tenant_id` column; a single user can belong to multiple tenants
 
 ### Native Distributed Architecture

@@ -2,13 +2,13 @@
 slug: '/docs/configuration'
 title: 'Service Configuration'
 hide_title: true
-description: 'A component-level guide to LinaPro core host service configuration — how config.yaml drives HTTP server, logging, database, JWT authentication, sessions, monitoring, health probes, scheduling, internationalization, cluster coordination, file uploads, and plugin governance, with production deployment recommendations.'
+description: 'A component-level guide to LinaPro core framework service configuration — how config.yaml drives HTTP server, logging, database, JWT authentication, sessions, monitoring, health probes, scheduling, internationalization, cluster coordination, file uploads, and plugin governance, with production deployment recommendations.'
 keywords:
   - configuration
   - config.yaml
   - LinaPro configuration
   - runtime configuration
-  - core host service
+  - core framework service
   - HTTP server
   - logging
   - PostgreSQL
@@ -28,7 +28,7 @@ keywords:
 
 ## Introduction
 
-Configuration management is one of the runtime entry points for `lina-core`. When the host starts, it reads `config.yaml` and distributes the settings to the `HTTP` server, logging, database, authentication, sessions, scheduling, internationalization, cluster coordination, file uploads, and plugin governance subsystems.
+Configuration management is one of the runtime entry points for `lina-core`. When the core framework starts, it reads `config.yaml` and distributes the settings to the `HTTP` server, logging, database, authentication, sessions, scheduling, internationalization, cluster coordination, file uploads, and plugin governance subsystems.
 
 The default configuration file lives in the main repository:
 
@@ -36,7 +36,7 @@ The default configuration file lives in the main repository:
 apps/lina-core/manifest/config/config.yaml
 ```
 
-This file serves as both the default development template and an index for understanding how the host operates. Business projects can override sensitive settings per environment at delivery time — database connections, `JWT` secrets, log output, and cluster coordination addresses.
+This file serves as both the default development template and an index for understanding how the core framework operates. Business projects can override sensitive settings per environment at delivery time — database connections, `JWT` secrets, log output, and cluster coordination addresses.
 
 ## Configuration Groups
 
@@ -58,7 +58,7 @@ This file serves as both the default development template and an index for under
 
 ## Server and API Documentation
 
-`server.address` sets the host listen address, defaulting to `:8080`. `server.dumpRouterMap` outputs the route table at startup — useful during development but not recommended for production.
+`server.address` sets the core framework listen address, defaulting to `:8080`. `server.dumpRouterMap` outputs the route table at startup — useful during development but not recommended for production.
 
 `server.extensions.apiDocPath` is a `LinaPro` extension field on the `GoFrame` server configuration, defaulting to `/api.json`:
 
@@ -70,7 +70,7 @@ server:
     apiDocPath: "/api.json"
 ```
 
-After startup, the host publishes the aggregated `OpenAPI` document at this path. See [API Reference](/docs/api-reference) for more on API documentation design.
+After startup, the core framework publishes the aggregated `OpenAPI` document at this path. See [API Reference](/docs/api-reference) for more on API documentation design.
 
 ## Logging
 
@@ -139,7 +139,7 @@ session:
   cleanupInterval: 5m
 ```
 
-`session.timeout` determines how long an inactive session lives. `session.cleanupInterval` controls how often the built-in session cleanup task runs. This cleanup task is projected into the host's persistent task system — see [Scheduled Tasks](/docs/cron-tasks) for details.
+`session.timeout` determines how long an inactive session lives. `session.cleanupInterval` controls how often the built-in session cleanup task runs. This cleanup task is projected into the core framework persistent task system — see [Scheduled Tasks](/docs/cron-tasks) for details.
 
 ## Monitoring, Health, and Shutdown
 
@@ -184,7 +184,7 @@ i18n:
       nativeName: 简体中文
 ```
 
-The main repository ships `zh-CN` and `en-US` runtime language resources by default. When adding a new language, you need to provide host and plugin language packs and add the language to `i18n.locales`. See [I18N Internationalization](/docs/i18n) for resource organization details.
+The main repository ships `zh-CN` and `en-US` runtime language resources by default. When adding a new language, you need to provide core framework and plugin language packs and add the language to `i18n.locales`. See [I18N Internationalization](/docs/i18n) for resource organization details.
 
 ## Cluster Coordination
 
@@ -217,7 +217,7 @@ cluster:
 
 ## File Uploads
 
-Upload configuration controls where the host saves files and the single-file size limit:
+Upload configuration controls where the core framework saves files and the single-file size limit:
 
 ```yaml
 upload:
@@ -225,11 +225,11 @@ upload:
   maxSize: 20
 ```
 
-Plugins that need file storage should use their own namespace, for example `temp/upload/content-notice/`, to avoid mixing with host or other plugin resources.
+Plugins that need file storage should use their own namespace, for example `temp/upload/content-notice/`, to avoid mixing with core framework or other plugin resources.
 
 ## Plugin Configuration
 
-Plugin configuration bridges host governance and the plugin runtime:
+Plugin configuration bridges core framework governance and the plugin runtime:
 
 ```yaml
 plugin:
@@ -245,7 +245,7 @@ plugin:
 |---------|-------------|
 | `allowForceUninstall` | Whether platform administrators can perform an audited force-uninstall after a lifecycle guard vetoes |
 | `dynamic.storagePath` | Storage directory for `WASM` dynamic plugin build artifacts and uploads |
-| `autoEnable` | Plugin list to automatically install and enable when the host starts |
+| `autoEnable` | Plugin list to automatically install and enable when the core framework starts |
 
 Each entry in `autoEnable` uses the `{id, withMockData}` structure. `withMockData: true` loads demo data from the plugin's `manifest/sql/mock-data` during auto-installation — not recommended for production.
 

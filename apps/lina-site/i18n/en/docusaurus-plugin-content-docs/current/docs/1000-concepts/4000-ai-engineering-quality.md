@@ -119,7 +119,7 @@ Spec-driven development improves quality in several ways:
 
 `AGENTS.md` covers the following core constraint dimensions:
 
-- **Architecture constraints**: Defines the project positioning and the `lina-core` host boundary, preventing tight coupling between the core domain and workspace presentation structure.
+- **Architecture constraints**: Defines the project positioning and the `lina-core` boundary, preventing tight coupling between the core domain and workspace presentation structure.
 - **Module design rules**: Business modules must support on-demand disabling with coordinated frontend hiding; data permission filtering must happen at the database query layer; source plugin directory layout is fixed.
 - **Interface design constraints**: Enforces `RESTful` semantics throughout the repository; action-style path names are prohibited.
 - **Code quality rules**: Runtime dependencies must be injected through constructors; errors must be wrapped with `bizerr`; logging must pass `ctx` along the call chain; cached state must be coordinated across instances in cluster mode.

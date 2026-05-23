@@ -2,7 +2,7 @@
 slug: '/docs/routing'
 title: 'Routing Management'
 hide_title: true
-description: 'This article covers the routing management strategy of the LinaPro core host service, including API versioning (/api/v1 prefix conventions), the built-in middleware pipeline (unified response, CORS, request body limits, business context injection, JWT authentication, tenant resolution, permission enforcement), layered auth-route design, inline API attribute management via g.Meta struct tags, and the contrasting routing strategies between source plugins (free to register any path) and dynamic plugins (constrained to /x/{pluginID}/ prefix), helping developers understand the framework routing architecture and follow best practices.'
+description: 'This article covers the routing management strategy of the LinaPro core framework service, including API versioning (/api/v1 prefix conventions), the built-in middleware pipeline (unified response, CORS, request body limits, business context injection, JWT authentication, tenant resolution, permission enforcement), layered auth-route design, inline API attribute management via g.Meta struct tags, and the contrasting routing strategies between source plugins (free to register any path) and dynamic plugins (constrained to /x/{pluginID}/ prefix), helping developers understand the framework routing architecture and follow best practices.'
 keywords:
   - routing management
   - API versioning
@@ -28,11 +28,11 @@ keywords:
 
 ## Overview
 
-The routing system of `lina-core` is built on top of GoFrame's `ghttp.Server`, organized around four dimensions: **version prefixes**, **middleware chains**, **permission declarations**, and **plugin extension interfaces**. The host manages its own API versions under the `/api/v1` prefix, enforces CORS, authentication, and permission governance through an ordered middleware chain, maintains all API attributes inline with code via `g.Meta` struct tags, and provides differentiated routing strategies for the two plugin types.
+The routing system of `lina-core` is built on top of GoFrame's `ghttp.Server`, organized around four dimensions: **version prefixes**, **middleware chains**, **permission declarations**, and **plugin extension interfaces**. The core framework manages its own API versions under the `/api/v1` prefix, enforces CORS, authentication, and permission governance through an ordered middleware chain, maintains all API attributes inline with code via `g.Meta` struct tags, and provides differentiated routing strategies for the two plugin types.
 
 ## API Version Management
 
-All host control-plane APIs are mounted under the `/api/v1` router group. The version prefix is declared via `server.Group`. When a future `/api/v2` is needed, only a new group needs to be added — existing `v1` endpoints remain unaffected.
+All core framework control-plane APIs are mounted under the `/api/v1` router group. The version prefix is declared via `server.Group`. When a future `/api/v2` is needed, only a new group needs to be added — existing `v1` endpoints remain unaffected.
 
 ```go
 server.Group("/api/v1", func(group *ghttp.RouterGroup) {
@@ -44,15 +44,15 @@ server.Group("/api/v1", func(group *ghttp.RouterGroup) {
 
 | Path Prefix | Purpose |
 |-------------|---------|
-| `/api/v1` | Current stable host API version — authentication, users, roles, plugin management, and other control-plane endpoints |
-| `/x` | Dedicated data-plane prefix for dynamic plugins, dispatched by the host runtime to the matching plugin |
+| `/api/v1` | Current stable core framework API version — authentication, users, roles, plugin management, and other control-plane endpoints |
+| `/x` | Dedicated data-plane prefix for dynamic plugins, dispatched by the core framework runtime to the matching plugin |
 | `/` | Root-level routes — static frontend assets, health probes, etc. |
 
 The guiding principle for version management is: **a router group is a version boundary**. Different API versions coexist in the same process, each with its own middleware configuration and handler set — no `Content-Type` negotiation or special request headers are used for versioning.
 
 ## Middleware Pipeline
 
-The host divides middleware into two categories: **request-chain middleware** mounted on router groups, and **global middleware** registered at the server level. Request-chain middleware executes in declaration order; if any middleware calls `r.ExitAll()`, the chain stops immediately.
+The core framework divides middleware into two categories: **request-chain middleware** mounted on router groups, and **global middleware** registered at the server level. Request-chain middleware executes in declaration order; if any middleware calls `r.ExitAll()`, the chain stops immediately.
 
 ### Common Base Middleware
 
@@ -96,7 +96,7 @@ flowchart TD
 
 ### Middleware Available to Source Plugins
 
-The host publishes the above middleware to source plugins through the `RouteMiddlewares` interface. Plugins compose the middleware they need without directly depending on internal host packages:
+The core framework publishes the above middleware to source plugins through the `RouteMiddlewares` interface. Plugins compose the middleware they need without directly depending on internal core framework packages:
 
 ```go
 routes.Group("/api/v1", func(group pluginhost.RouteGroup) {
@@ -125,7 +125,7 @@ routes.Group("/api/v1", func(group pluginhost.RouteGroup) {
 
 ## Auth Route Design
 
-The host separates routes into **public routes** and **protected routes** using middleware differences between router sub-groups, rather than relying on path conventions or special markers.
+The core framework separates routes into **public routes** and **protected routes** using middleware differences between router sub-groups, rather than relying on path conventions or special markers.
 
 ### Route Layering
 
@@ -169,7 +169,7 @@ For a detailed treatment of authentication (JWT issuance, session management, RB
 
 `lina-core` uses the `g.Meta` mechanism to declare all API attributes — path, method, grouping tags, summary, description, permission, MIME type, and more — inline in the request DTO's struct tags, achieving **code and documentation from a single source of truth**.
 
-### Host Endpoint Tag Example
+### Core Framework Endpoint Tag Example
 
 ```go
 type CreateRecordReq struct {
@@ -195,25 +195,25 @@ type CreateDemoRecordReq struct {
 
 | Tag Field | Scope | Description |
 |-----------|-------|-------------|
-| `path` | Host / Source plugin / Dynamic plugin | Endpoint route path |
-| `method` | Host / Source plugin / Dynamic plugin | HTTP method, e.g. `get`, `post` |
-| `tags` | Host / Source plugin / Dynamic plugin | Grouping tags used for OpenAPI document categories |
-| `summary` | Host / Source plugin / Dynamic plugin | Short endpoint description, shown in docs and plugin management UI |
-| `dc` | Host / Source plugin | Detailed endpoint description (`description` shorthand) |
-| `permission` | Host / Source plugin / Dynamic plugin | Permission identifier enforced by the `Permission` middleware |
-| `mime` | Host / Source plugin | Request body MIME type, e.g. `multipart/form-data` |
+| `path` | Core framework / Source plugin / Dynamic plugin | Endpoint route path |
+| `method` | Core framework / Source plugin / Dynamic plugin | HTTP method, e.g. `get`, `post` |
+| `tags` | Core framework / Source plugin / Dynamic plugin | Grouping tags used for OpenAPI document categories |
+| `summary` | Core framework / Source plugin / Dynamic plugin | Short endpoint description, shown in docs and plugin management UI |
+| `dc` | Core framework / Source plugin | Detailed endpoint description (`description` shorthand) |
+| `permission` | Core framework / Source plugin / Dynamic plugin | Permission identifier enforced by the `Permission` middleware |
+| `mime` | Core framework / Source plugin | Request body MIME type, e.g. `multipart/form-data` |
 | `access` | Dynamic plugin | Access control — `public` for anonymous, `login` for authenticated |
 | `operLog` | Dynamic plugin | Operation log type — `create`, `update`, `delete`, `other` |
 
-This approach consolidates endpoint definition, documentation metadata, and permission declarations in the same DTO file. The host automatically aggregates the OpenAPI document from these tags, eliminating the need to maintain separate annotation files or documentation, and fundamentally removing the risk of drift between code and docs.
+This approach consolidates endpoint definition, documentation metadata, and permission declarations in the same DTO file. The core framework automatically aggregates the OpenAPI document from these tags, eliminating the need to maintain separate annotation files or documentation, and fundamentally removing the risk of drift between code and docs.
 
 ## Source Plugin Routing
 
-Source plugins are compiled and delivered with the host binary. They register routes via the `Routes()` method of `pluginhost.HTTPRegistrar` and have **full freedom to register any route path**.
+Source plugins are compiled and delivered with the core framework binary. They register routes via the `Routes()` method of `pluginhost.HTTPRegistrar` and have **full freedom to register any route path**.
 
 ### Registration
 
-Source plugins declare a route-registration callback in their `init()` function. The host triggers all callbacks during the `registerSourcePluginHTTPRoutes` startup phase:
+Source plugins declare a route-registration callback in their `init()` function. The core framework triggers all callbacks during the `registerSourcePluginHTTPRoutes` startup phase:
 
 ```go
 plugin.HTTP().RegisterRoutes(
@@ -223,7 +223,7 @@ plugin.HTTP().RegisterRoutes(
 )
 ```
 
-The `registerRoutes` callback receives an `HTTPRegistrar` and creates route groups via `Routes().Group()`, composing host-published middleware through `Middlewares()`:
+The `registerRoutes` callback receives an `HTTPRegistrar` and creates route groups via `Routes().Group()`, composing core framework-published middleware through `Middlewares()`:
 
 ```go
 func registerRoutes(ctx context.Context, registrar pluginhost.HTTPRegistrar) error {
@@ -261,17 +261,17 @@ func registerRoutes(ctx context.Context, registrar pluginhost.HTTPRegistrar) err
 
 Source plugins are not subject to any enforced route-path restriction. They can register routes under `/`, `/portal`, `/api/v1`, `/api/v2`, or any custom prefix. This freedom comes with the following expectations:
 
-- **Avoid conflicting with host routes**: The host already occupies all control-plane paths under `/api/v1`. Source plugins should use an unambiguous namespace such as `/api/v1/plugins/{plugin-id}/`
+- **Avoid conflicting with core framework routes**: The core framework already occupies all control-plane paths under `/api/v1`. Source plugins should use an unambiguous namespace such as `/api/v1/plugins/{plugin-id}/`
 - **Avoid conflicts between plugins**: When multiple source plugins are installed, path collisions cause route registration to fail and stop program startup — developers must ensure path uniqueness
-- **Protected routes must follow the correct middleware order**: Any sub-group that uses `Auth` must compose middleware as `Auth → Tenancy → Permission`; the host enforces this constraint through automated tests
+- **Protected routes must follow the correct middleware order**: Any sub-group that uses `Auth` must compose middleware as `Auth → Tenancy → Permission`; the core framework enforces this constraint through automated tests
 
 ### Route Capture
 
-During the registration phase the host captures all `SourceRouteBinding` records from source plugins and aggregates documentable endpoints into the host OpenAPI document automatically — no additional developer action is required.
+During the registration phase the core framework captures all `SourceRouteBinding` records from source plugins and aggregates documentable endpoints into the core framework OpenAPI document automatically — no additional developer action is required.
 
 ## Dynamic Plugin Routing
 
-Dynamic plugins (WASM plugins) have their routes fully managed by the host. The plugin itself does not interact with GoFrame's route registration mechanism directly, and routing capabilities are explicitly constrained.
+Dynamic plugins (WASM plugins) have their routes fully managed by the core framework. The plugin itself does not interact with GoFrame's route registration mechanism directly, and routing capabilities are explicitly constrained.
 
 ### Namespace Constraint
 
@@ -283,11 +283,11 @@ All dynamic plugin routes are forced under the `/x/{pluginID}/` prefix:
 /x/linapro-demo-dynamic/demo-records/{id}
 ```
 
-This constraint is enforced by a wildcard catch-all handler (`/*dynamicPath`) bound to the `/x` router group. A plugin cannot bind to `/api/v1` or any path outside `/x`, ensuring dynamic plugins can never disrupt the host routing structure.
+This constraint is enforced by a wildcard catch-all handler (`/*dynamicPath`) bound to the `/x` router group. A plugin cannot bind to `/api/v1` or any path outside `/x`, ensuring dynamic plugins can never disrupt the core framework routing structure.
 
 ### Route Declaration
 
-Dynamic plugin routes are declared through `RouteContract` embedded in the WASM artifact — not registered at runtime. The host parses route contracts when loading the artifact; incoming requests are matched by the host-side `PrepareDynamicRouteMiddleware`:
+Dynamic plugin routes are declared through `RouteContract` embedded in the WASM artifact — not registered at runtime. The core framework parses route contracts when loading the artifact; incoming requests are matched by the core framework-side `PrepareDynamicRouteMiddleware`:
 
 ```go
 // Route contract embedded in the WASM artifact
@@ -303,7 +303,7 @@ type RouteContract struct {
 }
 ```
 
-The `Path` field is the plugin-internal path. The host prepends `/x/{pluginID}` when exposing it externally.
+The `Path` field is the plugin-internal path. The core framework prepends `/x/{pluginID}` when exposing it externally.
 
 ### Dynamic Route Request Flow
 
@@ -325,8 +325,8 @@ Dynamic plugin route access is declared through the `access` and `permission` fi
 | Field | Value | Description |
 |-------|-------|-------------|
 | `access` | `public` | Anonymous access — no authentication required |
-| `access` | `login` | Requires an authenticated session — the host validates the JWT |
-| `permission` | e.g. `linapro-demo-dynamic:record:create` | Requires a specific permission — the host checks it against the user's permission set |
+| `access` | `login` | Requires an authenticated session — the core framework validates the JWT |
+| `permission` | e.g. `linapro-demo-dynamic:record:create` | Requires a specific permission — the core framework checks it against the user's permission set |
 
 ### Source Plugin vs. Dynamic Plugin Routing Comparison
 
@@ -334,10 +334,10 @@ Dynamic plugin route access is declared through the `access` and `permission` fi
 |-----------|--------------|---------------|
 | **Registration method** | Callback registered via `HTTPRegistrar` at startup | Route contracts parsed from WASM artifact at load time |
 | **Path restriction** | None — any path can be registered | Forced under `/x/{pluginID}/` |
-| **Middleware composition** | Plugin selects and combines from `RouteMiddlewares` | Managed entirely by the host; plugin influences auth behavior via `access` field |
+| **Middleware composition** | Plugin selects and combines from `RouteMiddlewares` | Managed entirely by the core framework; plugin influences auth behavior via `access` field |
 | **Permission declaration** | Inline in DTO's `g.Meta` tag | `permission` field in `RouteContract` |
-| **OpenAPI document** | Automatically aggregated into host docs | Host reads and aggregates from route contracts |
-| **Route conflict risk** | Developer responsibility | Avoided by host namespace constraints |
+| **OpenAPI document** | Automatically aggregated into core framework docs | Core framework reads and aggregates from route contracts |
+| **Route conflict risk** | Developer responsibility | Avoided by core framework namespace constraints |
 
 ## Global Middleware Extension
 
@@ -354,4 +354,4 @@ err := registrar.GlobalMiddlewares().Bind(
 )
 ```
 
-The host automatically injects a plugin-enabled state guard into global middleware. When the plugin is disabled, the middleware logic is skipped transparently — developers do not need to handle plugin state checks themselves.
+The core framework automatically injects a plugin-enabled state guard into global middleware. When the plugin is disabled, the middleware logic is skipped transparently — developers do not need to handle plugin state checks themselves.

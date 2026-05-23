@@ -29,7 +29,7 @@ The plugin system is `LinaPro`'s core extension mechanism for business capabilit
 
 `LinaPro` supports two delivery modes simultaneously:
 
-- **Source plugins**: Participate in host compilation as `Go` source code, suited for long-term business capabilities.
+- **Source plugins**: Participate in core framework compilation as `Go` source code, suited for long-term business capabilities.
 - **Dynamic plugins**: Uploaded and loaded as `.wasm` runtime artifacts, suited for binary distribution, hot-loading, and temporary extensions.
 
 The two modes differ in runtime form, but share the same plugin governance plane. The admin side sees the same plugin lifecycle, dependencies, permissions, status, and multi-tenant policies.
@@ -43,7 +43,7 @@ A single plugin form cannot simultaneously satisfy development efficiency, runti
 | **Long-term business modules** | Source plugins | Native `Go` performance, complete toolchain, easy to test and maintain |
 | **Urgent fixes or temporary capabilities** | Dynamic plugins | Can be uploaded and enabled at runtime, reducing deployment impact |
 | **Commercial plugin distribution** | Dynamic plugins | Can distribute only binary artifacts without exposing source |
-| **Deep host collaboration** | Source plugins | Can use host capabilities through stable `pluginhost` contracts |
+| **Deep core framework collaboration** | Source plugins | Can use core framework capabilities through stable `pluginhost` contracts |
 
 In most business development, source plugins are the default choice. Choose dynamic plugins when hot-loading, source code protection, or end-user plugin uploads are hard requirements.
 
@@ -58,7 +58,7 @@ flowchart TD
         Dynamic["WASM Dynamic Plugins<br/>.wasm artifacts"]
     end
 
-    subgraph Pipeline["Host Governance Pipeline"]
+    subgraph Pipeline["Core Framework Governance Pipeline"]
         Catalog["catalog<br/>Manifest discovery & release snapshot"]
         Dependency["dependency<br/>Framework & plugin dependency checks"]
         Lifecycle["lifecycle<br/>Install, enable, disable, uninstall, upgrade"]
@@ -79,14 +79,14 @@ flowchart TD
 | `catalog` | Reads `plugin.yaml` or `WASM` custom sections and generates an auditable release snapshot |
 | `dependency` | Checks framework version range, plugin dependencies, and circular dependencies |
 | `lifecycle` | Orchestrates install, enable, disable, uninstall, and runtime upgrade |
-| `integration` | Projects menus, permissions, routes, hooks, and scheduled tasks into the host runtime |
+| `integration` | Projects menus, permissions, routes, hooks, and scheduled tasks into the core framework runtime |
 | `plugin-runtime cache` | Provides low-latency plugin status, route, and resource snapshots for request paths |
 
 ## Key Public Contracts
 
 ### plugin.yaml
 
-Every plugin must provide a `plugin.yaml`. It is the unified entry point for plugin identity, dependencies, menus, multi-tenant policy, and dynamic plugin host service authorization.
+Every plugin must provide a `plugin.yaml`. It is the unified entry point for plugin identity, dependencies, menus, multi-tenant policy, and dynamic plugin core framework service authorization.
 
 ```yaml
 id: content-article
@@ -108,7 +108,7 @@ menus:
     type: M
 ```
 
-Dynamic plugins can also declare `hostServices` to request access to host capabilities:
+Dynamic plugins can also declare `hostServices` to request access to core framework capabilities:
 
 ```yaml
 hostServices:
@@ -132,18 +132,18 @@ hostServices:
 |-----------|-----------|
 | `Assets()` | Embeds plugin manifest, language packs, `SQL`, and frontend resources |
 | `HTTP()` | Registers plugin `HTTP` routes |
-| `Hooks()` | Subscribes to host events |
+| `Hooks()` | Subscribes to core framework events |
 | `Cron()` | Registers plugin task handlers |
 | `Lifecycle()` | Registers install, upgrade, disable, uninstall, and other lifecycle callbacks |
 | `Governance()` | Declares menu and permission filtering logic |
 
-Source plugins cannot directly `import` the host's `internal/` directory — they can only use stable contracts published by the host.
+Source plugins cannot directly `import` the core framework's `internal/` directory. They can only use stable contracts published by the core framework.
 
 ### pluginbridge
 
-`pluginbridge` is the sandbox communication layer for **dynamic plugins**. The host encapsulates request, identity, tenant, and permission snapshots into a `BridgeRequestEnvelopeV1` and passes it into the `WASM` module. The plugin returns a `BridgeResponseEnvelopeV1`.
+`pluginbridge` is the sandbox communication layer for **dynamic plugins**. The core framework encapsulates request, identity, tenant, and permission snapshots into a `BridgeRequestEnvelopeV1` and passes it into the `WASM` module. The plugin returns a `BridgeResponseEnvelopeV1`.
 
-When a dynamic plugin accesses host capabilities, it issues a `host_call`. The host validates the service, method, and resource boundaries against the `hostServices` authorization snapshot confirmed at installation time.
+When a dynamic plugin accesses core framework capabilities, it issues a `host_call`. The core framework validates the service, method, and resource boundaries against the `hostServices` authorization snapshot confirmed at installation time.
 
 ## Lifecycle States
 
@@ -169,7 +169,7 @@ stateDiagram-v2
     upgrade_failed --> upgrade_running: Retry upgrade
 ```
 
-Plugin file updates do not automatically switch the active version. After the host starts or scans and finds a higher version, it marks the plugin as `pending_upgrade`. The administrator previews and explicitly executes the runtime upgrade in the plugin management page. The upgrade flow runs dependency pre-checks, lifecycle callbacks, upgrade `SQL`, governance resource synchronization, active release switching, cache invalidation, and cluster notification.
+Plugin file updates do not automatically switch the active version. After the core framework starts or scans and finds a higher version, it marks the plugin as `pending_upgrade`. The administrator previews and explicitly executes the runtime upgrade in the plugin management page. The upgrade flow runs dependency pre-checks, lifecycle callbacks, upgrade `SQL`, governance resource synchronization, active release switching, cache invalidation, and cluster notification.
 
 ## Isolation Mechanisms
 
@@ -178,13 +178,13 @@ Plugin file updates do not automatically switch the active version. After the ho
 Plugin-owned tables must use a `snake_case` prefix derived from the plugin `ID`:
 
 ```text
-Host tables: sys_user, sys_role, sys_menu
+Core framework tables: sys_user, sys_role, sys_menu
 Plugin tables: content_notice_notice, org_center_dept, plugin_demo_dynamic_record
 ```
 
-System tables use the `sys_` prefix. Plugin tables use the `<plugin_id>_` prefix. Host and plugin data are fully isolated, avoiding naming conflicts and permission misuse.
+System tables use the `sys_` prefix. Plugin tables use the `<plugin_id>_` prefix. Core framework and plugin data are fully isolated, avoiding naming conflicts and permission misuse.
 
-Plugins that need multi-tenant support should design their tables to include a `tenant_id` column and use the host-published tenant filtering capability to append filter conditions.
+Plugins that need multi-tenant support should design their tables to include a `tenant_id` column and use the core framework-published tenant filtering capability to append filter conditions.
 
 ### File namespace
 
@@ -197,7 +197,7 @@ temp/upload/plugin-demo-dynamic/
 
 ### Sandbox isolation
 
-`WASM` dynamic plugins cannot directly access the host filesystem, network, or database. All access goes through `hostServices` bridging, constrained by authorization snapshots.
+`WASM` dynamic plugins cannot directly access the core framework filesystem, network, or database. All access goes through `hostServices` bridging, constrained by authorization snapshots.
 
 ## Multi-Tenant Fields
 
@@ -211,12 +211,12 @@ Plugins declare multi-tenant boundaries through three fields:
 
 For example, the `multi-tenant` plugin itself is a platform-level governance plugin using `platform_only` and `global`. Content, organization, and audit plugins are typically `tenant_aware`.
 
-## Host and Plugin Boundaries
+## Core Framework and Plugin Boundaries
 
 | Rule | Reason |
 |------|--------|
-| Plugins must not depend on host `internal/` packages | Host internals can evolve; stable contracts are provided by `pkg/` |
-| Plugin menus use the `plugin:<plugin-id>:<key>` format | Avoids conflicts with the host or other plugins |
+| Plugins must not depend on the core framework's `internal/` packages | Core framework internals can evolve; stable contracts are provided by `pkg/` |
+| Plugin menus use the `plugin:<plugin-id>:<key>` format | Avoids conflicts with the core framework or other plugins |
 | Installation `SQL` must be idempotent | Supports repeated execution, reinstallation with data retention, and upgrade recovery |
 | Plugin service logic goes in `backend/internal/service/` | Keeps plugin backend structure consistent, avoiding package naming confusion |
 | Plugin uninstallation distinguishes retained vs. cleaned data | Reduces accidental deletion risk and allows data reuse on reinstallation |

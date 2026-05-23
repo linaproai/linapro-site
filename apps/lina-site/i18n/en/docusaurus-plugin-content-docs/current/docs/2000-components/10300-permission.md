@@ -2,7 +2,7 @@
 slug: '/docs/permission'
 title: 'Permission Management'
 hide_title: true
-description: 'This article covers the permission management strategy of the LinaPro core host service, including the issuance, parsing, and revocation of dual JWTs (Access Token and Refresh Token), lifecycle management of both token types, online session management via hot-state storage, the design of the RBAC role-permission model (three-tier relationship: role → menu → permission), token-scoped access context caching with revision-based invalidation, declarative API permission management via g.Meta struct tags and the Permission middleware enforcement flow, and menu permission management (menu types, role-menu associations, permission trees, and data scope control) — giving developers a complete understanding of the authentication and authorization system.'
+description: 'This article covers the permission management strategy of the LinaPro core framework service, including the issuance, parsing, and revocation of dual JWTs (Access Token and Refresh Token), lifecycle management of both token types, online session management via hot-state storage, the design of the RBAC role-permission model (three-tier relationship: role → menu → permission), token-scoped access context caching with revision-based invalidation, declarative API permission management via g.Meta struct tags and the Permission middleware enforcement flow, and menu permission management (menu types, role-menu associations, permission trees, and data scope control) — giving developers a complete understanding of the authentication and authorization system.'
 keywords:
   - permission management
   - JWT authentication
@@ -251,7 +251,7 @@ s.bizCtxSvc.SetUserAccess(
 
 ### Dynamic Plugin API Permissions
 
-Dynamic plugins use `g.Meta`. Permission declarations follow the same pattern as the host, with two additional fields — `access` and `operLog`:
+Dynamic plugins use `g.Meta`. Permission declarations follow the same pattern as the core framework, with two additional fields — `access` and `operLog`:
 
 ```go
 type CreateDemoRecordReq struct {

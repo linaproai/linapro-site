@@ -2,13 +2,13 @@
 slug: '/docs/configuration'
 title: '服务配置管理'
 hide_title: true
-description: '本文从组件设计角度介绍 LinaPro 核心宿主服务的配置管理能力，说明 config.yaml 如何统一驱动 HTTP服务、日志、数据库、JWT认证、会话、监控、健康探针、定时调度、国际化、集群协调、文件上传和插件治理，并给出生产环境需要重点关注的配置边界。'
+description: '本文从组件设计角度介绍 LinaPro 主框架服务的配置管理能力，说明 config.yaml 如何统一驱动 HTTP服务、日志、数据库、JWT认证、会话、监控、健康探针、定时调度、国际化、集群协调、文件上传和插件治理，并给出生产环境需要重点关注的配置边界。'
 keywords:
   - 配置管理
   - config.yaml
   - LinaPro配置
   - 运行时配置
-  - 核心宿主服务
+  - 主框架服务
   - HTTP服务
   - 日志配置
   - PostgreSQL
@@ -28,7 +28,7 @@ keywords:
 
 ## 基本介绍
 
-配置管理是`lina-core`的运行时入口之一。宿主启动时读取`config.yaml`，再把其中的配置分发给`HTTP`服务、日志、数据库、认证、会话、调度、国际化、集群协调、文件上传和插件治理等组件。
+配置管理是`lina-core`的运行时入口之一。主框架启动时读取`config.yaml`，再把其中的配置分发给`HTTP`服务、日志、数据库、认证、会话、调度、国际化、集群协调、文件上传和插件治理等组件。
 
 默认配置文件位于主仓库：
 
@@ -36,7 +36,7 @@ keywords:
 apps/lina-core/manifest/config/config.yaml
 ```
 
-这个文件既是开发环境的默认模板，也是理解宿主运行方式的索引。业务项目可以在交付时按环境覆盖敏感配置，例如数据库连接、`JWT`密钥、日志输出和集群协调地址。
+这个文件既是开发环境的默认模板，也是理解主框架运行方式的索引。业务项目可以在交付时按环境覆盖敏感配置，例如数据库连接、`JWT`密钥、日志输出和集群协调地址。
 
 ## 配置分组
 
@@ -58,7 +58,7 @@ apps/lina-core/manifest/config/config.yaml
 
 ## 服务与接口文档
 
-`server.address`决定宿主监听地址，默认值为`:8080`。`server.dumpRouterMap`用于启动时输出路由表，适合开发排查，不建议在生产环境长期打开。
+`server.address`决定主框架监听地址，默认值为`:8080`。`server.dumpRouterMap`用于启动时输出路由表，适合开发排查，不建议在生产环境长期打开。
 
 `server.extensions.apiDocPath`是`LinaPro`在`GoFrame`服务配置上的扩展字段，默认值为`/api.json`：
 
@@ -70,7 +70,7 @@ server:
     apiDocPath: "/api.json"
 ```
 
-宿主启动后会在这个路径输出聚合后的`OpenAPI`文档。更多接口文档设计见[接口文档](/docs/api-reference)。
+主框架启动后会在这个路径输出聚合后的`OpenAPI`文档。更多接口文档设计见[接口文档](/docs/api-reference)。
 
 ## 日志配置
 
@@ -139,7 +139,7 @@ session:
   cleanupInterval: 5m
 ```
 
-`session.timeout`决定无活动会话的过期时间，`session.cleanupInterval`决定内置会话清理任务的运行间隔。该清理任务会投影到宿主持久化任务系统中，更多说明见[定时任务](/docs/cron-tasks)。
+`session.timeout`决定无活动会话的过期时间，`session.cleanupInterval`决定内置会话清理任务的运行间隔。该清理任务会投影到主框架持久化任务系统中，更多说明见[定时任务](/docs/cron-tasks)。
 
 ## 监控、健康与关停
 
@@ -184,7 +184,7 @@ i18n:
       nativeName: 简体中文
 ```
 
-当前主仓库默认提供`zh-CN`和`en-US`两套运行时语言资源。新增语言时，需要补齐宿主和插件语言包，并把该语言加入`i18n.locales`。更多资源组织方式见[I18N国际化](/docs/i18n)。
+当前主仓库默认提供`zh-CN`和`en-US`两套运行时语言资源。新增语言时，需要补齐主框架和插件语言包，并把该语言加入`i18n.locales`。更多资源组织方式见[I18N国际化](/docs/i18n)。
 
 ## 集群协调
 
@@ -217,7 +217,7 @@ cluster:
 
 ## 文件上传
 
-上传配置控制宿主保存文件的路径和单文件大小上限：
+上传配置控制主框架保存文件的路径和单文件大小上限：
 
 ```yaml
 upload:
@@ -225,11 +225,11 @@ upload:
   maxSize: 20
 ```
 
-插件如需存储文件，应使用插件自己的命名空间，例如`temp/upload/content-notice/`，避免和宿主或其他插件资源混用。
+插件如需存储文件，应使用插件自己的命名空间，例如`temp/upload/content-notice/`，避免和主框架或其他插件资源混用。
 
 ## 插件配置
 
-插件配置连接宿主治理能力和插件运行时：
+插件配置连接主框架治理能力和插件运行时：
 
 ```yaml
 plugin:
@@ -245,7 +245,7 @@ plugin:
 |--------|------|
 | `allowForceUninstall` | 是否允许平台管理员在生命周期防护否决后执行带审计的强制卸载 |
 | `dynamic.storagePath` | `WASM`动态插件构建产物和上传产物的存储目录 |
-| `autoEnable` | 宿主启动时自动安装并启用的插件清单 |
+| `autoEnable` | 主框架启动时自动安装并启用的插件清单 |
 
 `autoEnable`中的每个条目使用`{id, withMockData}`结构。`withMockData: true`表示自动安装时同时加载插件`manifest/sql/mock-data`下的演示数据，不建议生产环境启用。
 
@@ -263,4 +263,3 @@ plugin:
 | `cluster.redis` | 集群模式使用独立、可靠、带认证的`Redis`实例 |
 | `plugin.allowForceUninstall` | 按组织治理要求决定是否允许强制卸载 |
 | `plugin.autoEnable` | 生产环境谨慎启用演示数据 |
-

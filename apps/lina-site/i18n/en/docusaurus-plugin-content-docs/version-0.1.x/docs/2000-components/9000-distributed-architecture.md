@@ -25,7 +25,7 @@ keywords:
 
 ## Overview
 
-`LinaPro`'s distributed capabilities are built into the core host service. Development environments and small-scale deployments can use single-node mode; when business scale grows, enable cluster mode through configuration. Multiple host nodes share the same `PostgreSQL` database and use `Redis` for cross-node coordination.
+`LinaPro`'s distributed capabilities are built into the core framework service. Development environments and small-scale deployments can use single-node mode; when business scale grows, enable cluster mode through configuration. Multiple core framework nodes share the same `PostgreSQL` database and use `Redis` for cross-node coordination.
 
 Business code, plugin code, and the frontend workspace do not need to be rewritten when switching from single-node to cluster mode. What changes is the deployment topology and `cluster` configuration.
 
@@ -38,7 +38,7 @@ cluster:
   enabled: false
 ```
 
-Single-node mode does not require `Redis`. The host process uses local caching, local locks, and `PostgreSQL` for development, testing, and small-scale operation.
+Single-node mode does not require `Redis`. The core framework process uses local caching, local locks, and `PostgreSQL` for development, testing, and small-scale operation.
 
 ```text
 ┌─────────────────────┐
@@ -150,7 +150,7 @@ This mechanism avoids querying the database on every request while ensuring that
 
 ## Distributed Locks
 
-The host provides a unified lock capability. In single-node mode it degrades to a local lock; in cluster mode it uses the distributed lock provided by the coordination backend. Plugin runtime upgrades, critical maintenance tasks, and any process requiring global mutual exclusion can all reuse this capability.
+The core framework provides a unified lock capability. In single-node mode it degrades to a local lock; in cluster mode it uses the distributed lock provided by the coordination backend. Plugin runtime upgrades, critical maintenance tasks, and any process requiring global mutual exclusion can all reuse this capability.
 
 The design goal of distributed locks is not to replace database transactions, but to protect runtime orchestration processes that must have only one executor across the cluster.
 
@@ -201,12 +201,12 @@ Scaling from single-node to cluster typically follows these steps:
 2. Prepare an accessible `Redis` instance.
 3. Set `cluster.enabled` to `true` and configure `cluster.coordination: redis` and `cluster.redis` endpoints.
 4. Start multiple `lina-core` nodes pointing to the same database.
-5. Add all host nodes to the load balancer.
+5. Add all core framework nodes to the load balancer.
 6. Verify `/health`, login, menus, plugin state, task scheduling, and permission change synchronization.
 
 ## Design Boundaries
 
 - Cluster coordination currently only supports `Redis`.
 - `SQLite` is only for single-node local demos or smoke verification — it does not support clustering.
-- Distributed capabilities do not change the business `API` contract; business code should still access data through stable services published by the host and plugins.
+- Distributed capabilities do not change the business `API` contract; business code should still access data through stable services published by the core framework and plugins.
 - High availability also requires external load balancing, database reliability, and `Redis` reliability to work together.
