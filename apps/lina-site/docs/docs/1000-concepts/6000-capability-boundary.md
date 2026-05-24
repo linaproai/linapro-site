@@ -1,11 +1,11 @@
 ---
 slug: '/docs/capability-boundary'
-title: '框架与插件能力边界'
+title: '框架与插件职能边界'
 hide_title: true
-description: '本文介绍 LinaPro 主框架与插件能力边界的设计理念与实现细节，阐述默认管理工作台、主框架控制面 API、统一插件 API 命名空间、插件公开静态资源托管和源码插件 HTTP 路由之间的职责划分，说明 APIPrefix、route contract、public_assets、source、mount、index 等约定如何在源码插件和动态插件中落地，帮助开发者准确理解主框架与插件之间的协作方式。'
+description: '本文介绍 LinaPro 主框架与插件职能边界的设计理念与实现细节，阐述默认管理工作台、主框架控制面 API、统一插件 API 命名空间、插件公开静态资源托管和源码插件 HTTP 路由之间的职责划分，说明 APIPrefix、route contract、public_assets、source、mount、index 等约定如何在源码插件和动态插件中落地，帮助开发者准确理解主框架与插件之间的协作方式。'
 keywords:
-  - 主框架能力边界
-  - 插件能力边界
+  - 主框架职能边界
+  - 插件职能边界
   - pluginhost
   - pluginbridge
   - APIPrefix
@@ -36,6 +36,10 @@ keywords:
   - 插件扩展
   - LinaPro
 ---
+
+:::warning 注意
+由于目前`LinaPro`处于测试阶段，相关的边界设计和实现细节可能会有调整，本文内容仅供参考，后续可能会有较大改动，请以最新的官方文档和代码实现为准。
+:::
 
 ## 设计理念
 
@@ -298,7 +302,7 @@ menus:
 
 主框架将基础能力通过稳定的服务适配器接口向插件暴露，插件只需调用这些接口，无需了解主框架内部实现。
 
-**源码插件**通过`HostServices`接口访问主框架基础能力，该接口由`pluginhost.HTTPRegistrar`和`pluginhost.CronRegistrar`统一提供：
+**源码插件**通过`HostServices`接口访问主框架基础能力，该接口由`pluginhost.HTTPRegistrar`和`pluginhost.CronRegistrar`统一提供，例如：
 
 ```go
 func registerRoutes(ctx context.Context, registrar pluginhost.HTTPRegistrar) error {

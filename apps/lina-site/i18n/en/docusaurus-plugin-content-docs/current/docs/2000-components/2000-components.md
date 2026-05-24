@@ -2,7 +2,7 @@
 slug: '/docs/components'
 title: 'Component Design'
 hide_title: true
-description: 'An overview of the LinaPro component design philosophy: separating a stable platform foundation from pluggable business extensions, replacing implicit coupling with explicit contracts, and delivering capabilities as self-contained, composable units. Authentication, RBAC, multi-tenancy, scheduling, i18n, cluster coordination, and API documentation are built into the core framework; business capabilities are delivered as independent plugins; the frontend and backend are decoupled through public API contracts.'
+description: 'An overview of the LinaPro component design philosophy: a stable foundation paired with on-demand plugin extensibility, explicit contracts replacing implicit coupling, and self-contained composable capabilities. Authentication, RBAC, multi-tenancy, scheduling, i18n, cluster coordination, and API documentation are built into the stable platform foundation; business capabilities are delivered through self-contained component extensions; the frontend and backend are decoupled through public API contracts; components are independently replaceable.'
 keywords:
   - component design
   - LinaPro components
@@ -32,7 +32,7 @@ keywords:
   - component collaboration
 ---
 
-## Design Philosophy
+## Introduction
 
 `LinaPro`'s component design centers on one principle: **stable foundation, extend on demand**. Platform-level capabilities are built into the core framework; business capabilities are delivered as self-contained components; components collaborate through explicit contracts with no hidden coupling.
 
