@@ -37,6 +37,10 @@ keywords:
   - LinaPro
 ---
 
+:::warning Note
+LinaPro is currently in its testing phase. The boundary designs and implementation details described here may change. This page is provided for reference only.
+:::
+
 ## Design Philosophy
 
 `LinaPro` was designed around one core principle from the start: **the core framework is responsible only for lightweight foundational capabilities and stable extension interfaces, while business capabilities are implemented through plugins**.
