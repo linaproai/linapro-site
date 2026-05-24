@@ -105,14 +105,19 @@ apps/lina-plugins/<plugin-id>/
 │   │   └── model/                   # do/entity模型
 │   └── plugin.go                    # 插件注册入口
 ├── frontend/
-│   └── pages/                       # 插件页面
+│   └── pages/                       # 动态插件前端资产
 ├── manifest/
+│   ├── config/
+│   │   ├── config.yaml              # 动态产物携带的默认配置
+│   │   └── config.example.yaml      # 配置模板，不作为运行时默认值
 │   ├── sql/                         # 安装与升级SQL
 │   │   ├── mock-data/               # 演示数据，可选
 │   │   └── uninstall/               # 卸载SQL
 │   └── i18n/                        # 插件语言包
 └── README.md
 ```
+
+构建工具会优先读取插件嵌入资源，并在需要时回退扫描目录，把`plugin.yaml`、`frontend/`资产、`manifest/sql`、`manifest/i18n`、`manifest/config/config.yaml`、`manifest/config/config.example.yaml`和`manifest/`下的声明资源写入动态产物。运行时资源会绑定到当前有效发布的校验和与生成号，安装、启用、禁用、卸载、升级或同版本刷新都会触发相应缓存失效。
 
 ## WASM入口
 
@@ -146,7 +151,7 @@ func linaHostCallAlloc(size uint32) uint32 {
 func main() {}
 ```
 
-业务路由通常委托给`pluginbridge.MustNewGuestControllerRouteDispatcher`，由控制器方法处理具体请求。
+业务路由通常委托给`pluginbridge.MustNewGuestControllerRouteDispatcher`，由控制器方法处理具体请求。`linactl`会为`wasip1`构建注入零反射分发所需的契约元数据。
 
 ## hostServices授权
 
@@ -161,7 +166,9 @@ func main() {}
 | `cache` | 集群感知缓存读写 |
 | `lock` | 分布式锁获取、续约和释放 |
 | `cron` | 动态插件内置任务注册 |
-| `config` | 插件配置读取 |
+| `config` | 当前插件自己的只读配置读取 |
+| `hostConfig` | 宿主公开配置白名单读取 |
+| `manifest` | 当前插件`manifest/`声明资源读取 |
 | `notify` | 主框架通知能力 |
 
 示例：
@@ -170,6 +177,8 @@ func main() {}
 hostServices:
   - service: runtime
     methods: [log.write, info.now, info.node]
+  - service: cron
+    methods: [register]
   - service: data
     methods: [list, get, create, update, delete]
     resources:
@@ -179,7 +188,22 @@ hostServices:
     methods: [request]
     resources:
       - url: https://api.example.com
+  - service: config
+    methods: [get]
+  - service: hostConfig
+    methods: [get]
+    resources:
+      keys:
+        - workspace.basePath
+        - i18n.default
+  - service: manifest
+    methods: [get]
+    resources:
+      paths:
+        - metadata.yaml
 ```
+
+`config`、`hostConfig`和`manifest`只允许`get`方法。`guest`侧`SDK`提供的`String`、`Bool`、`Int`、`Duration`、`Scan`等便捷函数会转化为`get`调用，不需要也不能作为清单授权方法声明。`hostConfig`必须声明`resources.keys`，`manifest`必须声明`resources.paths`。
 
 ## 构建动态插件
 
@@ -190,7 +214,27 @@ make wasm
 make wasm p=plugin-demo-dynamic
 ```
 
-构建产物输出到`temp/output/<plugin-id>.wasm`，并包含插件清单、路由契约和必要嵌入资源。
+构建产物输出到`temp/output/<plugin-id>.wasm`，并包含插件清单、路由契约、公开前端资产、安装与卸载脚本、语言包、插件默认配置和声明资源。构建产物中的默认配置只在没有生产外部配置和开发期配置时作为回退来源。
+
+## 前端资产
+
+动态插件通过`plugin.yaml`的`public_assets`声明可公开资源，主框架统一托管到`/x-assets/{plugin-id}/{version}/...`：
+
+```yaml
+public_assets:
+  - source: frontend/pages
+    mount: /
+    index: index.html
+
+menus:
+  - key: plugin:linapro-demo-dynamic:main-entry
+    path: /x-assets/linapro-demo-dynamic/v0.1.0/mount.js
+    component: system/plugin/dynamic-page
+    query:
+      pluginAccessMode: embedded-mount
+```
+
+动态插件产物中存在的`frontend`文件不会自动全部公开，只有命中`public_assets`声明的资源才会通过`/x-assets`返回。插件禁用、未安装、租户不可用或访问版本不匹配时，公开资产默认返回`404`。
 
 ## 安装、启用与升级
 
@@ -199,11 +243,18 @@ make wasm p=plugin-demo-dynamic
 1. 构建`.wasm`产物。
 2. 在管理工作台的扩展中心上传动态插件包。
 3. 主框架验证`WASM`文件头、自定义段、嵌入清单、`ABI`版本和资源。
-4. 管理员确认`hostServices`授权。
+4. 管理员确认`hostServices`授权；如果存在`storage`、`network`、`data`、`hostConfig`、`manifest`等资源型声明，需要确认资源范围。
 5. 执行安装`SQL`并写入治理记录。
-6. 启用后，主框架装载`WASM`沙箱并投影路由、菜单和资源。
+6. 启用后，主框架装载`WASM`沙箱并投影路由、菜单、公开资产和资源快照。
 
 上传更高版本时，主框架不会直接切换有效版本，而是将插件标记为`pending_upgrade`。管理员在插件管理页预览差异并显式执行运行时升级。升级失败时保留旧有效版本，并记录失败诊断，便于修复后重试。
+
+动态插件`API`最终公开在统一插件命名空间下。主框架只负责拼接`/x/{plugin-id}`前缀，后续路径来自插件自己的路由契约，因此外部访问路径形如：
+
+```text
+/x/linapro-demo-dynamic/demo-records
+/x/linapro-demo-dynamic/backend-summary
+```
 
 ## 与源码插件的差异
 
@@ -224,4 +275,3 @@ make wasm p=plugin-demo-dynamic
 - 对外网络访问应明确目标地址，避免泛化授权。
 - 对运行时升级准备可回滚、幂等的升级`SQL`。
 - 把长期高频业务逻辑沉淀为源码插件，把动态插件用于热加载和隔离场景。
-

@@ -1,6 +1,6 @@
 ---
 slug: '/quick/have-a-try'
-title: 'Development Experience'
+title: 'Have a Try'
 hide_title: true
 description: "This guide uses a complete article management CRUD source plugin example to demonstrate LinaPro's AI-native development workflow. It covers requirement exploration with the spec-driven workflow, OpenSpec proposal generation, AI-led code implementation, service startup and feature verification, feedback-driven fixes, and change archival, helping developers understand how LinaPro turns AI Coding tools into a full-cycle delivery process for real business features."
 keywords:
@@ -26,7 +26,7 @@ This guide walks you through building an article management `CRUD` plugin and ex
 
 ## Development Goal
 
-Build a source plugin named `content-article` that provides article create, read, update, and delete management, including:
+Build a source plugin named `linapro-content-article` that provides article create, read, update, and delete management, including:
 
 - Article list display and pagination
 - Article creation, editing, and deletion
@@ -97,7 +97,7 @@ Enter in `Claude Code`:
 
 **What AI does:**
 
-Automatically generates the following documents under `openspec/changes/content-article/`:
+Automatically generates the following documents under `openspec/changes/linapro-content-article/`:
 
 | File | Contents |
 |------|----------|
@@ -185,13 +185,13 @@ After code implementation is complete, `AI` usually stops the service and report
 make dev
 ```
 
-After the service starts, open the admin workspace: `http://localhost:5666`
+After the service starts, open the admin workspace: `http://localhost:5666/admin`
 
 **Install and enable the plugin:**
 
 1. Log in to the admin workspace (`admin / admin123`)
 2. Go to "Extension Center -> Plugin Management"
-3. Find the `content-article` plugin and click "Install and Enable"
+3. Find the `linapro-content-article` plugin and click "Install and Enable"
 
 **Access the article management page:**
 

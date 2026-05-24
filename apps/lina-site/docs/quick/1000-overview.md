@@ -62,7 +62,7 @@ curl -o docker-compose.yaml https://raw.githubusercontent.com/linaproai/linapro/
 docker compose up
 ```
 
-随后可以访问 http://127.0.0.1:8080 体验完整的`LinaPro`默认提供的管理工作台，账号密码`admin/admin123`。
+随后可以按镜像启动日志中的管理工作台地址访问`LinaPro`默认工作台，账号密码`admin/admin123`。源码开发环境的默认工作台地址为`http://localhost:5666/admin`，主框架接口地址为`http://localhost:9120`。
 
 :::info 提示
 其中的镜像版本为`nightly`表示每日构建镜像，主要用于测试使用，也可以修改为稳定的版本标签如`v0.2.0`等。

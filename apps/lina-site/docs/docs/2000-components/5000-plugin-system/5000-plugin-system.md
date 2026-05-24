@@ -33,7 +33,9 @@ keywords:
 - **源码插件**：以`Go`源码形式参与主框架编译，适合长期维护的业务能力。
 - **动态插件**：以`.wasm`产物运行时上传和加载，适合二进制分发、热加载和临时扩展。
 
-两种模式运行形态不同，但共享同一套插件治理面。管理端看到的是同一类插件生命周期、依赖、权限、状态和多租户策略。
+两种模式运行形态不同，但共享同一套插件治理面。管理端看到的是同一类插件生命周期、依赖、权限、状态、多租户策略、公开静态资源和插件自身配置。
+
+源码插件和动态插件的目录结构也趋于一致：根目录包含`plugin.yaml`，后端能力位于`backend/`，前端资源位于`frontend/`，安装脚本、语言包、配置和声明资源位于`manifest/`。源码插件通过`plugin_embed.go`把这些资源嵌入主框架编译产物；动态插件通过构建工具把同类资源写入`.wasm`产物，并在运行时绑定到当前有效发布版本。
 
 ## 插件不必包含前端页面
 
@@ -98,7 +100,7 @@ flowchart TD
 
 ### plugin.yaml
 
-每个插件都必须提供`plugin.yaml`。它是插件身份、依赖、菜单、多租户策略和动态插件主框架能力授权的统一入口。
+每个插件都必须提供`plugin.yaml`。它是插件身份、依赖、菜单、多租户策略、公开静态资源和动态插件主框架能力授权的统一入口。
 
 ```yaml
 id: content-article
@@ -110,7 +112,23 @@ supports_multi_tenant: true
 default_install_mode: tenant_scoped
 description: 提供文章内容的增删改查管理功能
 author: linapro
+homepage: https://example.com/plugins/content-article
 license: Apache-2.0
+i18n:
+  enabled: true
+  default: zh-CN
+  locales:
+    - locale: en-US
+      nativeName: English
+    - locale: zh-CN
+      nativeName: 简体中文
+dependencies:
+  framework:
+    version: ">=0.1.0 <1.0.0"
+public_assets:
+  - source: frontend/pages
+    mount: /
+    index: index.html
 menus:
   - key: plugin:content-article:list
     name: 文章管理
@@ -120,7 +138,11 @@ menus:
     type: M
 ```
 
-动态插件还可以声明`hostServices`，申请访问主框架服务：
+插件`ID`必须是`kebab-case`，最长`64`个字符。菜单`key`必须使用`plugin:<plugin-id>:...`格式，菜单类型使用`D`、`M`、`B`分别表示目录、页面和按钮权限。`supports_multi_tenant`是必填语义字段，用来明确插件是否参与租户级安装和开通治理。
+
+`public_assets`声明插件作者允许匿名访问的静态资源目录。主框架只会托管声明命中的资源，并统一映射到`/x-assets/{plugin-id}/{version}/...`。同一插件版本下的公开资源内容应保持稳定；资源变化应升级插件版本或引入等价的内容版本机制。
+
+动态插件还可以声明`hostServices`，申请访问主框架服务。`hostServices`是授权申请清单，不是运行时自动拥有的能力；安装或升级时需要主框架确认并写入授权快照：
 
 ```yaml
 hostServices:
@@ -134,7 +156,23 @@ hostServices:
     resources:
       paths:
         - plugin-demo-dynamic/
+  - service: config
+    methods: [get]
+  - service: hostConfig
+    methods: [get]
+    resources:
+      keys:
+        - workspace.basePath
+        - i18n.default
+  - service: manifest
+    methods: [get]
+    resources:
+      paths:
+        - metadata.yaml
 ```
+
+`config`、`hostConfig`和`manifest`都是只读服务，清单中只声明`methods: [get]`。`String`、`Bool`、`Int`、`Duration`、`Scan`等是源码插件或动态插件`SDK`在`get`之上的便捷方法，不应作为授权方法写入清单。
+
 
 ### pluginhost
 
@@ -148,6 +186,7 @@ hostServices:
 | `Cron()` | 注册插件任务处理器 |
 | `Lifecycle()` | 注册安装、升级、禁用、卸载等生命周期回调 |
 | `Governance()` | 声明菜单和权限过滤逻辑 |
+| `HostServices()` | 获取插件作用域的配置、缓存、租户、通知、清单资源等主框架服务 |
 
 源码插件无法直接`import`主框架的`internal/`目录，只能使用主框架发布的稳定契约。
 
@@ -157,9 +196,24 @@ hostServices:
 
 动态插件访问主框架能力时发起`host_call`，主框架按安装时确认的`hostServices`授权快照校验服务、方法和资源边界。
 
+### 插件配置与声明资源
+
+插件业务配置不应写入主框架`config.yaml`。主框架为插件提供插件作用域配置服务，读取优先级如下：
+
+| 优先级 | 配置位置 | 说明 |
+|--------|----------|------|
+| 1 | 运行目录下的`plugins/<plugin-id>/config.yaml` | 运维侧覆盖当前插件配置 |
+| 2 | `apps/lina-plugins/<plugin-id>/manifest/config/config.yaml` | 开发期插件默认配置 |
+| 3 | 动态插件产物中的`manifest/config/config.yaml` | 动态插件随发布版本携带的默认配置 |
+
+`manifest/config/config.example.yaml`只是配置模板，不是运行时默认值。源码插件通过`HostServices().Config()`读取当前插件自己的配置，通过`HostServices().HostConfig()`读取宿主公开配置白名单键，通过`HostServices().Manifest()`读取插件`manifest/`下的声明资源。动态插件对应使用`hostServices`中的`config`、`hostConfig`和`manifest`授权。
+
+声明资源路径相对`manifest/`，适合放置`metadata.yaml`等插件自有声明。`config`、`sql`和`i18n`是主框架专用目录，不作为普通声明资源读取。
+
+
 ## 生命周期状态
 
-插件生命周期覆盖发现、安装、启用、禁用、卸载和升级：
+插件生命周期覆盖发现、安装、启用、禁用、卸载和升级，并包含租户级禁用、租户删除、安装模式调整等治理钩子：
 
 ```mermaid
 stateDiagram-v2
@@ -182,6 +236,8 @@ stateDiagram-v2
 ```
 
 插件文件更新不会自动切换有效版本。主框架启动或扫描发现更高版本后，将插件标记为`pending_upgrade`，管理员在插件管理页预览并显式执行运行时升级。升级流程会执行依赖预检、生命周期回调、升级`SQL`、治理资源同步、有效发布切换、缓存失效和集群通知。
+
+动态插件升级如果涉及资源型`hostServices`变化，需要重新确认授权快照。源码插件升级会比较当前编译发现版本与数据库中的有效版本，避免把文件覆盖误认为运行时升级已经完成。
 
 ## 隔离机制
 
@@ -231,4 +287,7 @@ temp/upload/plugin-demo-dynamic/
 | 插件菜单使用`plugin:<plugin-id>:<key>`格式 | 避免与主框架或其他插件冲突 |
 | 安装`SQL`必须幂等 | 支持重复执行、保留数据后重新安装和升级恢复 |
 | 插件服务逻辑放在`backend/internal/service/` | 保持插件后端结构一致，避免包命名混乱 |
+| 插件`API`使用`/x/{plugin-id}/...` | 源码插件和动态插件共享统一插件`API`命名空间，避免占用主框架`/api/v1`控制面 |
+| 公开静态资源必须声明`public_assets` | 主框架只托管插件显式授权公开的资源目录 |
+| 插件配置通过插件作用域配置服务读取 | 避免插件直接依赖宿主全局配置结构 |
 | 插件卸载区分保留数据和清理数据 | 降低误删风险，允许后续重新安装复用数据 |

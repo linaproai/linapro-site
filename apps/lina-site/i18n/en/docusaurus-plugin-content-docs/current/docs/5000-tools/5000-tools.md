@@ -1,6 +1,6 @@
 ---
 slug: '/docs/tools'
-title: 'Development Tools'
+title: 'Tools'
 hide_title: true
 description: 'An overview of the developer tooling built into LinaPro — covering every make command with usage examples, and the full AI skills library for frontend design, code review, testing, performance auditing, and OpenSpec workflows.'
 keywords:

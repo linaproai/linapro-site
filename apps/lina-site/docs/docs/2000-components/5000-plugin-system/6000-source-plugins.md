@@ -46,15 +46,21 @@ apps/lina-plugins/<plugin-id>/
 ├── plugin_embed.go
 ├── backend/
 │   ├── api/                         # API DTO与路由契约
+│   ├── hack/
+│   │   └── config.yaml              # make dao等插件开发配置
 │   ├── internal/
 │   │   ├── controller/              # HTTP控制器
 │   │   ├── service/                 # 业务服务层
-│   │   ├── dao/                     # gf gen dao生成
+│   │   ├── dao/                     # make dao生成
 │   │   └── model/                   # do/entity模型
 │   └── plugin.go                    # 插件注册入口
 ├── frontend/
-│   └── pages/                       # 插件页面
+│   ├── pages/                       # 插件页面
+│   └── slots/                       # 插槽页面，可选
 ├── manifest/
+│   ├── config/
+│   │   ├── config.yaml              # 开发期默认配置
+│   │   └── config.example.yaml      # 配置模板，不作为运行时默认值
 │   ├── sql/                         # 安装与升级SQL
 │   │   ├── mock-data/               # 演示数据，可选
 │   │   └── uninstall/               # 卸载SQL
@@ -122,10 +128,16 @@ CREATE INDEX IF NOT EXISTS idx_content_article_record_tenant
 
 ```go
 type ArticleListReq struct {
-    g.Meta `path:"/plugins/content-article/article" method:"get" tags:"Article" summary:"List articles" permission:"content-article:article:view"`
+    g.Meta `path:"/articles" method:"get" tags:"Article" summary:"List articles" permission:"content-article:article:view"`
     Page     int `json:"page" v:"min:1"`
     PageSize int `json:"pageSize" v:"min:1,max:100"`
 }
+```
+
+这里的`path`是控制器绑定到插件路由组后的相对路径。源码插件业务`API`应统一挂载到`/x/{plugin-id}/...`，而不是占用主框架`/api/v1`控制面。例如上面的接口在`linapro-content-article`插件中推荐暴露为：
+
+```text
+/x/linapro-content-article/articles
 ```
 
 服务层通过插件自有`DAO`访问数据库。需要租户隔离时，应使用主框架发布的`TenantFilterService`追加租户条件，而不是手写不一致的过滤规则。
@@ -136,7 +148,7 @@ type ArticleListReq struct {
 
 ```go
 func init() {
-    plugin := pluginhost.NewSourcePlugin("content-article")
+    plugin := pluginhost.NewSourcePlugin("linapro-content-article")
 
     plugin.Assets().UseEmbeddedFiles(contentarticle.EmbeddedFiles)
 
@@ -161,6 +173,77 @@ func init() {
 
 主框架在插件完整模式下生成聚合入口，空白导入已配置插件，使这些`init()`注册逻辑进入主框架进程。
 
+### 路由注册
+
+`HTTPRegistrar.Routes()`返回插件路由注册器。注册器的`APIPrefix()`当前返回插件专属命名空间`/x/{plugin-id}`，后续路径段由插件自行组织：
+
+```go
+func registerRoutes(ctx context.Context, registrar pluginhost.HTTPRegistrar) error {
+    routes := registrar.Routes()
+    middlewares := routes.Middlewares()
+
+    routes.Group(routes.APIPrefix(), func(group pluginhost.RouteGroup) {
+        group.Middleware(
+            middlewares.NeverDoneCtx(),
+            middlewares.HandlerResponse(),
+            middlewares.CORS(),
+            middlewares.RequestBodyLimit(),
+            middlewares.Ctx(),
+        )
+
+        group.Group("/", func(group pluginhost.RouteGroup) {
+            group.Middleware(
+                middlewares.Auth(),
+                middlewares.Tenancy(),
+                middlewares.Permission(),
+            )
+            group.Bind(articleController)
+        })
+    })
+    return nil
+}
+```
+
+源码插件仍可注册非保留公开路由，例如`/portal/...`、`/assets/...`或`/`，用于门户页面、自管静态文件或`SPA fallback`。这类路由不属于插件`API`，不会自动投影为工作台菜单、权限或`OpenAPI`接口。源码插件不得在`/x`下注册其他插件的路径；注册冲突或越界路径会在启动阶段被拒绝。
+
+### 插件配置和清单资源
+
+源码插件通过`registrar.HostServices()`获取插件作用域主框架服务，其中配置和声明资源是最新版本中比较重要的能力：
+
+| 服务 | 用途 |
+|------|------|
+| `Config()` | 读取当前插件自己的配置，生产覆盖路径为`plugins/<plugin-id>/config.yaml`，开发期默认路径为`manifest/config/config.yaml` |
+| `HostConfig()` | 读取宿主公开配置白名单键，例如`workspace.basePath`、`i18n.default`和`i18n.enabled` |
+| `Manifest()` | 读取当前插件`manifest/`下的声明资源，例如`metadata.yaml` |
+
+`manifest/config/config.example.yaml`只是模板，不参与默认读取。插件不应通过`g.Cfg()`扫描宿主完整配置树，也不应把插件业务配置写进主框架`config.yaml`。
+
+```go
+func registerRoutes(ctx context.Context, registrar pluginhost.HTTPRegistrar) error {
+    services := registrar.HostServices()
+
+    timeout, err := services.Config().Duration(ctx, "sync.timeout", 5*time.Second)
+    if err != nil {
+        return err
+    }
+    _ = timeout
+
+    workspaceBase, err := services.HostConfig().String(ctx, "workspace.basePath", "/admin")
+    if err != nil {
+        return err
+    }
+    _ = workspaceBase
+
+    var metadata struct {
+        Category string `yaml:"category"`
+    }
+    if err := services.Manifest().Scan(ctx, "metadata.yaml", "", &metadata); err != nil {
+        return err
+    }
+    return nil
+}
+```
+
 ## 前端页面
 
 源码插件的前端页面位于`frontend/pages/`，由主框架工作台动态页壳加载。插件菜单中的`component`通常使用：
@@ -170,6 +253,8 @@ component: system/plugin/dynamic-page
 ```
 
 页面可以复用默认工作台的前端生态和设计规范。插件禁用后，主框架菜单接口不再返回该插件入口，工作台侧边栏会自动隐藏。
+
+源码插件也可以声明`public_assets`，让主框架把插件内可公开的静态资源托管到`/x-assets/{plugin-id}/{version}/...`。只有`plugin.yaml`中显式声明的资源目录会被公开；租户文件、用户私有文件、安装脚本和配置文件不应放入`public_assets`。
 
 ## 事件钩子与定时任务
 

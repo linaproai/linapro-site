@@ -1,6 +1,6 @@
 ---
 slug: '/quick/environment'
-title: 'Environment Setup'
+title: 'Environment'
 hide_title: true
 description: 'This guide explains every dependency required to run LinaPro from source, including Git, Go (1.25+), Node.js (20.19+), pnpm (10.0+), PostgreSQL 14+, the cross-platform linactl development command entry, and the recommended AI-native workflow tools and skills such as Claude Code, OpenSpec CLI, goframe-v2, and find-skills. It also provides installation guidance for macOS, Linux, and Windows so developers can prepare a local development environment before installing LinaPro.'
 keywords:

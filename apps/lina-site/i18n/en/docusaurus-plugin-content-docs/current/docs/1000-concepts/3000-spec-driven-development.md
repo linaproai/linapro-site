@@ -1,6 +1,6 @@
 ---
 slug: '/docs/spec-driven-development'
-title: 'AI Spec-Driven Development'
+title: 'Spec Driven Development'
 hide_title: true
 description: 'A detailed guide to LinaPro Specification-Driven Development (SDD) and the OpenSpec workflow — the five-stage development loop (explore, propose, implement, review, archive), the responsibilities of AI and humans at each stage, the OpenSpec directory structure and spec file formats, and how spec anchors and mandatory E2E tests prevent architectural drift.'
 keywords:
@@ -81,7 +81,7 @@ Answer AI's questions, provide additional context, and make decisions when multi
 /opsx:propose <change-name>
 ```
 
-The `change-name` uses `kebab-case` to describe the change, e.g., `content-article` or `user-export`.
+The `change-name` uses `kebab-case` to describe the change, e.g., `linapro-content-article` or `user-export`.
 
 **What AI does:**
 

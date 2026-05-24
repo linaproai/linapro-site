@@ -1,6 +1,6 @@
 ---
 slug: '/docs/wasm-plugins'
-title: 'Dynamic Plugins (WASM)'
+title: 'WASM Plugins'
 hide_title: true
 description: 'An introduction to WebAssembly (WASM) fundamentals and advantages — cross-platform support, secure sandboxing, near-native performance, hot-loading, and multi-language ecosystem — followed by a practical guide to LinaPro WASM dynamic plugins covering use cases, sandbox model, pluginbridge protocol, exported functions, hostServices authorization, build process, runtime installation and enablement, explicit upgrades, and key differences from source plugins.'
 keywords:
@@ -102,14 +102,19 @@ apps/lina-plugins/<plugin-id>/
 │   │   └── model/                   # do/entity models
 │   └── plugin.go                    # Plugin registration entry
 ├── frontend/
-│   └── pages/                       # Plugin pages
+│   └── pages/                       # Dynamic plugin frontend assets
 ├── manifest/
+│   ├── config/
+│   │   ├── config.yaml              # Default configuration carried in the dynamic artifact
+│   │   └── config.example.yaml      # Configuration template, not a runtime default
 │   ├── sql/                         # Installation and upgrade SQL
 │   │   ├── mock-data/               # Demo data, optional
 │   │   └── uninstall/               # Uninstall SQL
 │   └── i18n/                        # Plugin language packs
 └── README.md
 ```
+
+The build tool reads embedded plugin resources first and falls back to directory scanning when needed. It writes `plugin.yaml`, `frontend/` assets, `manifest/sql`, `manifest/i18n`, `manifest/config/config.yaml`, `manifest/config/config.example.yaml`, and declaration resources under `manifest/` into the dynamic artifact. Runtime resources are bound to the checksum and generation of the current active release; installation, enablement, disablement, uninstallation, upgrade, or same-version refresh invalidates the corresponding caches.
 
 ## WASM Entry Point
 
@@ -143,7 +148,7 @@ func linaHostCallAlloc(size uint32) uint32 {
 func main() {}
 ```
 
-Business routing is typically delegated to `pluginbridge.MustNewGuestControllerRouteDispatcher`, which dispatches requests to controller methods.
+Business routing is typically delegated to `pluginbridge.MustNewGuestControllerRouteDispatcher`, which dispatches requests to controller methods. `linactl` injects the contract metadata required by zero-reflection dispatch when building for `wasip1`.
 
 ## hostServices Authorization
 
@@ -158,7 +163,9 @@ Dynamic plugins must declare the core framework services, methods, and resource 
 | `cache` | Cluster-aware cache read/write |
 | `lock` | Distributed lock acquisition, renewal, and release |
 | `cron` | Built-in task registration for dynamic plugins |
-| `config` | Plugin configuration reading |
+| `config` | Read-only access to the current plugin's own configuration |
+| `hostConfig` | Read-only access to allowlisted public host configuration |
+| `manifest` | Read-only access to the current plugin's `manifest/` declaration resources |
 | `notify` | Core framework notification capability |
 
 Example:
@@ -167,6 +174,8 @@ Example:
 hostServices:
   - service: runtime
     methods: [log.write, info.now, info.node]
+  - service: cron
+    methods: [register]
   - service: data
     methods: [list, get, create, update, delete]
     resources:
@@ -176,7 +185,22 @@ hostServices:
     methods: [request]
     resources:
       - url: https://api.example.com
+  - service: config
+    methods: [get]
+  - service: hostConfig
+    methods: [get]
+    resources:
+      keys:
+        - workspace.basePath
+        - i18n.default
+  - service: manifest
+    methods: [get]
+    resources:
+      paths:
+        - metadata.yaml
 ```
+
+`config`, `hostConfig`, and `manifest` allow only the `get` method. Convenience functions on the guest-side `SDK`, such as `String`, `Bool`, `Int`, `Duration`, and `Scan`, are converted into `get` calls. They do not need to and must not be declared as authorization methods. `hostConfig` must declare `resources.keys`, and `manifest` must declare `resources.paths`.
 
 ## Building Dynamic Plugins
 
@@ -187,7 +211,27 @@ make wasm
 make wasm p=plugin-demo-dynamic
 ```
 
-Build artifacts are output to `temp/output/<plugin-id>.wasm` and include the plugin manifest, route contracts, and necessary embedded resources.
+Build artifacts are output to `temp/output/<plugin-id>.wasm` and include the plugin manifest, route contracts, public frontend assets, install and uninstall scripts, language packs, plugin default configuration, and declaration resources. Default configuration inside the artifact is used only as a fallback when no production external configuration or development-time configuration exists.
+
+## Frontend Assets
+
+Dynamic plugins declare public resources through `public_assets` in `plugin.yaml`. The core framework hosts them under `/x-assets/{plugin-id}/{version}/...`:
+
+```yaml
+public_assets:
+  - source: frontend/pages
+    mount: /
+    index: index.html
+
+menus:
+  - key: plugin:linapro-demo-dynamic:main-entry
+    path: /x-assets/linapro-demo-dynamic/v0.1.0/mount.js
+    component: system/plugin/dynamic-page
+    query:
+      pluginAccessMode: embedded-mount
+```
+
+Frontend files inside a dynamic plugin artifact are not automatically exposed. Only resources matched by `public_assets` are served through `/x-assets`. If the plugin is disabled, not installed, unavailable to the tenant, or requested with a mismatched version, public assets return `404` by default.
 
 ## Installation, Enablement, and Upgrade
 
@@ -196,11 +240,18 @@ The runtime flow for dynamic plugins:
 1. Build the `.wasm` artifact.
 2. Upload the dynamic plugin package in the admin workspace's Extension Center.
 3. The core framework validates the `WASM` file header, custom sections, embedded manifest, `ABI` version, and resources.
-4. The administrator confirms `hostServices` authorization.
+4. The administrator confirms `hostServices` authorization. If the plugin declares resource-scoped services such as `storage`, `network`, `data`, `hostConfig`, or `manifest`, the resource scope must also be confirmed.
 5. The installation `SQL` is executed and governance records are written.
-6. Once enabled, the core framework loads the `WASM` sandbox and projects routes, menus, and resources.
+6. Once enabled, the core framework loads the `WASM` sandbox and projects routes, menus, public assets, and resource snapshots.
 
 When a higher version is uploaded, the core framework does not immediately switch the active version. Instead, it marks the plugin as `pending_upgrade`. The administrator previews the diff in the plugin management page and explicitly executes the runtime upgrade. If the upgrade fails, the previous active version is retained and failure diagnostics are recorded for retry after fixing.
+
+Dynamic plugin `API`s are ultimately exposed under the unified plugin namespace. The core framework only prepends `/x/{plugin-id}`; the remaining path comes from the plugin's own route contract. External paths therefore look like:
+
+```text
+/x/linapro-demo-dynamic/demo-records
+/x/linapro-demo-dynamic/backend-summary
+```
 
 ## Key Differences from Source Plugins
 

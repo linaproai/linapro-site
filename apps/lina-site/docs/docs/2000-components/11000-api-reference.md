@@ -32,7 +32,7 @@ keywords:
 默认访问路径由`config.yaml`中的`server.extensions.apiDocPath`控制，默认值为：
 
 ```text
-http://localhost:8080/api.json
+http://localhost:9120/api.json
 ```
 
 管理工作台在「开发中心 → 接口文档」中消费同一份文档，提供浏览和调试入口。
@@ -66,7 +66,7 @@ flowchart LR
 
 ```go
 type ArticleListReq struct {
-    g.Meta  `path:"/plugins/content-article/articles" method:"get" tags:"Content Article" summary:"List articles" dc:"Query article records by page." permission:"content-article:article:view"`
+    g.Meta  `path:"/articles" method:"get" tags:"Content Article" summary:"List articles" dc:"Query article records by page." permission:"content-article:article:view"`
     Page    int    `json:"page" v:"min:1" dc:"Page number"`
     Size    int    `json:"size" v:"min:1,max:100" dc:"Page size"`
     Keyword string `json:"keyword" dc:"Title keyword"`
@@ -80,6 +80,12 @@ type ArticleListRes struct {
 ```
 
 这里的`permission:"content-article:article:view"`会进入接口文档，也会和`RBAC`权限体系形成一致的审计口径。不要使用旧式或非当前契约的权限标签来描述新接口。
+
+源码插件示例中的`path:"/articles"`是控制器绑定到插件`API`路由组后的相对路径。若插件`ID`为`linapro-content-article`，并通过`routes.APIPrefix()`注册路由，最终公开路径是：
+
+```text
+/x/linapro-content-article/articles
+```
 
 ## 权限与文档一致性
 
@@ -99,7 +105,7 @@ type ArticleListRes struct {
 
 源码插件接口建议遵守这些规则：
 
-- 路径使用插件命名空间，例如`/plugins/content-article/articles`。
+- 路径使用统一插件`API`命名空间，例如`/x/linapro-content-article/articles`；不要把插件业务接口挂到主框架`/api/v1`控制面。
 - `tags`使用稳定的业务模块名，避免每次版本升级都改变分组。
 - `summary`保持短句，`dc`用于补充更完整的描述。
 - `permission`必须和插件`plugin.yaml`声明的权限资源保持一致。
@@ -110,6 +116,8 @@ type ArticleListRes struct {
 `WASM`动态插件的接口由插件产物携带路由契约，主框架在安装、启用和升级时读取并投影到接口文档。动态插件运行在`pluginbridge`之上，接口请求进入主框架后仍会先经过认证、权限和租户上下文处理，再传入`WASM`沙箱。
 
 动态插件不能直接修改主框架路由表。它公开哪些路由、能访问哪些主框架服务、能触达哪些数据表或外部地址，都由插件清单、产物元数据和`hostServices`授权快照共同决定。
+
+动态插件内部路由契约由插件自行定义，主框架对外拼接`/x/{plugin-id}`前缀，例如`/x/linapro-demo-dynamic/demo-records`。接口文档只聚合主框架控制面接口和插件`API`路由；源码插件自管门户页面、`/x-assets`公开静态资源和工作台页面菜单不属于`OpenAPI`接口。
 
 ## 接口多语言
 
@@ -146,10 +154,10 @@ apps/lina-plugins/content-notice/manifest/i18n/zh-CN/apidoc/
 
 | 工具 | 使用方式 |
 |------|----------|
-| `Apifox` | 新建项目后选择导入`OpenAPI/Swagger`，填写`http://localhost:8080/api.json` |
+| `Apifox` | 新建项目后选择导入`OpenAPI/Swagger`，填写`http://localhost:9120/api.json` |
 | `Postman` | 使用`Import`的`Link`方式导入`/api.json` |
 | `Swagger UI` | 指向主框架暴露的`/api.json`地址 |
-| `curl` | 使用`curl -o api.json http://localhost:8080/api.json`下载文档 |
+| `curl` | 使用`curl -o api.json http://localhost:9120/api.json`下载文档 |
 
 ## 常见问题
 

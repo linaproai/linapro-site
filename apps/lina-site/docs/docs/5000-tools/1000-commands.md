@@ -169,7 +169,7 @@ cd hack/tools/linactl
 go run . dev skip_wasm=true
 ```
 
-后端默认监听`http://localhost:9120`，前端默认监听`http://localhost:5666`。运行日志分别写入`temp/lina-core.log`和`temp/lina-vben.log`。
+后端默认监听`http://localhost:9120`，前端开发服务器默认监听`http://localhost:5666`，管理工作台默认开发入口为`http://localhost:5666/admin`。运行日志分别写入`temp/lina-core.log`和`temp/lina-vben.log`。
 
 ### make stop
 
@@ -604,13 +604,3 @@ make mock confirm=mock
 make help
 ```
 
-### make release.tag.check
-
-校验发布标签是否与`apps/lina-core/manifest/config/metadata.yaml`中的`framework.version`一致。未显式传入`tag`时，命令会读取`GITHUB_REF_NAME`，适合在发布流水线中校验标签和框架元数据是否同步。
-
-```bash
-make release.tag.check tag=v0.6.0
-
-# 只打印 metadata.yaml 中的 framework.version
-make release.tag.check print_version=1
-```

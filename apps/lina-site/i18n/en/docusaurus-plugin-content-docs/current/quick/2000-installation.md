@@ -1,6 +1,6 @@
 ---
 slug: '/quick/installation'
-title: 'Quick Installation'
+title: 'Installation'
 hide_title: true
 description: 'This guide explains how to install and initialize the LinaPro framework in a few minutes. It covers cloning the source repository with Git, initializing official plugin submodules when needed, preparing the default PostgreSQL database, copying and adjusting the configuration file, initializing the database through the cross-platform linactl or compatible make entry, loading demo data, starting the development service, integrating AI Coding tools, and verifying that the installation is working correctly.'
 keywords:
@@ -125,8 +125,9 @@ When the services start successfully, visit:
 
 | Service | URL |
 |---------|-----|
-| Default admin workspace | `http://localhost:5666` |
-| Backend `API` service | `http://localhost:8080` |
+| Frontend dev server | `http://localhost:5666` |
+| Backend `API` service | `http://localhost:9120` |
+| Default admin workspace | `http://localhost:5666/admin` |
 
 Log in to the admin workspace with the default account:
 

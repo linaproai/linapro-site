@@ -1,6 +1,6 @@
 ---
 slug: '/docs/api-reference'
-title: 'Unified API Reference'
+title: 'API Reference'
 hide_title: true
 description: 'From a component design perspective, this page explains how LinaPro aggregates API documentation — the core framework, source plugins, and WASM dynamic plugins are unified into a single OpenAPI document through g.Meta contracts, permission tags, API doc i18n resources, the in-workspace developer center debugging page, and third-party tool import.'
 keywords:
@@ -32,7 +32,7 @@ The API documentation is the unified view through which `lina-core` exposes its 
 The default access path is controlled by `server.extensions.apiDocPath` in `config.yaml`:
 
 ```text
-http://localhost:8080/api.json
+http://localhost:9120/api.json
 ```
 
 The admin workspace consumes the same document under **Developer Center → API Documentation**, providing a browsing and debugging entry point.
@@ -66,7 +66,7 @@ The core framework and source plugins use `GoFrame`'s `g.Meta` struct tags to de
 
 ```go
 type ArticleListReq struct {
-    g.Meta  `path:"/plugins/content-article/articles" method:"get" tags:"Content Article" summary:"List articles" dc:"Query article records by page." permission:"content-article:article:view"`
+    g.Meta  `path:"/articles" method:"get" tags:"Content Article" summary:"List articles" dc:"Query article records by page." permission:"content-article:article:view"`
     Page    int    `json:"page" v:"min:1" dc:"Page number"`
     Size    int    `json:"size" v:"min:1,max:100" dc:"Page size"`
     Keyword string `json:"keyword" dc:"Title keyword"`
@@ -80,6 +80,12 @@ type ArticleListRes struct {
 ```
 
 The `permission:"content-article:article:view"` here flows into the API documentation and also forms a consistent audit scope with the `RBAC` permission system. Do not use legacy or non-current permission tags to describe new interfaces.
+
+In this source plugin example, `path:"/articles"` is relative to the plugin `API` route group where the controller is bound. If the plugin `ID` is `linapro-content-article` and routes are registered through `routes.APIPrefix()`, the final public path is:
+
+```text
+/x/linapro-content-article/articles
+```
 
 ## Permission and Documentation Alignment
 
@@ -99,7 +105,7 @@ Source plugins define `DTO`s in their own `backend/api/` directory and register 
 
 Source plugin interfaces should follow these conventions:
 
-- Paths use the plugin namespace, e.g. `/plugins/content-article/articles`.
+- Paths use the unified plugin `API` namespace, e.g. `/x/linapro-content-article/articles`; do not mount plugin business interfaces under the core framework `/api/v1` control plane.
 - `tags` uses a stable business module name — avoid changing the grouping on every version bump.
 - `summary` should be a short phrase; `dc` is for a more complete description.
 - `permission` must be consistent with the permission resources declared in the plugin's `plugin.yaml`.
@@ -110,6 +116,8 @@ Source plugin interfaces should follow these conventions:
 `WASM` dynamic plugin interfaces are carried by the plugin artifact as route contracts. The core framework reads and projects them into the API documentation upon installation, enablement, and upgrade. Dynamic plugins run on top of `pluginbridge`; interface requests still pass through the core framework's authentication, permission, and tenant context processing before entering the `WASM` sandbox.
 
 Dynamic plugins cannot directly modify the core framework route table. Which routes they expose, which core framework services they can access, and which database tables or external addresses they can reach are all jointly determined by the plugin manifest, artifact metadata, and the `hostServices` authorization snapshot.
+
+Dynamic plugin internal route contracts are defined by the plugin. The core framework prepends `/x/{plugin-id}` for public access, for example `/x/linapro-demo-dynamic/demo-records`. API documentation aggregates only core framework control-plane interfaces and plugin `API` routes; source-plugin-managed portal pages, `/x-assets` public static assets, and workspace menu pages are not `OpenAPI` interfaces.
 
 ## API Documentation Internationalization
 
@@ -146,10 +154,10 @@ In-browser debugging uses the current logged-in user's authentication state. Deb
 
 | Tool | Usage |
 |------|-------|
-| `Apifox` | Create a new project, select **Import OpenAPI/Swagger**, and enter `http://localhost:8080/api.json` |
+| `Apifox` | Create a new project, select **Import OpenAPI/Swagger**, and enter `http://localhost:9120/api.json` |
 | `Postman` | Use **Import** with the **Link** method to import `/api.json` |
 | `Swagger UI` | Point to the core framework-exposed `/api.json` URL |
-| `curl` | Download with `curl -o api.json http://localhost:8080/api.json` |
+| `curl` | Download with `curl -o api.json http://localhost:9120/api.json` |
 
 ## Troubleshooting
 

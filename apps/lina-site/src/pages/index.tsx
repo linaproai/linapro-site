@@ -1,7 +1,6 @@
 import Link from '@docusaurus/Link';
 import Translate, {translate} from '@docusaurus/Translate';
 import useBaseUrl from '@docusaurus/useBaseUrl';
-import CodeBlock from '@theme/CodeBlock';
 import Layout from '@theme/Layout';
 import {useEffect, useState} from 'react';
 
@@ -37,7 +36,6 @@ function HomepageHeader() {
                             <a href="https://golang.org/" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/badge/Go-1.25+-00ADD8.svg" alt="Go" /></a>
                             <a href="https://www.typescriptlang.org/" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/badge/TypeScript-5.x-3178C6.svg" alt="TypeScript" /></a>
                             <a href="https://vitejs.dev/" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/badge/Vite-6.x-646CFF.svg" alt="Vite" /></a>
-                            <a href="https://element-plus.org/" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/badge/Element_Plus-2.x-409EFF.svg" alt="Element Plus" /></a>
                             <a href="https://tailwindcss.com/" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/badge/Tailwind_CSS-3.x-06B6D4.svg" alt="Tailwind CSS" /></a>
                             <a href="https://goframe.org/" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/badge/GoFrame-v2-00ADD8.svg" alt="GoFrame" /></a>
                             <a href="https://github.com/Daymychen/art-design-pro" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/badge/Art_Design_Pro-UI-FF6B6B.svg" alt="Art Design Pro" /></a>
@@ -604,53 +602,6 @@ function Modules() {
     );
 }
 
-const quickStartBlocks = [
-    {
-        id: 'install',
-        label: 'INSTALL',
-        body: 'git clone --depth 1 https://github.com/linaproai/linapro.git linapro',
-    },
-    {
-        id: 'init',
-        label: 'INITIALIZE',
-        body: 'make init confirm=init\nmake mock confirm=mock   # optional demo data',
-    },
-    {
-        id: 'dev',
-        label: 'DEVELOP',
-        body: 'make dev\n# Workspace: http://localhost:5666\n# API:       http://localhost:8080',
-    },
-];
-
-function QuickStart() {
-    return (
-        <section className="home-section home-section--quickstart">
-            <div className="container">
-                <h2 className="section-title">
-                    <Translate id="home.quickstart.title" description="QuickStart section title">
-                        Up and running in three commands
-                    </Translate>
-                </h2>
-                <p className="section-lead">
-                    <Translate id="home.quickstart.lead" description="QuickStart section lead">
-                        Install, initialize, and run the default workspace in minutes.
-                    </Translate>
-                </p>
-                <div className="quickstart-blocks">
-                    {quickStartBlocks.map((b) => (
-                        <div key={b.id} className="quickstart-block">
-                            <div className="quickstart-block-label">{b.label}</div>
-                            <CodeBlock language="bash" className="quickstart-codeblock">
-                                {b.body}
-                            </CodeBlock>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        </section>
-    );
-}
-
 function FinalCta() {
     const githubImage = useBaseUrl('/img/github.svg');
     return (
@@ -701,7 +652,6 @@ export default function Home(): JSX.Element {
             <Layers />
             <Workflow />
             <Modules />
-            <QuickStart />
             <FinalCta />
         </Layout>
     );

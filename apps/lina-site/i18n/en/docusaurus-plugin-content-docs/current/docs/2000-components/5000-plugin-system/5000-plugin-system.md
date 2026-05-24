@@ -1,8 +1,8 @@
 ---
 slug: '/docs/plugin-system'
-title: 'Dual-Mode Plugin System'
+title: 'Plugin System'
 hide_title: true
-description: 'A component-level guide to the LinaPro dual-mode plugin system — why source plugins and WASM dynamic plugins share the same governance pipeline, and how catalog, dependency, lifecycle, integration, plugin-runtime cache, pluginhost, pluginbridge, plugin.yaml, multi-tenant fields, lifecycle states, isolation mechanisms, and runtime upgrades together form an extensible plugin architecture.'
+description: 'A component-level guide to the LinaPro dual-mode plugin system — why source plugins and WASM dynamic plugins share the same governance pipeline, and how catalog, dependency, lifecycle, integration, plugin-runtime cache, pluginhost, pluginbridge, plugin.yaml, multi-tenant fields, lifecycle states, isolation mechanisms, runtime upgrades, public static assets, and plugin-scoped configuration together form an extensible plugin architecture.'
 keywords:
   - plugin system
   - dual-mode plugins
@@ -32,7 +32,9 @@ The plugin system is `LinaPro`'s core extension mechanism for business capabilit
 - **Source plugins**: Participate in core framework compilation as `Go` source code, suited for long-term business capabilities.
 - **Dynamic plugins**: Uploaded and loaded as `.wasm` runtime artifacts, suited for binary distribution, hot-loading, and temporary extensions.
 
-The two modes differ in runtime form, but share the same plugin governance plane. The admin side sees the same plugin lifecycle, dependencies, permissions, status, and multi-tenant policies.
+The two modes differ in runtime form, but share the same plugin governance plane. The admin side sees the same plugin lifecycle, dependencies, permissions, status, multi-tenant policies, public static assets, and plugin-owned configuration.
+
+The directory structures for source plugins and dynamic plugins are also converging: the root contains `plugin.yaml`, backend capability lives under `backend/`, frontend resources live under `frontend/`, and installation scripts, language packs, configuration, and declarative resources live under `manifest/`. Source plugins embed these resources into the core framework build artifact through `plugin_embed.go`; dynamic plugins write the same kinds of resources into `.wasm` artifacts through the build tool and bind them to the current active release version at runtime.
 
 ## Plugins Don't Have to Include a Frontend
 
@@ -97,7 +99,7 @@ flowchart TD
 
 ### plugin.yaml
 
-Every plugin must provide a `plugin.yaml`. It is the unified entry point for plugin identity, dependencies, menus, multi-tenant policy, and dynamic plugin core framework service authorization.
+Every plugin must provide a `plugin.yaml`. It is the unified entry point for plugin identity, dependencies, menus, multi-tenant policy, public static assets, and dynamic plugin core framework service authorization.
 
 ```yaml
 id: content-article
@@ -109,7 +111,23 @@ supports_multi_tenant: true
 default_install_mode: tenant_scoped
 description: 提供文章内容的增删改查管理功能
 author: linapro
+homepage: https://example.com/plugins/content-article
 license: Apache-2.0
+i18n:
+  enabled: true
+  default: zh-CN
+  locales:
+    - locale: en-US
+      nativeName: English
+    - locale: zh-CN
+      nativeName: 简体中文
+dependencies:
+  framework:
+    version: ">=0.1.0 <1.0.0"
+public_assets:
+  - source: frontend/pages
+    mount: /
+    index: index.html
 menus:
   - key: plugin:content-article:list
     name: 文章管理
@@ -119,7 +137,11 @@ menus:
     type: M
 ```
 
-Dynamic plugins can also declare `hostServices` to request access to core framework capabilities:
+The plugin `ID` must be `kebab-case` and at most 64 characters. Menu `key` values must use the `plugin:<plugin-id>:...` format. Menu types use `D`, `M`, and `B` for directory, page, and button permissions. `supports_multi_tenant` is a required semantic field that makes explicit whether the plugin participates in tenant-level installation and provisioning governance.
+
+`public_assets` declares static resource directories that the plugin author permits anonymous users to access. The core framework serves only resources matched by this declaration and maps them to `/x-assets/{plugin-id}/{version}/...`. Public asset content under the same plugin version should remain stable; if resources change, upgrade the plugin version or use an equivalent content-versioning mechanism.
+
+Dynamic plugins can also declare `hostServices` to request access to core framework capabilities. `hostServices` is an authorization request list, not a set of capabilities automatically granted at runtime. During installation or upgrade, the core framework must confirm and persist the authorization snapshot:
 
 ```yaml
 hostServices:
@@ -133,7 +155,22 @@ hostServices:
     resources:
       paths:
         - plugin-demo-dynamic/
+  - service: config
+    methods: [get]
+  - service: hostConfig
+    methods: [get]
+    resources:
+      keys:
+        - workspace.basePath
+        - i18n.default
+  - service: manifest
+    methods: [get]
+    resources:
+      paths:
+        - metadata.yaml
 ```
+
+`config`, `hostConfig`, and `manifest` are all read-only services; manifests should declare only `methods: [get]`. `String`, `Bool`, `Int`, `Duration`, `Scan`, and similar helpers are source plugin or dynamic plugin `SDK` convenience methods layered on top of `get`, and should not be written as authorization methods.
 
 ### pluginhost
 
@@ -147,6 +184,7 @@ hostServices:
 | `Cron()` | Registers plugin task handlers |
 | `Lifecycle()` | Registers install, upgrade, disable, uninstall, and other lifecycle callbacks |
 | `Governance()` | Declares menu and permission filtering logic |
+| `HostServices()` | Gets plugin-scoped core framework services such as configuration, cache, tenancy, notifications, and manifest resources |
 
 Source plugins cannot directly `import` the core framework's `internal/` directory. They can only use stable contracts published by the core framework.
 
@@ -156,9 +194,23 @@ Source plugins cannot directly `import` the core framework's `internal/` directo
 
 When a dynamic plugin accesses core framework capabilities, it issues a `host_call`. The core framework validates the service, method, and resource boundaries against the `hostServices` authorization snapshot confirmed at installation time.
 
+### Plugin Configuration and Manifest Resources
+
+Plugin business configuration should not be written into the core framework `config.yaml`. The core framework provides a plugin-scoped configuration service with the following read priority:
+
+| Priority | Configuration location | Description |
+|----------|------------------------|-------------|
+| 1 | `plugins/<plugin-id>/config.yaml` under the runtime directory | Operations-side override for the current plugin |
+| 2 | `apps/lina-plugins/<plugin-id>/manifest/config/config.yaml` | Development-time plugin default configuration |
+| 3 | `manifest/config/config.yaml` inside a dynamic plugin artifact | Default configuration carried with a dynamic plugin release |
+
+`manifest/config/config.example.yaml` is only a configuration template, not a runtime default. Source plugins read their own configuration through `HostServices().Config()`, read allowlisted public host configuration keys through `HostServices().HostConfig()`, and read declaration resources under `manifest/` through `HostServices().Manifest()`. Dynamic plugins use the corresponding `config`, `hostConfig`, and `manifest` authorizations in `hostServices`.
+
+Manifest resource paths are relative to `manifest/` and are suitable for plugin-owned declarations such as `metadata.yaml`. `config`, `sql`, and `i18n` are dedicated core framework resource directories and are not read as general manifest resources.
+
 ## Lifecycle States
 
-The plugin lifecycle covers discovery, installation, enablement, disablement, uninstallation, and upgrade:
+The plugin lifecycle covers discovery, installation, enablement, disablement, uninstallation, and upgrade, and also includes governance hooks such as tenant-level disablement, tenant deletion, and install-mode adjustment:
 
 ```mermaid
 stateDiagram-v2
@@ -181,6 +233,8 @@ stateDiagram-v2
 ```
 
 Plugin file updates do not automatically switch the active version. After the core framework starts or scans and finds a higher version, it marks the plugin as `pending_upgrade`. The administrator previews and explicitly executes the runtime upgrade in the plugin management page. The upgrade flow runs dependency pre-checks, lifecycle callbacks, upgrade `SQL`, governance resource synchronization, active release switching, cache invalidation, and cluster notification.
+
+If a dynamic plugin upgrade changes resource-scoped `hostServices`, the authorization snapshot must be confirmed again. Source plugin upgrades compare the discovered version compiled into the current code with the effective version stored in the database, avoiding any assumption that overwriting files has completed the runtime upgrade.
 
 ## Isolation Mechanisms
 
@@ -230,4 +284,7 @@ For example, the `multi-tenant` plugin itself is a platform-level governance plu
 | Plugin menus use the `plugin:<plugin-id>:<key>` format | Avoids conflicts with the core framework or other plugins |
 | Installation `SQL` must be idempotent | Supports repeated execution, reinstallation with data retention, and upgrade recovery |
 | Plugin service logic goes in `backend/internal/service/` | Keeps plugin backend structure consistent, avoiding package naming confusion |
+| Plugin `API`s use `/x/{plugin-id}/...` | Source plugins and dynamic plugins share a unified plugin `API` namespace and avoid occupying the core framework `/api/v1` control plane |
+| Public static assets must be declared through `public_assets` | The core framework serves only directories the plugin explicitly authorizes for public access |
+| Plugin configuration is read through the plugin-scoped configuration service | Avoids direct dependency on the host's global configuration structure |
 | Plugin uninstallation distinguishes retained vs. cleaned data | Reduces accidental deletion risk and allows data reuse on reinstallation |

@@ -1,6 +1,6 @@
 ---
 slug: '/docs/ai-native'
-title: 'AI-Native Design'
+title: 'AI Native'
 hide_title: true
 description: 'A detailed look at LinaPro as an AI-native framework — what AI-native truly means, how it differs from AI-assisted development, how AI participates in every stage of the development lifecycle, the built-in AI skill system covering backend, frontend, testing, performance auditing, and version management, and why spec-driven development prevents architectural drift over time.'
 keywords:

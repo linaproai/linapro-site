@@ -21,6 +21,8 @@ keywords:
   - RBAC
   - 前端工作台
   - 动态路由
+  - workspace.basePath
+  - /admin
   - LinaPro
 ---
 
@@ -29,6 +31,8 @@ keywords:
 `lina-vben`是`LinaPro`内置的默认管理工作台，基于`Vue 3 + Vben5 + Ant Design Vue + TypeScript`构建。它不是业务逻辑的定义者，而是`lina-core`主框架`API`和所有已启用插件`API`的标准`UI`表达层。
 
 开发者可以直接基于它构建业务应用，也可以替换为自定义前端。只要新的前端遵循主框架公开的`RESTful API`和权限模型，就能接入同一套后端能力。
+
+默认管理工作台的本地开发入口是`http://localhost:5666/admin`。其中`/admin`来自公开前端配置`workspace.basePath`，用于确定工作台`Vue Router`基准路径和资源解析边界；主框架接口默认监听`http://localhost:9120`，不要把主框架接口地址加上`/admin`当作默认工作台地址。
 
 ## 技术栈
 
@@ -55,6 +59,8 @@ keywords:
 ### 插件页面通过动态页壳加载
 
 源码插件和动态插件都可以声明前端页面。工作台通过`system/plugin/dynamic-page`页壳承载插件页面，减少插件接入时对工作台代码的侵入。
+
+动态插件的运行时前端入口通常来自`/x-assets/{plugin-id}/{version}/...`公开资产，并通过菜单`query.pluginAccessMode: embedded-mount`声明内嵌挂载模式。源码插件页面通常在工作台构建阶段编译进前端产物，也可以使用`public_assets`托管明确适合匿名访问的静态资源。
 
 ## 功能模块
 
@@ -122,6 +128,8 @@ sequenceDiagram
 | **升级** | 对`pending_upgrade`或`upgrade_failed`插件执行显式运行时升级 |
 | **上传动态插件** | 上传`.wasm`产物，进入动态插件发现和治理流程 |
 
+插件列表读取的是后端完整投影缓存。打开列表不会隐式触发插件同步写入；显式同步、上传、安装、启用、禁用、卸载和升级等操作会刷新缓存。界面中的插件类型显示为“源码插件”或“动态插件”，动态插件底层即使是`WASM`产物，也仍归入“动态插件”治理类型。
+
 ## 开发中心
 
 开发中心聚合主框架和插件接口文档，开发者可以查看`OpenAPI`文档、请求参数、响应结构和权限标识，并直接发起调试请求。在线调试会使用当前登录用户的认证状态，写操作会产生真实数据变更，应在测试环境谨慎使用。
@@ -134,7 +142,8 @@ sequenceDiagram
 |------|----|
 | 用户名 | `admin` |
 | 密码 | `admin123` |
-| 默认前端地址 | `http://localhost:5666` |
+| 默认工作台地址 | `http://localhost:5666/admin` |
+| 前端开发服务器 | `http://localhost:5666` |
 
 生产环境应在初始化后立即修改默认密码，并按组织安全策略配置角色和权限。
 

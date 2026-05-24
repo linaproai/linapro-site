@@ -1,6 +1,6 @@
 ---
 slug: '/docs/commands'
-title: 'Development Commands'
+title: 'Commands'
 hide_title: true
 description: 'This page describes the cross-platform development command set used by LinaPro, including linactl, the Makefile compatibility entry, the Windows make.cmd wrapper, local environment checks and setup, development server management, full builds, WASM plugin builds, Docker image builds, plugin workspace management, agent resource symlink management, test validation, i18n checks, database initialization, and release governance. It helps developers use the same project toolchain consistently on macOS, Linux, and Windows.'
 keywords:
@@ -168,7 +168,7 @@ cd hack/tools/linactl
 go run . dev skip_wasm=true
 ```
 
-The backend listens on `http://localhost:9120` by default, and the frontend listens on `http://localhost:5666`. Logs are written to `temp/lina-core.log` and `temp/lina-vben.log`.
+The backend listens on `http://localhost:9120` by default, the frontend dev server listens on `http://localhost:5666` by default, and the default admin workspace development entry is `http://localhost:5666/admin`. Logs are written to `temp/lina-core.log` and `temp/lina-vben.log`.
 
 ### make stop
 
@@ -600,15 +600,4 @@ Prints the default cross-platform development command list, sorted by command na
 
 ```bash
 make help
-```
-
-### make release.tag.check
-
-Verifies that the release tag matches `framework.version` in `apps/lina-core/manifest/config/metadata.yaml`. When `tag` is not passed explicitly, the command reads `GITHUB_REF_NAME`, making it suitable for release pipeline validation.
-
-```bash
-make release.tag.check tag=v0.6.0
-
-# Print only framework.version from metadata.yaml
-make release.tag.check print_version=1
 ```

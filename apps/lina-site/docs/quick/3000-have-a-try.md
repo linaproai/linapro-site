@@ -26,7 +26,7 @@ keywords:
 
 ## 开发目标
 
-开发一个名为`content-article`的源码插件，实现文章的增删改查管理功能，包括：
+开发一个名为`linapro-content-article`的源码插件，实现文章的增删改查管理功能，包括：
 
 - 文章列表展示与分页
 - 文章创建、编辑、删除
@@ -97,7 +97,7 @@ claude
 
 **AI 会做什么：**
 
-在`openspec/changes/content-article/`目录下自动生成以下文档：
+在`openspec/changes/linapro-content-article/`目录下自动生成以下文档：
 
 | 文件 | 内容 |
 |------|------|
@@ -185,13 +185,13 @@ claude
 make dev
 ```
 
-服务启动后，打开管理工作台：`http://localhost:5666`
+服务启动后，打开管理工作台：`http://localhost:5666/admin`
 
 **安装并启用插件：**
 
 1. 登录管理工作台（`admin / admin123`）
 2. 进入「扩展中心 → 插件管理」
-3. 找到`content-article`插件，点击「安装并启用」
+3. 找到`linapro-content-article`插件，点击「安装并启用」
 
 **访问文章管理页面：**
 

@@ -195,33 +195,21 @@
     "message": "内置模块可直接构建业务，也可通过插件扩展或替换，并统一接入实时生效的 RBAC 权限体系。",
     "description": "Modules section lead"
   },
-  "home.modules.preview.overview": {
-    "message": "工作台概览",
-    "description": "Screenshot slot: workspace overview"
+  "home.modules.preview.i18n": {
+    "message": "框架级国际化治理",
+    "description": "Screenshot slot: i18n governance"
   },
-  "home.modules.preview.rbac": {
-    "message": "用户与角色权限",
-    "description": "Screenshot slot: users & roles"
+  "home.modules.preview.plugin": {
+    "message": "插件管理",
+    "description": "Screenshot slot: plugin management"
   },
-  "home.modules.preview.modules": {
-    "message": "业务模块管理",
-    "description": "Screenshot slot: business modules"
+  "home.modules.preview.apidoc": {
+    "message": "内置接口文档",
+    "description": "Screenshot slot: API docs"
   },
-  "home.modules.preview.monitor": {
-    "message": "监控与审计",
-    "description": "Screenshot slot: monitoring & audit"
-  },
-  "home.quickstart.title": {
-    "message": "三条命令，立即上手",
-    "description": "QuickStart section title"
-  },
-  "home.quickstart.lead": {
-    "message": "一键安装脚本覆盖 macOS / Linux / Windows，常用任务统一收敛到 Make 入口，默认管理工作台登录即用。",
-    "description": "QuickStart section lead"
-  },
-  "home.quickstart.footnote": {
-    "message": "默认账号：",
-    "description": "QuickStart footnote"
+  "home.modules.preview.menu": {
+    "message": "菜单管理",
+    "description": "Screenshot slot: menu management"
   },
   "home.cta.title": {
     "message": "准备好交付 AI 原生的软件了吗？",

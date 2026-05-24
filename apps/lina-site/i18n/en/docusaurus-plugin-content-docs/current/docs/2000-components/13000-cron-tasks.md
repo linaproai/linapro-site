@@ -1,6 +1,6 @@
 ---
 slug: '/docs/cron-tasks'
-title: 'Scheduled Tasks'
+title: 'Cron Tasks'
 hide_title: true
 description: 'A component-level guide to the LinaPro persistent scheduled task system — task types, cron expressions, task groups, execution logs, built-in tasks, source plugin and dynamic plugin task declarations, master_only and all_node execution scopes, singleton and parallel concurrency strategies, and cluster scheduling behavior.'
 keywords:
@@ -123,7 +123,15 @@ plugin.Cron().RegisterCron(
 )
 ```
 
-Dynamic plugins declare their task capabilities through the plugin manifest and `hostServices` authorization. The core framework converts plugin tasks into unified handler references and pauses related tasks when the plugin is unavailable, disabled, or has upgrade anomalies — preventing scheduling to non-executable targets.
+Dynamic plugins declare task capabilities through `hostServices` authorization and register task contracts at runtime:
+
+```yaml
+hostServices:
+  - service: cron
+    methods: [register]
+```
+
+The core framework converts dynamic plugin tasks into unified handler references and pauses related tasks when the plugin is unavailable, disabled, or has upgrade anomalies, preventing scheduling to non-executable targets. A dynamic plugin that has not declared `cron.register` authorization cannot register built-in tasks.
 
 ## Execution Scope
 

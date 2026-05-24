@@ -1,6 +1,6 @@
 ---
 slug: '/docs/capability-boundary'
-title: '框架与插件职能边界'
+title: '框架组件职能边界'
 hide_title: true
 description: '本文介绍 LinaPro 主框架与插件职能边界的设计理念与实现细节，阐述默认管理工作台、主框架控制面 API、统一插件 API 命名空间、插件公开静态资源托管和源码插件 HTTP 路由之间的职责划分，说明 APIPrefix、route contract、public_assets、source、mount、index 等约定如何在源码插件和动态插件中落地，帮助开发者准确理解主框架与插件之间的协作方式。'
 keywords:
@@ -48,6 +48,7 @@ keywords:
 这一原则背后的出发点是明确的。主框架若承载过多的业务逻辑，会随着业务需求的变化而频繁修改，导致升级成本高、稳定性下降。反过来，将业务能力完全下推到插件，主框架就可以专注于保持稳定的基础设施——认证、授权、多租户、路由调度、定时任务、静态资源、插件生命周期——而这些基础设施一旦稳定，就能长期支撑上层插件的快速迭代。
 
 然而，主框架与插件之间并非完全隔离，协作本身需要边界与规范。若插件对主框架产生过度依赖，比如直接导入主框架的`internal`包、绕过发布的接口调用私有实现，那么插件就会随主框架内部实现的变动而频繁破坏。反过来，若主框架为迁就某个特定插件而暴露专用接口，插件与主框架之间就产生了不必要的耦合，损害了整个系统的可维护性。
+
 
 `LinaPro`通过以下方式在主框架和插件之间建立清晰的协作边界：
 
@@ -121,7 +122,7 @@ workspace:
 
 在普通单域名部署中，建议保留`/admin`，让根路径和其他公开路径继续留给门户页面、源码插件自管页面或静态资源。若使用独立管理后台域名，也可以把`workspace.basePath`配置为`/`，让整个域名只承载管理工作台。
 
-无论使用哪个入口路径，都不能占用主框架保留命名空间，例如主框架控制面`/api`、统一插件`API`命名空间`/x`、插件公开资产命名空间`/x-assets`、旧插件资产命名空间`/plugin-assets`以及其他保留路径。该配置属于启动期路由边界，修改后需要重启主框架才能生效。
+无论使用哪个入口路径，都不能占用主框架保留命名空间，例如主框架控制面`/api`、统一插件`API`命名空间`/x`、插件公开资产命名空间`/x-assets`以及其他保留路径。修改该配置后，需要让主框架公开配置、前端路由基准和部署入口保持一致。
 
 ### 工作台与插件的对接方式
 
@@ -160,14 +161,13 @@ sequenceDiagram
 工作台是主框架的标准`UI`消费者，不是业务逻辑的定义者。主框架提供`API`契约，工作台通过这些契约展示数据和提供操作入口；插件扩展了主框架的`API`，工作台同样通过统一的菜单和动态页壳机制承载插件页面，无需针对每个插件修改前端代码。
 
 开发者可以用自定义前端完全替换内置工作台，只要新的前端遵循主框架公开的`RESTful API`和权限模型，就能使用同一套后端能力。
-
-工作台页面路径、主框架控制面`API`和插件`API`是三个独立边界：
+主框架控制面`API`、统一插件`API`和默认管理工作台是三个独立边界：
 
 | 边界 | 默认路径 | 说明 |
 |------|----------|------|
-| 默认管理工作台 | `/admin` | 管理工作台`SPA`入口和刷新`fallback`边界 |
 | 主框架控制面`API` | `/api/v1/...` | 主框架内建系统治理、用户、权限、配置等控制面接口 |
-| 统一插件`API` | `/x/{plugin-id}/...` | 源码插件和动态插件共同使用的插件`API`命名空间，`/api/v1`是官方示例采用的插件内版本分组 |
+| 统一插件`API` | `/x/{plugin-id}/...` | 插件`API`命名空间，后续路径段由插件自行组织 |
+| 默认管理工作台 | `http://localhost:5666/admin` | 本地开发默认工作台地址，不是主框架`API`路由 |
 
 ## 插件能力边界
 
@@ -179,7 +179,7 @@ sequenceDiagram
 /x/{plugin-id}/...
 ```
 
-这里的`/x`表示统一插件`API`命名空间，`{plugin-id}`用于隔离不同插件，后续路径段由插件自行定义。官方插件通常在该命名空间下继续使用`/api/v1`作为版本分组，因此常见公开路径会呈现为`/x/{plugin-id}/api/v1/...`，但主框架强制的是`/x/{plugin-id}`边界，而不是固定的`/api/v1`子路径。
+这里的`/x`表示统一插件`API`命名空间，`{plugin-id}`用于隔离不同插件，后续路径段由插件自行定义。官方插件建议在该命名空间下继续使用`/api/v1`作为版本分组，因此常见公开路径会呈现为`/x/{plugin-id}/api/v1/...`，但主框架强制的是`/x/{plugin-id}`边界，而不是固定的`/api/v1`子路径。
 
 此外，**源码插件**拥有注册非保留`HTTP`路由路径的自由度。插件在`init()`阶段声明路由注册回调，主框架启动时统一触发，插件可以注册`/`、`/portal/...`、`/assets/...`或其他非保留公开路径，用于页面、门户、静态资源、自管`fallback`或其他`HTTP`响应逻辑。这种自由度为源码插件提供了极大的灵活性，但也带来了一个潜在风险：**当多个源码插件注册了相同的路由路径时，路由冲突会导致服务启动失败**。例如多个插件都注册了相同的`GET /`根路由，`HTTP Server`路由器会因路由重复而抛出错误，进程启动中止。
 
@@ -193,7 +193,7 @@ sequenceDiagram
 `x`表示`eXtension`，是一个约定的命名空间前缀，表明该路径属于插件扩展的`API`，而非主框架控制面接口。
 :::
 
-源码插件对外暴露的业务`API`应挂载在该前缀下。推荐继续按插件内部版本分组组织接口，例如：
+源码插件对外暴露的业务`API`应挂载在该前缀下。插件可以直接在该前缀下注册接口，也可以按自身需要增加内部版本分组。例如：
 
 ```text
 /x/linapro-demo-source/api/v1/demo-records
@@ -202,7 +202,7 @@ sequenceDiagram
 
 源码插件不得在`/x`下注册其他插件的路径。为了保持边界清晰，公开页面、门户入口、静态资源或健康检查等非`API`路由不建议放在`/x/{plugin-id}`下；公开页面和自管静态资源应继续使用`/`、`/portal/...`、`/assets/...`或其他非保留路径。
 
-**动态插件**运行在`WASM`沙箱中，无法直接接触`HTTP Server`的路由注册机制。动态插件通过构建期`RegisterRoutes`和`route contract`声明内部`path`、`method`、`access`和`permission`。主框架运行时只拥有`/x/{plugin-id}`前缀，后续路径来自动态插件自己的`route contract`。官方动态插件示例同样把内部路由分组声明为`/api/v1`，因此最终公开路径为：
+**动态插件**运行在`WASM`沙箱中，无法直接接触`HTTP Server`的路由注册机制。动态插件通过构建期`RegisterRoutes`和`route contract`声明内部`path`、`method`、`access`和`permission`。主框架运行时只拥有`/x/{plugin-id}`前缀，后续路径来自动态插件自己的`route contract`。典型公开路径示例为：
 
 ```text
 /x/linapro-demo-dynamic/api/v1/demo-records
@@ -212,11 +212,11 @@ sequenceDiagram
 
 源码插件请求由源码插件注册的`HTTP Server handler`处理，动态插件请求由主框架根据`route contract`桥接到对应运行时。主框架控制面`API`仍使用`/api/v1/...`；源码插件和动态插件都不应把插件业务接口挂载在主框架控制面命名空间下。
 
-| 插件类型 | 路由注册方式 | 路径约束 | 冲突风险 |
-|----------|-------------|----------|----------|
-| 源码插件`API` | `pluginhost.RouteRegistrar` | 必须使用`APIPrefix()`返回的`/x/{plugin-id}`命名空间，后续路径由插件定义 | 按插件`ID`隔离，不会与其他插件的`/x`命名空间冲突 |
-| 源码插件自定义路由 | `pluginhost.RouteRegistrar` | 可注册非保留路径，例如`/portal/...`或`/assets/...` | 与主框架、工作台或其他插件冲突时启动失败 |
-| 动态插件`API` | 主框架按`route contract`分发 | 主框架拼接`/x/{plugin-id}`与契约内部路径，官方示例使用`/api/v1/...` | 由主框架按插件`ID`、活动产物和契约隔离 |
+| 插件类型 | 路径约束 | 冲突风险 |
+|----------|----------|----------|
+| 源码插件`API` | 必须使用`APIPrefix()`返回的`/x/{plugin-id}`命名空间，后续路径由插件定义，建议使用`/api/v1`的版本路由 | 按插件`ID`隔离，不会与其他插件的`/x`命名空间冲突 |
+| 源码插件自定义路由 | 可注册非保留路径，例如`/portal/...`或`/assets/...` | 与主框架或其他插件冲突时启动失败 |
+| 动态插件`API` | 主框架拼接`/x/{plugin-id}`与契约内部路径，后续路径由插件契约定义，建议使用`/api/v1`的版本路由 | 由主框架按插件`ID`、活动产物和契约隔离 |
 
 ### 静态资源
 
@@ -246,7 +246,7 @@ public_assets:
 
 当源码插件通过`plugin.Assets().UseEmbeddedFiles(...)`注册`embedded filesystem`时，主框架只从`public_assets`声明的目录读取可公开资源。例如：
 
-| source | mount | 插件内文件 | 映射后的公开路径 |
+| source | mount | 插件内文件示例 | 映射后的公开路径示例 |
 |----------|---------|-----------|-----------------|
 | `frontend/public` | `/` | `frontend/public/logo.png` | `/x-assets/{plugin-id}/{version}/logo.png` |
 | `frontend/pages` | `pages` | `frontend/pages/standalone.html` | `/x-assets/{plugin-id}/{version}/pages/standalone.html` |
@@ -271,7 +271,7 @@ menus:
       pluginAccessMode: embedded-mount
 ```
 
-插件也可以通过动态路由的方式自行暴露静态资源访问接口，但**不推荐**这种做法。主框架统一的静态资源入口提供了以下治理能力，自行实现会产生重复逻辑：
+此外，虽然插件也可以通过动态路由的方式自行暴露静态资源访问接口，但**不推荐**这种做法。主框架统一的静态资源入口提供了以下治理能力，自行实现会产生重复逻辑：
 
 | 主框架统一治理能力 | 自行实现时的问题 |
 |-----------------|-----------------|
@@ -312,6 +312,8 @@ func registerRoutes(ctx context.Context, registrar pluginhost.HTTPRegistrar) err
     _ = svc.TenantFilter()
     _ = svc.Cache()
     _ = svc.Config()
+    _ = svc.HostConfig()
+    _ = svc.Manifest()
     _ = svc.Notify()
     // ...
     return nil
@@ -326,8 +328,10 @@ func registerRoutes(ctx context.Context, registrar pluginhost.HTTPRegistrar) err
 | `Auth()` | 租户认证适配器 |
 | `BizCtx()` | 业务上下文适配器 |
 | `Cache()` | 插件粒度缓存适配器 |
-| `Config()` | 静态配置读取适配器 |
+| `Config()` | 当前插件自己的静态配置读取适配器，只读取插件作用域配置，不回退扫描宿主完整配置树 |
+| `HostConfig()` | 宿主公开配置读取适配器，仅暴露白名单键，例如`workspace.basePath`、`i18n.default`、`i18n.enabled` |
 | `I18n()` | 运行时翻译适配器 |
+| `Manifest()` | 当前插件`manifest/`声明资源读取适配器，用于读取`metadata.yaml`等非`config`、`sql`、`i18n`专用目录资源 |
 | `Notify()` | 通知发送适配器 |
 | `PluginState()` | 插件启用状态适配器 |
 | `PluginLifecycle()` | 插件生命周期编排适配器 |
@@ -348,6 +352,19 @@ hostServices:
     methods: [get, set, delete]
   - service: runtime
     methods: [log.write, info.uuid, info.now]
+  - service: config
+    methods: [get]
+  - service: hostConfig
+    methods: [get]
+    resources:
+      keys:
+        - workspace.basePath
+        - i18n.default
+  - service: manifest
+    methods: [get]
+    resources:
+      paths:
+        - metadata.yaml
 ```
 
 当前动态插件可申请的主框架服务能力包括：
@@ -362,9 +379,11 @@ hostServices:
 | `cache` | 插件缓存读取、写入、删除、自增和过期时间调整 |
 | `lock` | 分布式锁获取、续期和释放 |
 | `notify` | 消息通知发送 |
-| `config` | 只读配置读取、存在性检查和类型化取值 |
+| `config` | 只读读取当前插件自己的配置；动态插件清单只声明`methods: [get]`，类型化读取是`SDK`便捷方法 |
+| `hostConfig` | 只读读取宿主公开配置白名单键；必须通过`resources.keys`声明可读键 |
+| `manifest` | 只读读取插件`manifest/`声明资源；必须通过`resources.paths`声明可读路径 |
 
-其中，`storage`通过`paths`限定可访问路径，`data`通过`tables`限定可访问数据表，`network`通过资源声明限定可访问的`URL`模式；其他服务继续按`methods`控制可调用方法。
+其中，`storage`通过`paths`限定可访问路径，`data`通过`tables`限定可访问数据表，`network`通过资源声明限定可访问的`URL`模式，`hostConfig`通过`keys`限定宿主公开配置键，`manifest`通过`paths`限定插件声明资源路径；其他服务继续按`methods`控制可调用方法。
 
 主框架的基础能力会随版本迭代持续扩充，插件可以根据实际需要选择性地使用这些能力，无需感知主框架内部服务的具体实现。
 
@@ -379,56 +398,55 @@ hostServices:
 | **接口语义** | 内容查看、业务操作 | 数据管理、配置变更 |
 | **菜单挂载** | 不一定挂载到工作台 | 通常通过工作台菜单访问 |
 
-主框架不感知插件内部的路由分组逻辑，不负责插件路由的管控面与数据面区分。插件完全自行管理路由的内部分组，通过路由子组在插件内部区分维护。需要注意的是，`/x/{plugin-id}`只承载插件`API`命名空间；如果插件采用`/api/v1`版本分组，门户`API`和管理`API`可以继续放在`/x/{plugin-id}/api/v1/...`下。源码插件的公开页面、门户入口、静态资源或自管`fallback`不属于插件`API`，应继续使用`/portal/*`、`/assets/*`等非保留路径。以下是源码插件同时注册公开门户入口、门户`API`和管理`API`的示例：
+主框架不感知插件内部的路由分组逻辑，不负责插件路由的管控面与数据面区分。插件完全自行管理路由的内部分组，通过路由子组在插件内部区分维护。需要注意的是，`/x/{plugin-id}`只承载插件`API`命名空间；门户`API`和管理`API`可以直接放在`/x/{plugin-id}/portal/...`与`/x/{plugin-id}/admin/...`等插件自定义子路径下。如果插件自行增加版本分组，它也只是插件后续路径的一部分，不是主框架强制前缀。源码插件的公开页面、门户入口、静态资源或自管`fallback`不属于插件`API`，应继续使用`/portal/*`、`/assets/*`等非保留路径。以下是源码插件同时注册公开门户入口、门户`API`和管理`API`的示例：
 
 ```go
 func registerRoutes(ctx context.Context, registrar pluginhost.HTTPRegistrar) error {
     var (
         routes      = registrar.Routes()
         middlewares = routes.Middlewares()
-        apiPrefix   = registrar.APIPrefix()
+        apiPrefix   = routes.APIPrefix()
     )
     // 插件 API：源码插件和动态插件都必须进入 /x/{plugin-id} 命名空间。
     // 这里把 /api/v1 作为插件内部 API 版本分组。
     routes.Group(apiPrefix, func(group pluginhost.RouteGroup) {
         group.Group("/api/v1", func(group pluginhost.RouteGroup) {
-            group.Middleware(
-                middlewares.NeverDoneCtx(),
-                middlewares.HandlerResponse(),
-                middlewares.CORS(),
-                middlewares.RequestBodyLimit(),
-                middlewares.Ctx(),
+        group.Middleware(
+            middlewares.NeverDoneCtx(),
+            middlewares.HandlerResponse(),
+            middlewares.CORS(),
+            middlewares.RequestBodyLimit(),
+            middlewares.Ctx(),
+        )
+
+        // 门户 API（数据面）：面向前台用户，部分接口可匿名访问。
+        // 完整路径示例：/x/my-plugin/api/v1/portal/articles。
+        group.Group("/portal", func(group pluginhost.RouteGroup) {
+            // 公开接口：无需登录
+            group.Bind(
+                portalArticleCtrl,
             )
-
-            // 门户 API（数据面）：面向前台用户，部分接口可匿名访问。
-            // 完整路径示例：/x/my-plugin/api/v1/portal/articles。
-            group.Group("/portal", func(group pluginhost.RouteGroup) {
-                // 公开接口：无需登录
-                group.Bind(
-                    portalArticleCtrl,
-                )
-                // 登录接口：需要认证但不限管理权限
-                group.Group("/", func(group pluginhost.RouteGroup) {
-                    group.Middleware(
-                        middlewares.Auth(),
-                    )
-                    group.POST("/comments", commentCtrl.Create)
-                })
-            })
-
-            // 管理 API（管控面）：面向管理后台，需要完整的认证和权限校验。
-            // 完整路径示例：/x/my-plugin/api/v1/admin/articles。
-            group.Group("/admin", func(group pluginhost.RouteGroup) {
+            // 登录接口：需要认证但不限管理权限
+            group.Group("/", func(group pluginhost.RouteGroup) {
                 group.Middleware(
                     middlewares.Auth(),
-                    middlewares.Tenancy(),
-                    middlewares.Permission(),
                 )
-                group.Bind(
-                    adminArticleCtrl,
-                    adminCommentCtrl,
-                )
+                group.POST("/comments", commentCtrl.Create)
             })
+        })
+
+        // 管理 API（管控面）：面向管理后台，需要完整的认证和权限校验。
+        // 完整路径示例：/x/my-plugin/api/v1/admin/articles。
+        group.Group("/admin", func(group pluginhost.RouteGroup) {
+            group.Middleware(
+                middlewares.Auth(),
+                middlewares.Tenancy(),
+                middlewares.Permission(),
+            )
+            group.Bind(
+                adminArticleCtrl,
+                adminCommentCtrl,
+            )
         })
     })
 
@@ -463,10 +481,10 @@ type ArticleAdminListReq struct {
 
 ## 边界设计的延伸意义
 
-主框架与插件的能力边界设计不仅关乎当前的功能划分，也影响整个生态的长期演进方式。
+主框架与各个组件的职能边界设计不仅关乎当前的功能划分，也影响整个生态的长期演进方式。
 
-**对主框架而言**，稳定的扩展接口意味着内部实现可以安全地演进——主框架可以重构`HostServices`的具体实现、优化插件治理流程、扩展新的基础能力，只要`pluginhost`和`pluginbridge`的公开契约保持稳定，所有已有插件就不会受到影响。
+- **对主框架而言**，稳定的扩展接口意味着内部实现可以安全地演进——主框架可以重构`HostServices`的具体实现、优化插件治理流程、扩展新的基础能力，只要`pluginhost`和`pluginbridge`的公开契约保持稳定，所有已有插件就不会受到影响。
 
-**对插件开发者而言**，明确的边界意味着可以放心地使用主框架提供的基础能力，无需了解其内部实现，也不必担心未来版本的主框架升级会破坏插件逻辑——只要插件严格通过稳定契约与主框架协作，版本兼容性就由主框架的接口稳定性来保障。
+- **对插件开发者而言**，明确的边界意味着可以放心地使用主框架提供的基础能力，无需了解其内部实现，也不必担心未来版本的主框架升级会破坏插件逻辑——只要插件严格通过稳定契约与主框架协作，版本兼容性就由主框架的接口稳定性来保障。
 
-**对系统整体而言**，这种分层架构让不同团队可以独立维护主框架和各自的插件，减少了协作摩擦，也为将来引入更多插件类型或扩展治理能力保留了充足的空间。
+- **对系统整体而言**，这种分层架构让不同团队可以独立维护主框架和各自的插件，减少了协作摩擦，也为将来引入更多插件类型或扩展治理能力保留了充足的空间。

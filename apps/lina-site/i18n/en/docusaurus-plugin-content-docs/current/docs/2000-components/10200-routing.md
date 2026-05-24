@@ -1,8 +1,8 @@
 ---
 slug: '/docs/routing'
-title: 'Routing Management'
+title: 'Routing'
 hide_title: true
-description: 'This article covers the routing management strategy of the LinaPro core framework service, including API versioning (/api/v1 prefix conventions), the built-in middleware pipeline (unified response, CORS, request body limits, business context injection, JWT authentication, tenant resolution, permission enforcement), layered auth-route design, inline API attribute management via g.Meta struct tags, and the contrasting routing strategies between source plugins (free to register any path) and dynamic plugins (constrained to /x/{pluginID}/ prefix), helping developers understand the framework routing architecture and follow best practices.'
+description: 'This article covers the routing management strategy of the LinaPro core framework service, including the /api/v1 prefix for core framework control-plane APIs, the unified /x/{plugin-id}/... plugin API namespace, the built-in middleware pipeline, layered protected-route design, inline API attribute management via g.Meta struct tags, and the different integration approaches for source-plugin custom non-reserved routes and dynamic-plugin route contracts.'
 keywords:
   - routing management
   - API versioning
@@ -45,8 +45,10 @@ server.Group("/api/v1", func(group *ghttp.RouterGroup) {
 | Path Prefix | Purpose |
 |-------------|---------|
 | `/api/v1` | Current stable core framework API version — authentication, users, roles, plugin management, and other control-plane endpoints |
-| `/x` | Dedicated data-plane prefix for dynamic plugins, dispatched by the core framework runtime to the matching plugin |
-| `/` | Root-level routes — static frontend assets, health probes, etc. |
+| `/x/{plugin-id}/...` | Shared plugin `API` namespace for source plugins and dynamic plugins; `APIPrefix()` returns `/x/{plugin-id}`, and the remaining path is organized by the plugin |
+| `/x-assets/{plugin-id}/{version}` | Public plugin static asset hosting entry |
+| `/admin` | Default admin workspace frontend route base; locally accessed through `http://localhost:5666/admin`, not a core framework control-plane `API` |
+| `/` | No longer falls back to the admin workspace by default; usually reserved for portals, custom pages, or source-plugin-managed routes |
 
 The guiding principle for version management is: **a router group is a version boundary**. Different API versions coexist in the same process, each with its own middleware configuration and handler set — no `Content-Type` negotiation or special request headers are used for versioning.
 
@@ -56,14 +58,14 @@ The core framework divides middleware into two categories: **request-chain middl
 
 ### Common Base Middleware
 
-The following middleware applies to both the `/api/v1` group and the dynamic plugin group `/x`, forming the base processing pipeline for every request:
+The following middleware applies to both the `/api/v1` group and the plugin `API` group `/x`, forming the base processing pipeline for every request:
 
 | Middleware | Responsibility |
 |------------|---------------|
 | `ghttp.MiddlewareNeverDoneCtx` | Replaces the request `Context` with a non-cancellable copy, preventing client disconnection from prematurely terminating business logic |
 | `middlewareSvc.Response` | Serializes a unified JSON response envelope, localizes business error messages, and transparently passes through `304`, `204`, and streaming responses |
 | `middlewareSvc.CORS` | Calls `CORSDefault`, allowing cross-origin requests and handling `OPTIONS` preflight |
-| `middlewareSvc.RequestBodyLimit` | Caps non-multipart bodies at 8 MB; for multipart uploads, the limit is computed dynamically from the `sys.upload.maxSize` configuration |
+| `middlewareSvc.RequestBodyLimit` | Caps non-multipart bodies at 100 MB; for multipart uploads, the limit is computed dynamically from the `sys.upload.maxSize` configuration |
 | `middlewareSvc.Ctx` | Injects the business context (user identity placeholder, tenant placeholder, request locale), and sets the `Content-Language` response header |
 
 ### Authentication and Permission Middleware
@@ -99,7 +101,7 @@ flowchart TD
 The core framework publishes the above middleware to source plugins through the `RouteMiddlewares` interface. Plugins compose the middleware they need without directly depending on internal core framework packages:
 
 ```go
-routes.Group("/api/v1", func(group pluginhost.RouteGroup) {
+routes.Group(routes.APIPrefix(), func(group pluginhost.RouteGroup) {
     group.Middleware(
         middlewares.NeverDoneCtx(),
         middlewares.HandlerResponse(),
@@ -173,11 +175,13 @@ For a detailed treatment of authentication (JWT issuance, session management, RB
 
 ```go
 type CreateRecordReq struct {
-    g.Meta  `path:"/plugins/linapro-demo-source/records" method:"post" mime:"multipart/form-data" tags:"Source Plugin Demo" summary:"Create source plugin sample record" dc:"Create a sample record with an optional attachment." permission:"linapro-demo-source:example:create"`
+    g.Meta  `path:"/records" method:"post" mime:"multipart/form-data" tags:"Source Plugin Demo" summary:"Create source plugin sample record" dc:"Create a sample record with an optional attachment." permission:"linapro-demo-source:example:create"`
     Title   string `json:"title" v:"required|length:1,128" dc:"Record title"`
     Content string `json:"content" dc:"Record content"`
 }
 ```
+
+In a source plugin `DTO`, `path` is relative to the plugin route group where the controller is bound. The final public path is the combination of the source plugin's `routes.APIPrefix()` and the `DTO path`, for example `/x/linapro-demo-source/records`.
 
 ### Dynamic Plugin Endpoint Tag Example
 
@@ -209,7 +213,7 @@ This approach consolidates endpoint definition, documentation metadata, and perm
 
 ## Source Plugin Routing
 
-Source plugins are compiled and delivered with the core framework binary. They register routes via the `Routes()` method of `pluginhost.HTTPRegistrar` and have **full freedom to register any route path**.
+Source plugins are compiled and delivered with the core framework binary and register routes through `Routes()` from `pluginhost.HTTPRegistrar`. Source plugin `API`s must enter their own `/x/{plugin-id}` namespace. Source plugins can also register non-reserved public routes for portal pages, public assets, custom `fallback`s, and other `HTTP` response logic.
 
 ### Registration
 
@@ -230,7 +234,7 @@ func registerRoutes(ctx context.Context, registrar pluginhost.HTTPRegistrar) err
     routes      := registrar.Routes()
     middlewares := routes.Middlewares()
 
-    routes.Group("/api/v1", func(group pluginhost.RouteGroup) {
+    routes.Group(routes.APIPrefix(), func(group pluginhost.RouteGroup) {
         // Base middleware
         group.Middleware(
             middlewares.NeverDoneCtx(),
@@ -257,12 +261,27 @@ func registerRoutes(ctx context.Context, registrar pluginhost.HTTPRegistrar) err
 }
 ```
 
-### Freedom and Conflict Risk
+### Plugin API Namespace and Custom Routes
 
-Source plugins are not subject to any enforced route-path restriction. They can register routes under `/`, `/portal`, `/api/v1`, `/api/v2`, or any custom prefix. This freedom comes with the following expectations:
+`RouteRegistrar.APIPrefix()` returns the mandatory `API` namespace for the current plugin:
 
-- **Avoid conflicting with core framework routes**: The core framework already occupies all control-plane paths under `/api/v1`. Source plugins should use an unambiguous namespace such as `/api/v1/plugins/{plugin-id}/`
-- **Avoid conflicts between plugins**: When multiple source plugins are installed, path collisions cause route registration to fail and stop program startup — developers must ensure path uniqueness
+```text
+/x/{plugin-id}
+```
+
+Source plugin business APIs must live under this namespace. The remaining path is plugin-defined, for example:
+
+```text
+/x/linapro-demo-source/records
+/x/linapro-demo-source/records/{id}
+```
+
+Source plugins must not register another plugin's path under `/x`. The core framework rejects source plugin route registrations that cross the plugin's own `/x/{plugin-id}` boundary.
+
+Source plugins can register non-reserved paths such as `/`, `/portal/...`, and `/assets/...`. This freedom comes with the following expectations:
+
+- **Avoid conflicting with core framework routes**: The core framework occupies `/api`, `/x`, and `/x-assets`; source plugin public pages should use clear non-reserved namespaces, and `/admin` is normally reserved for the default workspace frontend route
+- **Avoid conflicts between plugins**: When multiple source plugins are installed, collisions on non-reserved paths cause route registration to fail and stop program startup — developers must ensure path uniqueness
 - **Protected routes must follow the correct middleware order**: Any sub-group that uses `Auth` must compose middleware as `Auth → Tenancy → Permission`; the core framework enforces this constraint through automated tests
 
 ### Route Capture
@@ -275,7 +294,7 @@ Dynamic plugins (WASM plugins) have their routes fully managed by the core frame
 
 ### Namespace Constraint
 
-All dynamic plugin routes are forced under the `/x/{pluginID}/` prefix:
+All dynamic plugin `API` routes are forced under the `/x/{plugin-id}/` prefix. The remaining path comes from the dynamic plugin's own `route contract`, for example:
 
 ```text
 /x/linapro-demo-dynamic/backend-summary
@@ -283,7 +302,7 @@ All dynamic plugin routes are forced under the `/x/{pluginID}/` prefix:
 /x/linapro-demo-dynamic/demo-records/{id}
 ```
 
-This constraint is enforced by a wildcard catch-all handler (`/*dynamicPath`) bound to the `/x` router group. A plugin cannot bind to `/api/v1` or any path outside `/x`, ensuring dynamic plugins can never disrupt the core framework routing structure.
+This constraint is enforced by a wildcard catch-all handler bound to the `/x` router group. A plugin cannot bind to the core framework `/api/v1` control plane or any `API` path outside `/x`, ensuring dynamic plugins cannot disrupt the core framework routing structure.
 
 ### Route Declaration
 
@@ -303,13 +322,13 @@ type RouteContract struct {
 }
 ```
 
-The `Path` field is the plugin-internal path. The core framework prepends `/x/{pluginID}` when exposing it externally.
+The `Path` field is the plugin-internal path. The core framework prepends `/x/{plugin-id}` when exposing it externally. If the internal path is `/demo-records`, the final public path is `/x/{plugin-id}/demo-records`.
 
 ### Dynamic Route Request Flow
 
 ```mermaid
 flowchart TD
-    A["Request /x/{pluginID}/..."] --> B["Base middleware<br/>Response / CORS / RequestBodyLimit / Ctx"]
+    A["Request /x/{plugin-id}/..."] --> B["Base middleware<br/>Response / CORS / RequestBodyLimit / Ctx"]
     B --> C["PrepareDynamicRouteMiddleware<br/>Route matching + runtime state caching"]
     C -- Route not found --> D["Return 404"]
     C -- Route matched --> E["AuthenticateDynamicRouteMiddleware<br/>JWT validation + permission check"]
@@ -333,7 +352,7 @@ Dynamic plugin route access is declared through the `access` and `permission` fi
 | Dimension | Source Plugin | Dynamic Plugin |
 |-----------|--------------|---------------|
 | **Registration method** | Callback registered via `HTTPRegistrar` at startup | Route contracts parsed from WASM artifact at load time |
-| **Path restriction** | None — any path can be registered | Forced under `/x/{pluginID}/` |
+| **Path restriction** | Plugin `API`s must use `/x/{plugin-id}`; non-reserved public paths can also be registered | Forced under `/x/{plugin-id}/` |
 | **Middleware composition** | Plugin selects and combines from `RouteMiddlewares` | Managed entirely by the core framework; plugin influences auth behavior via `access` field |
 | **Permission declaration** | Inline in DTO's `g.Meta` tag | `permission` field in `RouteContract` |
 | **OpenAPI document** | Automatically aggregated into core framework docs | Core framework reads and aggregates from route contracts |

@@ -1,6 +1,6 @@
 ---
 slug: '/community/support'
-title: 'Support Us'
+title: 'Support'
 hide_title: true
 description: 'Practical ways to support the long-term maintenance of LinaPro, including filing reproducible issues, improving documentation, sharing production experience, joining community discussions, and donating through WeChat Pay or Alipay. Please include your GitHub or Gitee account name in the donation note so we can keep an accurate donation record.'
 keywords:

@@ -1,6 +1,6 @@
 ---
 slug: '/docs/capability-boundary'
-title: 'Framework and Plugin Capability Boundaries'
+title: 'Capability Boundary'
 hide_title: true
 description: 'This page explains how LinaPro defines capability boundaries between the core framework and plugins. It covers the default admin workspace, core framework control-plane APIs, the unified plugin API namespace, public plugin asset hosting, source-plugin HTTP routes, and the division of responsibility between source plugins and dynamic plugins. It also explains how APIPrefix, route contracts, public_assets, source, mount, and index are implemented across source plugins and dynamic plugins, so developers can understand exactly how the core framework and plugins collaborate without leaking responsibilities into each other.'
 keywords:
@@ -121,7 +121,7 @@ workspace:
 
 For a normal single-domain deployment, keeping `/admin` is recommended so the root path and other public paths remain available for portal pages, source-plugin-owned pages, or static assets. When the admin workspace uses a dedicated domain, `workspace.basePath` may also be set to `/`, allowing the whole domain to serve only the admin workspace.
 
-Whichever entry path you use, it must not occupy a core framework-reserved namespace such as the core framework control plane `/api`, the unified plugin `API` namespace `/x`, the public plugin asset namespace `/x-assets`, the legacy plugin asset namespace `/plugin-assets`, or any other reserved path. This configuration is a startup-scoped routing boundary, so core framework restart is required after changing it.
+Whichever entry path you use, it must not occupy a core framework-reserved namespace such as the core framework control plane `/api`, the unified plugin `API` namespace `/x`, the public plugin asset namespace `/x-assets`, or any other reserved path. After changing this configuration, keep the core framework public configuration, frontend route base, and deployment entry aligned.
 
 ### How the Workspace Connects to Plugins
 
@@ -161,13 +161,13 @@ The workspace is the standard `UI` consumer of the core framework. It does not d
 
 Developers can replace the built-in workspace with a custom frontend. As long as the new frontend follows the core framework's public `RESTful API` and permission model, it can use the same backend capabilities.
 
-Workspace page paths, core framework control-plane APIs, and plugin APIs are three separate boundaries:
+Core framework control-plane APIs, unified plugin APIs, and the default admin workspace are three separate boundaries:
 
 | Boundary | Default Path | Description |
 |----------|--------------|-------------|
-| Default admin workspace | `/admin` | Admin workspace `SPA` entry and refresh `fallback` boundary |
 | Core framework control-plane `API` | `/api/v1/...` | Built-in core framework governance APIs for users, permissions, configuration, and related system capabilities |
-| Unified plugin `API` | `/x/{plugin-id}/...` | Shared plugin `API` namespace for source plugins and dynamic plugins; `/api/v1` is the internal version group used by the official examples |
+| Unified plugin `API` | `/x/{plugin-id}/...` | Plugin `API` namespace; remaining path segments are organized by each plugin |
+| Default admin workspace | `http://localhost:5666/admin` | Default local development workspace address; not a core framework `API` route |
 
 ## Plugin Capability Boundaries
 
@@ -179,7 +179,7 @@ The two plugin types differ clearly in route registration capability, but their 
 /x/{plugin-id}/...
 ```
 
-Here, `/x` is the unified plugin `API` namespace, `{plugin-id}` isolates each plugin, and the remaining path segments are owned by the plugin. Official plugins usually continue with `/api/v1` as an internal version group, so their public paths commonly look like `/x/{plugin-id}/api/v1/...`. The boundary enforced by the core framework, however, is `/x/{plugin-id}`, not a fixed `/api/v1` child path.
+Here, `/x` is the unified plugin `API` namespace, `{plugin-id}` isolates each plugin, and the remaining path segments are owned by the plugin. Official plugins are recommended to continue using `/api/v1` as an internal version group, so common public paths look like `/x/{plugin-id}/api/v1/...`. The boundary enforced by the core framework, however, is `/x/{plugin-id}`, not a fixed `/api/v1` child path.
 
 **Source plugins** can register non-reserved `HTTP` route paths freely. A plugin declares a route registration callback during `init()`, and the core framework triggers it during startup. A plugin can register `/`, `/portal/...`, `/assets/...`, or other non-reserved public paths for pages, portals, static assets, custom `fallback` behavior, or other `HTTP` responses. This flexibility is useful, but it also creates a risk: **if multiple source plugins register the same route path, route conflicts cause service startup to fail**. For example, if more than one plugin registers the same `GET /` root route, the `HTTP Server` router reports a duplicate route and the process exits.
 
@@ -193,7 +193,7 @@ Plugin APIs for source plugins must not use arbitrary public paths. They must us
 `x` stands for `eXtension`. It is the conventional namespace prefix that marks the path as a plugin extension `API`, not a core framework control-plane endpoint.
 :::
 
-Source plugin business APIs should be mounted under that prefix. The recommended pattern is to add an internal API version group, for example:
+Source plugin business APIs should be mounted under that prefix. A plugin may register endpoints directly under the prefix, or add its own internal version group as needed. For example:
 
 ```text
 /x/linapro-demo-source/api/v1/demo-records
@@ -202,7 +202,7 @@ Source plugin business APIs should be mounted under that prefix. The recommended
 
 Source plugins must not register another plugin's path under `/x`. To keep boundaries clear, public pages, portal entries, static assets, health checks, and other non-API routes should not live under `/x/{plugin-id}`. Public pages and plugin-managed static assets should continue to use `/`, `/portal/...`, `/assets/...`, or another non-reserved path.
 
-**Dynamic plugins** run inside a `WASM` sandbox and cannot directly access the `HTTP Server` route registration mechanism. Dynamic plugins declare their internal `path`, `method`, `access`, and `permission` through build-time `RegisterRoutes` metadata and the generated `route contract`. At runtime, the core framework owns only the `/x/{plugin-id}` prefix; the remaining path comes from the dynamic plugin's route contract. The official dynamic plugin example also declares `/api/v1` as its internal route group, producing public paths such as:
+**Dynamic plugins** run inside a `WASM` sandbox and cannot directly access the `HTTP Server` route registration mechanism. Dynamic plugins declare their internal `path`, `method`, `access`, and `permission` through build-time `RegisterRoutes` metadata and the generated `route contract`. At runtime, the core framework owns only the `/x/{plugin-id}` prefix; the remaining path comes from the dynamic plugin's route contract. Typical public paths look like:
 
 ```text
 /x/linapro-demo-dynamic/api/v1/demo-records
@@ -212,11 +212,11 @@ Source plugins must not register another plugin's path under `/x`. To keep bound
 
 Source plugin requests are handled by the `HTTP Server` handlers registered by source plugins. Dynamic plugin requests are bridged by the core framework to the matching runtime based on the `route contract`. Core framework control-plane APIs still use `/api/v1/...`; neither source plugins nor dynamic plugins should mount plugin business APIs under the core framework control-plane namespace.
 
-| Plugin Type | Route Registration | Path Constraint | Conflict Risk |
-|-------------|--------------------|-----------------|---------------|
-| Source plugin `API` | `pluginhost.RouteRegistrar` | Must use the `/x/{plugin-id}` namespace returned by `APIPrefix()`; remaining segments are plugin-defined | Isolated by plugin `ID`, so it does not conflict with another plugin's `/x` namespace |
-| Source plugin custom routes | `pluginhost.RouteRegistrar` | Can register non-reserved paths such as `/portal/...` or `/assets/...` | Startup fails if they conflict with core framework, workspace, or other plugin routes |
-| Dynamic plugin `API` | Core framework dispatches by `route contract` | Core framework combines `/x/{plugin-id}` with the contract's internal path; official examples use `/api/v1/...` | Avoided by core framework isolation through plugin `ID`, active artifact, and route contract |
+| Plugin Type | Path Constraint | Conflict Risk |
+|-------------|-----------------|---------------|
+| Source plugin `API` | Must use the `/x/{plugin-id}` namespace returned by `APIPrefix()`; remaining segments are plugin-defined, with `/api/v1` recommended for internal versioning | Isolated by plugin `ID`, so it does not conflict with another plugin's `/x` namespace |
+| Source plugin custom routes | Can register non-reserved paths such as `/portal/...` or `/assets/...` | Startup fails if they conflict with the core framework or another plugin |
+| Dynamic plugin `API` | Core framework combines `/x/{plugin-id}` with the contract's internal path; remaining segments are defined by the plugin contract, with `/api/v1` recommended for internal versioning | Avoided by core framework isolation through plugin `ID`, active artifact, and route contract |
 
 ### Static Assets
 
@@ -247,8 +247,8 @@ public_assets:
 
 When a source plugin registers an `embedded filesystem` through `plugin.Assets().UseEmbeddedFiles(...)`, the core framework exposes files only from directories declared in `public_assets`. For example:
 
-| source | mount | File inside the plugin | Public URL |
-|--------|-------|------------------------|------------|
+| source | mount | Example file inside the plugin | Example public URL |
+|--------|-------|--------------------------------|--------------------|
 | `frontend/public` | `/` | `frontend/public/logo.png` | `/x-assets/{plugin-id}/{version}/logo.png` |
 | `frontend/pages` | `pages` | `frontend/pages/standalone.html` | `/x-assets/{plugin-id}/{version}/pages/standalone.html` |
 
@@ -313,6 +313,8 @@ func registerRoutes(ctx context.Context, registrar pluginhost.HTTPRegistrar) err
     _ = svc.TenantFilter()
     _ = svc.Cache()
     _ = svc.Config()
+    _ = svc.HostConfig()
+    _ = svc.Manifest()
     _ = svc.Notify()
     // ...
     return nil
@@ -327,8 +329,10 @@ Current `HostServices` covers the following service domains:
 | `Auth()` | Tenant authentication adapter |
 | `BizCtx()` | Business context adapter |
 | `Cache()` | Plugin-scoped cache adapter |
-| `Config()` | Static configuration reader adapter |
+| `Config()` | Reads the current plugin's own static configuration; it is scoped to the plugin and does not fall back to scanning the full host configuration tree |
+| `HostConfig()` | Reads allowlisted public host configuration keys such as `workspace.basePath`, `i18n.default`, and `i18n.enabled` |
 | `I18n()` | Runtime translation adapter |
+| `Manifest()` | Reads declaration resources under the current plugin's `manifest/`, such as `metadata.yaml`, excluding dedicated `config`, `sql`, and `i18n` resource directories |
 | `Notify()` | Notification sender adapter |
 | `PluginState()` | Plugin enablement state adapter |
 | `PluginLifecycle()` | Plugin lifecycle orchestration adapter |
@@ -349,6 +353,19 @@ hostServices:
     methods: [get, set, delete]
   - service: runtime
     methods: [log.write, info.uuid, info.now]
+  - service: config
+    methods: [get]
+  - service: hostConfig
+    methods: [get]
+    resources:
+      keys:
+        - workspace.basePath
+        - i18n.default
+  - service: manifest
+    methods: [get]
+    resources:
+      paths:
+        - metadata.yaml
 ```
 
 Current core framework service capabilities available to dynamic plugins include:
@@ -363,9 +380,11 @@ Current core framework service capabilities available to dynamic plugins include
 | `cache` | Plugin cache read, write, delete, increment, and expiry adjustment |
 | `lock` | Distributed lock acquire, renew, and release |
 | `notify` | Message notification sending |
-| `config` | Read-only configuration reads, existence checks, and typed values |
+| `config` | Read-only access to the current plugin's own configuration; dynamic plugin manifests declare only `methods: [get]`, while typed reads are `SDK` convenience methods |
+| `hostConfig` | Read-only access to allowlisted public host configuration keys; readable keys must be declared through `resources.keys` |
+| `manifest` | Read-only access to plugin `manifest/` declaration resources; readable paths must be declared through `resources.paths` |
 
-For `storage`, accessible paths are constrained by `paths`; for `data`, accessible tables are constrained by `tables`; for `network`, accessible targets are constrained by declared `URL` resource patterns. Other services continue to be controlled by `methods`.
+For `storage`, accessible paths are constrained by `paths`; for `data`, accessible tables are constrained by `tables`; for `network`, accessible targets are constrained by declared `URL` resource patterns; for `hostConfig`, host keys are constrained by `keys`; and for `manifest`, declaration resources are constrained by `paths`. Other services continue to be controlled by `methods`.
 
 The core framework's foundational capabilities will continue to expand across versions. Plugins can use only the capabilities they actually need without depending on core framework internal service implementations.
 
@@ -380,56 +399,54 @@ When implementing business capabilities, plugins often need two kinds of interfa
 | **Interface semantics** | Content viewing and business operations | Data management and configuration changes |
 | **Menu mounting** | Not necessarily mounted in the workspace | Usually accessed through workspace menus |
 
-The core framework does not interpret a plugin's internal route grouping and does not distinguish the plugin's control plane from its data plane. Plugins own this internal grouping entirely. Note that `/x/{plugin-id}` carries the plugin `API` namespace only. If a plugin uses `/api/v1` as its internal version group, portal APIs and admin APIs can live under `/x/{plugin-id}/api/v1/...`. Public pages, portal entries, static assets, or custom `fallback` routes for source plugins are not plugin APIs and should continue to use non-reserved paths such as `/portal/*` or `/assets/*`. The following example shows a source plugin registering a public portal entry, portal APIs, and admin APIs together:
+The core framework does not interpret a plugin's internal route grouping and does not distinguish the plugin's control plane from its data plane. Plugins own this internal grouping entirely. Note that `/x/{plugin-id}` carries the plugin `API` namespace only. Portal APIs and admin APIs can live directly under plugin-defined subpaths such as `/x/{plugin-id}/portal/...` and `/x/{plugin-id}/admin/...`. If the plugin adds a version group, it is only another plugin-owned path segment, not a core framework-mandated prefix. Public pages, portal entries, static assets, or custom `fallback` routes for source plugins are not plugin APIs and should continue to use non-reserved paths such as `/portal/*` or `/assets/*`. The following example shows a source plugin registering a public portal entry, portal APIs, and admin APIs together:
 
 ```go
 func registerRoutes(ctx context.Context, registrar pluginhost.HTTPRegistrar) error {
     var (
         routes      = registrar.Routes()
         middlewares = routes.Middlewares()
-        apiPrefix   = registrar.APIPrefix()
+        apiPrefix   = routes.APIPrefix()
     )
     // Plugin APIs: both source plugins and dynamic plugins must enter the
     // /x/{plugin-id} namespace. Here, /api/v1 is the plugin's internal API version group.
     routes.Group(apiPrefix, func(group pluginhost.RouteGroup) {
-        group.Group("/api/v1", func(group pluginhost.RouteGroup) {
-            group.Middleware(
-                middlewares.NeverDoneCtx(),
-                middlewares.HandlerResponse(),
-                middlewares.CORS(),
-                middlewares.RequestBodyLimit(),
-                middlewares.Ctx(),
+        group.Middleware(
+            middlewares.NeverDoneCtx(),
+            middlewares.HandlerResponse(),
+            middlewares.CORS(),
+            middlewares.RequestBodyLimit(),
+            middlewares.Ctx(),
+        )
+
+        // Portal API (data plane): for frontend users; some endpoints can be anonymous.
+        // Full path example: /x/my-plugin/api/v1/portal/articles.
+        group.Group("/portal", func(group pluginhost.RouteGroup) {
+            // Public endpoint: no login required.
+            group.Bind(
+                portalArticleCtrl,
             )
-
-            // Portal API (data plane): for frontend users; some endpoints can be anonymous.
-            // Full path example: /x/my-plugin/api/v1/portal/articles.
-            group.Group("/portal", func(group pluginhost.RouteGroup) {
-                // Public endpoint: no login required.
-                group.Bind(
-                    portalArticleCtrl,
-                )
-                // Login endpoint: requires authentication but not admin permission.
-                group.Group("/", func(group pluginhost.RouteGroup) {
-                    group.Middleware(
-                        middlewares.Auth(),
-                    )
-                    group.POST("/comments", commentCtrl.Create)
-                })
-            })
-
-            // Admin API (control plane): for the admin workspace; requires full auth and permission checks.
-            // Full path example: /x/my-plugin/api/v1/admin/articles.
-            group.Group("/admin", func(group pluginhost.RouteGroup) {
+            // Login endpoint: requires authentication but not admin permission.
+            group.Group("/", func(group pluginhost.RouteGroup) {
                 group.Middleware(
                     middlewares.Auth(),
-                    middlewares.Tenancy(),
-                    middlewares.Permission(),
                 )
-                group.Bind(
-                    adminArticleCtrl,
-                    adminCommentCtrl,
-                )
+                group.POST("/comments", commentCtrl.Create)
             })
+        })
+
+        // Admin API (control plane): for the admin workspace; requires full auth and permission checks.
+        // Full path example: /x/my-plugin/api/v1/admin/articles.
+        group.Group("/admin", func(group pluginhost.RouteGroup) {
+            group.Middleware(
+                middlewares.Auth(),
+                middlewares.Tenancy(),
+                middlewares.Permission(),
+            )
+            group.Bind(
+                adminArticleCtrl,
+                adminCommentCtrl,
+            )
         })
     })
 
@@ -464,10 +481,10 @@ type ArticleAdminListReq struct {
 
 ## Why These Boundaries Matter
 
-The capability boundary design between the core framework and plugins is not only about today's feature division. It also shapes how the whole ecosystem evolves over time.
+The responsibility boundary design between the core framework and each component is not only about today's feature division. It also shapes how the whole ecosystem evolves over time.
 
-**For the core framework**, stable extension interfaces mean internal implementation can evolve safely. The core framework can refactor concrete `HostServices` implementations, optimize plugin governance flows, and add new foundational capabilities. As long as the public `pluginhost` and `pluginbridge` contracts remain stable, existing plugins are not affected.
+- **For the core framework**, stable extension interfaces mean internal implementation can evolve safely. The core framework can refactor concrete `HostServices` implementations, optimize plugin governance flows, and add new foundational capabilities. As long as the public `pluginhost` and `pluginbridge` contracts remain stable, existing plugins are not affected.
 
-**For plugin developers**, clear boundaries mean core framework capabilities can be used with confidence. Developers do not need to understand core framework internals or worry that future core framework upgrades will break plugin logic. If a plugin collaborates with the core framework strictly through stable contracts, version compatibility is protected by the core framework's interface stability.
+- **For plugin developers**, clear boundaries mean core framework capabilities can be used with confidence. Developers do not need to understand core framework internals or worry that future core framework upgrades will break plugin logic. If a plugin collaborates with the core framework strictly through stable contracts, version compatibility is protected by the core framework's interface stability.
 
-**For the system as a whole**, this layered architecture allows different teams to maintain the core framework and their own plugins independently, reducing coordination friction and leaving enough room for future plugin types or governance capabilities.
+- **For the system as a whole**, this layered architecture allows different teams to maintain the core framework and their own plugins independently, reducing coordination friction and leaving enough room for future plugin types or governance capabilities.

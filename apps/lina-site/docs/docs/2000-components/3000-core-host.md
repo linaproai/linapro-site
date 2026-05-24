@@ -1,14 +1,19 @@
 ---
 slug: '/docs/core-host'
-title: '主框架服务'
+title: '主框架功能设计'
 hide_title: true
-description: '本文从组件设计角度介绍 LinaPro 主框架服务 lina-core，整合说明 API契约、治理服务、运行时配置、接口文档、定时调度、国际化、多租户基础能力、插件运行时、集群协调和健康探针等内容，帮助开发者理解主框架如何作为稳定底座支撑工作台、源码插件和WASM动态插件。'
+description: '本文从架构总览角度介绍 LinaPro 主框架服务 lina-core，重点说明主框架在系统中的职责边界、运行时链路、启动加载流程、内置平台能力矩阵、插件扩展接缝以及与管理工作台、源码插件、WASM动态插件、PostgreSQL和Redis之间的协作关系，帮助开发者先建立整体认知，再进入配置、权限、接口文档、定时任务、国际化、多租户、插件系统和分布式架构等专题页面深入阅读。'
 keywords:
   - lina-core
   - 主框架服务
+  - 架构总览
+  - 运行时链路
+  - 启动流程
   - GoFrame
   - API契约
+  - 路由中间件
   - 配置管理
+  - 权限管理
   - 接口文档
   - 定时任务
   - 国际化
@@ -23,15 +28,56 @@ keywords:
   - tenant_id
   - pluginhost
   - pluginbridge
+  - pluginservice
+  - sourceupgrade
 ---
 
 ## 基本介绍
 
-`lina-core`是`LinaPro`的后端主框架，也是所有通用平台能力的稳定底座。它基于`Go`语言构建，负责提供`RESTful API`契约、认证鉴权、权限治理、运行时配置、接口文档、定时调度、国际化、多租户上下文、插件生命周期和集群协调。
+`lina-core`是`LinaPro`的后端主框架，也是平台级能力的稳定底座。它负责承载`HTTP`入口、认证鉴权、权限治理、运行时配置、接口文档聚合、定时调度、国际化、多租户上下文、插件治理、集群协调和健康探针。
 
-主框架的设计原则是：**主框架提供通用能力，业务领域通过插件扩展**。因此，`lina-core`不会直接内置具体业务模块，而是通过稳定的扩展接口让源码插件和`WASM`动态插件接入。
+这篇文档只解释主框架在整体系统中的位置和协作方式，不展开每个能力的完整配置和使用细节。需要深入了解某个专题时，可以从后文的能力矩阵跳转到对应文档。
+
+`lina-core`的核心原则是：**主框架提供稳定公共能力，业务领域通过插件扩展**。主框架不直接内置具体业务模块，而是通过`pluginhost`、`pluginbridge`和`pluginservice`发布稳定扩展接缝，让源码插件和`WASM`动态插件接入统一治理面。
+
+## 主框架边界
+
+主框架的职责不是“包含所有功能”，而是把跨业务的公共能力统一治理起来，并为业务插件提供可复用的运行时环境。
+
+| 范围 | 主框架职责 | 边界 |
+|------|------------|------|
+| <span style={{whiteSpace: 'nowrap'}}><strong>平台控制面</strong></span> | 管理用户、角色、菜单、会话、配置、文件、插件、任务等基础资源 | 不承载具体行业或项目业务模型 |
+| <span style={{whiteSpace: 'nowrap'}}><strong>请求链路</strong></span> | 统一处理路由、中间件、认证、权限、租户上下文、数据范围和审计 | 不把业务规则写入全局中间件 |
+| <span style={{whiteSpace: 'nowrap'}}><strong>接口扩展</strong></span> | 向源码插件发布`pluginhost`和`pluginservice`，向动态插件发布`pluginbridge`和`hostServices` | 插件不能直接依赖主框架`internal/`实现 |
+| <span style={{whiteSpace: 'nowrap'}}><strong>运行时治理</strong></span> | 负责插件发现、安装、启用、禁用、升级、卸载、菜单权限同步和缓存刷新 | 插件自己的领域逻辑、前端页面和私有配置由插件维护 |
+| <span style={{whiteSpace: 'nowrap'}}><strong>部署协调</strong></span> | 在单机模式下提供进程内协调，在集群模式下接入集群协调器 | 业务数据仍由数据库和插件自己的表结构承载 |
+
+## 运行时架构
+
+一次请求进入主框架后，会先经过统一入口和治理链路，再落到主框架控制器或插件路由。插件看到的是经过主框架整理后的身份、租户、权限和配置上下文，而不是主框架内部实现对象。
+
+```mermaid
+flowchart TD
+    Client["浏览器或外部系统"] --> Entry["HTTP入口"]
+    Entry --> Guard["路由、中间件、认证权限"]
+    Guard --> Context["身份/租户/数据范围上下文"]
+    Context --> Dispatch{"请求归属"}
+    Dispatch --> Core["主框架控制器与服务"]
+    Dispatch --> Plugin["插件路由与处理器"]
+```
+
+主路径只表达请求如何被治理和分发，旁路依赖通过下表理解：
+
+| 关系 | 说明 |
+|------|------|
+| 主框架服务 → `PostgreSQL` | 保存用户、角色、菜单、配置、插件治理、任务日志和会话投影等数据 |
+| 插件处理器 → `PostgreSQL` | 读写插件自有表，表结构和业务数据由插件负责 |
+| 插件处理器 → `hostServices` | 动态插件通过授权快照访问配置、存储、锁、通知等宿主能力 |
+| 主框架服务 → 集群协调器 | 在集群模式下处理选主、分布式锁、缓存修订、在线会话热状态和跨节点事件 |
 
 ## 目录结构
+
+`lina-core`的代码目录围绕契约、控制器、服务、声明资源和公开扩展接口组织：
 
 ```text
 apps/lina-core/
@@ -39,16 +85,16 @@ apps/lina-core/
 ├── internal/
 │   ├── cmd/                 # 服务启动、路由绑定、插件扫描
 │   ├── controller/          # HTTP控制器
-│   └── service/             # 业务服务层
-│       ├── apidoc/          # OpenAPI文档聚合
+│   ├── dao/                 # 数据访问对象
+│   ├── model/               # 数据模型
+│   ├── packed/              # 嵌入的主框架资源
+│   └── service/             # 主框架内部服务
 │       ├── auth/            # 认证服务
 │       ├── bizctx/          # 请求身份与租户上下文
-│       ├── cluster/         # 集群运行状态
-│       ├── coordination/    # Redis协调抽象
 │       ├── cron/            # 定时调度入口
 │       ├── i18n/            # 国际化运行时
-│       ├── jobmgmt/         # 持久化任务管理
-│       └── plugin/          # 插件治理与运行时
+│       ├── plugin/          # 插件治理与生命周期
+│       └── ...              # 其他核心服务
 ├── manifest/
 │   ├── config/              # 配置模板与框架元数据
 │   ├── i18n/                # 主框架运行时语言包
@@ -56,209 +102,56 @@ apps/lina-core/
 └── pkg/
     ├── pluginhost/          # 源码插件扩展接口
     ├── pluginbridge/        # WASM动态插件桥接协议
-    ├── pluginservice/       # 发布给源码插件的主框架服务契约
-    └── sourceupgrade/       # 源码插件运行时升级门面
+    ├── pluginservice/       # 基础能力实现
+    └── ...                  # 其他公共组件
 ```
 
-## API契约层
+目录边界也对应开发边界：主框架内部实现放在`internal/`中，插件只能依赖`pkg/`下发布的稳定契约。
+
+## 内置平台能力
+
+主框架内置的平台能力很多，但这篇文档只保留总览。每个专题的配置项、数据结构、开发方式和注意事项应放在对应专题页中维护。
+
+| 能力 | 主框架职责 | 深入阅读 |
+|------|------------|----------|
+| <span style={{whiteSpace: 'nowrap'}}><strong>路由与中间件</strong></span> | 注册主框架`API`路由，承载插件的统一入口，执行认证、权限、审计等中间件 | <span style={{whiteSpace: 'nowrap'}}>[路由与中间件](/docs/routing)</span> |
+| <span style={{whiteSpace: 'nowrap'}}><strong>认证与权限</strong></span> | 颁发和校验`JWT`，维护在线会话，按`RBAC`模型校验接口和菜单权限 | <span style={{whiteSpace: 'nowrap'}}>[权限管理策略](/docs/permission)</span> |
+| <span style={{whiteSpace: 'nowrap'}}><strong>配置管理</strong></span> | 加载宿主配置，提供公开宿主配置白名单，并为插件提供插件作用域配置服务 | <span style={{whiteSpace: 'nowrap'}}>[服务配置管理](/docs/configuration)</span> |
+| <span style={{whiteSpace: 'nowrap'}}><strong>接口文档</strong></span> | 聚合主框架、源码插件和动态插件的`OpenAPI`契约，输出`/api.json`并供工作台调试 | <span style={{whiteSpace: 'nowrap'}}>[一体化接口文档](/docs/api-reference)</span> |
+| <span style={{whiteSpace: 'nowrap'}}><strong>定时调度</strong></span> | 管理持久化任务、任务处理器、执行日志、手动触发、集群执行范围和并发策略 | <span style={{whiteSpace: 'nowrap'}}>[定时任务调度与执行](/docs/cron-tasks)</span> |
+| <span style={{whiteSpace: 'nowrap'}}><strong>I18N国际化</strong></span> | 加载主框架语言包，合并插件语言包，并为运行时文案和接口文档提供多语言资源 | <span style={{whiteSpace: 'nowrap'}}>[框架级I18N国际化](/docs/i18n)</span> |
+| <span style={{whiteSpace: 'nowrap'}}><strong>多租户基础</strong></span> | 提供`bizctx`、身份快照、`tenant_id`过滤接口和插件多租户元数据 | <span style={{whiteSpace: 'nowrap'}}>[原生多租户能力](/docs/multi-tenant)</span> |
+| <span style={{whiteSpace: 'nowrap'}}><strong>插件运行时</strong></span> | 发现插件清单，执行生命周期，投影路由、菜单、权限、钩子、任务和公开静态资源 | <span style={{whiteSpace: 'nowrap'}}>[双模式插件系统](/docs/plugin-system)</span> |
+| <span style={{whiteSpace: 'nowrap'}}><strong>集群协调</strong></span> | 在集群模式下通过协调器处理选主、分布式锁、缓存修订、键值缓存和跨节点事件 | <span style={{whiteSpace: 'nowrap'}}>[原生分布式架构](/docs/distributed-architecture)</span> |
+| <span style={{whiteSpace: 'nowrap'}}><strong>静态资源</strong></span> | 托管主框架嵌入资源、管理工作台资源和插件显式声明的公开资源 | <span style={{whiteSpace: 'nowrap'}}>[静态资源与前端资产](/docs/static-assets)</span> |
+
+## 启动与加载流程
+
+主框架启动时会先建立宿主运行时，再把插件能力接入统一治理面。推荐从这个顺序理解主框架和插件之间的关系：
+
+1. 加载配置与框架元数据。
+2. 初始化数据库连接与`DDL`。
+3. 加载主框架语言包。
+4. 扫描源码插件与动态插件声明。
+5. 执行插件依赖、版本和治理资源检查。
+6. 投影路由、菜单、权限、`Hook`、`Cron`和公开资产。
+7. 构建运行时缓存与集群修订状态。
+8. 启动定时调度。
+9. 启动`HTTP`服务与健康探针。
+
+这个流程体现了主框架的编排职责：它先保证自身控制面可用，再把插件声明转化为运行时能力。插件启用、禁用、升级或卸载时，也会沿着同一条治理主链刷新路由、权限、菜单、语言包、接口文档和缓存。
+
+## 与其他组件的关系
+
+`lina-core`是后端运行时中心，但它不独占系统能力。它通过公开契约与其他组件协作：
+
+| 组件 | 协作方式 |
+|------|----------|
+| 管理工作台 | 通过主框架公开`API`读取菜单、权限、配置、插件状态、接口文档和任务数据 |
+| 源码插件 | 随主框架编译，通过`pluginhost`注册路由、钩子、任务、生命周期回调和前端资产 |
+| `WASM`动态插件 | 作为运行时产物上传，通过`pluginbridge`处理请求，并通过`hostServices`访问授权能力 |
+| `PostgreSQL` | 保存主框架治理数据、插件治理数据、任务日志、会话投影和插件业务表 |
+| `Redis`协调器 | 在集群模式下承担选主、锁、缓存修订、在线会话热状态和跨节点事件 |
+
+从依赖方向看，工作台和插件都依赖主框架的公开契约；主框架不反向依赖具体业务插件的内部实现。
 
-主框架`API`层使用`g.Meta`结构体标签声明路径、方法、权限、摘要和参数。接口定义、权限标识和文档元数据共用同一个源头，避免文档和实现分离。
-
-```go
-type UserListReq struct {
-    g.Meta   `path:"/users" method:"get" tags:"User" summary:"List users" permission:"user:list"`
-    Page     int `json:"page" v:"min:1"`
-    PageSize int `json:"pageSize" v:"min:1,max:100"`
-}
-```
-
-这种方式带来三个好处：
-
-| 能力 | 说明 |
-|------|------|
-| **契约集中** | 路径、方法、请求、响应和权限声明集中在`api/`目录 |
-| **权限可审计** | `permission`标识直接绑定接口，便于角色和按钮权限治理 |
-| **文档可生成** | 主框架启动后自动聚合为`OpenAPI`文档 |
-
-## 治理服务
-
-### 认证与会话
-
-主框架使用`JWT`作为请求认证机制，登录成功后颁发`Token`，有效期由`jwt.expire`控制。会话服务记录在线状态、登录时间、设备信息和失效时间，并支持强制下线。
-
-关键配置：
-
-```yaml
-jwt:
-  secret: "lina-jwt-secret-key-change-in-production"
-  expire: 24h
-
-session:
-  timeout: 24h
-  cleanupInterval: 5m
-```
-
-生产环境必须替换`jwt.secret`，并避免在日志中输出敏感信息。
-
-### RBAC权限
-
-`LinaPro`采用声明式`RBAC`权限体系。角色通过菜单、页面和按钮权限获得访问范围，接口请求由认证中间件和权限中间件统一校验。
-
-权限拓扑缓存在主框架运行时中，变更后通过缓存修订机制快速生效；在集群模式下，权限版本会通过协调服务同步到各节点。
-
-### 操作审计
-
-主框架中间件对写操作进行审计，记录请求路径、操作者、参数摘要和执行结果。密码等敏感字段应由中间件或服务层屏蔽，避免写入日志。
-
-## 运行时配置
-
-主框架默认配置位于：
-
-```text
-apps/lina-core/manifest/config/config.yaml
-```
-
-主要配置分组如下：
-
-| 分组 | 说明 |
-|------|------|
-| `server` | `HTTP`监听地址、路由表输出、`/api.json`路径 |
-| `logger` | 日志路径、级别、结构化日志和`TraceID` |
-| `database` | 默认数据库连接串，生产推荐`PostgreSQL 14+` |
-| `jwt` | 签名密钥和`Token`有效期 |
-| `session` | 在线会话超时和清理间隔 |
-| `scheduler` | 定时调度默认时区 |
-| `i18n` | 默认语言、多语言开关和语言列表 |
-| `cluster` | 单机/集群模式、`Redis`协调器和选主租约 |
-| `upload` | 文件上传目录和单文件大小上限 |
-| `plugin` | 强制卸载策略、动态插件产物目录和自动启用插件 |
-
-数据库默认使用`PostgreSQL`：
-
-```yaml
-database:
-  default:
-    link: "pgsql:postgres:postgres@tcp(127.0.0.1:5432)/linapro?sslmode=disable"
-```
-
-`SQLite`仅适合单节点本地演示或冒烟验证，不建议用于生产，也不支持集群部署。
-
-完整配置分组、生产环境检查项和插件自动启用说明见[配置管理](/docs/configuration)。
-
-## 接口文档聚合
-
-主框架启动后自动聚合主框架和已启用插件的接口，生成`OpenAPI`文档：
-
-```text
-http://localhost:8080/api.json
-```
-
-管理工作台在「开发中心 → 接口文档」中内嵌浏览和调试界面。接口文档会显示请求参数、响应结构、权限标识和多语言描述，便于前后端联调。
-
-```mermaid
-flowchart LR
-    Host["主框架API定义"] --> Doc["OpenAPI文档"]
-    Source["源码插件API"] --> Doc
-    Dynamic["动态插件API"] --> Doc
-    Doc --> JSON["/api.json"]
-    JSON --> Workbench["开发中心接口文档"]
-```
-
-接口文档翻译位于`manifest/i18n/<locale>/apidoc/`。插件启用后，插件自己的接口文档翻译也会被纳入聚合。
-
-接口契约声明、`permission`权限标签、源码插件和动态插件文档投影方式见[接口文档](/docs/api-reference)。
-
-## 定时调度
-
-主框架提供持久化定时调度子系统，任务配置和执行日志保存在数据库中。任务支持两种执行类型：
-
-| 类型 | 说明 | 适用场景 |
-|------|------|----------|
-| `Go`处理器 | 调用主框架或插件注册的处理器 | 数据清理、统计、同步任务 |
-| `Shell`命令 | 执行系统命令 | 文件处理、系统维护脚本 |
-
-源码插件可以通过`pluginhost`注册自有任务处理器，随后在管理工作台中选择调用目标。任务还支持分组、手动触发、暂停恢复、超时控制和执行日志。
-
-集群模式下，任务通过执行范围控制调度行为：
-
-| 执行范围 | 说明 |
-|----------|------|
-| `master_only` | 仅主节点执行，适合全局唯一任务 |
-| `all_node` | 每个节点都执行，适合节点本地任务 |
-
-内置任务、执行日志、并发策略和插件任务注册方式见[定时任务](/docs/cron-tasks)。
-
-## 国际化运行时
-
-主框架默认提供`zh-CN`和`en-US`两套运行时语言资源。语言包位于：
-
-```text
-apps/lina-core/manifest/i18n/<locale>/
-```
-
-资源按语义域拆分，例如`menu.json`、`error.json`、`plugin.json`、`job.json`和`apidoc/`。插件在自己的`manifest/i18n/`中维护语言包，启用后由主框架自动合并。
-
-国际化配置示例：
-
-```yaml
-i18n:
-  default: zh-CN
-  enabled: true
-  locales:
-    - locale: en-US
-      nativeName: English
-    - locale: zh-CN
-      nativeName: 简体中文
-```
-
-修改语言包后，开发环境可以重启服务；生产环境应通过运行时缓存失效接口按语言或插件范围精确刷新，避免全量清空导致短暂翻译抖动。
-
-语言包目录、运行时资源加载模式、插件语言包和接口文档翻译规则见[I18N国际化](/docs/i18n)。
-
-## 多租户基础能力
-
-主框架原生内置多租户基础支撑，但完整租户控制面由官方`multi-tenant`源码插件提供。未启用该插件时，系统默认运行在`tenant_id = 0`的平台租户上下文中，保持单租户开箱体验。
-
-| 层级 | 职责 |
-|------|------|
-| 主框架 | `bizctx`请求上下文、身份快照、`tenant_id`过滤接口、插件多租户元数据 |
-| `multi-tenant`插件 | 租户主体、成员关系、租户解析、租户代管和租户插件治理 |
-| 租户感知插件 | 在清单中声明多租户能力，并在自有表中使用`tenant_id`隔离数据 |
-
-当前隔离模型为`Pool`共享表模型，使用`tenant_id`区分数据。`schema-per-tenant`、`database-per-tenant`、配额、计费和品牌定制保留为后续演进方向。
-
-租户上下文、租户过滤服务、`multi-tenant`插件和租户级插件治理见[多租户能力](/docs/multi-tenant)。
-
-## 插件运行时
-
-主框架通过插件运行时加载和治理两类插件：
-
-- 源码插件：随主框架编译，使用`pluginhost`注册路由、钩子、定时任务和生命周期回调。
-- `WASM`动态插件：作为运行时产物上传，使用`pluginbridge`在沙箱中处理请求，并通过`hostServices`访问受治理的主框架能力。
-
-插件运行时负责发现清单、检查依赖、执行安装和升级`SQL`、同步菜单权限、投影路由和钩子、刷新缓存，并在异常状态下控制业务入口。
-
-## 集群协调
-
-单机模式下，主框架只依赖`PostgreSQL`和进程内协调即可运行。集群模式启用后，必须配置分布式协调器（内置支持`Redis`，用户可自行适配修改）：
-
-```yaml
-cluster:
-  enabled: true
-  coordination: redis
-  redis:
-    address: "127.0.0.1:6379"
-```
-
-`Redis`用于选主、分布式锁、缓存修订和跨节点事件；`PostgreSQL`继续负责业务和治理数据持久化。更多部署细节见[原生分布式架构](/docs/distributed-architecture)。
-
-## 健康探针
-
-主框架提供`/health`端点，供负载均衡、容器编排和监控系统检查服务状态。默认检查数据库连通性，超时由`health.timeout`控制：
-
-```yaml
-health:
-  timeout: 5s
-```
-
-健康探针返回标准`HTTP`状态码，正常为`200`，异常为`503`。

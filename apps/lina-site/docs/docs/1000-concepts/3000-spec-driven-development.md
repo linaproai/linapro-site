@@ -81,7 +81,7 @@ flowchart LR
 /opsx:propose <change-name>
 ```
 
-其中`change-name`使用`kebab-case`格式描述本次变更，如`content-article`、`user-export`。
+其中`change-name`使用`kebab-case`格式描述本次变更，如`linapro-content-article`、`user-export`。
 
 **AI 的工作：**
 

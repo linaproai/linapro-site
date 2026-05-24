@@ -1,8 +1,8 @@
 ---
 slug: '/docs/routing'
-title: '路由管理策略'
+title: '路由与中间件'
 hide_title: true
-description: '本文从组件设计角度介绍 LinaPro 主框架服务的路由管理策略，涵盖 API 版本管理（/api/v1 前缀惯例）、内置中间件体系（统一响应、CORS、请求体限制、业务上下文、JWT 鉴权、租户解析、权限校验）、鉴权路由的分层设计、基于 g.Meta 标签的接口属性一体化维护，以及源码插件自由注册路由与动态插件受限于 /x/{pluginID}/ 前缀的差异化路由策略，帮助开发者理解框架路由体系并遵循最佳实践。'
+description: '本文从组件设计角度介绍 LinaPro 主框架服务的路由管理策略，涵盖主框架控制面 API 的 /api/v1 前缀、统一插件 API 命名空间 /x/{plugin-id}/...、内置中间件体系、鉴权路由分层、基于 g.Meta 标签的接口属性一体化维护，以及源码插件自定义非保留路由和动态插件 route contract 的差异化接入方式，帮助开发者理解框架路由体系并遵循最佳实践。'
 keywords:
   - 路由管理
   - API版本管理
@@ -45,8 +45,10 @@ server.Group("/api/v1", func(group *ghttp.RouterGroup) {
 | 路径前缀 | 用途 |
 |----------|------|
 | `/api/v1` | 主框架当前稳定`API`版本，包含认证、用户、权限、插件治理等控制面接口 |
-| `/x` | 动态插件数据面专属前缀，由主框架统一分发给对应的动态插件运行时处理 |
-| `/` | 静态前端资源、健康探针等根路径入口 |
+| `/x/{plugin-id}/...` | 源码插件和动态插件共同使用的插件`API`命名空间；`APIPrefix()`返回`/x/{plugin-id}`，后续路径由插件自行组织 |
+| `/x-assets/{plugin-id}/{version}` | 插件声明式公开静态资源托管入口 |
+| `/admin` | 默认管理工作台前端路由基准；本地默认通过`http://localhost:5666/admin`访问，不属于主框架控制面`API` |
+| `/` | 根路径不再默认回退到管理工作台，通常留给门户、自定义页面或源码插件自管路由 |
 
 版本管理的设计原则是：**路由组即版本边界**。不同版本的`API`在同一服务进程内共存，各自拥有独立的中间件配置和处理器集合，不依赖`Content-Type`或请求头进行版本协商。
 
@@ -56,14 +58,14 @@ server.Group("/api/v1", func(group *ghttp.RouterGroup) {
 
 ### 公共基础中间件
 
-以下中间件对`/api/v1`路由组和动态插件路由组`/x`均生效，构成所有请求的基础处理链：
+以下中间件对`/api/v1`路由组和插件`API`路由组`/x`均生效，构成所有请求的基础处理链：
 
 | 中间件 | 作用 |
 |--------|------|
 | `ghttp.MiddlewareNeverDoneCtx` | 将请求`Context`替换为永不取消的副本，防止客户端断连导致业务逻辑提前终止 |
 | `middlewareSvc.Response` | 统一序列化`JSON`响应体，localize业务错误文案，处理`304`、`204`及流式响应透传 |
 | `middlewareSvc.CORS` | 执行`CORSDefault`，允许跨域请求，处理`OPTIONS`预检 |
-| `middlewareSvc.RequestBodyLimit` | 非`multipart`请求默认限制`8MB`；`multipart`上传请求按`sys.upload.maxSize`配置动态计算上限 |
+| `middlewareSvc.RequestBodyLimit` | 非`multipart`请求默认限制`100MB`；`multipart`上传请求按`sys.upload.maxSize`配置动态计算上限 |
 | `middlewareSvc.Ctx` | 注入业务上下文（用户身份占位、租户占位、请求`locale`），设置`Content-Language`响应头 |
 
 ### 鉴权与权限中间件
@@ -99,7 +101,7 @@ flowchart TD
 主框架通过`RouteMiddlewares`接口将上述中间件发布给源码插件，插件按需组合使用，无需直接依赖主框架内部包：
 
 ```go
-routes.Group("/api/v1", func(group pluginhost.RouteGroup) {
+routes.Group(routes.APIPrefix(), func(group pluginhost.RouteGroup) {
     group.Middleware(
         middlewares.NeverDoneCtx(),
         middlewares.HandlerResponse(),
@@ -173,11 +175,13 @@ type UserListReq struct {
 
 ```go
 type CreateRecordReq struct {
-    g.Meta  `path:"/plugins/linapro-demo-source/records" method:"post" mime:"multipart/form-data" tags:"Source Plugin Demo" summary:"Create source plugin sample record" dc:"创建示例记录" permission:"linapro-demo-source:example:create"`
+    g.Meta  `path:"/records" method:"post" mime:"multipart/form-data" tags:"Source Plugin Demo" summary:"Create source plugin sample record" dc:"创建示例记录" permission:"linapro-demo-source:example:create"`
     Title   string `json:"title" v:"required|length:1,128" dc:"记录标题"`
     Content string `json:"content" dc:"记录内容"`
 }
 ```
+
+源码插件`DTO`中的`path`是控制器绑定到插件路由组后的相对路径。最终公开路径由源码插件注册的`routes.APIPrefix()`和`DTO path`共同组成，例如`/x/linapro-demo-source/records`。
 
 ### 动态插件接口标签示例
 
@@ -209,7 +213,7 @@ type CreateDemoRecordReq struct {
 
 ## 源码插件路由策略
 
-源码插件随主框架编译交付，通过`pluginhost.HTTPRegistrar`提供的`Routes()`接入主框架路由器，享有**自由注册任意路由路径**的能力。
+源码插件随主框架编译交付，通过`pluginhost.HTTPRegistrar`提供的`Routes()`接入主框架路由器。源码插件的插件`API`必须进入自己的`/x/{plugin-id}`命名空间；同时，源码插件仍可以注册非保留公开路由，用于门户页面、公开资产、自管`fallback`或其他`HTTP`响应逻辑。
 
 ### 注册方式
 
@@ -230,7 +234,7 @@ func registerRoutes(ctx context.Context, registrar pluginhost.HTTPRegistrar) err
     routes      := registrar.Routes()
     middlewares := routes.Middlewares()
 
-    routes.Group("/api/v1", func(group pluginhost.RouteGroup) {
+    routes.Group(routes.APIPrefix(), func(group pluginhost.RouteGroup) {
         // 组合公共基础中间件
         group.Middleware(
             middlewares.NeverDoneCtx(),
@@ -257,12 +261,27 @@ func registerRoutes(ctx context.Context, registrar pluginhost.HTTPRegistrar) err
 }
 ```
 
-### 路由自由与冲突风险
+### 插件API命名空间与自定义路由
 
-源码插件对路由路径没有任何强制限制，可以注册`/`、`/portal`、`/api/v1`、`/api/v2`或任意自定义前缀下的路由。这种自由度带来的开发规范要求是：
+`RouteRegistrar.APIPrefix()`返回当前插件的强制`API`命名空间：
 
-- **避免与主框架路由冲突**：主框架已占用`/api/v1`下的所有控制面路径（见 `API` 版本管理章节），源码插件应使用明确的命名空间，例如`/api/v1/plugins/{plugin-id}/`
-- **避免插件间路由冲突**：多个源码插件同时安装时，路径冲突会导致路由注册失败报错终止程序启动，开发者需确保路径唯一性
+```text
+/x/{plugin-id}
+```
+
+源码插件业务接口必须在该命名空间下，后续路径由插件自行组织，例如：
+
+```text
+/x/linapro-demo-source/records
+/x/linapro-demo-source/records/{id}
+```
+
+源码插件不得在`/x`下注册其他插件的路径。主框架会拒绝越过自身`/x/{plugin-id}`边界的源码插件路由注册。
+
+源码插件可以注册`/`、`/portal/...`、`/assets/...`等非保留路径。这种自由度带来的开发规范要求是：
+
+- **避免与主框架路由冲突**：主框架已占用`/api`、`/x`和`/x-assets`，源码插件公开页面应使用明确的非保留命名空间；`/admin`通常留给默认工作台前端路由，不建议源码插件复用
+- **避免插件间路由冲突**：多个源码插件同时安装时，非保留路径冲突会导致路由注册失败并终止程序启动，开发者需确保路径唯一性
 - **受保护路由必须遵循中间件顺序**：凡是使用`middlewareSvc.Auth`中间件的路由子组，必须按照`middlewareSvc.Auth → middlewareSvc.Tenancy → middlewareSvc.Permission`的顺序组合中间件，主框架有自动化测试保障这一约束
 
 ### 源码插件路由捕获
@@ -275,7 +294,7 @@ func registerRoutes(ctx context.Context, registrar pluginhost.HTTPRegistrar) err
 
 ### 路由命名空间约束
 
-动态插件的所有路由强制挂载在`/x/{pluginID}/`前缀下：
+动态插件的所有`API`路由强制挂载在`/x/{plugin-id}/`前缀下。后续路径来自动态插件自己的`route contract`，例如：
 
 ```text
 /x/linapro-demo-dynamic/backend-summary
@@ -283,7 +302,7 @@ func registerRoutes(ctx context.Context, registrar pluginhost.HTTPRegistrar) err
 /x/linapro-demo-dynamic/demo-records/{id}
 ```
 
-这个约束由主框架在`/x`路由组上绑定的通配符处理器`/*dynamicPath`统一拦截后实现。插件无法绑定到`/api/v1`或任何`/x`之外的路径，确保动态插件路由不会对主框架路由结构造成混乱。
+这个约束由主框架在`/x`路由组上绑定的通配符处理器统一拦截后实现。插件无法绑定到主框架`/api/v1`控制面或任何`/x`之外的`API`路径，确保动态插件路由不会对主框架路由结构造成混乱。
 
 ### 路由声明方式
 
@@ -303,13 +322,13 @@ type RouteContract struct {
 }
 ```
 
-`Path`字段是插件内部路径，主框架在对外暴露时自动拼接`/x/{pluginID}`前缀。
+`Path`字段是插件内部路径，主框架在对外暴露时自动拼接`/x/{plugin-id}`前缀。若内部路径是`/demo-records`，最终公开路径就是`/x/{plugin-id}/demo-records`。
 
 ### 动态路由请求处理流程
 
 ```mermaid
 flowchart TD
-    A["请求 /x/{pluginID}/..."] --> B["公共基础中间件<br/>middlewareSvc.Response / middlewareSvc.CORS / middlewareSvc.RequestBodyLimit / middlewareSvc.Ctx"]
+    A["请求 /x/{plugin-id}/..."] --> B["公共基础中间件<br/>middlewareSvc.Response / middlewareSvc.CORS / middlewareSvc.RequestBodyLimit / middlewareSvc.Ctx"]
     B --> C["PrepareDynamicRouteMiddleware<br/>路由匹配 + 缓存运行时状态"]
     C -- 路由不存在 --> D["返回 404"]
     C -- 路由匹配成功 --> E["AuthenticateDynamicRouteMiddleware<br/>JWT 校验 + 权限校验"]
@@ -333,7 +352,7 @@ flowchart TD
 | 维度 | 源码插件 | 动态插件 |
 |------|----------|----------|
 | **路由注册方式** | 启动阶段通过`HTTPRegistrar`回调注册 | 运行时从`WASM`产物中解析路由契约 |
-| **路由路径限制** | 无限制，可注册任意路径 | 强制在`/x/{pluginID}/`前缀下 |
+| **路由路径限制** | 插件`API`必须使用`/x/{plugin-id}`；可额外注册非保留公开路径 | 强制在`/x/{plugin-id}/`前缀下 |
 | **中间件组合** | 插件自行从`RouteMiddlewares`选择并组合 | 主框架统一管理，插件通过`access`字段影响鉴权行为 |
 | **权限声明位置** | `DTO`的`g.Meta`标签 | `RouteContract`的`permission`字段 |
 | **OpenAPI 文档** | 自动聚合到主框架文档 | 主框架从路由契约中读取并聚合 |

@@ -1,6 +1,6 @@
 ---
 slug: '/docs/admin-workspace'
-title: 'Built-in Admin Workspace'
+title: 'Admin Workspace'
 hide_title: true
 description: 'A component-level guide to the LinaPro built-in admin workspace, lina-vben — how it serves as the standard frontend consumer of the core framework service and plugin system, covering access control, system settings, job scheduling, multi-tenant management, plugin governance, developer center, and dynamic plugin pages, while maintaining consistency with backend API contracts, menu permissions, and I18N resources.'
 keywords:
@@ -22,6 +22,8 @@ keywords:
   - RBAC
   - frontend workspace
   - dynamic routing
+  - workspace.basePath
+  - /admin
 ---
 
 ## Introduction
@@ -29,6 +31,8 @@ keywords:
 `lina-vben` is `LinaPro`'s built-in admin workspace, built on `Vue 3 + Vben5 + Ant Design Vue + TypeScript`. It is not the definer of business logic — it is the standard `UI` expression layer for the `lina-core` API and all enabled plugin APIs.
 
 Developers can build business applications directly on top of it, or replace it with a custom frontend. As long as the new frontend follows the core framework's public `RESTful API` and permission model, it can plug into the same backend capabilities.
+
+The default local development entry for the admin workspace is `http://localhost:5666/admin`. The `/admin` segment comes from the public frontend configuration key `workspace.basePath`, which determines the workspace `Vue Router` base and asset resolution boundary. The core framework API listens at `http://localhost:9120` by default; do not treat the core framework API address plus `/admin` as the default workspace address.
 
 ## Technology Stack
 
@@ -55,6 +59,8 @@ The sidebar is not a pure frontend hardcode. When the core framework returns the
 ### Plugin pages load through a dynamic page shell
 
 Both source plugins and dynamic plugins can declare frontend pages. The workspace loads plugin pages through the `system/plugin/dynamic-page` shell, reducing the need for plugins to modify workspace code.
+
+Dynamic plugin runtime frontend entries usually come from public assets under `/x-assets/{plugin-id}/{version}/...` and declare embedded mount mode through `query.pluginAccessMode: embedded-mount` in the menu. Source plugin pages are usually compiled into the workspace build output, but can also use `public_assets` to host static resources that are explicitly safe for anonymous access.
 
 ## Functional Modules
 
@@ -122,6 +128,8 @@ Common operations:
 | **Upgrade** | Executes explicit runtime upgrade for `pending_upgrade` or `upgrade_failed` plugins |
 | **Upload dynamic plugin** | Uploads a `.wasm` artifact, entering the dynamic plugin discovery and governance flow |
 
+The plugin list reads the complete backend projection cache. Opening the list does not implicitly trigger plugin synchronization writes; explicit sync, upload, install, enable, disable, uninstall, and upgrade operations refresh the cache. The UI displays plugin types as "source plugin" or "dynamic plugin"; even if a dynamic plugin is backed by a `WASM` artifact, it still belongs to the dynamic plugin governance type.
+
 ## Developer Center
 
 The Developer Center aggregates core framework and plugin API documentation. Developers can view `OpenAPI` documents, request parameters, response structures, and permission identifiers, and issue debug requests directly. Online debugging uses the current logged-in user's authentication state — write operations produce real data changes and should be used cautiously in test environments.
@@ -134,7 +142,8 @@ Local demo environments typically use the following default credentials:
 |-------|-------|
 | Username | `admin` |
 | Password | `admin123` |
-| Default frontend URL | `http://localhost:5666` |
+| Default workspace URL | `http://localhost:5666/admin` |
+| Frontend dev server | `http://localhost:5666` |
 
 Production environments should change the default password immediately after initialization and configure roles and permissions according to organizational security policies.
 

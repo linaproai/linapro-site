@@ -1,6 +1,6 @@
 ---
 slug: '/quick/overview'
-title: 'Project Overview'
+title: 'Overview'
 hide_title: true
 description: 'A comprehensive introduction to LinaPro — its background, architecture, and core capabilities. LinaPro is an AI-native full-stack framework built on Go + Vue 3 with PostgreSQL by default (optional SQLite), native multi-tenant support, an official plugin submodule, Redis cluster coordination, a dual-mode plugin system, RBAC permission management, scheduled task scheduling, live API documentation, the optional-but-recommended OpenSpec spec-driven AI development workflow, and a lifecycle-spanning AI skill set for building sustainable, continuously deliverable business systems.'
 keywords:
@@ -62,7 +62,7 @@ curl -o docker-compose.yaml https://raw.githubusercontent.com/linaproai/linapro/
 docker compose up
 ```
 
-Then visit http://127.0.0.1:8080 to try the built-in `LinaPro` admin workspace with username/password `admin/admin123`.
+Then visit the admin workspace address shown in the image startup logs and sign in with `admin/admin123`. In a source development environment, the default workspace address is `http://localhost:5666/admin`, and the core framework API address is `http://localhost:9120`.
 
 :::info Tip
 The `nightly` image is a daily build intended mainly for testing. You can also switch it to a stable version tag such as `v0.2.0`.

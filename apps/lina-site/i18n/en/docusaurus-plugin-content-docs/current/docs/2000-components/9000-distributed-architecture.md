@@ -1,6 +1,6 @@
 ---
 slug: '/docs/distributed-architecture'
-title: 'Native Distributed Architecture'
+title: 'Distributed Architecture'
 hide_title: true
 description: 'From a component design perspective, this page explains the native distributed architecture of LinaPro — how to switch between single-node and cluster mode, the Redis coordinator, leader election, node responsibilities, cache revision, distributed locks, key-value cache, scheduled task execution scope, and the horizontal scaling process — helping developers understand how business code can scale to multi-node deployment with zero modifications.'
 keywords:

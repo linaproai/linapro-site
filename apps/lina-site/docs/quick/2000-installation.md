@@ -129,8 +129,9 @@ make dev
 
 | 服务 | 地址 |
 |------|------|
-| 默认管理工作台 | `http://localhost:5666` |
-| 后端`API`服务 | `http://localhost:8080` |
+| 前端开发服务 | `http://localhost:5666` |
+| 后端`API`服务 | `http://localhost:9120` |
+| 默认管理工作台 | `http://localhost:5666/admin` |
 
 使用默认账号登录管理工作台：
 

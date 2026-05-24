@@ -5,7 +5,8 @@ description: >-
   英文翻译之间的缺漏和内容差异，并进行补全修复。当 docs/ 中新增或更新了文档、或需要全量同步审查时使用。
   执行时必须优先检查 apps/lina-site/docs/ 的 git status；如果存在已修改、新增、重命名或删除的 Markdown 文档，
   必须先把这些变更同步到英文 i18n 中，再考虑全量审查。
-  翻译和文档标题都必须采用地道、专业、自然的英文表达，绝不逐字翻译，确保英文版本在英语环境下自然流畅。
+  翻译和文档标题都必须采用地道、专业、自然的英文表达；标题应尽可能与 slug/路径表达的英文路由名称一致，
+  绝不逐字翻译中文，确保英文版本在英语环境下自然流畅。
 ---
 
 # linasite-sync-i18n：文档 i18n 同步与翻译
@@ -15,10 +16,11 @@ description: >-
 **核心原则：**
 1. **路径镜像** — `docs/<path>.md` 对应 `i18n/en/docusaurus-plugin-content-docs/current/<path>.md`
 2. **slug 是唯一标识** — 每篇文档的 `slug` 字段是规范 URL，翻译时绝不修改
-3. **地道英文优先** — 先理解内容，再以英文习惯表达；正文、frontmatter 标题和各级标题都绝不逐字翻译
-4. **中文主稿为准** — `docs/` 是唯一事实来源，英文版跟随中文版更新
-5. **标题质量同等重要** — 文档标题是导航、SEO 和读者第一印象的一部分，必须符合英语技术文档的命名习惯
-6. **当前变更优先** — 每次执行先检查 `apps/lina-site/docs/` 的 git status；凡是当前工作区已修改、新增、重命名或删除的中文 Markdown 文档，都属于强制同步范围
+3. **标题贴近路由** — frontmatter `title` 应尽可能与 `slug` 或镜像路径所表达的英文路由名称一致，例如 `/docs/architecture/core-host` 对应 `Core Host`
+4. **地道英文优先** — 先理解内容，再以英文习惯表达；正文、frontmatter 标题和各级标题都绝不逐字翻译
+5. **中文主稿为准** — `docs/` 是唯一事实来源，英文版跟随中文版更新
+6. **标题质量同等重要** — 文档标题是导航、SEO 和读者第一印象的一部分，必须符合英语技术文档的命名习惯
+7. **当前变更优先** — 每次执行先检查 `apps/lina-site/docs/` 的 git status；凡是当前工作区已修改、新增、重命名或删除的中文 Markdown 文档，都属于强制同步范围
 
 ---
 
@@ -69,6 +71,7 @@ find apps/lina-site/docs -name "*.md" | sort
 - **相对路径**（相对于 `apps/lina-site/docs/`，例如 `docs/1000-concepts/1000-ai-native.md`）
 - **期望的 i18n 路径**：`apps/lina-site/i18n/en/docusaurus-plugin-content-docs/current/<relative-path>`
 - **slug**：从 frontmatter 的 `slug:` 字段读取
+- **路由名称候选**：优先从 `slug` 的最后一段推导；没有 slug 时，从文件名去掉数字前缀后推导
 - **中文标题**：frontmatter `title` 以及正文中的 `##`/`###` 标题
 
 ---
@@ -81,7 +84,7 @@ find apps/lina-site/docs -name "*.md" | sort
 find apps/lina-site/i18n/en/docusaurus-plugin-content-docs/current -name "*.md" | sort
 ```
 
-对每个文件读取其 frontmatter 中的 **slug** 和 **title**，构建索引：`slug → i18n/en 文件路径`，并记录正文中的 `##`/`###` 标题用于自然度检查。
+对每个文件读取其 frontmatter 中的 **slug** 和 **title**，构建索引：`slug → i18n/en 文件路径`，并记录正文中的 `##`/`###` 标题用于自然度和路由一致性检查。
 
 ---
 
@@ -108,17 +111,41 @@ find apps/lina-site/i18n/en/docusaurus-plugin-content-docs/current -name "*.md" 
    - 英文文件中存在大量未翻译的中文字符（代码块外）
    - 英文文件内容篇幅不足中文的 60%（排除代码块）
    - frontmatter `title` 或正文标题明显机械直译、不符合英语技术文档习惯，或与同类页面标题风格明显不一致
+   - frontmatter `title` 与 `slug` / 路径所表达的英文路由名称明显不一致，且内容没有支持这种差异
 4. 判断为**基本一致**（无需操作）的条件：
    - 章节结构对应
    - 核心内容已翻译
    - frontmatter `title` 和正文标题自然、专业、准确，符合英语技术文档命名习惯
    - 少量措辞差异属正常范围
 
-#### 标题自然度判断标准
+#### 标题与路由一致性判断标准
 
 检查英文文档时，必须同时审查 frontmatter `title` 与正文 `##`/`###` 标题。标题不只是翻译结果，也是站点导航、侧边栏、搜索和 SEO 的入口。
 
+先为每篇文档推导**英文路由名称候选**：
+
+1. 优先读取 frontmatter `slug`，取最后一个有意义的路径段。
+   - `/docs/architecture/core-host` → `core-host` → `Core Host`
+   - `/quickstart` → `quickstart` → `Quickstart` 或按站点习惯写作 `Quick Start`
+2. 如果没有 `slug`，从文件名推导，先去掉排序数字和后缀。
+   - `1000-ai-native.md` → `ai-native` → `AI-Native`
+   - `2000-wasm-plugins.md` → `wasm-plugins` → `WASM Plugins`
+3. 如果路由段是产品名、API 名、协议名或固定术语，按既有英文写法保留大小写。
+   - `openapi` → `OpenAPI`
+   - `wasm` → `WASM`
+   - `i18n` → `i18n`
+4. 将该候选与中文标题和全文内容一起判断。标题不要求机械等于路由段，但应表达同一个页面入口概念。
+
+标题命名优先级：
+
+1. **路由名称优先**：当 `slug` / 路径已经给出清晰英文概念时，frontmatter `title` 优先采用该概念的自然标题形式。
+2. **内容校准**：如果中文标题比路由更具体，或路由只是缩写，阅读正文后补足必要限定词。
+3. **英语读者优先**：不要为了贴合中文标题而牺牲英语自然度；也不要为了贴合路由而产生命名不清的标题。
+4. **一致性优先**：同目录、同类型页面保持标题风格一致；必要时读取邻近 2 到 3 篇英文文档作为参照。
+
 优先使用英语技术文档中自然的名词短语或动作短语：
+- `slug: /docs/architecture/core-host` 的标题应接近 `Core Host`，不要译成 `Core Main Machine`。
+- `slug: /docs/development/commands` 的标题应接近 `Development Commands`，不要仅按中文写成 `Commands for Development`。
 - 中文“开发指令”应译为 `Development Commands`，不要机械写成 `Dev Commands`，除非同一导航体系明确使用短标签。
 - 中文“OpenAPI接口文档”更自然的是 `OpenAPI Reference`，不要写成 `OpenAPI Interface Documentation`。
 - 中文“服务配置管理”应表达为 `Service Configuration` 或 `Service Configuration Management`，不要只写 `Configuration` 导致语义过泛。
@@ -130,6 +157,7 @@ find apps/lina-site/i18n/en/docusaurus-plugin-content-docs/current -name "*.md" 
 - **自然**：优先选择英语技术文档常见说法，例如 `Reference`、`Configuration`、`Execution`、`Development`、`Internationalization`。
 - **专业**：避免口语缩写和内部简称，如 `Dev`，除非该页面是窄导航标签或同级文档统一采用该表达。
 - **一致**：同一目录下同类标题使用一致风格，例如 `Development Commands`、`Development Tools`。
+- **贴近路由**：`slug` / 路径中的英文路由名通常代表站点希望用户记住的页面名称，标题应优先采用其自然可读形式。
 - **不过度翻译**：产品名、命令、API 名称、配置键名、插件 ID 和约定术语保持原样。
 
 ---
@@ -183,6 +211,7 @@ find apps/lina-site/i18n/en/docusaurus-plugin-content-docs/current -name "*.md" 
 **b. 完整阅读中文源文件** — 通读全文，理解：
 - 文档主题及其在 LinaPro 体系中的定位
 - 技术术语及其准确英文对应词
+- slug / 文件名表达的英文路由名称，以及它与中文标题、正文主题之间的关系
 - 文档语气（概念介绍、操作指引、参考手册等）
 - 结构元素：标题层级、代码块、提示框、Mermaid 图表
 
@@ -194,7 +223,7 @@ find apps/lina-site/i18n/en/docusaurus-plugin-content-docs/current -name "*.md" 
 | 自然表达 | 使用英语技术写作中惯用的句式结构 |
 | 保持技术精度 | LinaPro 专属术语、API 名称、配置键名保持原样 |
 | 匹配语气 | 概念文档保持概念性，操作指引保持步骤性 |
-| 标题与结构 | 保持相同层级结构，frontmatter `title` 和正文标题必须自然、专业、准确，必要时重写为英语技术文档习惯表达 |
+| 标题与结构 | 保持相同层级结构；frontmatter `title` 应尽可能采用 slug/路径路由名称的自然英文形式，正文标题必须自然、专业、准确，必要时重写为英语技术文档习惯表达 |
 | 代码块 | 绝不翻译代码、代码注释或 CLI 命令 |
 | Mermaid 图表 | 翻译节点标签和边标签，保留图表类型和语法 |
 | Frontmatter | 地道翻译 `title`、`description`、`keywords`；`slug` 和 `sidebar_position` 保持不变 |
@@ -225,14 +254,28 @@ keywords:                                  # ← 翻译为英文术语
 ---
 ```
 
-标题翻译时不要把中文词序硬搬到英文中。允许在不改变含义的前提下改写为更自然的英文技术文档标题：
+标题翻译时不要把中文词序硬搬到英文中。先根据 `slug` 或文件名推导英文路由名称，再结合全文内容决定自然标题。允许在不改变含义的前提下改写为更自然的英文技术文档标题：
 
 ```yaml
 # 中文源文件
+slug: '/docs/reference/openapi'
 title: 'OpenAPI接口文档'
 
 # 英文输出
+slug: '/docs/reference/openapi'
 title: 'OpenAPI Reference'
+```
+
+再例如：
+
+```yaml
+# 中文源文件
+slug: '/docs/architecture/core-host'
+title: '核心主机'
+
+# 英文输出
+slug: '/docs/architecture/core-host'
+title: 'Core Host'
 ```
 
 **e. 写入文件：**
@@ -277,6 +320,7 @@ find apps/lina-site/i18n/en/docusaurus-plugin-content-docs/current -name "*.md" 
 写入每个译文文件前，在脑内逐项确认：
 
 - [ ] 已完整阅读并理解中文文档
+- [ ] 已从 `slug` 或路径推导路由名称，并确认英文 `title` 与该路由概念一致
 - [ ] 英文读起来对母语者自然流畅
 - [ ] 技术术语与现有英文文档保持一致
 - [ ] frontmatter `title` 自然、专业、准确，不是机械直译
@@ -293,7 +337,7 @@ find apps/lina-site/i18n/en/docusaurus-plugin-content-docs/current -name "*.md" 
 
 - **严禁修改 `slug` 字段** — 这是规范 URL，必须与中文源文件保持一致
 - **通读全文再翻译** — 不允许逐段翻译，必须在理解全文后再动笔
-- **标题先理解再命名** — 标题必须传达页面定位和技术范围，必要时意译或改写为英语技术文档常用标题
+- **标题先理解再命名** — 标题必须传达页面定位和技术范围，并尽可能贴近 `slug` / 路径中的英文路由名称；必要时意译或改写为英语技术文档常用标题
 - **修改前先确认** — 展示差异报告并获得用户确认后再执行任何写入
 - **路径不匹配须人工决策** — 不得静默跳过或覆盖，必须提交用户决策
 - **禁止机械直译** — 若某句话或某个标题用英文说起来不自然，重写它，只要意思相同

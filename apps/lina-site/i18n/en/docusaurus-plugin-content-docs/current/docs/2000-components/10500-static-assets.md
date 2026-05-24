@@ -1,34 +1,41 @@
 ---
 slug: '/docs/static-assets'
-title: 'Static Asset Management'
+title: 'Static Assets'
 hide_title: true
-description: 'This page explains LinaPro static asset management, including how the core framework service and plugins use Go Embed to compile static files into binaries, the Go Embed model, asset directory conventions, core framework static asset routing priority, Vue page asset handling for source plugins, and how dynamic plugins carry frontend assets through WASM custom sections, cache them in core framework memory, and serve them on demand.'
+description: 'This page explains LinaPro static asset management: how the core framework packages runtime resources and admin workspace build output with Go Embed, how plugins explicitly publish public static resources through public_assets, and how the /admin workspace entry, /x plugin API namespace, /x-assets public plugin asset namespace, source-plugin custom routes, and dynamic-plugin frontend resources stay separated. It helps developers design plugin pages, public assets, and cache/version policies correctly.'
 keywords:
   - static assets
   - Go Embed
   - embed.FS
-  - frontend static assets
-  - core framework asset routing
-  - plugin-assets
+  - public_assets
+  - /x-assets
+  - workspace.basePath
+  - /admin
+  - public plugin assets
   - source plugin assets
+  - dynamic plugin assets
   - WASM frontend assets
-  - dynamic plugin frontend
-  - memory cache
-  - SPA fallback
   - embedded-mount
   - standalone page
   - plugin frontend embedding
-  - lina.plugin.frontend.assets
-  - WASM custom sections
-  - frontend asset management
-  - Vue assets
+  - mount
+  - index
+  - frontend assets
+  - frontend routing
   - pluginhost
   - pluginbridge
+  - LinaPro
 ---
 
 ## Introduction
 
-`LinaPro` uses `Go Embed` to package all static assets into the executable at compile time, so a single-binary deployment can run without an external static file directory. Core framework frontend assets, manifest templates, source plugin pages, and dynamic plugin frontend bundles all follow this principle. They only differ in how assets are embedded and served at each layer.
+`LinaPro` manages static assets through `Go Embed` and a declarative plugin asset model. The core framework packages runtime resources and admin workspace build output, while plugins must explicitly declare public resources through `public_assets` in `plugin.yaml`. The core framework then serves those resources from a versioned path:
+
+```text
+/x-assets/{plugin-id}/{version}/...
+```
+
+This path is the unified public entry for plugin static assets, shared by source plugins and dynamic plugins. Files are not exposed merely because they exist in `embed.FS`, a plugin directory, or a dynamic plugin artifact; they must be covered by a `public_assets` declaration.
 
 ## How Go Embed Works
 
@@ -41,301 +48,217 @@ import "embed"
 var Files embed.FS
 ```
 
-This declaration recursively embeds all files under `public/` and `manifest/` into the `Files` variable at compile time, including hidden files whose names start with `.` because the `all:` prefix is used. `embed.FS` implements the standard library `fs.FS` interface. It supports path lookup and file reads, but not writes.
+This declaration recursively embeds all files under `public/` and `manifest/` into the `Files` variable. `embed.FS` implements the standard library `fs.FS` interface, supports path lookup and file reads, and does not support writes.
 
 | Directive | Meaning |
 |-----------|---------|
-| `//go:embed file.txt` | Embeds one file |
-| `//go:embed dir/` | Embeds a directory, skipping files whose names start with `.` or `_` |
-| `//go:embed all:dir/` | Embeds a directory, including files whose names start with `.` or `_` |
-| `//go:embed dir1 dir2` | Embeds multiple directories or files at the same time |
+| `//go:embed file.txt` | Embed one file |
+| `//go:embed dir/` | Embed a directory, skipping files whose names start with `.` or `_` |
+| `//go:embed all:dir/` | Embed a directory, including files whose names start with `.` or `_` |
+| `//go:embed dir1 dir2` | Embed multiple directories or files at the same time |
 
-After assets are compiled into the binary, runtime code accesses them through `embed.FS` methods such as `Open` and `ReadFile`. The interface is the same as reading ordinary disk files, with no extraction step or temporary directory.
+After assets are compiled into the binary, runtime code accesses them through `embed.FS` methods such as `Open` and `ReadFile`, using the same interface as ordinary disk files.
 
-## Core Framework Static Assets
+## Core Framework and Workspace Assets
 
-### Asset Directories and Embed Declaration
-
-The `lina-core` service manages static assets under `internal/packed/`:
+`lina-core` manages embedded resources under `internal/packed/`:
 
 ```text
 internal/packed/
-├── packed.go           # embed.FS declaration
-├── public/             # Frontend build output from lina-vben
+├── packed.go
+├── public/             # Workspace build output and public frontend assets
 │   ├── index.html
 │   ├── css/
-│   ├── js/
-│   └── ...
-└── manifest/           # Runtime configuration manifests and initialization assets
+│   └── js/
+└── manifest/           # Runtime configuration, SQL, and i18n resources
     ├── config/
     ├── i18n/
     └── sql/
 ```
 
-`packed.go` embeds both directories into the `Files` variable:
+The `public/` directory is populated by frontend build output. The `manifest/` directory contains core framework initialization and runtime resources. During local development, the default admin workspace is served by the frontend dev server at `http://localhost:5666/admin`, while the core framework API listens at `http://localhost:9120`.
 
-```go
-package packed
+`workspace.basePath` defines the frontend router base path for the workspace. The default is `/admin`:
 
-import "embed"
-
-// Files stores embedded frontend static assets and prepared manifest assets.
-//
-//go:embed all:public all:manifest
-var Files embed.FS
+```yaml
+workspace:
+  basePath: "/admin"
 ```
 
-The `public/` directory is populated during the build phase by the compiled output of the `lina-vben` frontend project. The `manifest/` directory contains database initialization `SQL`, configuration templates, and internationalization resource bundles used to bootstrap the core framework on first startup.
+By default, `lina-vben` uses `/admin` as the `Vue Router` base. This path is not the core framework control-plane `API`; do not treat the core framework API address plus `/admin` as the default workspace address. For a dedicated admin-domain deployment, `workspace.basePath` can be set to `/`. It must not use reserved namespaces such as `/api`, `/x`, or `/x-assets`.
 
-### Static Asset Routing Priority
+## Backend Route Boundaries
 
-The core framework `HTTP` routing follows the rule that explicit routes take precedence over wildcard routes. During server startup, routes are registered in this order:
-
-```mermaid
-flowchart LR
-    A[API routes<br/>/api/v1/...] --> B[Source plugin HTTP routes]
-    B --> C[Frontend asset wildcard route<br/>/*]
-```
-
-The frontend asset wildcard route `/*` is always registered last and acts as the fallback handler for all unmatched routes. When a request reaches this handler, the core framework tries to match it in three steps:
+Core framework backend routes follow clear boundaries:
 
 ```mermaid
 flowchart TD
-    A[Receive request] --> B{Path starts with plugin-assets/?}
-    B -- Yes --> C{Plugin enabled and asset exists?}
-    C -- Yes --> D[Read dynamic plugin asset from memory cache and return it]
-    C -- No --> E[404]
-    B -- No --> F{File exists in embedded public/?}
-    F -- Yes --> G[Serve through the standard http.FileServer]
-    F -- No --> H[SPA fallback: return index.html]
+    A[HTTP request] --> B{Core framework control-plane API<br/>/api/v1/...}
+    B -- Yes --> C[Core framework controller]
+    B -- No --> D{Plugin API<br/>/x/:plugin-id/...}
+    D -- Yes --> E[Source plugin handler or dynamic plugin runtime]
+    D -- No --> F{Public plugin assets<br/>/x-assets/:plugin-id/:version/...}
+    F -- Yes --> G[public_assets hosting service]
+    F -- No --> H[Source plugin custom route or 404]
 ```
 
-1. **Dynamic plugin assets first**: If the request path matches `plugin-assets/{pluginID}/{version}/{assetPath}`, the core framework first checks whether the corresponding plugin is enabled, then reads the requested asset from the memory cache. If the plugin is not enabled or the asset does not exist, the core framework returns `404`.
-2. **Embedded frontend assets second**: If the requested file exists in the embedded `public/` directory, the core framework serves it with the standard `http.FileServer`.
-3. **`SPA` fallback last**: All remaining unmatched paths return `public/index.html`, allowing the `Vue` client router to take over.
+The key point is that `/api` is the core framework control plane, `/x` is the plugin `API` namespace, `/x-assets` is the public plugin asset namespace, and `/admin` is the frontend router base for the default workspace. These paths do not replace each other.
 
-## Source Plugin Static Assets
+## Public Plugin Asset Model
 
-### Embed Declaration
+Plugins declare public assets through the root-level `public_assets` field in `plugin.yaml`:
 
-A source plugin declares embedded content in `plugin_embed.go` at the plugin root:
+```yaml
+public_assets:
+  - source: frontend/public
+    mount: /
+    index: index.html
+  - source: frontend/pages
+    mount: pages
+    index: standalone.html
+```
+
+| Field | Description |
+|-------|-------------|
+| `source` | Plugin-relative directory, or a frontend asset prefix inside a dynamic plugin artifact |
+| `mount` | Relative mount path under `/x-assets/{plugin-id}/{version}/`; empty or `/` means the version root |
+| `index` | Default file returned when the mount directory itself is requested; defaults to `index.html` |
+
+Example mappings:
+
+| source | mount | File inside plugin | Public path |
+|--------|-------|--------------------|-------------|
+| `frontend/public` | `/` | `frontend/public/logo.png` | `/x-assets/{plugin-id}/{version}/logo.png` |
+| `frontend/pages` | `pages` | `frontend/pages/standalone.html` | `/x-assets/{plugin-id}/{version}/pages/standalone.html` |
+
+`public_assets` is an explicit publication boundary. Plugin authors should declare only files that are safe for anonymous access. Do not place governance metadata, installation scripts, configuration files, tenant-specific files, or user-private files in public asset directories. Files that require authentication, tenant filtering, or personalized access control should be served by the plugin's own `HTTP API`.
+
+## Source Plugin Assets
+
+Source plugins embed plugin resources into the core framework build artifact through `plugin_embed.go`:
 
 ```go
 package plugindemosource
 
 import "embed"
 
-// EmbeddedFiles contains the plugin manifest, convention-based SQL assets, and
-// frontend source resources.
-//
 //go:embed plugin.yaml frontend manifest
 var EmbeddedFiles embed.FS
 ```
 
-This declaration embeds the `plugin.yaml` manifest, the `frontend/` page directory, and the `manifest/` asset directory, including `SQL` files and internationalization bundles, into the `EmbeddedFiles` variable. These assets are compiled together with the core framework binary.
-
-### Asset Registration and Usage
-
-The plugin registers its embedded file system with the core framework in `init()`:
+During plugin registration, the embedded file system is handed to the core framework:
 
 ```go
 plugin := pluginhost.NewSourcePlugin(pluginID)
 plugin.Assets().UseEmbeddedFiles(plugindemosource.EmbeddedFiles)
 ```
 
-When the core framework scans source plugin manifests, it reads `plugin.yaml` from the embedded `embed.FS` and parses plugin identity, menus, permissions, and other metadata. No disk lookup is required.
+The core framework reads `plugin.yaml`, installation `SQL`, language packs, plugin configuration, and manifest resources from the embedded resources. Only resources matched by `public_assets` are exposed through `/x-assets`.
 
-### Frontend Page Assets
+Source plugin frontend pages usually live under `frontend/pages/` and are compiled into the built-in workspace frontend during the workspace build. After changing source plugin `.vue` pages, rebuild both frontend and backend for the change to take effect. This differs from runtime-uploaded frontend assets in dynamic plugins.
 
-Source plugins place frontend page `.vue` files under `frontend/pages/`:
+Source plugins can also register custom public routes such as `/portal/...`, `/assets/...`, or `/`. Those routes are fully maintained by plugin code. They are not generated automatically from `public_assets`, and the core framework does not treat them as workspace menus or `OpenAPI` interfaces.
 
-```text
-frontend/
-├── pages/
-│   ├── sidebar-entry.vue      # Page component referenced by a menu
-│   └── components/
-│       └── ...
-└── slots/                     # Slot pages, optional
-```
+## Dynamic Plugin Assets
 
-The core framework scans these paths through `ListFrontendPagePaths` and `ListFrontendSlotPaths`, but source plugin `.vue` files are **not served dynamically at runtime**. Instead, they are referenced and compiled during the `lina-vben` frontend build phase, then become part of the final `public/` bundle served by the core framework's embedded frontend asset route.
+When a dynamic plugin is built as a `.wasm` artifact, the build tool carries the resources needed at runtime:
 
-:::info
-Source plugin `Vue` page files are compile-time dependencies. After modifying them, you must rebuild both the core framework frontend and backend for the change to take effect. This differs from the runtime hot-loading model used by dynamic plugin frontend assets.
-:::
+| Resource | Source |
+|----------|--------|
+| Plugin manifest | `plugin.yaml` |
+| Frontend assets | `frontend/` |
+| Install and uninstall scripts | `manifest/sql/`, `manifest/sql/uninstall/` |
+| Demo data | `manifest/sql/mock-data/` |
+| I18N and API documentation translations | `manifest/i18n/` |
+| Default configuration | `manifest/config/config.yaml` |
+| Configuration template | `manifest/config/config.example.yaml` |
+| Declarative resources | General manifest files such as `manifest/metadata.yaml` |
 
-## Dynamic Plugin Static Assets
+The presence of frontend files in a dynamic plugin artifact does not make them public automatically. The core framework serves only assets matched by `public_assets`, mapping them to `/x-assets/{plugin-id}/{version}/...`. If the plugin is not installed, disabled, unavailable to the current tenant, or the requested version does not match, public assets return `404` by default.
 
-### WASM Custom Sections and Asset Storage
+Resource caches are bound to the checksum and generation of the current active release. Installation, enablement, disablement, uninstallation, upgrade, or same-version refresh invalidates the related runtime resource and frontend asset caches.
 
-Dynamic plugins package frontend assets into custom sections inside the `.wasm` file. When the core framework parses a `WASM` artifact, it reads each resource type from a fixed section name:
+## Frontend Loading Modes
 
-| Custom Section Name | Content |
-|---|---|
-| `lina.plugin.manifest` | Plugin identity manifest in `JSON` format |
-| `lina.plugin.dynamic` | Core framework runtime metadata, such as the `ABI` version and asset count |
-| `lina.plugin.frontend.assets` | Frontend static asset list, including paths, content, and `MIME` types |
-| `lina.plugin.i18n.assets` | Internationalization language bundles |
-| `lina.plugin.install.sql` | `SQL` executed during installation |
-| `lina.plugin.uninstall.sql` | `SQL` executed during uninstallation |
-
-`ArtifactFrontendAsset` is the data structure for each frontend asset:
-
-```go
-type ArtifactFrontendAsset struct {
-    Path          string // 资产相对路径，如 "pages/standalone.html"
-    ContentBase64 string // 资产内容的 base64 编码
-    ContentType   string // MIME 类型，如 "text/html"
-    Content       []byte // 解码后的原始字节（运行时使用，不序列化）
-}
-```
-
-Dynamic plugins also use `//go:embed` to embed the frontend file directory into `EmbeddedFiles`. During the build, the `LinaPro` plugin build tool reads these files from `embed.FS`, serializes them, and writes them into the `WASM` custom section:
-
-```go
-// plugin_embed.go（动态插件）
-//go:embed plugin.yaml frontend manifest
-var EmbeddedFiles embed.FS
-```
-
-### In-Memory Cache
-
-After the core framework reads a dynamic plugin `.wasm` artifact, it parses frontend assets into an **in-memory virtual file system** (`bundleFS`) and caches it in process memory with `{pluginID}@{version}` as the key:
-
-```mermaid
-flowchart LR
-    A[.wasm artifact] -->|Parse the lina.plugin.frontend.assets section| B[ArtifactFrontendAsset list]
-    B -->|buildBundle| C[bundleFS in-memory file system]
-    C -->|Use pluginID@version as the key| D[frontendBundleCache]
-```
-
-`bundleFS` implements the `fs.FS` interface. After path normalization, it reads bytes directly from the memory map without extracting files to disk. The cache lifetime is tied to the running core framework process. When a plugin is disabled or upgraded, the core framework actively calls `InvalidateBundle` to invalidate the corresponding cache entry.
-
-During startup, the core framework calls `PrewarmRuntimeFrontendBundles` for all enabled dynamic plugins, so the first request does not have to build the bundle on demand:
-
-```text
-Core framework startup
-  -> Scan .wasm artifacts
-  -> Call EnsureBundle for each enabled dynamic plugin
-  -> Write parsed results into frontendBundleCache
-  -> Ready to accept requests
-```
-
-A prewarm failure for one plugin does not prevent the core framework from starting. The core framework aggregates the failure details and writes them to the log.
-
-### Public Access Paths
-
-Dynamic plugin frontend assets are exposed through this path format:
-
-```text
-/plugin-assets/{pluginID}/{version}/{assetPath}
-```
-
-For example, the `pages/standalone.html` file from version `v0.1.0` of the `linapro-demo-dynamic` plugin is available at:
-
-```text
-/plugin-assets/linapro-demo-dynamic/v0.1.0/pages/standalone.html
-```
-
-`BuildRuntimeFrontendPublicBaseURL` generates the plugin-level base path. The plugin uses that path in `plugin.yaml` menu declarations to reference its own assets:
+Dynamic plugin menus are usually loaded through the `system/plugin/dynamic-page` shell. The common mode is `embedded-mount`:
 
 ```yaml
+public_assets:
+  - source: frontend/pages
+    mount: /
+    index: index.html
+
 menus:
-  - key: plugin:linapro-demo-dynamic:standalone-page
-    path: /plugin-assets/linapro-demo-dynamic/v0.1.0/pages/standalone.html
+  - key: plugin:linapro-demo-dynamic:main-entry
+    name: Dynamic Plugin Demo
+    path: /x-assets/linapro-demo-dynamic/v0.1.0/mount.js
     component: system/plugin/dynamic-page
+    perms: linapro-demo-dynamic:view
+    type: M
+    query:
+      pluginAccessMode: embedded-mount
 ```
 
-When the core framework receives a `/plugin-assets/...` request, it performs these checks in order:
-
-1. Parse `pluginID` and `version` from the path.
-2. Verify that the plugin is installed and enabled.
-3. Confirm that the requested version matches the currently active version.
-4. Read the requested file content from the in-memory cache (`bundleFS`).
-5. Set the correct `Content-Type` response header and return the content.
-
-Any failed check returns `404`, preventing assets from disabled or uninstalled plugins from being accessed.
-
-### Frontend Page Loading Modes
-
-Dynamic plugins support two frontend page loading modes.
-
-#### `embedded-mount` (Embedded Mount)
-
-Embedded mount mode loads the plugin's `JavaScript` module, either a `.js` or `.mjs` file, into the core framework page container through a dynamic `ESM` import. In this mode, the plugin's `JS` entry file must export a `mount(context)` function:
+In this mode, the menu `path` is the entry asset URL loaded by the dynamic page shell. It is not converted into an ordinary workspace route. The entry file usually exports a `mount(context)` function:
 
 ```js
-// 动态插件 mount.js 示例
 export async function mount(context) {
-    const { container, accessToken, locale, messages, t, query } = context;
-    // 在 container 中渲染插件 UI
-    return {
-        unmount(context) {
-            context.container.replaceChildren();
-        },
-        update(context) {
-            // 处理路由更新
-        }
-    };
+  const { container, accessToken, locale, messages, t, query } = context;
+  container.textContent = t('plugin.demo.title');
+  return {
+    unmount(nextContext) {
+      nextContext.container.replaceChildren();
+    },
+    update(nextContext) {
+      void nextContext;
+    }
+  };
 }
 ```
 
-The `context` object passed to `mount(context)` contains these fields:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `container` | `HTMLElement` | Mount container provided by the core framework |
-| `accessToken` | `string` | Current user's `JWT` token |
-| `assetURL` | `string` | Full `URL` of the current entry asset |
-| `baseURL` | `string` | `URL` prefix of the asset directory |
-| `locale` | `string` | Current user interface language |
-| `messages` | `object` | Runtime internationalization message snapshot |
-| `t` | `function` | Internationalization message lookup function |
-| `query` | `object` | Current route query parameters |
-| `route` | `object` | Current `Vue Router` route object |
-| `title` | `string` | Current menu title |
-
-Enable embedded mount mode in the menu declaration through the `query_param` field:
-
-```yaml
-menus:
-  - key: plugin:linapro-demo-dynamic:embedded-page
-    path: /plugin-assets/linapro-demo-dynamic/v0.1.0/pages/mount.js
-    component: system/plugin/dynamic-page
-    query_param: '{"pluginAccessMode":"embedded-mount"}'
-```
-
-#### `standalone` (Standalone Page)
-
-Standalone mode loads an `HTML` file from plugin assets through an `iframe`. The plugin page gets an independent browser context, making this mode suitable for scenarios that need full `DOM` control or external scripts. In the menu declaration, point `path` directly to the `HTML` asset path. No extra `query_param` is required:
+`standalone` mode usually loads an independent `HTML` asset through an `iframe`:
 
 ```yaml
 menus:
   - key: plugin:linapro-demo-dynamic:standalone-page
-    path: /plugin-assets/linapro-demo-dynamic/v0.1.0/pages/standalone.html
+    path: /x-assets/linapro-demo-dynamic/v0.1.0/standalone.html
     component: system/plugin/dynamic-page
     is_frame: 1
+    type: M
 ```
 
-### Asset Validation on Enablement
+Embedded mount is suitable when the plugin should share the workspace context, language packs, and authentication state. Standalone pages are suitable when the plugin needs full `DOM` control or isolation for third-party scripts.
 
-When a dynamic plugin is enabled, the core framework calls `ValidateRuntimeFrontendMenuBindings` to validate all asset references in menu declarations:
+## Path Validation
 
-1. Scan all menu records owned by the plugin.
-2. For each menu whose path points to the `/plugin-assets/` prefix, extract the asset relative path.
-3. Confirm that the version number in the path matches the currently active version.
-4. Check the in-memory cache to ensure that the referenced asset file exists.
-5. For `embedded-mount` mode, additionally verify that the entry file extension is `.js` or `.mjs`.
+The core framework strictly validates `public_assets` declarations. The following configurations are rejected:
 
-Any failed validation blocks the plugin enablement flow and returns a clear error message, preventing plugins with invalid menu bindings from entering service.
+| Invalid configuration | Reason |
+|-----------------------|--------|
+| Empty `source` | No clear publication boundary can be formed |
+| Absolute path or `URL` | May escape the plugin resource set |
+| `../` or `.` traversal segments | May read files outside the plugin root |
+| Wildcards, query strings, or fragments | Cannot be mapped to a stable static directory |
+| Duplicate or overlapping `mount` values | One access path would map to multiple sources |
+| Missing `source` | Source plugin directories or dynamic artifact frontend prefixes must exist |
+| Symlink escaping the plugin root | May read files outside the plugin |
+| `index` not shaped like a file name | Directory defaults must be safe relative file names |
 
-## Static Asset Comparison Across Layers
+These rules make static asset publication an explicit contract that can be reviewed, cached, and upgraded.
 
-| Dimension | Core Framework Static Assets | Source Plugin Static Assets | Dynamic Plugin Static Assets |
-|-----------|--------------------|-----------------------------|------------------------------|
-| **Embedding method** | `//go:embed all:public all:manifest` | `//go:embed plugin.yaml frontend manifest` | `//go:embed plugin.yaml frontend manifest` |
-| **How changes take effect** | Rebuild the core framework | Rebuild the core framework frontend and backend | Upload a new `.wasm` version and perform an explicit upgrade |
-| **Access path** | Any path, with `SPA` fallback | Resolved through the core framework frontend router | `/plugin-assets/{id}/{version}/...` |
-| **Runtime cache** | Embedded in the binary and read directly | Embedded in the binary and read directly | Process memory (`bundleFS`) |
-| **Hot loading** | Not supported | Not supported | Supported by uploading and upgrading to a new `WASM` version |
-| **Asset validation** | Guaranteed at build time | Guaranteed at build time | Validated at enablement time |
+## Caching and Versioning
+
+`/x-assets` paths include `{plugin-id, version}`, so public asset content under the same plugin version should remain stable. If asset content changes, upgrade the version in `plugin.yaml` or introduce an equivalent content-versioning mechanism. Publishing different content under the same version path can make browser caches, proxy caches, and cluster-node caches inconsistent.
+
+Dynamic plugins can continue serving public assets for the current active version while the plugin remains enabled. Source plugins resolve declared resources from the plugin resources compiled into the core framework or from the plugin directory.
+
+## Layer Comparison
+
+| Dimension | Default workspace assets | Source plugin assets | Dynamic plugin assets |
+|-----------|--------------------------|----------------------|-----------------------|
+| Embedding method | `//go:embed all:public all:manifest` | `//go:embed plugin.yaml frontend manifest` | Built into `.wasm` artifact resources |
+| Access entry | Local default `http://localhost:5666/admin`; `workspace.basePath` defaults to `/admin` | Workspace build output, plugin custom routes, or `/x-assets` | `/x-assets/{id}/{version}/...` |
+| Public authorization | Built-in core framework resources | Only resources matched by `public_assets` | Only resources matched by `public_assets` |
+| Change activation | Rebuild the core framework | Rebuild the core framework or upgrade the plugin version | Upload a new `.wasm` and run explicit runtime upgrade |
+| Runtime hot loading | Not supported | Not supported | Supported through upload and explicit upgrade |
+| Private file access | Controlled by core framework interfaces | Controlled by the plugin's own `HTTP API` | Controlled by plugin `API` or `hostServices` |
