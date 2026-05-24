@@ -170,9 +170,6 @@ docker run \
   -e POSTGRES_DB=linapro \
   postgres:14-alpine
 ```
-
-This example connects to the `linapro` database with `postgres:postgres@127.0.0.1:5432`. If you keep this password, update `database.default.link` in the project's `config.yaml` to `pgsql:postgres:postgres@tcp(127.0.0.1:5432)/linapro?sslmode=disable`.
-
 </TabItem>
 <TabItem value="windows" label="Windows">
 
@@ -180,8 +177,6 @@ Install it on the `Windows` side with the [PostgreSQL Windows installer](https:/
 
 </TabItem>
 </Tabs>
-
-By default, LinaPro connects to the `linapro` database with `postgres:postgres@127.0.0.1:5432`, using the link `pgsql:postgres:postgres@tcp(127.0.0.1:5432)/linapro?sslmode=disable`. You can change the connection settings in the project's `config.yaml`.
 
 ## Development Skills (Agent Skills)
 

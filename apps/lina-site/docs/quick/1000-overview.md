@@ -211,6 +211,5 @@ graph TB
 | **后端框架** | `GoFrame` | `v2.10.1`，提供路由、`ORM`、配置等全套能力 |
 | **前端框架** | `Vue 3` | 基于`Vben 5`管理台模板 |
 | **前端 `UI`** | `Ant Design Vue` | 企业级 `UI` 组件库 |
-| **构建工具** | `Vite` | 极速前端构建 |
 | **数据存储** | `PostgreSQL` | `PostgreSQL 14+`为默认数据存储 |
 | **插件运行时** | `WebAssembly` | `tetratelabs/wazero`，支持`WASM`动态插件 |

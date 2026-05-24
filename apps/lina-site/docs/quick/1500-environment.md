@@ -170,9 +170,6 @@ docker run \
   -e POSTGRES_DB=linapro \
   postgres:14-alpine
 ```
-
-该示例使用`postgres:postgres@127.0.0.1:5432`连接`linapro`数据库。如果沿用这个密码，请将项目`config.yaml`中的`database.default.link`改为`pgsql:postgres:postgres@tcp(127.0.0.1:5432)/linapro?sslmode=disable`。
-
 </TabItem>
 <TabItem value="windows" label="Windows">
 
@@ -180,8 +177,6 @@ docker run \
 
 </TabItem>
 </Tabs>
-
-`LinaPro`默认使用`postgres:postgres@127.0.0.1:5432`连接`linapro`数据库，对应连接串为`pgsql:postgres:postgres@tcp(127.0.0.1:5432)/linapro?sslmode=disable`，可在项目的`config.yaml`中修改连接配置。
 
 ## 开发技能(Agent Skills)
 

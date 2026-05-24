@@ -54,7 +54,7 @@ docker run \
   postgres:14-alpine
 ```
 
-If local port `5432` is already occupied, map the container to another host port, such as `15432:5432`, and update the port in `database.default.link` accordingly.
+If local port `5432` is already occupied, map the container to another host port, such as `15432:5432`.
 
 ### Configure the Database Connection
 
@@ -163,8 +163,7 @@ make image        # Build the Docker image
 
 ## Installation Verification
 
-After the service starts, open `http://localhost:5666` in your browser and log in with `admin / admin123`. If you can enter the admin workspace normally, the installation is complete.
-
+After the service starts, if you can enter the admin workspace normally, the installation is complete.
 If you run into issues, use the following checklist:
 
 1. Confirm that `PostgreSQL` is running and that the database connection in `config.yaml` is correct

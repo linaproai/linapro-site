@@ -209,6 +209,5 @@ Official source plugins live in `apps/lina-plugins/`, mounted as a `Git submodul
 | **Backend framework** | `GoFrame` | `v2.10.1` — routing, ORM, configuration, and more |
 | **Frontend framework** | `Vue 3` | Based on the Vben 5 admin template |
 | **Frontend UI** | `Ant Design Vue` | Enterprise-grade `UI` component library |
-| **Build tool** | `Vite` | Fast frontend builds |
 | **Data storage** | `PostgreSQL` | `PostgreSQL 14+` is the default data store |
 | **Plugin runtime** | `WebAssembly` | `tetratelabs/wazero`, powers `WASM` dynamic plugins |
