@@ -1,6 +1,6 @@
 ---
 slug: '/docs/api-reference'
-title: 'OpenAPI Reference'
+title: 'Unified API Reference'
 hide_title: true
 description: 'From a component design perspective, this page explains how LinaPro aggregates API documentation — the core framework, source plugins, and WASM dynamic plugins are unified into a single OpenAPI document through g.Meta contracts, permission tags, API doc i18n resources, the in-workspace developer center debugging page, and third-party tool import.'
 keywords:
