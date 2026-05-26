@@ -25,6 +25,9 @@ keywords:
   - official plugin submodules
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 Before cloning the repository, read [Environment Setup](/quick/environment) and make sure required components such as `Go`, `Node.js`, `pnpm`, and `PostgreSQL` are installed correctly.
 
 ## Clone the Repository
@@ -107,11 +110,26 @@ Run the following command to check whether the current development environment m
 make env.check
 ```
 
-If requirements are missing, you can install the complete development environment resources with the following command. This may take some time:
+If requirements are missing, you can install the complete development environment resources (frontend and test resource components only) with the following command. This may take some time:
 
 ```bash
 make env.setup
 ```
+
+This command automatically downloads the `Playwright` browser for end-to-end testing. If the `Chromium` download is slow, you can use a mirror to speed it up:
+
+<Tabs groupId="platform">
+<TabItem value="mac-linux" label="macOS / Linux" default>
+```bash
+PLAYWRIGHT_DOWNLOAD_HOST=https://cdn.npmmirror.com/binaries/playwright make env.setup
+```
+</TabItem>
+<TabItem value="windows" label="Windows">
+```bash
+$env:PLAYWRIGHT_DOWNLOAD_HOST="https://cdn.npmmirror.com/binaries/playwright" make env.setup
+```
+</TabItem>
+</Tabs>
 
 ### Start the Development Services
 

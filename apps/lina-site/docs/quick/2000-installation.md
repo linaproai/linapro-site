@@ -25,6 +25,9 @@ keywords:
   - 官方插件子模块
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 克隆仓库前，请先参阅[环境配置](/quick/environment)，确保`Go`、`Node.js`、`pnpm`、`PostgreSQL`等必要组件已正确安装。
 
 ## 克隆仓库
@@ -109,11 +112,27 @@ make mock confirm=mock
 make env.check
 ```
 
-如果不满足，则可通过以下指令安装完整的开发环境资源，可能需要较长时间：
+如果不满足，则可通过以下指令安装完整的开发环境资源（仅针对前端和测试资源组件），可能需要较长时间：
 
 ```bash
 make env.setup
 ```
+
+其中会自动下载`playwright`工具用于后续的`e2e`测试，如果遇到该工具下载`chromium`较慢，可以设置国内下载加速：
+
+<Tabs groupId="platform">
+<TabItem value="mac-linux" label="macOS / Linux" default>
+```bash
+PLAYWRIGHT_DOWNLOAD_HOST=https://cdn.npmmirror.com/binaries/playwright make env.setup
+``` 
+</TabItem>
+<TabItem value="windows" label="Windows">
+```bash
+$env:PLAYWRIGHT_DOWNLOAD_HOST="https://cdn.npmmirror.com/binaries/playwright" make env.setup
+``` 
+</TabItem>
+</Tabs>
+
 
 
 
