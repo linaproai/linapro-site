@@ -1,6 +1,6 @@
 {
   "version.label": {
-    "message": "0.2.x(Latest)",
+    "message": "0.3.x(Latest)",
     "description": "The label for version current"
   },
   "sidebar.mainSidebar.category.Core Concepts": {
