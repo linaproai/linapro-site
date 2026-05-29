@@ -28,7 +28,7 @@ function HomepageHeader() {
                         <div>
                             <a href="https://github.com/linaproai/linapro/actions/workflows/main-ci.yml" target="_blank" rel="noopener noreferrer"><img src="https://github.com/linaproai/linapro/actions/workflows/main-ci.yml/badge.svg" alt="LinaPro CI" /></a>
                             <a href="https://github.com/linaproai/linapro/releases" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/github/v/release/linaproai/linapro?style=flat&v=0.3.0" alt="LinaPro Stable Release" /></a>
-                            <a href="https://github.com/linaproai/linapro" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/github/license/linaproai/linapro.svg?style=flat&v=0.3.0" alt="LinaPro License" /></a>
+                            <a href="https://github.com/linaproai/linapro" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/badge/license-apache%202.0-green.svg?style=flat" alt="LinaPro License" /></a>
                             <a href="https://github.com/linaproai/linapro" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/badge/production-ready-blue.svg?style=flat" alt="LinaPro Is Production Ready" /></a>
                         </div>
                         <div>
