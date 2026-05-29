@@ -188,7 +188,7 @@ hostServices:
 | `Governance()` | 声明菜单和权限过滤逻辑 |
 | `HostServices()` | 获取插件作用域的配置、缓存、租户、通知、清单资源等主框架服务 |
 
-源码插件无法直接`import`主框架的`internal/`目录，只能使用主框架发布的稳定契约。
+源码插件无法直接`import`主框架的`internal/`目录，只能使用主框架发布的稳定契约。各基础能力服务的架构设计和使用约束，参见[插件基础能力](/docs/plugin-capability-services)。
 
 ### pluginbridge
 
@@ -208,7 +208,7 @@ hostServices:
 
 `manifest/config/config.example.yaml`只是配置模板，不是运行时默认值。源码插件通过`HostServices().Config()`读取当前插件自己的配置，通过`HostServices().HostConfig()`读取宿主公开配置白名单键，通过`HostServices().Manifest()`读取插件`manifest/`下的原始资源。动态插件对应使用`hostServices`中的`config`、`hostConfig`和`manifest`授权。
 
-`manifest`资源路径相对`manifest/`，可以读取`profile.yaml`、`resources/policy.yaml`、`config/config.example.yaml`、`sql/*.sql`或`i18n/*.json`等插件自有文件；读取原文不等于让配置、`SQL`或语言包生效。完整路径语义、读取优先级和使用示例参见[插件配置与manifest资源](/docs/plugin-config-and-metadata)。
+`manifest`资源路径相对`manifest/`，可以读取`profile.yaml`、`resources/policy.yaml`、`config/config.example.yaml`、`sql/*.sql`或`i18n/*.json`等插件自有文件；读取原文不等于让配置、`SQL`或语言包生效。完整路径语义、读取优先级和使用示例参见[插件配置与manifest资源](/docs/plugin-config-and-manifest)。
 
 
 ## 生命周期状态

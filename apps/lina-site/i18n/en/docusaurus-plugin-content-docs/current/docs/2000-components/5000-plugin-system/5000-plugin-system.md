@@ -187,7 +187,7 @@ hostServices:
 | `Governance()` | Declares menu and permission filtering logic |
 | `HostServices()` | Gets plugin-scoped core framework services such as configuration, cache, tenancy, notifications, and manifest resources |
 
-Source plugins cannot directly `import` the core framework's `internal/` directory. They can only use stable contracts published by the core framework.
+Source plugins cannot directly `import` the core framework's `internal/` directory. They can only use stable contracts published by the core framework. For architecture details and usage constraints of each foundational capability service, see [Plugin Capability Services Overview](/docs/plugin-capability-services).
 
 ### pluginbridge
 
@@ -207,7 +207,7 @@ Plugin business configuration should not be written into the core framework `con
 
 `manifest/config/config.example.yaml` is only a configuration template, not a runtime default. Source plugins read their own configuration through `HostServices().Config()`, read allowlisted public host configuration keys through `HostServices().HostConfig()`, and read original resources under `manifest/` through `HostServices().Manifest()`. Dynamic plugins use the corresponding `config`, `hostConfig`, and `manifest` authorizations in `hostServices`.
 
-Manifest resource paths are relative to `manifest/` and can be used to read plugin-owned files such as `profile.yaml`, `resources/policy.yaml`, `config/config.example.yaml`, `sql/*.sql`, or `i18n/*.json`. Reading the original content does not cause the configuration, `SQL`, or language pack to take effect. For full path semantics, read priority, and usage examples, see [Plugin Configuration and Manifest Resources](/docs/plugin-config-and-metadata).
+Manifest resource paths are relative to `manifest/` and can be used to read plugin-owned files such as `profile.yaml`, `resources/policy.yaml`, `config/config.example.yaml`, `sql/*.sql`, or `i18n/*.json`. Reading the original content does not cause the configuration, `SQL`, or language pack to take effect. For full path semantics, read priority, and usage examples, see [Plugin Configuration and Manifest Resources](/docs/plugin-config-and-manifest).
 
 
 ## Lifecycle States
