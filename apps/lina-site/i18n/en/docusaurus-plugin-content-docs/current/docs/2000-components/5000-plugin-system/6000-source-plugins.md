@@ -20,6 +20,10 @@ keywords:
   - menu declarations
   - permission declarations
   - lifecycle callbacks
+  - LinaPro plugin
+  - plugin configuration
+  - manifest resources
+  - raw resource reading
 ---
 
 ## Introduction
@@ -213,9 +217,9 @@ Source plugins use `registrar.HostServices()` to access plugin-scoped core frame
 |---------|---------|
 | `Config()` | Reads the current plugin's own configuration; the production override path is `plugins/<plugin-id>/config.yaml`, and the development default is `manifest/config/config.yaml` |
 | `HostConfig()` | Reads allowlisted public host configuration keys such as `workspace.basePath`, `i18n.default`, and `i18n.enabled` |
-| `Manifest()` | Reads declaration resources under the current plugin's `manifest/`, such as `metadata.yaml` |
+| `Manifest()` | Reads original resources under the current plugin's `manifest/`, such as `profile.yaml`, `config/config.example.yaml`, or `i18n/zh-CN/plugin.json` |
 
-`manifest/config/config.example.yaml` is only a template and is not part of default reads. Plugins should not scan the full host configuration tree through `g.Cfg()`, and should not put plugin business configuration into the core framework `config.yaml`.
+`manifest/config/config.example.yaml` is only a template and is not part of default reads. Plugins should not scan the full host configuration tree through `g.Cfg()`, and should not put plugin business configuration into the core framework `config.yaml`. For complete configuration read priority, `manifest` resource path semantics, and dedicated resource pipeline boundaries, see [Plugin Configuration and Manifest Resources](/docs/plugin-config-and-metadata).
 
 ```go
 func registerRoutes(ctx context.Context, registrar pluginhost.HTTPRegistrar) error {
@@ -233,15 +237,17 @@ func registerRoutes(ctx context.Context, registrar pluginhost.HTTPRegistrar) err
     }
     _ = workspaceBase
 
-    var metadata struct {
+    var profile struct {
         Category string `yaml:"category"`
     }
-    if err := services.Manifest().Scan(ctx, "metadata.yaml", "", &metadata); err != nil {
+    if err := services.Manifest().Scan(ctx, "profile.yaml", "", &profile); err != nil {
         return err
     }
     return nil
 }
 ```
+
+Here, `profile.yaml` is just an example of a plain `YAML` resource. The path is relative to `manifest/` and should not be written as `manifest/profile.yaml`.
 
 ## Frontend Pages
 

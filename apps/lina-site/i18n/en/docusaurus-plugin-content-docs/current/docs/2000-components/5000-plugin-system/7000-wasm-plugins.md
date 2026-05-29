@@ -25,6 +25,10 @@ keywords:
   - lock service
   - cron service
   - runtime service
+  - LinaPro plugin
+  - plugin configuration
+  - manifest resources
+  - raw resource reading
 ---
 
 
@@ -84,6 +88,8 @@ sequenceDiagram
 
 The core framework completes authentication, authorization, and tenant context handling before passing a request snapshot into the `WASM` instance. Dynamic plugins see a structured request envelope — not a raw core framework internal object.
 
+
+
 ## Directory Structure
 
 Dynamic plugin source directories follow the same layout as source plugins, with an additional `main.go` as the `WASM` entry point:
@@ -115,6 +121,8 @@ apps/lina-plugins/<plugin-id>/
 ```
 
 The build tool reads embedded plugin resources first and falls back to directory scanning when needed. It writes `plugin.yaml`, `frontend/` assets, `manifest/sql`, `manifest/i18n`, `manifest/config/config.yaml`, `manifest/config/config.example.yaml`, and declaration resources under `manifest/` into the dynamic artifact. Runtime resources are bound to the checksum and generation of the current active release; installation, enablement, disablement, uninstallation, upgrade, or same-version refresh invalidates the corresponding caches.
+
+Dynamic plugin configuration and `manifest` resource path semantics are consistent with source plugins. `manifest/config/config.yaml` serves as the default configuration snapshot carried in the dynamic artifact and is only used as a fallback when no production external configuration or development-time configuration file exists. `manifest/config/config.example.yaml` is only a template. Files such as `profile.yaml`, `resources/policy.yaml`, `config/config.example.yaml`, `sql/*.sql`, and `i18n/*.json` can all be read as-is through the `manifest` class of `hostServices`, but must be authorized in `resources.paths`. Reading the original content does not replace the configuration, `SQL`, or i18n dedicated pipelines. For complete details, see [Plugin Configuration and Manifest Resources](/docs/plugin-config-and-metadata).
 
 ## WASM Entry Point
 
@@ -197,10 +205,10 @@ hostServices:
     methods: [get]
     resources:
       paths:
-        - metadata.yaml
+        - profile.yaml
 ```
 
-`config`, `hostConfig`, and `manifest` allow only the `get` method. Convenience functions on the guest-side `SDK`, such as `String`, `Bool`, `Int`, `Duration`, and `Scan`, are converted into `get` calls. They do not need to and must not be declared as authorization methods. `hostConfig` must declare `resources.keys`, and `manifest` must declare `resources.paths`.
+`config`, `hostConfig`, and `manifest` allow only the `get` method. Convenience functions on the guest-side `SDK`, such as `String`, `Bool`, `Int`, `Duration`, and `Scan`, are converted into `get` calls. They do not need to and must not be declared as authorization methods. `hostConfig` must declare `resources.keys`, and `manifest` must declare `resources.paths`. `manifest` resource paths are relative to the `manifest/` directory — for example, `profile.yaml` in the example above should not be written as `manifest/profile.yaml`.
 
 ## Building Dynamic Plugins
 

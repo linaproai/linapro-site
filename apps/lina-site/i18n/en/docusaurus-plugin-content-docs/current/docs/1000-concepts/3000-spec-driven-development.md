@@ -35,7 +35,7 @@ In traditional development, requirements documents and technical designs quickly
 
 ## The OpenSpec Workflow
 
-`LinaPro` ships a built-in spec-driven AI development workflow, with `OpenSpec` as the recommended implementation tool. Organized around the `openspec/` directory, it consists of five stages that form a complete development loop:
+`OpenSpec` is an AI spec-driven workflow tool that `LinaPro` strongly recommends. It is not a `LinaPro` runtime dependency — users can employ other `SDD` tools such as `Spec-kit` or `Superpowers` — but the framework provides thorough application, testing, and support for `OpenSpec`. Teams are encouraged to use it in formal iterations to form a complete development loop:
 
 ```mermaid
 flowchart LR

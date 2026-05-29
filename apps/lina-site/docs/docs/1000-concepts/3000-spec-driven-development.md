@@ -35,7 +35,7 @@ keywords:
 
 ## OpenSpec 工作流
 
-`LinaPro`内置规范驱动的`AI`研发工作流，`OpenSpec`是该工作流可选但特别建议安装的实现工具。它不是`LinaPro`运行时依赖，项目不安装也可以启动和运行；但框架已经围绕`openspec/`目录、`opsx`指令和相关`Agent Skills`提供了良好支持，建议团队在正式迭代中使用它形成完整研发闭环：
+`OpenSpec`是`LinaPro`特别建议安装的`AI`规范驱动工作流实现工具。它不是`LinaPro`运行时依赖，用户使用其他`SDD`工具（如`Spec-kit`、`Superpowers`等）也是可以的，但框架对`OpenSpec`提供了良好的应用、测试与支持，建议团队在正式迭代中使用它形成完整研发闭环：
 
 ```mermaid
 flowchart LR

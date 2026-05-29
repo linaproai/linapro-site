@@ -2,7 +2,7 @@
 slug: '/docs/ai-native'
 title: 'AI Native'
 hide_title: true
-description: 'A detailed look at LinaPro as an AI-native framework — what AI-native truly means, how it differs from AI-assisted development, how AI participates in every stage of the development lifecycle, the built-in AI skill system covering backend, frontend, testing, performance auditing, and version management, and why spec-driven development prevents architectural drift over time.'
+description: 'A detailed look at LinaPro as an AI-native framework — what AI-native truly means, how it differs from AI-assisted development, how AI participates in every stage of the development lifecycle, the built-in AI skill system covering backend, frontend, testing, performance auditing, and version management, progressive project specification management, and why spec-driven development prevents architectural drift over time.'
 keywords:
   - AI-native
   - AI-native framework
@@ -29,6 +29,10 @@ keywords:
   - frontend-design
   - performance audit
   - skill ecosystem
+  - AGENTS.md
+  - AI project specification
+  - progressive specification
+  - make agents
 ---
 
 ## What "AI-Native" Means
@@ -53,7 +57,9 @@ These two dimensions complement each other and together form the foundation of `
 | **Test coverage** | Mandatory `E2E` tests, a prerequisite for every change | Written as needed, gaps possible |
 | **Iteration speed** | Bounded by `AI` processing speed | Bounded by human coding speed |
 
-## AI Across the Full Development Lifecycle
+## AI-Native Development System Design
+
+### AI Across the Full Development Lifecycle
 
 In `LinaPro`'s AI-native workflow, AI is deeply involved at every stage of development:
 
@@ -74,7 +80,7 @@ flowchart TD
     I -->|"Confirmed complete"| K["AI archives change\nSpecs consolidated as baseline"]
 ```
 
-- **Requirements analysis:** `AI` reads the project specs (`AGENTS.md`/`CLAUDE.md`), existing `OpenSpec` documents, and source code to deeply understand the current architecture. It proactively asks clarifying questions to help you think through scope and impact.
+- **Requirements analysis:** `AI` reads the project specs (`AGENTS.md`), existing `OpenSpec` documents, and source code to deeply understand the current architecture. It proactively asks clarifying questions to help you think through scope and impact.
 
 - **System design:** `AI` produces database schema designs, API interface definitions, and frontend page structures, forming a complete design document (`design.md`) and incremental specs (`specs/`) for your review and approval.
 
@@ -84,27 +90,57 @@ flowchart TD
 
 - **Documentation archival:** `AI` organizes the design decisions and API specs from the change into baseline documentation for future iterations to reference.
 
-## Built-in AI Skill System
+### Built-in AI Skill System
 
-AI-native is not just about a development workflow — it also means the framework provides deep, purpose-built skills for every stage of AI work. `LinaPro` ships a built-in AI skill system covering the full development lifecycle, so AI can work at maximum effectiveness in every concrete scenario without requiring developers to re-explain project conventions at the start of every session.
+AI-native is not just about a development workflow — it also means the framework provides deep, purpose-built skills for every stage of AI work. `LinaPro` ships a built-in AI skill system covering the full development lifecycle, so AI can work at maximum effectiveness in every concrete scenario without requiring developers to re-explain project conventions at the start of every session. Here are some examples of the built-in skills:
 
 | Category | Skill | Core capability |
 |----------|-------|----------------|
 | **Development workflow** | `openspec-*` | Requirements exploration, change proposals, design document generation |
 | **Development workflow** | `lina-review` | Code and spec compliance review — the quality gate before archiving an `OpenSpec` change |
 | **Development workflow** | `lina-feedback` | Issue tracking, bug fixes, and E2E test coverage closure |
-| **Backend** | `goframe-v2` | `GoFrame` development conventions, best practices for API, service, and DAO layers |
 | **Frontend** | `frontend-design` | Production-grade frontend design that avoids generic AI-generated interface patterns |
 | **Frontend** | `frontend-patterns` | Frontend development patterns: state management, performance optimization, form handling |
 | **Testing** | `lina-e2e` | `Playwright` E2E test case naming, organization, and writing conventions |
 | **Testing** | `playwright-cli` | Browser automation for E2E test execution and debugging |
 | **Quality** | `lina-perf-audit` | Backend API performance auditing — surfaces N+1 queries, missing indexes, and similar issues |
 | **Quality baseline** | `karpathy-guidelines` | Guards against common LLM coding pitfalls to keep implementations precise and lean |
-| **Version management** | `lina-upgrade` | Framework and source plugin version upgrades, AI-guided and script-driven |
 | **Version management** | `git-commit-push` | Analyzes the diff and generates commit messages that match the repository's conventions |
 | **Version management** | `git-worktree` | Creates isolated `Git` worktrees for parallel tasks to avoid conflicts |
 
-These skills are embedded in the framework's AI collaboration spec (`.agents/skills/`) as domain knowledge — no installation required. AI tools activate the relevant skill automatically when handling the corresponding scenario. The result: **in every concrete work context, AI makes decisions that comply with `LinaPro`'s framework constraints** rather than falling back on general model knowledge to produce code or documentation that doesn't fit the project.
+These skills are embedded in the framework's AI collaboration spec (`.agents/skills/`) as domain knowledge. Project built-in skills are loaded automatically with the source code, and AI tools activate the relevant skill automatically when handling the corresponding scenario. External tools or skills such as `OpenSpec CLI`, `goframe-v2`, and `find-skills` are still recommended for on-demand installation to get the full spec-driven and backend development experience. The direct benefit of this rich skill ecosystem is: **in every concrete work context, AI makes decisions that comply with `LinaPro`'s framework constraints** rather than falling back on general model knowledge to produce code or documentation that doesn't fit the project.
+
+### Progressive Project Specification Management
+
+`LinaPro` does not cram all rules into one oversized prompt. Instead, it uses a progressive project specification management strategy. The `AI Agent` first reads the top-level entry point, then continues to read detailed rule files based on the domains hit by the current task.
+
+```mermaid
+flowchart TD
+    A["AI Coding tool enters the project"] --> B["Reads root AGENTS.md"]
+    B --> C{"Which domains does the current task hit?"}
+    C --> D["Reads .agents/rules/*.md as needed"]
+    C --> E{"Is a plugin directory being modified?"}
+    E -- Yes --> F["Reads apps/lina-plugins/<plugin-id>/AGENTS.md first"]
+    E -- No --> G["Follows global specs and matched rules"]
+    F --> H["Plugin local rules override conflicting items\nUncovered items continue to follow global specs"]
+    D --> I["Executes task using OpenSpec, skills, and source code"]
+    G --> I
+    H --> I
+```
+
+| Specification resource | Responsibility |
+|------------------------|---------------|
+| `AGENTS.md` | Top-level specification entry point — declares project positioning, mandatory trigger scenarios, rule-loading gates, and rule file index |
+| `.agents/rules/*.md` | Domain-specific detailed rules, such as documentation, plugins, backend, frontend, database, testing, and development tools |
+| `.agents/skills/` | Project built-in skills that give `AI` specialized workflows and constraints in concrete scenarios |
+| `.agents/prompts/` | Project commands and prompt directory, such as `OpenSpec`-related command entry points |
+| `apps/lina-plugins/<plugin-id>/AGENTS.md` | Plugin local specification entry point — applies only to file changes within that plugin directory |
+
+Plugin local specifications are an important part of this strategy. When developing a plugin, if the plugin directory contains an `AGENTS.md`, the `AI Agent` should read it first. When the plugin local specification conflicts with the project top-level specification or `.agents/rules/*.md`, the plugin local specification takes precedence within that plugin directory. Uncovered items continue to follow the global specifications and matched rule files.
+
+The value of this design is that the main project maintains a unified engineering quality baseline, while plugins can express their own domain constraints, directory conventions, business rules, and testing requirements. As the number of plugins grows, `AI` does not need to load all plugin rules at once — it reads the corresponding local specification only when entering a specific plugin development context.
+
+To accommodate different developers' preferred `AI Coding` tools, `LinaPro` provides the `make agents` command family to bridge the unified source to each tool's own conventional paths. For example, tools that natively read `AGENTS.md` need no extra files; tools that only read `CLAUDE.md`, `GEMINI.md`, or `QWEN.md` can use the same root specification through symlinks. Skills and prompts are bridged to `.claude/skills`, `.codex/prompts`, `.cursor/commands`, and similar paths in the same way.
 
 ## Spec-Driven Development
 

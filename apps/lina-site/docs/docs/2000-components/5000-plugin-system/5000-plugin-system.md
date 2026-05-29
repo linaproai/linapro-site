@@ -35,7 +35,7 @@ keywords:
 
 两种模式运行形态不同，但共享同一套插件治理面。管理端看到的是同一类插件生命周期、依赖、权限、状态、多租户策略、公开静态资源和插件自身配置。
 
-源码插件和动态插件的目录结构也趋于一致：根目录包含`plugin.yaml`，后端能力位于`backend/`，前端资源位于`frontend/`，安装脚本、语言包、配置和声明资源位于`manifest/`。源码插件通过`plugin_embed.go`把这些资源嵌入主框架编译产物；动态插件通过构建工具把同类资源写入`.wasm`产物，并在运行时绑定到当前有效发布版本。
+源码插件和动态插件的目录结构也趋于一致：根目录包含`plugin.yaml`，后端能力位于`backend/`，前端资源位于`frontend/`，安装脚本、语言包、配置和插件自有资源位于`manifest/`。源码插件通过`plugin_embed.go`把这些资源嵌入主框架编译产物；动态插件通过构建工具把同类资源写入`.wasm`产物，并在运行时绑定到当前有效发布版本。
 
 ## 插件不必包含前端页面
 
@@ -168,7 +168,7 @@ hostServices:
     methods: [get]
     resources:
       paths:
-        - metadata.yaml
+        - profile.yaml
 ```
 
 `config`、`hostConfig`和`manifest`都是只读服务，清单中只声明`methods: [get]`。`String`、`Bool`、`Int`、`Duration`、`Scan`等是源码插件或动态插件`SDK`在`get`之上的便捷方法，不应作为授权方法写入清单。
@@ -196,19 +196,19 @@ hostServices:
 
 动态插件访问主框架能力时发起`host_call`，主框架按安装时确认的`hostServices`授权快照校验服务、方法和资源边界。
 
-### 插件配置与声明资源
+### 插件配置与manifest资源
 
 插件业务配置不应写入主框架`config.yaml`。主框架为插件提供插件作用域配置服务，读取优先级如下：
 
 | 优先级 | 配置位置 | 说明 |
 |--------|----------|------|
-| 1 | 运行目录下的`plugins/<plugin-id>/config.yaml` | 运维侧覆盖当前插件配置 |
+| 1 | 生产配置根下`plugins/<plugin-id>/config.yaml` | 运维侧覆盖当前插件配置 |
 | 2 | `apps/lina-plugins/<plugin-id>/manifest/config/config.yaml` | 开发期插件默认配置 |
 | 3 | 动态插件产物中的`manifest/config/config.yaml` | 动态插件随发布版本携带的默认配置 |
 
-`manifest/config/config.example.yaml`只是配置模板，不是运行时默认值。源码插件通过`HostServices().Config()`读取当前插件自己的配置，通过`HostServices().HostConfig()`读取宿主公开配置白名单键，通过`HostServices().Manifest()`读取插件`manifest/`下的声明资源。动态插件对应使用`hostServices`中的`config`、`hostConfig`和`manifest`授权。
+`manifest/config/config.example.yaml`只是配置模板，不是运行时默认值。源码插件通过`HostServices().Config()`读取当前插件自己的配置，通过`HostServices().HostConfig()`读取宿主公开配置白名单键，通过`HostServices().Manifest()`读取插件`manifest/`下的原始资源。动态插件对应使用`hostServices`中的`config`、`hostConfig`和`manifest`授权。
 
-声明资源路径相对`manifest/`，适合放置`metadata.yaml`等插件自有声明。`config`、`sql`和`i18n`是主框架专用目录，不作为普通声明资源读取。
+`manifest`资源路径相对`manifest/`，可以读取`profile.yaml`、`resources/policy.yaml`、`config/config.example.yaml`、`sql/*.sql`或`i18n/*.json`等插件自有文件；读取原文不等于让配置、`SQL`或语言包生效。完整路径语义、读取优先级和使用示例参见[插件配置与manifest资源](/docs/plugin-config-and-metadata)。
 
 
 ## 生命周期状态

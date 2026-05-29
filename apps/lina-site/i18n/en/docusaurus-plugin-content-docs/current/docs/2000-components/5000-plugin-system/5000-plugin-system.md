@@ -21,6 +21,7 @@ keywords:
   - plugin dependencies
   - multi-tenant plugins
   - plugin boundaries
+  - LinaPro
 ---
 
 ## Introduction
@@ -34,7 +35,7 @@ The plugin system is `LinaPro`'s core extension mechanism for business capabilit
 
 The two modes differ in runtime form, but share the same plugin governance plane. The admin side sees the same plugin lifecycle, dependencies, permissions, status, multi-tenant policies, public static assets, and plugin-owned configuration.
 
-The directory structures for source plugins and dynamic plugins are also converging: the root contains `plugin.yaml`, backend capability lives under `backend/`, frontend resources live under `frontend/`, and installation scripts, language packs, configuration, and declarative resources live under `manifest/`. Source plugins embed these resources into the core framework build artifact through `plugin_embed.go`; dynamic plugins write the same kinds of resources into `.wasm` artifacts through the build tool and bind them to the current active release version at runtime.
+The directory structures for source plugins and dynamic plugins are also converging: the root contains `plugin.yaml`, backend capability lives under `backend/`, frontend resources live under `frontend/`, and installation scripts, language packs, configuration, and plugin-owned resources live under `manifest/`. Source plugins embed these resources into the core framework build artifact through `plugin_embed.go`; dynamic plugins write the same kinds of resources into `.wasm` artifacts through the build tool and bind them to the current active release version at runtime.
 
 ## Plugins Don't Have to Include a Frontend
 
@@ -167,7 +168,7 @@ hostServices:
     methods: [get]
     resources:
       paths:
-        - metadata.yaml
+        - profile.yaml
 ```
 
 `config`, `hostConfig`, and `manifest` are all read-only services; manifests should declare only `methods: [get]`. `String`, `Bool`, `Int`, `Duration`, `Scan`, and similar helpers are source plugin or dynamic plugin `SDK` convenience methods layered on top of `get`, and should not be written as authorization methods.
@@ -204,9 +205,10 @@ Plugin business configuration should not be written into the core framework `con
 | 2 | `apps/lina-plugins/<plugin-id>/manifest/config/config.yaml` | Development-time plugin default configuration |
 | 3 | `manifest/config/config.yaml` inside a dynamic plugin artifact | Default configuration carried with a dynamic plugin release |
 
-`manifest/config/config.example.yaml` is only a configuration template, not a runtime default. Source plugins read their own configuration through `HostServices().Config()`, read allowlisted public host configuration keys through `HostServices().HostConfig()`, and read declaration resources under `manifest/` through `HostServices().Manifest()`. Dynamic plugins use the corresponding `config`, `hostConfig`, and `manifest` authorizations in `hostServices`.
+`manifest/config/config.example.yaml` is only a configuration template, not a runtime default. Source plugins read their own configuration through `HostServices().Config()`, read allowlisted public host configuration keys through `HostServices().HostConfig()`, and read original resources under `manifest/` through `HostServices().Manifest()`. Dynamic plugins use the corresponding `config`, `hostConfig`, and `manifest` authorizations in `hostServices`.
 
-Manifest resource paths are relative to `manifest/` and are suitable for plugin-owned declarations such as `metadata.yaml`. `config`, `sql`, and `i18n` are dedicated core framework resource directories and are not read as general manifest resources.
+Manifest resource paths are relative to `manifest/` and can be used to read plugin-owned files such as `profile.yaml`, `resources/policy.yaml`, `config/config.example.yaml`, `sql/*.sql`, or `i18n/*.json`. Reading the original content does not cause the configuration, `SQL`, or language pack to take effect. For full path semantics, read priority, and usage examples, see [Plugin Configuration and Manifest Resources](/docs/plugin-config-and-metadata).
+
 
 ## Lifecycle States
 

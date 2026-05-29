@@ -26,6 +26,9 @@ keywords:
   - cron服务
   - runtime服务
   - LinaPro插件
+  - 插件配置
+  - manifest资源
+  - 原始资源读取
 ---
 
 
@@ -117,7 +120,9 @@ apps/lina-plugins/<plugin-id>/
 └── README.md
 ```
 
-构建工具会优先读取插件嵌入资源，并在需要时回退扫描目录，把`plugin.yaml`、`frontend/`资产、`manifest/sql`、`manifest/i18n`、`manifest/config/config.yaml`、`manifest/config/config.example.yaml`和`manifest/`下的声明资源写入动态产物。运行时资源会绑定到当前有效发布的校验和与生成号，安装、启用、禁用、卸载、升级或同版本刷新都会触发相应缓存失效。
+构建工具会优先读取插件嵌入资源，并在需要时回退扫描目录，把`plugin.yaml`、`frontend/`资产、`manifest/sql`、`manifest/i18n`、`manifest/config/config.yaml`、`manifest/config/config.example.yaml`和`manifest/`下的其他资源写入动态产物。运行时资源会绑定到当前有效发布的校验和与生成号，安装、启用、禁用、卸载、升级或同版本刷新都会触发相应缓存失效。
+
+动态插件的配置与`manifest`资源路径语义和源码插件保持一致。`manifest/config/config.yaml`会作为动态`artifact`携带的默认配置快照，只有在没有生产外部配置和开发期配置文件时才作为回退来源；`manifest/config/config.example.yaml`只是模板。`profile.yaml`、`resources/policy.yaml`、`config/config.example.yaml`、`sql/*.sql`和`i18n/*.json`等文件都可以通过`manifest`类`hostServices`按原文读取，但必须在`resources.paths`中授权；读取原文不替代配置、`SQL`或国际化专用管线。完整说明参见[插件配置与manifest资源](/docs/plugin-config-and-metadata)。
 
 ## WASM入口
 
@@ -168,7 +173,7 @@ func main() {}
 | `cron` | 动态插件内置任务注册 |
 | `config` | 当前插件自己的只读配置读取 |
 | `hostConfig` | 宿主公开配置白名单读取 |
-| `manifest` | 当前插件`manifest/`声明资源读取 |
+| `manifest` | 当前插件`manifest/`原始资源读取 |
 | `notify` | 主框架通知能力 |
 
 示例：
@@ -200,10 +205,10 @@ hostServices:
     methods: [get]
     resources:
       paths:
-        - metadata.yaml
+        - profile.yaml
 ```
 
-`config`、`hostConfig`和`manifest`只允许`get`方法。`guest`侧`SDK`提供的`String`、`Bool`、`Int`、`Duration`、`Scan`等便捷函数会转化为`get`调用，不需要也不能作为清单授权方法声明。`hostConfig`必须声明`resources.keys`，`manifest`必须声明`resources.paths`。
+`config`、`hostConfig`和`manifest`只允许`get`方法。`guest`侧`SDK`提供的`String`、`Bool`、`Int`、`Duration`、`Scan`等便捷函数会转化为`get`调用，不需要也不能作为清单授权方法声明。`hostConfig`必须声明`resources.keys`，`manifest`必须声明`resources.paths`。`manifest`资源路径相对`manifest/`目录，例如示例中的`profile.yaml`不应写成`manifest/profile.yaml`。
 
 ## 构建动态插件
 
@@ -214,7 +219,7 @@ make wasm
 make wasm p=plugin-demo-dynamic
 ```
 
-构建产物输出到`temp/output/<plugin-id>.wasm`，并包含插件清单、路由契约、公开前端资产、安装与卸载脚本、语言包、插件默认配置和声明资源。构建产物中的默认配置只在没有生产外部配置和开发期配置时作为回退来源。
+构建产物输出到`temp/output/<plugin-id>.wasm`，并包含插件清单、路由契约、公开前端资产、安装与卸载脚本、语言包、插件默认配置和`manifest`资源。构建产物中的默认配置只在没有生产外部配置和开发期配置时作为回退来源。
 
 ## 前端资产
 

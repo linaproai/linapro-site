@@ -21,6 +21,9 @@ keywords:
   - 权限声明
   - 生命周期回调
   - LinaPro插件
+  - 插件配置
+  - manifest资源
+  - 原始资源读取
 ---
 
 ## 基本介绍
@@ -208,15 +211,15 @@ func registerRoutes(ctx context.Context, registrar pluginhost.HTTPRegistrar) err
 
 ### 插件配置和清单资源
 
-源码插件通过`registrar.HostServices()`获取插件作用域主框架服务，其中配置和声明资源是最新版本中比较重要的能力：
+源码插件通过`registrar.HostServices()`获取插件作用域主框架服务。与配置和`manifest`资源相关的能力包括：
 
 | 服务 | 用途 |
 |------|------|
-| `Config()` | 读取当前插件自己的配置，生产覆盖路径为`plugins/<plugin-id>/config.yaml`，开发期默认路径为`manifest/config/config.yaml` |
+| `Config()` | 读取当前插件自己的配置，生产覆盖路径为生产配置根下`plugins/<plugin-id>/config.yaml`，开发期默认路径为`manifest/config/config.yaml` |
 | `HostConfig()` | 读取宿主公开配置白名单键，例如`workspace.basePath`、`i18n.default`和`i18n.enabled` |
-| `Manifest()` | 读取当前插件`manifest/`下的声明资源，例如`metadata.yaml` |
+| `Manifest()` | 读取当前插件`manifest/`下的原始资源，例如`profile.yaml`、`config/config.example.yaml`或`i18n/zh-CN/plugin.json` |
 
-`manifest/config/config.example.yaml`只是模板，不参与默认读取。插件不应通过`g.Cfg()`扫描宿主完整配置树，也不应把插件业务配置写进主框架`config.yaml`。
+`manifest/config/config.example.yaml`只是模板，不参与默认读取。插件不应通过`g.Cfg()`扫描宿主完整配置树，也不应把插件业务配置写进主框架`config.yaml`。完整的配置读取优先级、`manifest`资源路径语义和专用资源管线边界，参见[插件配置与manifest资源](/docs/plugin-config-and-metadata)。
 
 ```go
 func registerRoutes(ctx context.Context, registrar pluginhost.HTTPRegistrar) error {
@@ -234,15 +237,17 @@ func registerRoutes(ctx context.Context, registrar pluginhost.HTTPRegistrar) err
     }
     _ = workspaceBase
 
-    var metadata struct {
+    var profile struct {
         Category string `yaml:"category"`
     }
-    if err := services.Manifest().Scan(ctx, "metadata.yaml", "", &metadata); err != nil {
+    if err := services.Manifest().Scan(ctx, "profile.yaml", "", &profile); err != nil {
         return err
     }
     return nil
 }
 ```
+
+这里的`profile.yaml`只是普通`YAML`资源示例。路径相对`manifest/`，不应写成`manifest/profile.yaml`。
 
 ## 前端页面
 

@@ -465,7 +465,15 @@ make i18n.check
 
 ## AI工具集成
 
-`agents`系列命令用于管理仓库内面向不同`AI Coding Agent`的资源软链。仓库以`.agents/skills`、`.agents/prompts/`和根目录`AGENTS.md`作为统一资源来源，再按不同工具的约定路径创建软链，例如`.claude/skills`、`.codex/prompts/opsx`、`CLAUDE.md`或`GEMINI.md`。
+`agents`系列命令用于管理仓库内面向不同`AI Coding Agent`的资源软链。`LinaPro`把项目规范、技能和提示词统一维护在仓库标准位置，再通过软链适配不同工具自己的项目路径。
+
+| 统一来源 | 作用 | 典型桥接示例 |
+|----------|------|--------------|
+| `AGENTS.md` | 项目顶层规范入口 | `CLAUDE.md`、`GEMINI.md`、`QWEN.md` |
+| `.agents/skills` | 项目内置`AI`技能 | `.claude/skills`、`.goose/skills`、`.augment/skills` |
+| `.agents/prompts` | 项目命令和提示词目录 | `.claude/commands`、`.codex/prompts`、`.cursor/commands` |
+
+这样做的目标是让团队只维护一份规范和一套技能，同时兼容开发者习惯使用的不同`AI Coding`工具。原生支持`AGENTS.md`或`.agents/skills`的工具会被识别为原生支持，命令只展示状态，不会重复创建不必要的软链。
 
 这些命令只管理自己创建的软链；移除命令不会删除真实目录或文件，也不会移除指向外部目标的非托管软链。遇到已存在但目标不一致的软链时，通常需要传入`FORCE=1`才会重建。
 
@@ -487,11 +495,13 @@ make agents agent=claude-code action=unlink
 make agents agent=claude-code force=1
 ```
 
-如果智能体原生读取某类资源，例如原生读取`AGENTS.md`，聚合入口会跳过该资源并在汇总中说明原因。
+如果智能体原生读取某类资源，例如原生读取`AGENTS.md`，聚合入口会跳过该资源并在汇总中说明原因。聚合入口适合个人开发环境初始化；如果要批量处理多个工具，使用后面的`agents.<resource>.<action>`命令。
 
 ### make agents.skills.link
 
 将支持的智能体项目技能目录软链到统一来源`.agents/skills`。不传`agent`时，非交互环境会输出支持状态和提示；交互式终端会进入选择流程。支持`agent=<name|all|csv>`批量处理多个智能体。
+
+技能目录承载的是项目内置能力，例如`openspec-*`、`lina-review`、`lina-feedback`、`lina-e2e`、`frontend-design`等。工具完成软链后，这些技能会按各自触发规则参与后续开发、审查和测试工作。
 
 ```bash
 # 查看技能软链状态
@@ -520,6 +530,8 @@ make agents.skills.unlink agent=all
 
 将支持的智能体命令或提示词目录软链到`.agents/prompts/`下的规范来源。当前主要用于把`.agents/prompts/opsx`桥接到各工具自己的命令目录，例如`.claude/commands/opsx`、`.cursor/commands/opsx`、`.codex/prompts/opsx`或`.gemini/commands/opsx`。
 
+提示词目录解决的是“同一套项目命令如何在不同工具里被调用”的问题。例如`opsx`工作流可以在支持命令目录的工具中保持一致入口，而不需要为每个工具复制一份命令文件。
+
 ```bash
 # 查看提示词软链状态
 make agents.prompts.link
@@ -543,6 +555,8 @@ make agents.prompts.unlink agent=all
 ### make agents.md.link
 
 将支持的智能体私有规则文件软链到根目录`AGENTS.md`。例如，`claude-code`对应`CLAUDE.md`，`gemini-cli`对应`GEMINI.md`，`qwen-code`对应`QWEN.md`，`junie`对应`.junie/guidelines.md`。原生读取`AGENTS.md`的智能体只会在状态中展示，不需要创建软链。
+
+`AGENTS.md`本身是项目顶层规范入口。它保留项目定位、强制触发场景和规则加载门禁；被它显式引用的`.agents/rules/*.md`承载更细的领域规则。开发插件时，插件目录还可以提供`apps/lina-plugins/<plugin-id>/AGENTS.md`作为本地规范入口，在该插件目录内覆盖全局规范中冲突的规则。
 
 ```bash
 # 查看 AGENTS.md 规则文件软链状态
@@ -603,4 +617,3 @@ make mock confirm=mock
 ```bash
 make help
 ```
-

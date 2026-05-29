@@ -116,6 +116,7 @@ Every `make <command>` example below can be replaced with `cd hack/tools/linactl
 | `make release.tag.check` | Release governance | Verify the `release tag` matches `framework.version` in `metadata.yaml` |
 | `make help` | Other | Show all available commands |
 
+
 ## Environment Management
 
 ### make env.check
@@ -461,9 +462,18 @@ Scans runtime-visible code paths for hardcoded text that has not been added to t
 make i18n.check
 ```
 
+
 ## AI Tool Integration
 
-The `agents` command family manages repository-local resource symlinks for different `AI Coding Agent` tools. The repository uses `.agents/skills`, `.agents/prompts/`, and the root `AGENTS.md` as canonical resource sources, then creates symlinks at tool-specific paths such as `.claude/skills`, `.codex/prompts/opsx`, `CLAUDE.md`, or `GEMINI.md`.
+The `agents` command family manages repository-local resource symlinks for different `AI Coding Agent` tools. `LinaPro` maintains project specifications, skills, and prompts at standard repository locations, then bridges them to each tool's own project paths through symlinks.
+
+| Canonical source | Purpose | Typical bridge examples |
+|------------------|---------|------------------------|
+| `AGENTS.md` | Project top-level specification entry | `CLAUDE.md`, `GEMINI.md`, `QWEN.md` |
+| `.agents/skills` | Project built-in AI skills | `.claude/skills`, `.goose/skills`, `.augment/skills` |
+| `.agents/prompts` | Project commands and prompt directory | `.claude/commands`, `.codex/prompts`, `.cursor/commands` |
+
+The goal is to let teams maintain one specification and one skill set while accommodating different developers' preferred `AI Coding` tools. Tools that natively support `AGENTS.md` or `.agents/skills` are recognized as such, and the commands only show status without creating unnecessary symlinks.
 
 These commands manage only the symlinks they create. Unlink commands do not delete real directories or files, and they do not remove unmanaged symlinks that point elsewhere. If a symlink already exists but points to a different target, pass `FORCE=1` to rebuild it.
 
@@ -485,11 +495,13 @@ make agents agent=claude-code action=unlink
 make agents agent=claude-code force=1
 ```
 
-If an agent natively reads a resource type, such as `AGENTS.md`, the aggregate entry skips that resource and explains why in the summary.
+If an agent natively reads a resource type, such as `AGENTS.md`, the aggregate entry skips that resource and explains why in the summary. The aggregate entry is suited for personal development environment initialization; to batch-process multiple tools, use the `agents.<resource>.<action>` commands below.
 
 ### make agents.skills.link
 
 Symlinks supported agents' project skill directories to the canonical `.agents/skills` source. Without `agent`, a non-interactive environment prints support status and guidance, while an interactive terminal opens the selection flow. Use `agent=<name|all|csv>` to process one or more agents.
+
+Skill directories carry project built-in capabilities such as `openspec-*`, `lina-review`, `lina-feedback`, `lina-e2e`, and `frontend-design`. After the symlink is created, these skills participate in subsequent development, review, and testing workflows according to their trigger rules.
 
 ```bash
 # Show skill symlink status
@@ -518,6 +530,8 @@ make agents.skills.unlink agent=all
 
 Symlinks supported agents' command or prompt directories to canonical sources under `.agents/prompts/`. This is mainly used to bridge `.agents/prompts/opsx` to each tool's own command directory, such as `.claude/commands/opsx`, `.cursor/commands/opsx`, `.codex/prompts/opsx`, or `.gemini/commands/opsx`.
 
+Prompt directories solve the problem of how the same set of project commands can be invoked across different tools. For example, the `opsx` workflow can maintain a consistent entry point in tools that support command directories, without duplicating command files for each tool.
+
 ```bash
 # Show prompt symlink status
 make agents.prompts.link
@@ -541,6 +555,8 @@ make agents.prompts.unlink agent=all
 ### make agents.md.link
 
 Symlinks supported agents' private rule files to the root `AGENTS.md`. For example, `claude-code` maps to `CLAUDE.md`, `gemini-cli` maps to `GEMINI.md`, `qwen-code` maps to `QWEN.md`, and `junie` maps to `.junie/guidelines.md`. Agents that natively read `AGENTS.md` are shown in status output and do not need symlinks.
+
+`AGENTS.md` itself is the project top-level specification entry. It declares project positioning, mandatory trigger scenarios, and rule-loading gates. The `.agents/rules/*.md` files referenced by it carry finer-grained domain rules. When developing a plugin, the plugin directory can also provide `apps/lina-plugins/<plugin-id>/AGENTS.md` as a local specification entry, overriding conflicting rules from the global specification within that plugin directory.
 
 ```bash
 # Show AGENTS.md rule-file symlink status
