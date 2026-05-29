@@ -2,7 +2,7 @@
 slug: '/docs/plugin-system'
 title: '双模式插件系统'
 hide_title: true
-description: '本文从组件设计角度介绍 LinaPro 双模式插件系统，说明源码插件和WASM动态插件为何共享同一套治理主链，以及 catalog、dependency、lifecycle、integration、plugin-runtime cache、pluginhost、pluginbridge、plugin.yaml、多租户字段、生命周期、隔离机制和运行时升级如何共同构成可扩展的插件体系。'
+description: '源码插件和WASM动态插件为何共享同一套治理主链，以及 catalog、dependency、lifecycle、integration、plugin-runtime cache、pluginhost、pluginbridge、plugin.yaml、多租户字段、生命周期、隔离机制和运行时升级如何共同构成可扩展的插件体系。'
 keywords:
   - 插件系统
   - 双模式插件

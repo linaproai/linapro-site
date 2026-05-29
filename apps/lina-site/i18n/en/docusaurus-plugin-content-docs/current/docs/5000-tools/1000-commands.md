@@ -2,7 +2,7 @@
 slug: '/docs/commands'
 title: 'Commands'
 hide_title: true
-description: 'This page describes the cross-platform development command set used by LinaPro, including linactl, the Makefile compatibility entry, the Windows make.cmd wrapper, local environment checks and setup, development server management, full builds, WASM plugin builds, Docker image builds, plugin workspace management, agent resource symlink management, test validation, i18n checks, database initialization, and release governance. It helps developers use the same project toolchain consistently on macOS, Linux, and Windows.'
+description: 'including linactl, the Makefile compatibility entry, the Windows make.cmd wrapper, local environment checks and setup, development server management, full builds, WASM plugin builds, Docker image builds, plugin workspace management, agent resource symlink management, test validation, i18n checks, database initialization, and release governance. It helps developers use the same project toolchain consistently on macOS, Linux, and Windows.'
 keywords:
   - make commands
   - development commands

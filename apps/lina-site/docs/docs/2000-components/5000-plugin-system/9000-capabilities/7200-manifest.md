@@ -2,7 +2,7 @@
 slug: '/docs/plugin-capability-manifest'
 title: 'ManifestService'
 hide_title: true
-description: '本文从架构设计角度介绍 LinaPro 的 ManifestService，说明插件清单资源服务的路径语义、资源管线边界和与配置服务的关系，帮助插件开发者理解如何读取 manifest/ 目录下的原始资源文件。'
+description: '插件清单资源服务的路径语义、资源管线边界和与配置服务的关系，帮助插件开发者理解如何读取 manifest/ 目录下的原始资源文件。'
 keywords:
   - ManifestService
   - 清单资源
@@ -104,4 +104,4 @@ graph TB
 ## 相关服务
 
 - [ConfigService](/docs/plugin-capability-config) - 读取经过优先级解析的插件配置值
-- [I18nService](/docs/plugin-capability-i18n) - 运行时翻译能力，语言包文件通过ManifestService读取
+- [I18nService](/docs/plugin-capability-i18n) - 运行时翻译能力，语言包文件通过`ManifestService`读取

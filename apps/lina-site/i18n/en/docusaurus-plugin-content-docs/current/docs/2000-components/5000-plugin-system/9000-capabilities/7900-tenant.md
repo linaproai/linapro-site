@@ -2,7 +2,7 @@
 slug: '/docs/plugin-capability-tenant'
 title: 'Tenant (Tenant Capability)'
 hide_title: true
-description: "An architectural overview of LinaPro tenant capability (tenantcap.Service) — the consumer-side interface design, Provider and Resolver extension mechanisms, capability degradation strategy, and the service's role in multi-tenant architecture, helping plugin developers understand how to consume and extend tenant capabilities."
+description: "the consumer-side interface design, Provider and Resolver extension mechanisms, capability degradation strategy, and the service's role in multi-tenant architecture, helping plugin developers understand how to consume and extend tenant capabilities."
 keywords:
   - tenant capability
   - tenantcap

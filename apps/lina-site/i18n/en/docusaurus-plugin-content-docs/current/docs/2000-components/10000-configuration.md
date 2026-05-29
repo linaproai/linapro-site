@@ -2,7 +2,7 @@
 slug: '/docs/configuration'
 title: 'Configuration'
 hide_title: true
-description: 'A component-level guide to LinaPro core framework service configuration — how config.yaml drives the HTTP server, logging, database, JWT authentication, sessions, monitoring, health probes, scheduling, public admin workspace frontend configuration, internationalization, cluster coordination, file uploads, and plugin governance, with the key configuration boundaries to review before production deployment.'
+description: 'how config.yaml drives the HTTP server, logging, database, JWT authentication, sessions, monitoring, health probes, scheduling, public admin workspace frontend configuration, internationalization, cluster coordination, file uploads, and plugin governance, with the key configuration boundaries to review before production deployment.'
 keywords:
   - configuration
   - config.yaml

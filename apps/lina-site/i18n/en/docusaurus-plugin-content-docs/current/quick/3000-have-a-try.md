@@ -2,7 +2,7 @@
 slug: '/quick/have-a-try'
 title: 'Have a Try'
 hide_title: true
-description: "This guide uses a complete article management CRUD source plugin example to demonstrate LinaPro's AI-native development workflow. It covers requirement exploration with the spec-driven workflow, OpenSpec proposal generation, AI-led code implementation, service startup and feature verification, feedback-driven fixes, and change archival, helping developers understand how LinaPro turns AI Coding tools into a full-cycle delivery process for real business features."
+description: 'requirement exploration with the spec-driven workflow, OpenSpec proposal generation, AI-led code implementation, service startup and feature verification, feedback-driven fixes, and change archival, helping developers understand how LinaPro turns AI Coding tools into a full-cycle delivery process for real business features.'
 keywords:
   - LinaPro
   - first framework experience

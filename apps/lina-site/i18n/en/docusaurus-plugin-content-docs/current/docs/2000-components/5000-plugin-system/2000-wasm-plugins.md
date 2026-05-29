@@ -2,7 +2,7 @@
 slug: '/docs/wasm-plugins'
 title: 'Dynamic Plugins'
 hide_title: true
-description: 'An introduction to WebAssembly (WASM) concepts and advantages — cross-platform portability, secure sandboxing, near-native performance, hot-loading, and multi-language support — followed by a component-level guide to LinaPro WASM dynamic plugins covering applicable scenarios, the sandbox model, the pluginbridge protocol, exported functions, hostServices authorization, the build process, runtime installation and enablement, explicit upgrades, and key differences from source plugins.'
+description: 'WebAssembly (WASM) concepts and advantages — cross-platform portability, secure sandboxing, near-native performance, hot-loading, and multi-language support — followed by a component-level guide to LinaPro WASM dynamic plugins covering applicable scenarios, the sandbox model, the pluginbridge protocol, exported functions, hostServices authorization, the build process, runtime installation and enablement, explicit upgrades, and key differences from source plugins.'
 keywords:
   - WASM dynamic plugins
   - WebAssembly

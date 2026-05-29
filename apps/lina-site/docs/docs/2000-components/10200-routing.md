@@ -2,7 +2,7 @@
 slug: '/docs/routing'
 title: '路由与中间件'
 hide_title: true
-description: '本文从组件设计角度介绍 LinaPro 主框架服务的路由管理策略，涵盖主框架控制面 API 的 /api/v1 前缀、统一插件 API 命名空间 /x/{plugin-id}/...、内置中间件体系、鉴权路由分层、基于 g.Meta 标签的接口属性一体化维护，以及源码插件自定义非保留路由和动态插件 route contract 的差异化接入方式，帮助开发者理解框架路由体系并遵循最佳实践。'
+description: '主框架控制面 API 的 /api/v1 前缀、统一插件 API 命名空间 /x/{plugin-id}/...、内置中间件体系、鉴权路由分层、基于 g.Meta 标签的接口属性一体化维护，以及源码插件自定义非保留路由和动态插件 route contract 的差异化接入方式，帮助开发者理解框架路由体系并遵循最佳实践。'
 keywords:
   - 路由管理
   - API版本管理

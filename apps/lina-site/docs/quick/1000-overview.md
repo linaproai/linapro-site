@@ -2,7 +2,7 @@
 slug: '/quick/overview'
 title: '项目介绍'
 hide_title: true
-description: '本文全面介绍 LinaPro 的项目背景、技术架构与核心功能。LinaPro 是一款面向可持续交付的 AI 原生全栈框架，基于 Go + Vue 3 构建，默认使用 PostgreSQL，支持可选 SQLite、原生多租户、官方插件子模块、Redis 集群协调、双模式插件系统、RBAC 权限管理、定时任务调度、在线 API 文档、可选但推荐的 OpenSpec 规范驱动 AI 研发工作流和覆盖全生命周期的 AI 技能体系，帮助开发者和企业快速构建可持续交付的业务系统。'
+description: '一款面向可持续交付的 AI 原生全栈框架，基于 Go + Vue 3 构建，默认使用 PostgreSQL，支持可选 SQLite、原生多租户、官方插件子模块、Redis 集群协调、双模式插件系统、RBAC 权限管理、定时任务调度、在线 API 文档、可选但推荐的 OpenSpec 规范驱动 AI 研发工作流和覆盖全生命周期的 AI 技能体系，帮助开发者和企业快速构建可持续交付的业务系统。'
 keywords:
   - LinaPro
   - AI原生框架
@@ -39,7 +39,7 @@ keywords:
 | 资源 | 地址 |
 |------|------|
 | **开源仓库** | https://github.com/linaproai/linapro |
-| **后台演示** | http://demo.linapro.ai/ <br/>账号：`admin` <br/>密码：`admin123`|
+| **后台演示** | http://demo.linapro.ai/admin <br/>账号：`admin` <br/>密码：`admin123`|
 | **官方网站** | https://linapro.ai/ |
 
 :::info 提示

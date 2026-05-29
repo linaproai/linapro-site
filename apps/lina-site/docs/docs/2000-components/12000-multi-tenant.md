@@ -2,7 +2,7 @@
 slug: '/docs/multi-tenant'
 title: '原生多租户能力'
 hide_title: true
-description: '本文从组件设计角度介绍 LinaPro 多租户能力，说明主框架 bizctx、TenantFilterService、tenant_id 过滤接口、默认平台租户、官方 multi-tenant 源码插件、租户代管、插件多租户清单字段和当前 Pool 共享表模型之间如何协作。'
+description: '主框架 bizctx、TenantFilterService、tenant_id 过滤接口、默认平台租户、官方 multi-tenant 源码插件、租户代管、插件多租户清单字段和当前 Pool 共享表模型之间如何协作。'
 keywords:
   - 多租户
   - tenant_id

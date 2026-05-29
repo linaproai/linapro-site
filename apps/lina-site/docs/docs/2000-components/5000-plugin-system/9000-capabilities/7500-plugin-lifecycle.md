@@ -2,7 +2,7 @@
 slug: '/docs/plugin-capability-plugin-lifecycle'
 title: 'PluginLifecycleService'
 hide_title: true
-description: '本文从架构设计角度介绍 LinaPro 的 PluginLifecycleService，说明插件生命周期编排服务在租户级治理中的角色、与 pluginhost.Lifecycle 的区别和设计约束，帮助插件开发者理解宿主如何编排跨插件的租户级生命周期事件。'
+description: '插件生命周期编排服务在租户级治理中的角色、与 pluginhost.Lifecycle 的区别和设计约束，帮助插件开发者理解宿主如何编排跨插件的租户级生命周期事件。'
 keywords:
   - PluginLifecycleService
   - 插件生命周期
@@ -117,4 +117,4 @@ graph TB
 ## 相关服务
 
 - [PluginStateService](/docs/plugin-capability-plugin-state) - 查询插件启用状态，与生命周期编排互补
-- [TenantService](/docs/plugin-capability-tenant) - 租户管理模块使用PluginLifecycleService编排租户级事件
+- [TenantService](/docs/plugin-capability-tenant) - 租户管理模块使用`PluginLifecycleService`编排租户级事件

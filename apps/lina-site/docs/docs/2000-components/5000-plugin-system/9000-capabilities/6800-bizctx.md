@@ -2,7 +2,7 @@
 slug: '/docs/plugin-capability-bizctx'
 title: 'BizCtxService'
 hide_title: true
-description: '本文从架构设计角度介绍 LinaPro 的 BizCtxService，说明业务上下文投影服务的设计约束、CurrentContext 字段含义和在请求链路中的位置，帮助插件开发者理解如何读取当前请求的用户、租户、模拟状态等上下文信息。'
+description: '业务上下文投影服务的设计约束、CurrentContext 字段含义和在请求链路中的位置，帮助插件开发者理解如何读取当前请求的用户、租户、模拟状态等上下文信息。'
 keywords:
   - BizCtxService
   - 业务上下文
@@ -99,6 +99,6 @@ sequenceDiagram
 
 ## 相关服务
 
-- [AuthService](/docs/plugin-capability-auth) - 认证中间件使用AuthService写入用户身份
+- [AuthService](/docs/plugin-capability-auth) - 认证中间件使用`AuthService`写入用户身份
 - [TenantService](/docs/plugin-capability-tenant) - 租户解析中间件写入租户信息
-- [TenantFilterService](/docs/plugin-capability-tenant-filter) - 使用BizCtx中的TenantID和PlatformBypass过滤数据
+- [TenantFilterService](/docs/plugin-capability-tenant-filter) - 使用`BizCtx`中的`TenantID`和`PlatformBypass`过滤数据

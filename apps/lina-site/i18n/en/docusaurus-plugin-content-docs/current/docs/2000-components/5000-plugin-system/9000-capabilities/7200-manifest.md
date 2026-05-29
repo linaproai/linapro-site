@@ -2,7 +2,7 @@
 slug: '/docs/plugin-capability-manifest'
 title: 'ManifestService'
 hide_title: true
-description: "An architectural overview of LinaPro's ManifestService — path semantics for manifest resources, the boundary between resource reading and the configuration pipeline, and how to read raw resource files from the manifest/ directory."
+description: 'path semantics for manifest resources, the boundary between resource reading and the configuration pipeline, and how to read raw resource files from the manifest/ directory.'
 keywords:
   - ManifestService
   - manifest resources

@@ -2,7 +2,7 @@
 slug: '/docs/plugin-system'
 title: 'Plugin System'
 hide_title: true
-description: 'A component-level guide to the LinaPro dual-mode plugin system — why source plugins and WASM dynamic plugins share the same governance pipeline, and how catalog, dependency, lifecycle, integration, plugin-runtime cache, pluginhost, pluginbridge, plugin.yaml, multi-tenant fields, lifecycle states, isolation mechanisms, runtime upgrades, public static assets, and plugin-scoped configuration together form an extensible plugin architecture.'
+description: 'why source plugins and WASM dynamic plugins share the same governance pipeline, and how catalog, dependency, lifecycle, integration, plugin-runtime cache, pluginhost, pluginbridge, plugin.yaml, multi-tenant fields, lifecycle states, isolation mechanisms, runtime upgrades, public static assets, and plugin-scoped configuration together form an extensible plugin architecture.'
 keywords:
   - plugin system
   - dual-mode plugins

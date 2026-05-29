@@ -2,7 +2,7 @@
 slug: '/docs/plugin-capability-cache'
 title: 'CacheService'
 hide_title: true
-description: '本文从架构设计角度介绍 LinaPro 的 CacheService，说明插件作用域缓存的隔离机制、缓存值类型、过期策略和设计约束，帮助插件开发者理解缓存服务如何在多插件和多租户环境下保证数据隔离和安全降级。'
+description: '插件作用域缓存的隔离机制、缓存值类型、过期策略和设计约束，帮助插件开发者理解缓存服务如何在多插件和多租户环境下保证数据隔离和安全降级。'
 keywords:
   - CacheService
   - 缓存服务
@@ -104,5 +104,5 @@ graph TB
 
 ## 相关服务
 
-- [TenantFilterService](/docs/plugin-capability-tenant-filter) - 缓存键中的租户隔离与TenantFilter的租户过滤互补
+- [TenantFilterService](/docs/plugin-capability-tenant-filter) - 缓存键中的租户隔离与`TenantFilter`的租户过滤互补
 - [ConfigService](/docs/plugin-capability-config) - 配置是持久数据，缓存是失真性运行时数据

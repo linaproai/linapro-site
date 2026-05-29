@@ -2,7 +2,7 @@
 slug: '/docs/agent-skills'
 title: 'Agent Skills'
 hide_title: true
-description: 'This page introduces LinaPro''s AI-focused skill system, including the optional externally installed OpenSpec CLI, goframe-v2, and find-skills tools or skills, plus project-bundled skills for frontend design, Git workflows, code review, E2E testing, performance auditing, OpenSpec implementation and archiving, and other workflows that load automatically in the project. It also notes that source plugin upgrade scenarios may depend on the lina-upgrade skill provided by the AI tool environment, helping developers understand what each skill does, how to install it, and how to invoke it.'
+description: 'the optional externally installed OpenSpec CLI, goframe-v2, and find-skills tools or skills, plus project-bundled skills for frontend design, Git workflows, code review, E2E testing, performance auditing, OpenSpec implementation and archiving, and other workflows that load automatically in the project. It also notes that source plugin upgrade scenarios may depend on the lina-upgrade skill provided by the AI tool environment, helping developers understand what each skill does, how to install it, and how to invoke it.'
 keywords:
   - AI skills
   - development skills

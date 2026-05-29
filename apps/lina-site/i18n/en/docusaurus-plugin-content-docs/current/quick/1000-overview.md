@@ -2,7 +2,7 @@
 slug: '/quick/overview'
 title: 'Overview'
 hide_title: true
-description: 'A comprehensive introduction to LinaPro — its background, architecture, and core capabilities. LinaPro is an AI-native full-stack framework built on Go + Vue 3 with PostgreSQL by default (optional SQLite), native multi-tenant support, an official plugin submodule, Redis cluster coordination, a dual-mode plugin system, RBAC permission management, scheduled task scheduling, live API documentation, the optional-but-recommended OpenSpec spec-driven AI development workflow, and a lifecycle-spanning AI skill set for building sustainable, continuously deliverable business systems.'
+description: 'LinaPro is an AI-native full-stack framework built on Go + Vue 3 with PostgreSQL by default (optional SQLite), native multi-tenant support, an official plugin submodule, Redis cluster coordination, a dual-mode plugin system, RBAC permission management, scheduled task scheduling, live API documentation, the optional-but-recommended OpenSpec spec-driven AI development workflow, and a lifecycle-spanning AI skill set for building sustainable, continuously deliverable business systems.'
 keywords:
   - LinaPro
   - AI-native framework
@@ -39,7 +39,7 @@ keywords:
 | Resource | URL |
 |----------|-----|
 | **Open-source repository** | https://github.com/linaproai/linapro |
-| **Live demo** | http://demo.linapro.ai/ <br/>Username: `admin` <br/>Password: `admin123` |
+| **Live demo** | http://demo.linapro.ai/admin <br/>Username: `admin` <br/>Password: `admin123` |
 | **Official website** | https://linapro.ai/ |
 
 :::info Tip

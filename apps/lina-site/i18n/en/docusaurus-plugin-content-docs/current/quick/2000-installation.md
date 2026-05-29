@@ -2,7 +2,7 @@
 slug: '/quick/installation'
 title: 'Installation'
 hide_title: true
-description: 'This guide explains how to install and initialize the LinaPro framework in a few minutes. It covers cloning the source repository with Git, initializing official plugin submodules when needed, preparing the default PostgreSQL database, copying and adjusting the configuration file, initializing the database through the cross-platform linactl or compatible make entry, loading demo data, starting the development service, integrating AI Coding tools, and verifying that the installation is working correctly.'
+description: 'how to install and initialize the LinaPro framework in a few minutes. It covers cloning the source repository with Git, initializing official plugin submodules when needed, preparing the default PostgreSQL database, copying and adjusting the configuration file, initializing the database through the cross-platform linactl or compatible make entry, loading demo data, starting the development service, integrating AI Coding tools, and verifying that the installation is working correctly.'
 keywords:
   - LinaPro
   - framework installation

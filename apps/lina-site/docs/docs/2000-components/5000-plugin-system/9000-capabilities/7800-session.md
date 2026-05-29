@@ -2,7 +2,7 @@
 slug: '/docs/plugin-capability-session'
 title: 'SessionService'
 hide_title: true
-description: '本文从架构设计角度介绍 LinaPro 的 SessionService，说明在线会话管理服务的设计定位、Session 投影模型和在会话治理中的位置，帮助插件开发者理解如何正确查询和管理在线用户会话。'
+description: '在线会话管理服务的设计定位、Session 投影模型和在会话治理中的位置，帮助插件开发者理解如何正确查询和管理在线用户会话。'
 keywords:
   - SessionService
   - 会话服务
@@ -35,7 +35,7 @@ keywords:
 
 | 字段 | 说明 |
 |------|------|
-| `TokenId` | 会话的唯一Token标识 |
+| `TokenId` | 会话的唯一`Token`标识 |
 | `TenantId` | 会话所属租户，`0`表示平台 |
 | `UserId` | 认证用户ID |
 | `Username` | 认证用户名 |
@@ -85,17 +85,17 @@ graph TB
 | 方法 | 说明 |
 |------|------|
 | `ListPage` | 分页查询在线会话列表，支持用户名和IP模糊过滤 |
-| `Revoke` | 按TokenID撤销一个在线会话，用户被踢出 |
+| `Revoke` | 按`TokenID`撤销一个在线会话，用户被踢出 |
 
 ## 设计约束
 
 - **会话是只读投影。** `Session`结构体是只读的，不能通过修改它来改变会话状态。需要撤销会话使用`Revoke`。
 - **分页查询受租户范围影响。** 平台管理员可以查询所有租户的会话，租户管理员只能查询本租户会话。
-- **撤销是即时生效。** `Revoke`执行后，对应Token立即失效，客户端下次请求将被拒绝。
+- **撤销是即时生效。** `Revoke`执行后，对应`Token`立即失效，客户端下次请求将被拒绝。
 - **`DeptName`是投影字段。** 部门名称来自组织能力提供方的投影，如果组织能力不可用，该字段可能为空。
 
 ## 相关服务
 
-- [AuthService](/docs/plugin-capability-auth) - AuthService在认证流程中注册会话，SessionService在管理流程中查询会话
-- [BizCtxService](/docs/plugin-capability-bizctx) - 当前请求的会话信息投影到BizCtx中
-- [OrgService](/docs/plugin-capability-org) - Session中的DeptName来自组织能力投影
+- [AuthService](/docs/plugin-capability-auth) - `AuthService`在认证流程中注册会话，`SessionService`在管理流程中查询会话
+- [BizCtxService](/docs/plugin-capability-bizctx) - 当前请求的会话信息投影到`BizCtx`中
+- [OrgService](/docs/plugin-capability-org) - `Session`中的`DeptName`来自组织能力投影

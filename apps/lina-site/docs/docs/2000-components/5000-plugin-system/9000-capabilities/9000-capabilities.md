@@ -2,7 +2,7 @@
 slug: '/docs/plugin-capability-services'
 title: '插件可用基础能力概览'
 hide_title: true
-description: '本文从架构设计角度介绍 LinaPro 主框架向插件暴露的基础能力服务（capability.Services），说明 Services 接口的设计原则、服务分类、获取方式和按场景选服务指南，帮助插件开发者理解各能力服务的定位、边界和协作关系，建立正确的使用心智模型。'
+description: 'Services 接口的设计原则、服务分类、获取方式和按场景选服务指南，帮助插件开发者理解各能力服务的定位、边界和协作关系，建立正确的使用心智模型。'
 keywords:
   - 插件能力
   - capability.Services

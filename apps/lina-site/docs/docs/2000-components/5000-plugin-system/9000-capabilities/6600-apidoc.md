@@ -2,7 +2,7 @@
 slug: '/docs/plugin-capability-apidoc'
 title: 'APIDocService'
 hide_title: true
-description: '本文从架构设计角度介绍 LinaPro 的 APIDocService，说明 API 文档本地化服务的设计动机、操作键构建机制和在请求链路中的位置，帮助插件开发者理解路由操作键如何映射到本地化的模块标签和操作摘要。'
+description: 'API 文档本地化服务的设计动机、操作键构建机制和在请求链路中的位置，帮助插件开发者理解路由操作键如何映射到本地化的模块标签和操作摘要。'
 keywords:
   - APIDocService
   - API文档

@@ -2,7 +2,7 @@
 slug: '/docs/plugin-capability-notify'
 title: 'NotifyService'
 hide_title: true
-description: '本文从架构设计角度介绍 LinaPro 的 NotifyService，说明通知服务的发布模型、SourceType 和 CategoryCode 分类设计和在消息管线中的位置，帮助插件开发者理解如何通过通知服务将业务事件扇入宿主统一收件箱。'
+description: '通知服务的发布模型、SourceType 和 CategoryCode 分类设计和在消息管线中的位置，帮助插件开发者理解如何通过通知服务将业务事件扇入宿主统一收件箱。'
 keywords:
   - NotifyService
   - 通知服务
@@ -87,5 +87,5 @@ sequenceDiagram
 
 ## 相关服务
 
-- [BizCtxService](/docs/plugin-capability-bizctx) - 获取当前用户ID作为通知发送者
+- [BizCtxService](/docs/plugin-capability-bizctx) - 获取当前用户`ID`作为通知发送者
 - [I18nService](/docs/plugin-capability-i18n) - 通知内容可能需要翻译

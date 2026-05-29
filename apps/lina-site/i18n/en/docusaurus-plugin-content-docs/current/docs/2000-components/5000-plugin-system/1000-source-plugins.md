@@ -2,7 +2,7 @@
 slug: '/docs/source-plugins'
 title: 'Source Plugins'
 hide_title: true
-description: 'A component-level guide to LinaPro source plugins from the perspective of architecture and development practice — covering when to use source plugins, the standard directory structure, plugin.yaml manifest, installation SQL, API contracts, service-layer implementation, pluginhost registration, database access, frontend pages, event hooks, runtime upgrades, and best practices for extending long-term business capabilities with native Go.'
+description: 'when to use source plugins, the standard directory structure, plugin.yaml manifest, installation SQL, API contracts, service-layer implementation, pluginhost registration, database access, frontend pages, event hooks, runtime upgrades, and best practices for extending long-term business capabilities with native Go.'
 keywords:
   - source plugins
   - plugin development

@@ -2,7 +2,7 @@
 slug: '/docs/plugin-capability-plugin-lifecycle'
 title: 'PluginLifecycleService'
 hide_title: true
-description: "An architectural overview of LinaPro's PluginLifecycleService, covering its role in tenant-level lifecycle orchestration, the distinction from pluginhost.Lifecycle, and design constraints — helping plugin developers understand how the host orchestrates cross-plugin tenant-level lifecycle events."
+description: 'its role in tenant-level lifecycle orchestration, the distinction from pluginhost.Lifecycle, and design constraints — helping plugin developers understand how the host orchestrates cross-plugin tenant-level lifecycle events.'
 keywords:
   - PluginLifecycleService
   - plugin lifecycle

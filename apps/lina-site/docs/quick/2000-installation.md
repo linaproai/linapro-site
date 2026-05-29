@@ -2,7 +2,7 @@
 slug: '/quick/installation'
 title: '快速安装'
 hide_title: true
-description: '本文介绍如何在几分钟内完成 LinaPro 框架的安装与初始配置，包括通过 Git 克隆仓库获取源码、按需初始化官方插件子模块、准备默认 PostgreSQL 数据库、复制并调整配置文件、使用跨平台 linactl 或兼容 make 入口初始化数据库、加载演示数据、启动开发服务和验证安装结果的完整步骤。克隆仓库之前，请先完成环境配置。'
+description: '如何在几分钟内完成 LinaPro 框架的安装与初始配置，包括通过 Git 克隆仓库获取源码、按需初始化官方插件子模块、准备默认 PostgreSQL 数据库、复制并调整配置文件、使用跨平台 linactl 或兼容 make 入口初始化数据库、加载演示数据、启动开发服务和验证安装结果的完整步骤。克隆仓库之前，请先完成环境配置。'
 keywords:
   - LinaPro
   - 框架安装

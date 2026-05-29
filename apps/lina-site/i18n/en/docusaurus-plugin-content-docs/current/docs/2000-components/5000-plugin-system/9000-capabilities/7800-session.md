@@ -2,7 +2,7 @@
 slug: '/docs/plugin-capability-session'
 title: 'SessionService'
 hide_title: true
-description: 'An architectural overview of LinaPro SessionService — the online session management service covering its design positioning, Session projection model, and role in session governance, helping plugin developers understand how to query and manage online user sessions.'
+description: 'the online session management service covering its design positioning, Session projection model, and role in session governance, helping plugin developers understand how to query and manage online user sessions.'
 keywords:
   - SessionService
   - session service

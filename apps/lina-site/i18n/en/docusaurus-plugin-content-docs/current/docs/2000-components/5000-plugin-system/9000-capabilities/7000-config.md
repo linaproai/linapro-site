@@ -2,7 +2,7 @@
 slug: '/docs/plugin-capability-config'
 title: 'ConfigService and HostConfigService'
 hide_title: true
-description: "An architectural overview of LinaPro's ConfigService and HostConfigService — how plugin configuration and host configuration are read with different priority layers and whitelist boundaries, and the design constraints that keep them isolated."
+description: 'how plugin configuration and host configuration are read with different priority layers and whitelist boundaries, and the design constraints that keep them isolated.'
 keywords:
   - ConfigService
   - HostConfigService

@@ -2,7 +2,7 @@
 slug: '/docs/plugin-capability-route'
 title: 'RouteService'
 hide_title: true
-description: '本文从架构设计角度介绍 LinaPro 的 RouteService，说明动态路由元数据服务的设计定位、DynamicRouteMetadata 结构体和与动态插件的关系，帮助插件开发者理解如何获取当前动态路由请求的元数据信息。'
+description: '动态路由元数据服务的设计定位、DynamicRouteMetadata 结构体和与动态插件的关系，帮助插件开发者理解如何获取当前动态路由请求的元数据信息。'
 keywords:
   - RouteService
   - 动态路由

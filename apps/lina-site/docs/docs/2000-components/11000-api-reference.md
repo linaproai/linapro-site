@@ -2,7 +2,7 @@
 slug: '/docs/api-reference'
 title: '一体化接口文档'
 hide_title: true
-description: '本文从组件设计角度介绍 LinaPro 的接口文档能力，说明主框架、源码插件和WASM动态插件如何被聚合为统一的 OpenAPI 文档，g.Meta 契约、permission 权限标签、接口多语言资源、开发中心调试页面和第三方工具导入之间如何协作。'
+description: '主框架、源码插件和WASM动态插件如何被聚合为统一的 OpenAPI 文档，g.Meta 契约、permission 权限标签、接口多语言资源、开发中心调试页面和第三方工具导入之间如何协作。'
 keywords:
   - 接口文档
   - OpenAPI

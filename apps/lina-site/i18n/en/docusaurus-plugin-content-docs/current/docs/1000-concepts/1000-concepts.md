@@ -2,7 +2,7 @@
 slug: '/docs/concepts'
 title: 'Concepts'
 hide_title: true
-description: 'An introduction to the core design principles behind LinaPro, including AI-native design, modular architecture, AI spec-driven development, AI engineering quality assurance, and framework-plugin capability boundaries, helping developers build the right mental model before going deeper into the framework.'
+description: 'AI-native design, modular architecture, AI spec-driven development, AI engineering quality assurance, and framework-plugin capability boundaries, helping developers build the right mental model before going deeper into the framework.'
 keywords:
   - design principles
   - design philosophy

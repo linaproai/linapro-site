@@ -2,7 +2,7 @@
 slug: '/docs/cron-tasks'
 title: '定时任务调度与执行'
 hide_title: true
-description: '本文从组件设计角度介绍 LinaPro 的持久化定时任务系统，说明任务类型、Cron表达式、任务分组、执行日志、内置任务、源码插件和动态插件任务声明、master_only 与 all_node 执行范围、singleton 与 parallel 并发策略以及集群调度行为。'
+description: '任务类型、Cron表达式、任务分组、执行日志、内置任务、源码插件和动态插件任务声明、master_only 与 all_node 执行范围、singleton 与 parallel 并发策略以及集群调度行为。'
 keywords:
   - 定时任务
   - 定时调度

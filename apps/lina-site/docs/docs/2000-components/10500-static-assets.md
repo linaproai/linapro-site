@@ -2,7 +2,7 @@
 slug: '/docs/static-assets'
 title: '静态资源与前端资产'
 hide_title: true
-description: '本文介绍 LinaPro 的静态资源管理机制，阐述主框架如何通过 Go Embed 打包运行时资源和工作台构建产物，插件如何通过 public_assets 声明可公开静态资源，并说明 /admin 前端工作台入口、/x 插件 API、/x-assets 插件公开资产命名空间、源码插件自管路由和动态插件前端资源之间的职责边界，帮助开发者正确设计插件页面、公开资源和缓存版本策略。'
+description: '主框架如何通过 Go Embed 打包运行时资源和工作台构建产物，插件如何通过 public_assets 声明可公开静态资源，并说明 /admin 前端工作台入口、/x 插件 API、/x-assets 插件公开资产命名空间、源码插件自管路由和动态插件前端资源之间的职责边界，帮助开发者正确设计插件页面、公开资源和缓存版本策略。'
 keywords:
   - 静态资源
   - Go Embed

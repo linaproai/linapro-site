@@ -2,7 +2,7 @@
 slug: '/docs/plugin-management'
 title: 'Plugin Management'
 hide_title: true
-description: 'A component-level guide to LinaPro plugin management — source configuration, the local plugin workspace, plugins.init, plugins.install, plugins.update, plugins.status, admin-side lifecycle operations, dynamic plugin uploads, runtime upgrades, and how plugins move from code synchronization to runtime governance.'
+description: 'source configuration, the local plugin workspace, plugins.init, plugins.install, plugins.update, plugins.status, admin-side lifecycle operations, dynamic plugin uploads, runtime upgrades, and how plugins move from code synchronization to runtime governance.'
 keywords:
   - plugin management
   - plugin workspace

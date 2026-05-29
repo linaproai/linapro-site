@@ -2,7 +2,7 @@
 slug: '/docs/tools'
 title: '开发工具'
 hide_title: true
-description: '本节介绍 LinaPro 框架提供的开发工具，包括项目中所有 make 指令的说明与示例、以及内置 AI 技能体系的详细介绍，帮助开发者熟悉日常开发、构建、测试和 AI 辅助工作流中的核心工具链。'
+description: '项目中所有 make 指令的说明与示例、以及内置 AI 技能体系的详细介绍，帮助开发者熟悉日常开发、构建、测试和 AI 辅助工作流中的核心工具链。'
 keywords:
   - 开发工具
   - make指令

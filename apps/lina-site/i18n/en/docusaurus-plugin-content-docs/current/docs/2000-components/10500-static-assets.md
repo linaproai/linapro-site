@@ -2,7 +2,7 @@
 slug: '/docs/static-assets'
 title: 'Static Assets'
 hide_title: true
-description: 'This page explains LinaPro static asset management: how the core framework packages runtime resources and admin workspace build output with Go Embed, how plugins explicitly publish public static resources through public_assets, and how the /admin workspace entry, /x plugin API namespace, /x-assets public plugin asset namespace, source-plugin custom routes, and dynamic-plugin frontend resources stay separated. It helps developers design plugin pages, public assets, and cache/version policies correctly.'
+description: 'how the core framework packages runtime resources and admin workspace build output with Go Embed, how plugins explicitly publish public static resources through public_assets, and how the /admin workspace entry, /x plugin API namespace, /x-assets public plugin asset namespace, source-plugin custom routes, and dynamic-plugin frontend resources stay separated. It helps developers design plugin pages, public assets, and cache/version policies correctly.'
 keywords:
   - static assets
   - Go Embed

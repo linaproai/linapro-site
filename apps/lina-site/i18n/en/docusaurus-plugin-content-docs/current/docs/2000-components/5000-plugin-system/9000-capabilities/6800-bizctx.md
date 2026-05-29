@@ -2,7 +2,7 @@
 slug: '/docs/plugin-capability-bizctx'
 title: 'BizCtxService'
 hide_title: true
-description: "An architectural overview of BizCtxService in LinaPro — the read-only business context projection service, CurrentContext field semantics, and the service's role in the request pipeline for reading user, tenant, and impersonation state."
+description: "the read-only business context projection service, CurrentContext field semantics, and the service's role in the request pipeline for reading user, tenant, and impersonation state."
 keywords:
   - BizCtxService
   - business context

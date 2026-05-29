@@ -2,7 +2,7 @@
 slug: '/docs/wasm-plugins'
 title: '动态插件'
 hide_title: true
-description: '本文介绍WebAssembly（WASM）的核心概念与优势，包括跨平台性、安全沙箱、接近原生性能、热加载和多语言生态；并从组件设计和开发实践角度介绍LinaPro WASM动态插件，说明动态插件的适用场景、沙箱模型、pluginbridge协议、导出函数、hostServices授权、构建流程、运行时安装启用、显式升级和与源码插件的关键差异，帮助开发者理解运行时热加载扩展能力。'
+description: 'WebAssembly（WASM）的核心概念与优势，包括跨平台性、安全沙箱、接近原生性能、热加载和多语言生态；LinaPro WASM 动态插件的适用场景、沙箱模型、pluginbridge 协议、导出函数、hostServices 授权、构建流程、运行时安装启用、显式升级和与源码插件的关键差异，帮助开发者理解运行时热加载扩展能力。'
 keywords:
   - WASM动态插件
   - WebAssembly

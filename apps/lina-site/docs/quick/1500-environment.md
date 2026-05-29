@@ -2,7 +2,7 @@
 slug: '/quick/environment'
 title: '环境配置'
 hide_title: true
-description: '本文详细介绍运行 LinaPro 框架所需的全部环境依赖，包括 Git、Go（≥ 1.23）、Node.js（≥ 20.19）、pnpm（≥ 10.0）、PostgreSQL（14+）、可选 Redis 集群协调器、跨平台 linactl 开发指令入口，以及 AI 原生工作流推荐的 Claude Code、OpenSpec CLI、goframe-v2 和 find-skills 的版本要求与安装方法，并提供针对 macOS、Linux 和 Windows 平台的安装引导，帮助开发者在正式安装 LinaPro 之前快速完成本地环境准备。'
+description: '运行 LinaPro 框架所需的全部环境依赖，包括 Git、Go（≥ 1.23）、Node.js（≥ 20.19）、pnpm（≥ 10.0）、PostgreSQL（14+）、可选 Redis 集群协调器、跨平台 linactl 开发指令入口，以及 AI 原生工作流推荐的 Claude Code、OpenSpec CLI、goframe-v2 和 find-skills 的版本要求与安装方法，并提供针对 macOS、Linux 和 Windows 平台的安装引导，帮助开发者在正式安装 LinaPro 之前快速完成本地环境准备。'
 keywords:
   - LinaPro
   - 环境配置

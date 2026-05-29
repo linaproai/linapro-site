@@ -2,7 +2,7 @@
 slug: '/docs/plugin-capability-tenant'
 title: 'Tenant（租户能力）'
 hide_title: true
-description: '本文从架构设计角度介绍 LinaPro 的租户能力（tenantcap.Service），说明租户能力的消费侧接口设计、Provider 和 Resolver 扩展机制、能力降级策略和在多租户架构中的位置，帮助插件开发者理解如何消费和扩展租户能力。'
+description: '消费侧消费侧接口设计、Provider 和 Resolver 扩展机制、能力降级策略和在多租户架构中的位置，帮助插件开发者理解如何消费和扩展租户能力。'
 keywords:
   - 租户能力
   - tenantcap
@@ -148,6 +148,6 @@ graph TB
 ## 相关服务
 
 - [OrgService](/docs/plugin-capability-org) - 组织能力与租户能力互补，共同构成多租户+组织的数据模型
-- [BizCtxService](/docs/plugin-capability-bizctx) - 租户解析结果投影到BizCtx的TenantID字段
-- [AuthService](/docs/plugin-capability-auth) - 租户切换前使用TenantService校验合法性
-- [TenantFilterService](/docs/plugin-capability-tenant-filter) - 使用Tenant中的租户信息过滤数据
+- [BizCtxService](/docs/plugin-capability-bizctx) - 租户解析结果投影到`BizCtx`的`TenantID`字段
+- [AuthService](/docs/plugin-capability-auth) - 租户切换前使用`TenantService`校验合法性
+- [TenantFilterService](/docs/plugin-capability-tenant-filter) - 使用`Tenant`中的租户信息过滤数据

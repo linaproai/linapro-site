@@ -2,7 +2,7 @@
 slug: '/docs/multi-tenant'
 title: 'Multi Tenant'
 hide_title: true
-description: 'A component-level guide to LinaPro multi-tenancy — how the core framework bizctx, TenantFilterService, tenant_id filtering interface, default platform tenant, official multi-tenant source plugin, tenant impersonation, plugin multi-tenant manifest fields, and the current Pool shared-database model work together.'
+description: 'how the core framework bizctx, TenantFilterService, tenant_id filtering interface, default platform tenant, official multi-tenant source plugin, tenant impersonation, plugin multi-tenant manifest fields, and the current Pool shared-database model work together.'
 keywords:
   - multi-tenancy
   - tenant_id

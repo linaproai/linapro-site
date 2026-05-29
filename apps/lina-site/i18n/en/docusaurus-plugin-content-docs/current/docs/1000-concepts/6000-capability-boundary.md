@@ -2,7 +2,7 @@
 slug: '/docs/capability-boundary'
 title: 'Capability Boundary'
 hide_title: true
-description: 'This page explains how LinaPro defines capability boundaries between the core framework and plugins. It covers the default admin workspace, core framework control-plane APIs, the unified plugin API namespace, public plugin asset hosting, source-plugin HTTP routes, and the division of responsibility between source plugins and dynamic plugins. It also explains how APIPrefix, route contracts, public_assets, source, mount, and index are implemented across source plugins and dynamic plugins, so developers can understand exactly how the core framework and plugins collaborate without leaking responsibilities into each other.'
+description: 'Capability boundaries between the core framework and plugins. It covers the default admin workspace, core framework control-plane APIs, the unified plugin API namespace, public plugin asset hosting, source-plugin HTTP routes, and the division of responsibility between source plugins and dynamic plugins. It also explains how APIPrefix, route contracts, public_assets, source, mount, and index are implemented across source plugins and dynamic plugins, so developers can understand exactly how the core framework and plugins collaborate without leaking responsibilities into each other.'
 keywords:
   - core framework capability boundary
   - plugin capability boundary

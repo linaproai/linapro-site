@@ -2,7 +2,7 @@
 slug: '/community/support'
 title: '支持我们'
 hide_title: true
-description: '本文说明支持 LinaPro 长期维护的实际方式，包括反馈可复现问题、贡献文档、完善示例、分享生产实践、参与社区讨论，以及通过微信或支付宝捐赠支持开源项目持续发展。捐赠时请备注自己的 GitHub 或 Gitee 账号名称，便于后续整理捐赠记录。'
+description: '长期维护的实际方式，包括反馈可复现问题、贡献文档、完善示例、分享生产实践、参与社区讨论，以及通过微信或支付宝捐赠支持开源项目持续发展。捐赠时请备注自己的 GitHub 或 Gitee 账号名称，便于后续整理捐赠记录。'
 keywords:
   - LinaPro
   - 支持 LinaPro

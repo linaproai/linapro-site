@@ -2,7 +2,7 @@
 slug: '/docs/plugin-config-and-manifest'
 title: 'Plugin Configuration and Manifest Resources'
 hide_title: true
-description: 'A developer-focused guide to LinaPro plugin configuration files and manifest resources — how source plugins and dynamic plugins use independent configuration files, how production environments can override plugin configuration, how dynamic plugin artifacts carry default configuration, and how plugins read raw resources from the manifest through HostServices.Manifest.'
+description: 'how source plugins and dynamic plugins use independent configuration files, how production environments can override plugin configuration, how dynamic plugin artifacts carry default configuration, and how plugins read raw resources from the manifest through HostServices.Manifest.'
 keywords:
   - plugin configuration
   - manifest resources

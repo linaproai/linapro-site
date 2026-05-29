@@ -2,7 +2,7 @@
 slug: '/docs/plugin-capability-notify'
 title: 'NotifyService'
 hide_title: true
-description: "An architectural overview of LinaPro's NotifyService — the publish model for notifications, the SourceType and CategoryCode classification design, and where the service sits in the messaging pipeline."
+description: 'the publish model for notifications, the SourceType and CategoryCode classification design, and where the service sits in the messaging pipeline.'
 keywords:
   - NotifyService
   - notification service

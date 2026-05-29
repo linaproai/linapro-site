@@ -2,7 +2,7 @@
 slug: '/docs/capability-boundary'
 title: '框架组件职能边界'
 hide_title: true
-description: '本文介绍 LinaPro 主框架与插件职能边界的设计理念与实现细节，阐述默认管理工作台、主框架控制面 API、统一插件 API 命名空间、插件公开静态资源托管和源码插件 HTTP 路由之间的职责划分，说明 APIPrefix、route contract、public_assets、source、mount、index 等约定如何在源码插件和动态插件中落地，帮助开发者准确理解主框架与插件之间的协作方式。'
+description: '默认管理工作台、主框架控制面 API、统一插件 API 命名空间、插件公开静态资源托管和源码插件 HTTP 路由之间的职责划分，说明 APIPrefix、route contract、public_assets、source、mount、index 等约定如何在源码插件和动态插件中落地，帮助开发者准确理解主框架与插件之间的协作方式。'
 keywords:
   - 主框架职能边界
   - 插件职能边界

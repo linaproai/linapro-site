@@ -2,7 +2,7 @@
 slug: '/docs/commands'
 title: '开发指令'
 hide_title: true
-description: '本文介绍 LinaPro 项目中跨平台开发指令集的作用、支持的参数选项和使用示例，涵盖 linactl、Makefile 兼容入口、Windows make.cmd 包装入口、本地环境检查与初始化、开发服务管理、完整构建、WASM 插件构建、Docker 镜像构建、插件工作区管理、智能体资源软链管理、测试验证、国际化检查、数据库初始化和发布治理等场景，帮助开发者在 macOS、Linux 和 Windows 上稳定使用同一套项目工具链。'
+description: '支持的参数选项和使用示例，涵盖 linactl、Makefile 兼容入口、Windows make.cmd 包装入口、本地环境检查与初始化、开发服务管理、完整构建、WASM 插件构建、Docker 镜像构建、插件工作区管理、智能体资源软链管理、测试验证、国际化检查、数据库初始化和发布治理等场景，帮助开发者在 macOS、Linux 和 Windows 上稳定使用同一套项目工具链。'
 keywords:
   - make指令
   - 开发指令

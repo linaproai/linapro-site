@@ -2,7 +2,7 @@
 slug: '/docs/plugin-capability-config'
 title: 'ConfigService 与 HostConfigService'
 hide_title: true
-description: '本文从架构设计角度介绍 LinaPro 的 ConfigService 和 HostConfigService，说明插件配置与宿主配置的读取优先级、白名单边界和设计约束，帮助插件开发者理解配置服务的隔离机制和正确使用方式。'
+description: '插件配置与宿主配置的读取优先级、白名单边界和设计约束，帮助插件开发者理解配置服务的隔离机制和正确使用方式。'
 keywords:
   - ConfigService
   - HostConfigService

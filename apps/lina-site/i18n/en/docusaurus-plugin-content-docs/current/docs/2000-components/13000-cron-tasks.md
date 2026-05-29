@@ -2,7 +2,7 @@
 slug: '/docs/cron-tasks'
 title: 'Cron Tasks'
 hide_title: true
-description: 'A component-level guide to the LinaPro persistent scheduled task system — task types, cron expressions, task groups, execution logs, built-in tasks, source plugin and dynamic plugin task declarations, master_only and all_node execution scopes, singleton and parallel concurrency strategies, and cluster scheduling behavior.'
+description: 'task types, cron expressions, task groups, execution logs, built-in tasks, source plugin and dynamic plugin task declarations, master_only and all_node execution scopes, singleton and parallel concurrency strategies, and cluster scheduling behavior.'
 keywords:
   - scheduled tasks
   - task scheduling

@@ -2,7 +2,7 @@
 slug: '/docs/spec-driven-development'
 title: 'Spec Driven Development'
 hide_title: true
-description: 'A detailed guide to LinaPro Specification-Driven Development (SDD) and the OpenSpec workflow — the five-stage development loop (explore, propose, implement, review, archive), the responsibilities of AI and humans at each stage, the OpenSpec directory structure and spec file formats, and how spec anchors and mandatory E2E tests prevent architectural drift.'
+description: 'the five-stage development loop (explore, propose, implement, review, archive), the responsibilities of AI and humans at each stage, the OpenSpec directory structure and spec file formats, and how spec anchors and mandatory E2E tests prevent architectural drift.'
 keywords:
   - AI spec-driven development
   - SDD

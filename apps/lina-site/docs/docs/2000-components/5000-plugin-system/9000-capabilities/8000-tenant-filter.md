@@ -2,7 +2,7 @@
 slug: '/docs/plugin-capability-tenant-filter'
 title: 'TenantFilterService'
 hide_title: true
-description: '本文从架构设计角度介绍 LinaPro 的 TenantFilterService，说明租户过滤服务的数据库查询注入模式、与 pluginhost.Services 的关系和在多租户数据隔离中的位置，帮助插件开发者理解如何为插件自有表注入租户过滤条件。'
+description: '租户过滤服务的数据库查询注入模式、与 pluginhost.Services 的关系和在多租户数据隔离中的位置，帮助插件开发者理解如何为插件自有表注入租户过滤条件。'
 keywords:
   - TenantFilterService
   - 租户过滤
@@ -119,6 +119,6 @@ graph TB
 
 ## 相关服务
 
-- [BizCtxService](/docs/plugin-capability-bizctx) - TenantFilterContext中的身份信息来自BizCtx
-- [TenantService](/docs/plugin-capability-tenant) - 租户能力提供租户解析，TenantFilter使用租户信息过滤数据
-- [CacheService](/docs/plugin-capability-cache) - 缓存键中的租户隔离与TenantFilter的查询过滤互补
+- [BizCtxService](/docs/plugin-capability-bizctx) - `TenantFilterContext`中的身份信息来自`BizCtx`
+- [TenantService](/docs/plugin-capability-tenant) - 租户能力提供租户解析，`TenantFilter`使用租户信息过滤数据
+- [CacheService](/docs/plugin-capability-cache) - 缓存键中的租户隔离与`TenantFilter`的查询过滤互补

@@ -2,7 +2,7 @@
 slug: '/docs/plugin-capability-plugin-state'
 title: 'PluginStateService'
 hide_title: true
-description: '本文从架构设计角度介绍 LinaPro 的 PluginStateService，说明插件启用状态查询的本地快照与权威读取策略、Provider 启用状态的独立语义和设计约束，帮助插件开发者理解如何正确查询插件启用状态。'
+description: '插件启用状态查询的本地快照与权威读取策略、Provider 启用状态的独立语义和设计约束，帮助插件开发者理解如何正确查询插件启用状态。'
 keywords:
   - PluginStateService
   - 插件状态
@@ -102,6 +102,6 @@ graph TB
 
 ## 相关服务
 
-- [PluginLifecycleService](/docs/plugin-capability-plugin-lifecycle) - 生命周期编排改变插件状态，PluginStateService查询插件状态
-- [OrgService](/docs/plugin-capability-org) - 使用IsProviderEnabled判断组织能力提供方是否可用
-- [TenantService](/docs/plugin-capability-tenant) - 使用IsProviderEnabled判断租户能力提供方是否可用
+- [PluginLifecycleService](/docs/plugin-capability-plugin-lifecycle) - 生命周期编排改变插件状态，`PluginStateService`查询插件状态
+- [OrgService](/docs/plugin-capability-org) - 使用`IsProviderEnabled`判断组织能力提供方是否可用
+- [TenantService](/docs/plugin-capability-tenant) - 使用`IsProviderEnabled`判断租户能力提供方是否可用

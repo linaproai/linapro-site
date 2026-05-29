@@ -2,7 +2,7 @@
 slug: '/docs/admin-workspace'
 title: 'Admin Workspace'
 hide_title: true
-description: 'A component-level guide to the LinaPro built-in admin workspace, lina-vben — how it serves as the standard frontend consumer of the core framework service and plugin system, covering access control, system settings, job scheduling, multi-tenant management, plugin governance, developer center, and dynamic plugin pages, while maintaining consistency with backend API contracts, menu permissions, and I18N resources.'
+description: 'the standard frontend consumer of the core framework service and plugin system, covering access control, system settings, job scheduling, multi-tenant management, plugin governance, developer center, and dynamic plugin pages, while maintaining consistency with backend API contracts, menu permissions, and I18N resources.'
 keywords:
   - lina-vben
   - admin workspace

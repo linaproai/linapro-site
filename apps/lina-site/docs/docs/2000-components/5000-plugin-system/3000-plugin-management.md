@@ -2,7 +2,7 @@
 slug: '/docs/plugin-management'
 title: '插件管理'
 hide_title: true
-description: '本文从组件设计和操作流程角度介绍 LinaPro 插件管理，说明插件来源配置、本地插件工作区、plugins.init、plugins.install、plugins.update、plugins.status、管理端安装启用、禁用卸载、动态插件上传和运行时升级的完整链路，帮助开发者理解插件从代码获取到运行时生效的治理过程。'
+description: '插件来源配置、本地插件工作区、plugins.init、plugins.install、plugins.update、plugins.status、管理端安装启用、禁用卸载、动态插件上传和运行时升级的完整链路，帮助开发者理解插件从代码获取到运行时生效的治理过程。'
 keywords:
   - 插件管理
   - 插件工作区

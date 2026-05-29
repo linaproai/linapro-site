@@ -2,7 +2,7 @@
 slug: '/docs/core-host'
 title: 'Core Host'
 hide_title: true
-description: 'This architecture-level overview explains LinaPro core framework service lina-core: its responsibility boundaries, runtime request flow, startup and loading sequence, built-in platform capability matrix, plugin extension surfaces, and collaboration with the admin workspace, source plugins, WASM dynamic plugins, PostgreSQL, and Redis. It helps developers build a system-level map before reading deeper pages on configuration, permissions, API documentation, scheduled tasks, internationalization, multi-tenancy, the plugin system, and distributed architecture.'
+description: 'its responsibility boundaries, runtime request flow, startup and loading sequence, built-in platform capability matrix, plugin extension surfaces, and collaboration with the admin workspace, source plugins, WASM dynamic plugins, PostgreSQL, and Redis. It helps developers build a system-level map before reading deeper pages on configuration, permissions, API documentation, scheduled tasks, internationalization, multi-tenancy, the plugin system, and distributed architecture.'
 keywords:
   - lina-core
   - core framework service

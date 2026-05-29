@@ -1,8 +1,8 @@
 ---
 slug: '/docs/plugin-config-and-manifest'
-title: '插件配置与manifest资源'
+title: '插件配置与manifest'
 hide_title: true
-description: '本文从插件开发和运行时治理角度介绍 LinaPro 的插件配置文件与 manifest 资源机制，说明源码插件和动态插件如何使用独立配置文件、生产环境如何覆盖插件配置、动态插件 artifact 如何携带默认配置，以及插件如何通过 HostServices.Manifest 读取 manifest 下的原始资源，帮助开发者在不侵入主框架配置的前提下实现插件个性化配置、页面适配、资源检查和外部系统描述。'
+description: '源码插件和动态插件如何使用独立配置文件、生产环境如何覆盖插件配置、动态插件 artifact 如何携带默认配置，以及插件如何通过 HostServices.Manifest 读取 manifest 下的原始资源，帮助开发者在不侵入主框架配置的前提下实现插件个性化配置、页面适配、资源检查和外部系统描述。'
 keywords:
   - 插件配置
   - manifest资源

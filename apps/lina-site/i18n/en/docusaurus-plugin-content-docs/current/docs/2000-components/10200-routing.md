@@ -2,7 +2,7 @@
 slug: '/docs/routing'
 title: 'Routing'
 hide_title: true
-description: 'This article covers the routing management strategy of the LinaPro core framework service, including the /api/v1 prefix for core framework control-plane APIs, the unified /x/{plugin-id}/... plugin API namespace, the built-in middleware pipeline, layered protected-route design, inline API attribute management via g.Meta struct tags, and the different integration approaches for source-plugin custom non-reserved routes and dynamic-plugin route contracts.'
+description: 'routing management strategy of the LinaPro core framework service, including the /api/v1 prefix for core framework control-plane APIs, the unified /x/{plugin-id}/... plugin API namespace, the built-in middleware pipeline, layered protected-route design, inline API attribute management via g.Meta struct tags, and the different integration approaches for source-plugin custom non-reserved routes and dynamic-plugin route contracts.'
 keywords:
   - routing management
   - API versioning

@@ -2,7 +2,7 @@
 slug: '/docs/spec-driven-development'
 title: 'AI规范驱动开发'
 hide_title: true
-description: '本文详细介绍 LinaPro 的 AI 规范驱动开发（SDD）理念与 OpenSpec 工作流实践。OpenSpec 是可选但特别建议安装的规范驱动工作流组件，LinaPro 对其目录结构、指令和 Agent Skills 提供了良好支持。文章介绍五阶段研发闭环（探索、提案、实现、审查、归档）的完整流程、各阶段的 AI 职责和人类职责、OpenSpec 目录结构与规范文件格式，以及如何通过规范锚点和强制 E2E 测试防止架构漂移。'
+description: 'AI 规范驱动开发（SDD）理念与 OpenSpec 工作流实践。OpenSpec 是可选但特别建议安装的规范驱动工作流组件，LinaPro 对其目录结构、指令和 Agent Skills 提供了良好支持。文章介绍五阶段研发闭环（探索、提案、实现、审查、归档）的完整流程、各阶段的 AI 职责和人类职责、OpenSpec 目录结构与规范文件格式，以及如何通过规范锚点和强制 E2E 测试防止架构漂移。'
 keywords:
   - AI规范驱动开发
   - SDD

@@ -2,7 +2,7 @@
 slug: '/docs/plugin-capability-services'
 title: 'Plugin Capability Services Overview'
 hide_title: true
-description: "An architectural overview of LinaPro framework capability services (capability.Services) exposed to plugins — the design principles behind the Services interface, service classification, access patterns, and a scenario-based guide for choosing the right service, helping plugin developers understand each capability service's positioning, boundaries, and collaboration patterns."
+description: "the design principles behind the Services interface, service classification, access patterns, and a scenario-based guide for choosing the right service, helping plugin developers understand each capability service's positioning, boundaries, and collaboration patterns."
 keywords:
   - plugin capability
   - capability.Services

@@ -2,7 +2,7 @@
 slug: '/docs/plugin-capability-cache'
 title: 'CacheService'
 hide_title: true
-description: 'An architectural overview of CacheService in LinaPro — plugin-scoped cache isolation mechanisms, cache value types, expiration policies, and design constraints for data isolation and safe degradation across multiple plugins and tenants.'
+description: 'plugin-scoped cache isolation mechanisms, cache value types, expiration policies, and design constraints for data isolation and safe degradation across multiple plugins and tenants.'
 keywords:
   - CacheService
   - cache service

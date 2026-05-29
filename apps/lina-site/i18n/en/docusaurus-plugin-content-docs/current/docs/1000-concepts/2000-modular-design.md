@@ -2,7 +2,7 @@
 slug: '/docs/modular-design'
 title: 'Modular Design'
 hide_title: true
-description: 'An exploration of LinaPro modular design — how the leanness principle (keep the core minimal, extend through plugins), domain-bounded built-in capabilities, a first-class plugin system, stable extension interfaces, and real-world examples like cloud storage and LDAP/OIDC authentication let developers assemble systems from proven building blocks rather than building everything from scratch.'
+description: 'how the leanness principle (keep the core minimal, extend through plugins), domain-bounded built-in capabilities, a first-class plugin system, stable extension interfaces, and real-world examples like cloud storage and LDAP/OIDC authentication let developers assemble systems from proven building blocks rather than building everything from scratch.'
 keywords:
   - modular design
   - leanness principle

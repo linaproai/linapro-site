@@ -2,7 +2,7 @@
 slug: '/docs/ai-engineering-quality'
 title: 'AI Engineering Quality'
 hide_title: true
-description: 'A systematic look at the engineering management challenges that arise when AI is introduced into software development, and how LinaPro builds a complete AI engineering quality assurance system through the SDD spec-driven workflow, two layers of project specifications, interface abstraction and anti-leakage API contracts, and high-density test coverage where test code accounts for 39% of the total codebase.'
+description: 'the engineering management challenges that arise when AI is introduced into software development, and how LinaPro builds a complete AI engineering quality assurance system through the SDD spec-driven workflow, two layers of project specifications, interface abstraction and anti-leakage API contracts, and high-density test coverage where test code accounts for 39% of the total codebase.'
 keywords:
   - AI engineering quality
   - engineering quality assurance

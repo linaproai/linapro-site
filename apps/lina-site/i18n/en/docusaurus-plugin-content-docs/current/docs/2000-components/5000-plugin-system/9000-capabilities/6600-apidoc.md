@@ -2,7 +2,7 @@
 slug: '/docs/plugin-capability-apidoc'
 title: 'APIDocService'
 hide_title: true
-description: 'An architectural overview of APIDocService in LinaPro — how route operation keys are resolved into localized module labels and action summaries, and where the service fits in the request pipeline for audit logs and operation records.'
+description: 'how route operation keys are resolved into localized module labels and action summaries, and where the service fits in the request pipeline for audit logs and operation records.'
 keywords:
   - APIDocService
   - API documentation

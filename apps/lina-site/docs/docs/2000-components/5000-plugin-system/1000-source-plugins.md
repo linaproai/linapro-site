@@ -2,7 +2,7 @@
 slug: '/docs/source-plugins'
 title: '源码插件'
 hide_title: true
-description: '本文从组件设计和开发实践角度介绍 LinaPro 源码插件，说明源码插件的适用场景、目录结构、plugin.yaml清单、安装SQL、API契约、服务层实现、pluginhost注册、数据库访问、前端页面、事件钩子、运行时升级和最佳实践，帮助开发者用原生Go方式扩展长期业务能力。'
+description: '适用场景、目录结构、plugin.yaml清单、安装SQL、API契约、服务层实现、pluginhost注册、数据库访问、前端页面、事件钩子、运行时升级和最佳实践，帮助开发者用原生Go方式扩展长期业务能力。'
 keywords:
   - 源码插件
   - 插件开发

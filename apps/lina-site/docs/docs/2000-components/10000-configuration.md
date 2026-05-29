@@ -2,7 +2,7 @@
 slug: '/docs/configuration'
 title: '服务配置管理'
 hide_title: true
-description: '本文从组件设计角度介绍 LinaPro 主框架服务的配置管理能力，说明 config.yaml 如何统一驱动 HTTP服务、日志、数据库、JWT认证、会话、监控、健康探针、定时调度、公开前端工作台配置、国际化、集群协调、文件上传和插件治理，并给出生产环境需要重点关注的配置边界。'
+description: 'config.yaml 如何统一驱动 HTTP服务、日志、数据库、JWT认证、会话、监控、健康探针、定时调度、公开前端工作台配置、国际化、集群协调、文件上传和插件治理，并给出生产环境需要重点关注的配置边界。'
 keywords:
   - 配置管理
   - config.yaml

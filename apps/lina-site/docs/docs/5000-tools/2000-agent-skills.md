@@ -2,7 +2,7 @@
 slug: '/docs/agent-skills'
 title: '开发技能'
 hide_title: true
-description: '本文介绍 LinaPro 的 AI 专属技能体系，包含可选安装的 OpenSpec CLI、goframe-v2 和 find-skills 三项外部工具或技能，以及项目内置的前端设计、Git 工作流、代码审查、E2E 测试、性能审计、OpenSpec 实施归档等自动加载技能，并说明源码插件升级等场景可能依赖 AI 工具侧提供的 lina-upgrade 技能，帮助开发者全面了解各技能的作用、安装方法和使用方式。'
+description: '可选安装的 OpenSpec CLI、goframe-v2 和 find-skills 三项外部工具或技能，以及项目内置的前端设计、Git 工作流、代码审查、E2E 测试、性能审计、OpenSpec 实施归档等自动加载技能，并说明源码插件升级等场景可能依赖 AI 工具侧提供的 lina-upgrade 技能，帮助开发者全面了解各技能的作用、安装方法和使用方式。'
 keywords:
   - AI技能
   - 开发技能

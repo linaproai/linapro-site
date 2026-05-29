@@ -2,7 +2,7 @@
 slug: '/docs/plugin-capability-tenant-filter'
 title: 'TenantFilterService'
 hide_title: true
-description: 'An architectural overview of LinaPro TenantFilterService — the database query injection pattern for tenant filtering, its relationship with pluginhost.Services, and its role in multi-tenant data isolation, helping plugin developers understand how to inject tenant filter conditions for plugin-owned tables.'
+description: 'the database query injection pattern for tenant filtering, its relationship with pluginhost.Services, and its role in multi-tenant data isolation, helping plugin developers understand how to inject tenant filter conditions for plugin-owned tables.'
 keywords:
   - TenantFilterService
   - tenant filtering

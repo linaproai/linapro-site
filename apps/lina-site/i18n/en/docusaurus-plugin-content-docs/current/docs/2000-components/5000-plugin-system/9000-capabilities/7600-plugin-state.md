@@ -2,7 +2,7 @@
 slug: '/docs/plugin-capability-plugin-state'
 title: 'PluginStateService'
 hide_title: true
-description: "An architectural overview of LinaPro's PluginStateService, covering the local snapshot and authoritative read strategies for plugin enablement queries, the independent semantics of provider enablement status, and design constraints — helping plugin developers understand how to correctly query plugin enablement status."
+description: 'the local snapshot and authoritative read strategies for plugin enablement queries, the independent semantics of provider enablement status, and design constraints — helping plugin developers understand how to correctly query plugin enablement status.'
 keywords:
   - PluginStateService
   - plugin state

@@ -2,7 +2,7 @@
 slug: '/docs/plugin-capability-route'
 title: 'RouteService'
 hide_title: true
-description: "An architectural overview of LinaPro's RouteService, covering the design positioning of the dynamic route metadata service, the DynamicRouteMetadata struct, and its relationship with dynamic plugins — helping plugin developers understand how to retrieve metadata for the current dynamic route request."
+description: 'the design positioning of the dynamic route metadata service, the DynamicRouteMetadata struct, and its relationship with dynamic plugins — helping plugin developers understand how to retrieve metadata for the current dynamic route request.'
 keywords:
   - RouteService
   - dynamic route
