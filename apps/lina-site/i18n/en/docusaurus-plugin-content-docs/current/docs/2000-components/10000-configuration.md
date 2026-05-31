@@ -242,7 +242,7 @@ upload:
 
 Plugins that need file storage should use their own namespace, for example `temp/upload/content-notice/`, to avoid mixing with core framework or other plugin resources.
 
-## Plugin Configuration
+## Plugin Management Configuration
 
 Plugin configuration bridges core framework governance and the plugin runtime:
 
@@ -274,7 +274,7 @@ plugin:
 
 `withMockData` defaults to `false` and only applies during startup auto-installation. Already-installed plugins do not import demo data again just because the setting changes to `true`. Duplicate plugin `ID`s keep the first configuration entry.
 
-### Plugin-Owned Business Configuration
+## Plugin-Owned Business Configuration
 
 The core framework `config.yaml` stores core framework runtime configuration only. It should not carry a plugin's own business configuration. Plugins should read their configuration through the plugin-scoped configuration service, in this priority order:
 
