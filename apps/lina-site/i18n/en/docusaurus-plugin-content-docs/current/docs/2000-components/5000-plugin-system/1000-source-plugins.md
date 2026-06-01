@@ -2,13 +2,14 @@
 slug: '/docs/source-plugins'
 title: 'Source Plugins'
 hide_title: true
-description: 'when to use source plugins, the standard directory structure, plugin.yaml manifest, installation SQL, API contracts, service-layer implementation, pluginhost registration, database access, frontend pages, event hooks, runtime upgrades, and best practices for extending long-term business capabilities with native Go.'
+description: 'When to use source plugins, the standard directory structure, plugin.yaml manifest, plugin ID naming conventions, installation SQL, API contracts, service-layer implementation, pluginhost registration, database access, frontend pages, event hooks, runtime upgrades, and best practices for extending long-term business capabilities with native Go.'
 keywords:
   - source plugins
   - plugin development
   - pluginhost
   - plugin.yaml
   - plugin directory structure
+  - plugin ID naming convention
   - GoFrame plugins
   - plugin registration
   - installation SQL
@@ -78,40 +79,40 @@ apps/lina-plugins/<plugin-id>/
 `plugin.yaml` declares the plugin's identity, runtime form, multi-tenant boundaries, menus, and permissions:
 
 ```yaml
-id: content-article
-name: Article Management
+id: linapro-content-notice
+name: Content Notice
 version: v0.1.0
 type: source
 scope_nature: tenant_aware
 supports_multi_tenant: true
 default_install_mode: tenant_scoped
-description: Provides CRUD management for article content
+description: Provides publish and subscribe capabilities for content change notifications
 author: linapro
 license: Apache-2.0
 menus:
-  - key: plugin:content-article:list
-    name: Article Management
-    path: content-article-list
+  - key: plugin:linapro-content-notice:list
+    name: Content Notice
+    path: linapro-content-notice-list
     component: system/plugin/dynamic-page
-    perms: content-article:article:view
-    icon: ant-design:file-text-outlined
+    perms: content-notice:notice:view
+    icon: ant-design:notification-outlined
     type: M
     sort: 1
-  - key: plugin:content-article:create
-    parent_key: plugin:content-article:list
-    name: Create Article
-    perms: content-article:article:create
+  - key: plugin:linapro-content-notice:create
+    parent_key: plugin:linapro-content-notice:list
+    name: Create Notice
+    perms: content-notice:notice:create
     type: B
 ```
 
-Menu `key` values must be globally unique. Use the `plugin:<plugin-id>:<menu-key>` naming convention. Button permissions are attached to a menu via `type: B` and do not appear directly in the sidebar.
+The recommended plugin `ID` uses a three-segment `kebab-case` structure: `<author>-<domain>-<capability>`. For example, in `linapro-content-notice`, `linapro` is the author, `content` is the domain, and `notice` is the capability. The `<domain>` segment should be chosen from common business domains such as `content`, `monitor`, `org`, `tenant`, `auth`, `oidc`, `ai`, `storage`, `workflow`, `message`, and others — see [Plugin System](/docs/plugin-system) for the full list of recommended domains. Menu `key` values must be globally unique; use the `plugin:<plugin-id>:<menu-key>` format. Button permissions are attached to a menu via `type: B` and do not appear directly in the sidebar.
 
 ## Database and SQL
 
 Plugin installation scripts live in `manifest/sql/`, and uninstallation scripts live in `manifest/sql/uninstall/`. Installation and upgrade scripts must be idempotent — use `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`, and similar patterns.
 
 ```sql
-CREATE TABLE IF NOT EXISTS content_article_record (
+CREATE TABLE IF NOT EXISTS linapro_content_notice_record (
     "id" BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     "tenant_id" INT NOT NULL DEFAULT 0,
     "title" VARCHAR(255) NOT NULL DEFAULT '',
@@ -119,8 +120,8 @@ CREATE TABLE IF NOT EXISTS content_article_record (
     "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_content_article_record_tenant
-    ON content_article_record ("tenant_id");
+CREATE INDEX IF NOT EXISTS idx_linapro_content_notice_record_tenant
+    ON linapro_content_notice_record ("tenant_id");
 ```
 
 Tables that need multi-tenant support should include a `tenant_id` column. When the `multi-tenant` plugin is not enabled, `tenant_id = 0` represents the platform context.
@@ -130,17 +131,17 @@ Tables that need multi-tenant support should include a `tenant_id` column. When 
 Plugin `API` definitions also use `g.Meta` to declare paths, methods, permissions, and documentation:
 
 ```go
-type ArticleListReq struct {
-    g.Meta `path:"/articles" method:"get" tags:"Article" summary:"List articles" permission:"content-article:article:view"`
+type NoticeListReq struct {
+    g.Meta `path:"/notices" method:"get" tags:"Notice" summary:"List notices" permission:"content-notice:notice:view"`
     Page     int `json:"page" v:"min:1"`
     PageSize int `json:"pageSize" v:"min:1,max:100"`
 }
 ```
 
-The `path` here is the relative path after the controller is bound to the plugin route group. Source plugin business `API`s should be mounted under `/x/{plugin-id}/...` rather than occupying the core framework `/api/v1` control plane. For example, the endpoint above is recommended to be exposed as:
+The `path` here is the relative path after the controller is bound to the plugin route group. Source plugin business `API`s should be mounted under `/x/{plugin-id}/...` rather than occupying the core framework `/api/v1` control plane. For example, the endpoint above in the `linapro-content-notice` plugin is recommended to be exposed as:
 
 ```text
-/x/linapro-content-article/articles
+/x/linapro-content-notice/notices
 ```
 
 The service layer accesses the database through the plugin's own `DAO`. When tenant isolation is required, use the core framework's `TenantFilterService` to append tenant filter conditions instead of writing inconsistent filtering rules manually.
@@ -151,9 +152,9 @@ Source plugins register via `init()` in `backend/plugin.go`:
 
 ```go
 func init() {
-    plugin := pluginhost.NewSourcePlugin("linapro-content-article")
+    plugin := pluginhost.NewSourcePlugin("linapro-content-notice")
 
-    plugin.Assets().UseEmbeddedFiles(contentarticle.EmbeddedFiles)
+    plugin.Assets().UseEmbeddedFiles(contentnotice.EmbeddedFiles)
 
     plugin.HTTP().RegisterRoutes(
         pluginhost.ExtensionPointHTTPRouteRegister,
@@ -272,7 +273,7 @@ plugin.Cron().RegisterCron(
     pluginhost.ExtensionPointCronRegister,
     pluginhost.CallbackExecutionModeBlocking,
     func(registry pluginhost.CronRegistry) error {
-        registry.Register("content-article:cleanup", cleanupExpiredArticles)
+        registry.Register("content-notice:cleanup", cleanupExpiredNotices)
         return nil
     },
 )
@@ -288,7 +289,7 @@ This model avoids the assumption that overwriting files means the data and gover
 
 ## Best Practices
 
-- Use `kebab-case` for plugin `ID`s and the corresponding `snake_case` prefix for database table names.
+- Use the three-segment `<author>-<domain>-<capability>` `kebab-case` structure for plugin `ID`s, and the corresponding `snake_case` prefix for database table names.
 - Make installation and upgrade `SQL` idempotent to prevent failures when reinstalling with retained data.
 - Place service logic in `backend/internal/service/`.
 - Depend only on stable contracts such as `pluginhost` and `pluginservice`; do not directly import the core framework's `internal/` packages.

@@ -2,13 +2,14 @@
 slug: '/docs/source-plugins'
 title: '源码插件'
 hide_title: true
-description: '适用场景、目录结构、plugin.yaml清单、安装SQL、API契约、服务层实现、pluginhost注册、数据库访问、前端页面、事件钩子、运行时升级和最佳实践，帮助开发者用原生Go方式扩展长期业务能力。'
+description: '适用场景、目录结构、plugin.yaml清单、插件ID命名规范、安装SQL、API契约、服务层实现、pluginhost注册、数据库访问、前端页面、事件钩子、运行时升级和最佳实践，帮助开发者用原生Go方式扩展长期业务能力。'
 keywords:
   - 源码插件
   - 插件开发
   - pluginhost
   - plugin.yaml
   - 插件目录结构
+  - 插件ID命名规范
   - GoFrame插件
   - 插件注册
   - 安装SQL
@@ -78,40 +79,40 @@ apps/lina-plugins/<plugin-id>/
 `plugin.yaml`声明插件身份、运行形态、多租户边界、菜单和权限：
 
 ```yaml
-id: content-article
-name: 文章管理
+id: linapro-content-notice
+name: 内容通知
 version: v0.1.0
 type: source
 scope_nature: tenant_aware
 supports_multi_tenant: true
 default_install_mode: tenant_scoped
-description: 提供文章内容的增删改查管理功能
+description: 提供内容变更通知的发布与订阅能力
 author: linapro
 license: Apache-2.0
 menus:
-  - key: plugin:content-article:list
-    name: 文章管理
-    path: content-article-list
+  - key: plugin:linapro-content-notice:list
+    name: 内容通知
+    path: linapro-content-notice-list
     component: system/plugin/dynamic-page
-    perms: content-article:article:view
-    icon: ant-design:file-text-outlined
+    perms: content-notice:notice:view
+    icon: ant-design:notification-outlined
     type: M
     sort: 1
-  - key: plugin:content-article:create
-    parent_key: plugin:content-article:list
-    name: 创建文章
-    perms: content-article:article:create
+  - key: plugin:linapro-content-notice:create
+    parent_key: plugin:linapro-content-notice:list
+    name: 创建通知
+    perms: content-notice:notice:create
     type: B
 ```
 
-菜单`key`必须全局唯一，推荐使用`plugin:<plugin-id>:<menu-key>`格式。按钮权限通过`type: B`挂在菜单下，不直接出现在侧边栏中。
+插件`ID`推荐使用`<author>-<domain>-<capability>`三段式`kebab-case`结构，例如`linapro-content-notice`中`linapro`为作者、`content`为领域、`notice`为能力。`<domain>`段建议从`content`、`monitor`、`org`、`tenant`、`auth`、`oidc`、`ai`、`storage`、`workflow`、`message`等常见业务领域中选取，完整领域建议参见[插件系统](/docs/plugin-system)。菜单`key`必须全局唯一，推荐使用`plugin:<plugin-id>:<menu-key>`格式。按钮权限通过`type: B`挂在菜单下，不直接出现在侧边栏中。
 
 ## 数据库与SQL
 
 插件安装`SQL`位于`manifest/sql/`，卸载`SQL`位于`manifest/sql/uninstall/`。安装和升级脚本必须幂等，常用`CREATE TABLE IF NOT EXISTS`、`CREATE INDEX IF NOT EXISTS`等写法。
 
 ```sql
-CREATE TABLE IF NOT EXISTS content_article_record (
+CREATE TABLE IF NOT EXISTS linapro_content_notice_record (
     "id" BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     "tenant_id" INT NOT NULL DEFAULT 0,
     "title" VARCHAR(255) NOT NULL DEFAULT '',
@@ -119,8 +120,8 @@ CREATE TABLE IF NOT EXISTS content_article_record (
     "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_content_article_record_tenant
-    ON content_article_record ("tenant_id");
+CREATE INDEX IF NOT EXISTS idx_linapro_content_notice_record_tenant
+    ON linapro_content_notice_record ("tenant_id");
 ```
 
 需要支持多租户的插件表应包含`tenant_id`列。未启用`multi-tenant`插件时，`tenant_id = 0`表示平台上下文。
@@ -130,17 +131,17 @@ CREATE INDEX IF NOT EXISTS idx_content_article_record_tenant
 插件`API`定义同样使用`g.Meta`声明路径、方法、权限和文档说明：
 
 ```go
-type ArticleListReq struct {
-    g.Meta `path:"/articles" method:"get" tags:"Article" summary:"List articles" permission:"content-article:article:view"`
+type NoticeListReq struct {
+    g.Meta `path:"/notices" method:"get" tags:"Notice" summary:"List notices" permission:"content-notice:notice:view"`
     Page     int `json:"page" v:"min:1"`
     PageSize int `json:"pageSize" v:"min:1,max:100"`
 }
 ```
 
-这里的`path`是控制器绑定到插件路由组后的相对路径。源码插件业务`API`应统一挂载到`/x/{plugin-id}/...`，而不是占用主框架`/api/v1`控制面。例如上面的接口在`linapro-content-article`插件中推荐暴露为：
+这里的`path`是控制器绑定到插件路由组后的相对路径。源码插件业务`API`应统一挂载到`/x/{plugin-id}/...`，而不是占用主框架`/api/v1`控制面。例如上面的接口在`linapro-content-notice`插件中推荐暴露为：
 
 ```text
-/x/linapro-content-article/articles
+/x/linapro-content-notice/notices
 ```
 
 服务层通过插件自有`DAO`访问数据库。需要租户隔离时，应使用主框架发布的`TenantFilterService`追加租户条件，而不是手写不一致的过滤规则。
@@ -151,9 +152,9 @@ type ArticleListReq struct {
 
 ```go
 func init() {
-    plugin := pluginhost.NewSourcePlugin("linapro-content-article")
+    plugin := pluginhost.NewSourcePlugin("linapro-content-notice")
 
-    plugin.Assets().UseEmbeddedFiles(contentarticle.EmbeddedFiles)
+    plugin.Assets().UseEmbeddedFiles(contentnotice.EmbeddedFiles)
 
     plugin.HTTP().RegisterRoutes(
         pluginhost.ExtensionPointHTTPRouteRegister,
@@ -272,7 +273,7 @@ plugin.Cron().RegisterCron(
     pluginhost.ExtensionPointCronRegister,
     pluginhost.CallbackExecutionModeBlocking,
     func(registry pluginhost.CronRegistry) error {
-        registry.Register("content-article:cleanup", cleanupExpiredArticles)
+        registry.Register("content-notice:cleanup", cleanupExpiredNotices)
         return nil
     },
 )
@@ -288,7 +289,7 @@ plugin.Cron().RegisterCron(
 
 ## 最佳实践
 
-- 插件`ID`使用`kebab-case`，数据库表前缀使用对应的`snake_case`。
+- 插件`ID`使用`<author>-<domain>-<capability>`三段式`kebab-case`结构，数据库表前缀使用对应的`snake_case`。
 - 安装和升级`SQL`必须幂等，避免保留数据后重新安装失败。
 - 服务逻辑放在`backend/internal/service/`。
 - 插件只使用`pluginhost`和`pluginservice`等稳定契约，不直接依赖主框架的`internal/`包。

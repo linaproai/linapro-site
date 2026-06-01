@@ -2,7 +2,7 @@
 slug: '/docs/plugin-system'
 title: 'Plugin System'
 hide_title: true
-description: 'why source plugins and WASM dynamic plugins share the same governance pipeline, and how catalog, dependency, lifecycle, integration, plugin-runtime cache, pluginhost, pluginbridge, plugin.yaml, multi-tenant fields, lifecycle states, isolation mechanisms, runtime upgrades, public static assets, and plugin-scoped configuration together form an extensible plugin architecture.'
+description: 'Why source plugins and WASM dynamic plugins share the same governance pipeline, and how catalog, dependency, lifecycle, integration, plugin-runtime cache, pluginhost, pluginbridge, plugin.yaml, plugin ID naming conventions, multi-tenant fields, lifecycle states, isolation mechanisms, runtime upgrades, public static assets, and plugin-scoped configuration together form an extensible plugin architecture.'
 keywords:
   - plugin system
   - dual-mode plugins
@@ -11,6 +11,7 @@ keywords:
   - pluginhost
   - pluginbridge
   - plugin.yaml
+  - plugin ID naming convention
   - plugin lifecycle
   - plugin isolation
   - plugin governance
@@ -103,16 +104,16 @@ flowchart TD
 Every plugin must provide a `plugin.yaml`. It is the unified entry point for plugin identity, dependencies, menus, multi-tenant policy, public static assets, and dynamic plugin core framework service authorization.
 
 ```yaml
-id: content-article
-name: 文章管理
+id: linapro-content-notice
+name: Content Notice
 version: v0.1.0
 type: source
 scope_nature: tenant_aware
 supports_multi_tenant: true
 default_install_mode: tenant_scoped
-description: 提供文章内容的增删改查管理功能
+description: Provides publish and subscribe capabilities for content change notifications
 author: linapro
-homepage: https://example.com/plugins/content-article
+homepage: https://example.com/plugins/linapro-content-notice
 license: Apache-2.0
 i18n:
   enabled: true
@@ -130,15 +131,44 @@ public_assets:
     mount: /
     index: index.html
 menus:
-  - key: plugin:content-article:list
-    name: 文章管理
-    path: content-article-list
+  - key: plugin:linapro-content-notice:list
+    name: Content Notice
+    path: linapro-content-notice-list
     component: system/plugin/dynamic-page
-    perms: content-article:article:view
+    perms: content-notice:notice:view
     type: M
 ```
 
-The plugin `ID` must be `kebab-case` and at most 64 characters. Menu `key` values must use the `plugin:<plugin-id>:...` format. Menu types use `D`, `M`, and `B` for directory, page, and button permissions. `supports_multi_tenant` is a required semantic field that makes explicit whether the plugin participates in tenant-level installation and provisioning governance.
+The plugin `ID` is the unique identifier that runs through the entire plugin lifecycle — used for directory naming, `API` route namespacing, database table prefixes, menu `key` values, and static resource paths. `LinaPro` recommends a three-segment `kebab-case` structure: `<author>-<domain>-<capability>`:
+
+| Segment | Meaning | Example |
+|---------|---------|---------|
+| `<author>` | Plugin author or organization identifier | `linapro` |
+| `<domain>` | Business domain | `content`, `monitor`, `org`, `tenant` |
+| `<capability>` | Specific capability, may contain multiple `kebab` segments | `notice`, `loginlog`, `demo-guard` |
+
+The `<author>-<domain>-<capability>` pattern is the official recommended naming convention and repository governance standard, not a runtime enforcement rule. Runtime validation only ensures the `ID` is non-empty, at most 64 characters, and valid `kebab-case`. The core framework's `ParsePluginID` function will attempt to split the `ID` into `Author`, `Domain`, and `Capability` segments, but `ID`s with fewer than three segments are also accepted.
+
+The `<domain>` segment identifies the plugin's business domain. It is recommended to choose from the following common domains, though custom domains are also acceptable:
+
+| Domain | Use Case | Official Plugin Examples |
+|--------|----------|-------------------------|
+| `content` | Content management, articles, announcements, notifications | `linapro-content-notice` |
+| `monitor` | Monitoring, logging, auditing | `linapro-monitor-loginlog`, `linapro-monitor-operlog` |
+| `org` | Organization structure, departments, positions | `linapro-org-core` |
+| `tenant` | Multi-tenancy, tenant management | `linapro-tenant-core` |
+| `ops` | Operations, security, access control | `linapro-ops-demo-guard` |
+| `auth` | Authentication, authorization, SSO | — |
+| `oidc` | `OIDC` identity provider integration | — |
+| `ai` | Artificial intelligence, large language models, vector search | — |
+| `storage` | File storage, object storage | — |
+| `workflow` | Workflows, approval flows | — |
+| `message` | Message center, in-app notifications, push | — |
+| `payment` | Payments, orders, billing | — |
+| `gateway` | Gateway, rate limiting, routing | — |
+| `data` | Data integration, import/export, `ETL` | — |
+
+Menu `key` values must use the `plugin:<plugin-id>:...` format. Menu types use `D`, `M`, and `B` for directory, page, and button permissions. `supports_multi_tenant` is a required semantic field that makes explicit whether the plugin participates in tenant-level installation and provisioning governance.
 
 `public_assets` declares static resource directories that the plugin author permits anonymous users to access. The core framework serves only resources matched by this declaration and maps them to `/x-assets/{plugin-id}/{version}/...`. Public asset content under the same plugin version should remain stable; if resources change, upgrade the plugin version or use an equivalent content-versioning mechanism.
 
@@ -150,12 +180,12 @@ hostServices:
     methods: [list, get, create, update, delete]
     resources:
       tables:
-        - plugin_demo_dynamic_record
+        - linapro_demo_dynamic_record
   - service: storage
     methods: [put, get, delete, list]
     resources:
       paths:
-        - plugin-demo-dynamic/
+        - linapro-demo-dynamic/
   - service: config
     methods: [get]
   - service: hostConfig
@@ -201,7 +231,7 @@ Plugin business configuration should not be written into the core framework `con
 
 | Priority | Configuration location | Description |
 |----------|------------------------|-------------|
-| 1 | `plugins/<plugin-id>/config.yaml` under the runtime directory | Operations-side override for the current plugin |
+| 1 | `plugins/<plugin-id>/config.yaml` under the production configuration root | Operations-side override for the current plugin |
 | 2 | `apps/lina-plugins/<plugin-id>/manifest/config/config.yaml` | Development-time plugin default configuration |
 | 3 | `manifest/config/config.yaml` inside a dynamic plugin artifact | Default configuration carried with a dynamic plugin release |
 
@@ -246,7 +276,7 @@ Plugin-owned tables must use a `snake_case` prefix derived from the plugin `ID`:
 
 ```text
 Core framework tables: sys_user, sys_role, sys_menu
-Plugin tables: content_notice_notice, org_center_dept, plugin_demo_dynamic_record
+Plugin tables: linapro_content_notice_record, linapro_org_core_dept, linapro_demo_dynamic_record
 ```
 
 System tables use the `sys_` prefix. Plugin tables use the `<plugin_id>_` prefix. Core framework and plugin data are fully isolated, avoiding naming conflicts and permission misuse.
@@ -258,8 +288,8 @@ Plugins that need multi-tenant support should design their tables to include a `
 Plugin file storage should use the plugin `ID` as the path namespace:
 
 ```text
-temp/upload/content-notice/
-temp/upload/plugin-demo-dynamic/
+temp/upload/linapro-content-notice/
+temp/upload/linapro-demo-dynamic/
 ```
 
 ### Sandbox isolation

@@ -2,7 +2,7 @@
 slug: '/docs/plugin-system'
 title: '双模式插件系统'
 hide_title: true
-description: '源码插件和WASM动态插件为何共享同一套治理主链，以及 catalog、dependency、lifecycle、integration、plugin-runtime cache、pluginhost、pluginbridge、plugin.yaml、多租户字段、生命周期、隔离机制和运行时升级如何共同构成可扩展的插件体系。'
+description: '源码插件和WASM动态插件为何共享同一套治理主链，以及插件ID命名规范、catalog、dependency、lifecycle、integration、plugin-runtime cache、pluginhost、pluginbridge、plugin.yaml、多租户字段、生命周期、隔离机制和运行时升级如何共同构成可扩展的插件体系。'
 keywords:
   - 插件系统
   - 双模式插件
@@ -11,6 +11,7 @@ keywords:
   - pluginhost
   - pluginbridge
   - plugin.yaml
+  - 插件ID命名规范
   - 插件生命周期
   - 插件隔离
   - 插件治理
@@ -103,16 +104,16 @@ flowchart TD
 每个插件都必须提供`plugin.yaml`。它是插件身份、依赖、菜单、多租户策略、公开静态资源和动态插件主框架能力授权的统一入口。
 
 ```yaml
-id: content-article
-name: 文章管理
+id: linapro-content-notice
+name: 内容通知
 version: v0.1.0
 type: source
 scope_nature: tenant_aware
 supports_multi_tenant: true
 default_install_mode: tenant_scoped
-description: 提供文章内容的增删改查管理功能
+description: 提供内容变更通知的发布与订阅能力
 author: linapro
-homepage: https://example.com/plugins/content-article
+homepage: https://example.com/plugins/linapro-content-notice
 license: Apache-2.0
 i18n:
   enabled: true
@@ -130,15 +131,46 @@ public_assets:
     mount: /
     index: index.html
 menus:
-  - key: plugin:content-article:list
-    name: 文章管理
-    path: content-article-list
+  - key: plugin:linapro-content-notice:list
+    name: 内容通知
+    path: linapro-content-notice-list
     component: system/plugin/dynamic-page
-    perms: content-article:article:view
+    perms: content-notice:notice:view
     type: M
 ```
 
-插件`ID`必须是`kebab-case`，最长`64`个字符。菜单`key`必须使用`plugin:<plugin-id>:...`格式，菜单类型使用`D`、`M`、`B`分别表示目录、页面和按钮权限。`supports_multi_tenant`是必填语义字段，用来明确插件是否参与租户级安装和开通治理。
+### 插件ID命名规范
+
+插件`ID`是贯穿整个插件生命周期的唯一标识，用于目录命名、`API`路由命名空间、数据库表前缀、菜单`key`和静态资源路径。`LinaPro`推荐的插件`ID`采用`<author>-<domain>-<capability>`三段式`kebab-case`结构：
+
+| 段 | 含义 | 示例 |
+|------|------|------|
+| `<author>` | 插件作者或组织标识 | `linapro` |
+| `<domain>` | 业务领域 | `content`、`monitor`、`org`、`tenant` |
+| `<capability>` | 具体能力，可包含多个`kebab`段 | `notice`、`loginlog`、`demo-guard` |
+
+`<author>-<domain>-<capability>`是官方推荐的命名约定和仓库治理规范，不是运行时强制规则。运行时校验只确保`ID`非空、最长`64`个字符且为合法`kebab-case`。主框架的`ParsePluginID`函数会尽力从`ID`中拆分出`Author`、`Domain`和`Capability`三段，但少于三段的`ID`同样会被接受。
+
+`<domain>`段用于标识插件所属的业务领域，建议从以下常见领域中选取，也可根据实际业务自行定义：
+
+| 领域 | 适用场景 | 官方插件示例 |
+|------|----------|--------------|
+| `content` | 内容管理、文章、公告、通知 | `linapro-content-notice` |
+| `monitor` | 监控、日志、审计 | `linapro-monitor-loginlog`、`linapro-monitor-operlog` |
+| `org` | 组织架构、部门、岗位 | `linapro-org-core` |
+| `tenant` | 多租户、租户管理 | `linapro-tenant-core` |
+| `ops` | 运维、安全、访问控制 | `linapro-ops-demo-guard` |
+| `auth` | 认证、授权、单点登录 | — |
+| `oidc` | `OIDC`身份提供商集成 | — |
+| `ai` | 人工智能、大模型、向量检索 | — |
+| `storage` | 文件存储、对象存储 | — |
+| `workflow` | 工作流、审批流 | — |
+| `message` | 消息中心、站内信、推送 | — |
+| `payment` | 支付、订单、账单 | — |
+| `gateway` | 网关、限流、路由 | — |
+| `data` | 数据集成、导入导出、`ETL` | — |
+
+菜单`key`必须使用`plugin:<plugin-id>:...`格式，菜单类型使用`D`、`M`、`B`分别表示目录、页面和按钮权限。`supports_multi_tenant`是必填语义字段，用来明确插件是否参与租户级安装和开通治理。
 
 `public_assets`声明插件作者允许匿名访问的静态资源目录。主框架只会托管声明命中的资源，并统一映射到`/x-assets/{plugin-id}/{version}/...`。同一插件版本下的公开资源内容应保持稳定；资源变化应升级插件版本或引入等价的内容版本机制。
 
@@ -150,12 +182,12 @@ hostServices:
     methods: [list, get, create, update, delete]
     resources:
       tables:
-        - plugin_demo_dynamic_record
+        - linapro_demo_dynamic_record
   - service: storage
     methods: [put, get, delete, list]
     resources:
       paths:
-        - plugin-demo-dynamic/
+        - linapro-demo-dynamic/
   - service: config
     methods: [get]
   - service: hostConfig
@@ -247,7 +279,7 @@ stateDiagram-v2
 
 ```text
 主框架表：sys_user、sys_role、sys_menu
-插件表：content_notice_notice、org_center_dept、plugin_demo_dynamic_record
+插件表：linapro_content_notice_record、linapro_org_core_dept、linapro_demo_dynamic_record
 ```
 
 系统表使用`sys_`前缀，插件表使用`<plugin_id>_`前缀。主框架能力和插件能力的数据完全隔离，避免命名冲突和权限误用。
@@ -259,8 +291,8 @@ stateDiagram-v2
 插件文件存储应以插件`ID`作为路径命名空间，例如：
 
 ```text
-temp/upload/content-notice/
-temp/upload/plugin-demo-dynamic/
+temp/upload/linapro-content-notice/
+temp/upload/linapro-demo-dynamic/
 ```
 
 ### 沙箱隔离
