@@ -137,7 +137,7 @@ npm install -g pnpm
 
 ### PostgreSQL
 
-`LinaPro`默认使用`PostgreSQL 14+`作为数据库。运行`make init`或`make dev`之前，请先准备好可连接的`PostgreSQL`实例。
+`LinaPro`默认使用`PostgreSQL 14+`作为数据库。运行`make db.init`或`make dev`之前，请先准备好可连接的`PostgreSQL`实例。
 
 <Tabs groupId="platform">
 <TabItem value="mac-linux" label="macOS / Linux" default>

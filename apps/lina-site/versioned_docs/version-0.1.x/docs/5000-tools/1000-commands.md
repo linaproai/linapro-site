@@ -15,7 +15,7 @@ keywords:
   - make test
   - make image
   - make image.build
-  - make init
+  - make db.init
   - make wasm
   - make plugins.install
   - make plugins.status
@@ -52,7 +52,7 @@ go run . dev
 
 ```bash
 make help
-make init confirm=init
+make db.init confirm=init
 make dev
 ```
 
@@ -68,7 +68,7 @@ make help
 
 ```powershell
 .\make help
-.\make init confirm=init
+.\make db.init confirm=init
 .\make dev
 ```
 
@@ -98,8 +98,8 @@ make help
 | `make plugins.install` | 插件工作区 | 安装配置中的源码插件到`apps/lina-plugins` |
 | `make plugins.update` | 插件工作区 | 更新`apps/lina-plugins`中的源码插件 |
 | `make plugins.status` | 插件工作区 | 查看源码插件工作区状态 |
-| `make init` | 数据库 | 初始化数据库表结构和种子数据 |
-| `make mock` | 数据库 | 加载演示`Mock`数据 |
+| `make db.init` | 数据库 | 初始化数据库表结构和种子数据 |
+| `make db.mock` | 数据库 | 加载演示`Mock`数据 |
 | `make release.tag.check` | 发布治理 | 校验`release tag`与`metadata.yaml`中`framework.version`一致 |
 | `make help` | 其他 | 查看所有可用指令 |
 
@@ -398,24 +398,24 @@ make plugins.status
 
 :::
 
-### make init
+### make db.init
 
 初始化数据库的表结构（`DDL`）和系统必需的种子数据。后端会按`config.yaml`中`database.default.link`的配置自动选择`PostgreSQL`或`SQLite`方言，其中`PostgreSQL 14+`是默认数据存储，`SQLite`仅用于本地演示或冒烟验证。
 
 ```bash
 # 仅初始化（保留现有数据）
-make init confirm=init
+make db.init confirm=init
 
 # 重建数据库（清空后重新初始化）
-make init confirm=init rebuild=true
+make db.init confirm=init rebuild=true
 ```
 
-### make mock
+### make db.mock
 
-在`make init`完成之后，加载用于本地演示和开发验证的可选`Mock`数据。
+在`make db.init`完成之后，加载用于本地演示和开发验证的可选`Mock`数据。
 
 ```bash
-make mock confirm=mock
+make db.mock confirm=mock
 ```
 
 ## 其他

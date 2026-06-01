@@ -16,7 +16,7 @@ keywords:
   - make test
   - make image
   - make image.build
-  - make init
+  - make db.init
   - make wasm
   - make plugins.install
   - make plugins.status
@@ -57,7 +57,7 @@ go run . dev
 
 ```bash
 make help
-make init confirm=init
+make db.init confirm=init
 make dev
 ```
 
@@ -73,7 +73,7 @@ make help
 
 ```powershell
 .\make help
-.\make init confirm=init
+.\make db.init confirm=init
 .\make dev
 ```
 
@@ -111,8 +111,8 @@ Every `make <command>` example below can be replaced with `cd hack/tools/linactl
 | `make agents.prompts.unlink` | Agent resources | Remove symlinks managed by `agents.prompts.link` |
 | `make agents.md.link` | Agent resources | Symlink supported agents' private rule files to the root `AGENTS.md` |
 | `make agents.md.unlink` | Agent resources | Remove the `AGENTS.md` rule-file symlinks managed by `agents.md.link` |
-| `make init` | Database | Initialize database schema and seed data |
-| `make mock` | Database | Load demo `Mock` data |
+| `make db.init` | Database | Initialize database schema and seed data |
+| `make db.mock` | Database | Load demo `Mock` data |
 | `make release.tag.check` | Release governance | Verify the `release tag` matches `framework.version` in `metadata.yaml` |
 | `make help` | Other | Show all available commands |
 
@@ -505,26 +505,26 @@ Both `init` and `mock` perform destructive database operations. They require an 
 
 :::
 
-### make init
+### make db.init
 
 Initializes the database schema (`DDL`) and required system seed data. The command reads `database.default.link` from `apps/lina-core/manifest/config/config.yaml`; currently only the `PostgreSQL 14+` dialect is supported. `sqlite:`, `mysql:`, or unknown links fail fast during dialect parsing without creating local database files or continuing to execute `SQL`.
 
 ```bash
 # Initialize only, preserving existing data
-make init confirm=init
+make db.init confirm=init
 
 # Rebuild the database after wiping it
-make init confirm=init rebuild=true
+make db.init confirm=init rebuild=true
 ```
 
 If `PostgreSQL` cannot be reached, the command prompts you to start `PostgreSQL` and prints a local `docker run` example. `rebuild=true` first terminates connections to the target database, then runs `DROP DATABASE IF EXISTS` and `CREATE DATABASE`; use it only when the target database can be cleared.
 
-### make mock
+### make db.mock
 
-After `make init` completes, loads optional `Mock` data for local demos and development validation.
+After `make db.init` completes, loads optional `Mock` data for local demos and development validation.
 
 ```bash
-make mock confirm=mock
+make db.mock confirm=mock
 ```
 
 ## Other

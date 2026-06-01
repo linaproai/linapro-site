@@ -14,13 +14,13 @@ keywords:
   - config.yaml
   - 数据库配置
   - 数据库初始化
-  - make init
+  - make db.init
   - make dev
   - 安装验证
   - 开发服务
   - 环境配置
   - 演示数据
-  - make mock
+  - make db.mock
   - linactl
   - 官方插件子模块
 ---
@@ -43,7 +43,7 @@ git clone --depth 1 --branch v0.1.0 https://github.com/linaproai/linapro.git lin
 
 ### 准备 PostgreSQL
 
-`LinaPro`默认使用`PostgreSQL 14+`作为数据库。`make init`和`make dev`不会启动或管理数据库，请先准备可连接的`PostgreSQL`实例。本地开发可以使用以下容器：
+`LinaPro`默认使用`PostgreSQL 14+`作为数据库。`make db.init`和`make dev`不会启动或管理数据库，请先准备可连接的`PostgreSQL`实例。本地开发可以使用以下容器：
 
 ```bash
 docker run \
@@ -80,13 +80,13 @@ database:
 配置完成后，执行以下命令创建数据库表结构并写入初始数据：
 
 ```bash
-make init confirm=init
+make db.init confirm=init
 ```
 
 `Windows`用户如果使用`PowerShell`，可执行：
 
 ```powershell
-.\make init confirm=init
+.\make db.init confirm=init
 ```
 
 初始化完成后，数据库中将包含系统所需的基础表结构和默认配置数据。
@@ -96,7 +96,7 @@ make init confirm=init
 配置完成后，执行以下命令加载官方提供的演示数据：
 
 ```bash
-make mock confirm=mock
+make db.mock confirm=mock
 ```
 
 ### 启动开发服务
@@ -128,8 +128,8 @@ make dev
 make dev               # 启动前后端服务
 make stop              # 停止所有本地服务
 make status            # 查看服务运行状态
-make init confirm=init # 重新初始化数据库
-make mock confirm=mock # 重新加载演示数据
+make db.init confirm=init # 重新初始化数据库
+make db.mock confirm=mock # 重新加载演示数据
 make test              # 运行完整 E2E 测试套件
 make build             # 编译生成可发布的二进制文件
 make image             # 构建 Docker 镜像

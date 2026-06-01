@@ -133,7 +133,7 @@ After installation, run `pnpm --version` and confirm that the output is at least
 
 ### PostgreSQL
 
-LinaPro uses `PostgreSQL 14+` as its default database. Before running `make init` or `make dev`, prepare a reachable `PostgreSQL` instance.
+LinaPro uses `PostgreSQL 14+` as its default database. Before running `make db.init` or `make dev`, prepare a reachable `PostgreSQL` instance.
 
 <Tabs groupId="platform">
 <TabItem value="mac-linux" label="macOS / Linux" default>

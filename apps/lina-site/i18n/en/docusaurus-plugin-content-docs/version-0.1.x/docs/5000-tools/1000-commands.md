@@ -15,7 +15,7 @@ keywords:
   - make test
   - make image
   - make image.build
-  - make init
+  - make db.init
   - make wasm
   - make plugins.install
   - make plugins.status
@@ -52,7 +52,7 @@ go run . dev
 
 ```bash
 make help
-make init confirm=init
+make db.init confirm=init
 make dev
 ```
 
@@ -68,7 +68,7 @@ make help
 
 ```powershell
 .\make help
-.\make init confirm=init
+.\make db.init confirm=init
 .\make dev
 ```
 
@@ -98,8 +98,8 @@ All `make <command>` examples in this document can be equivalently replaced with
 | `make plugins.install` | Plugin workspace | Install configured source plugins into `apps/lina-plugins` |
 | `make plugins.update` | Plugin workspace | Update source plugins in `apps/lina-plugins` |
 | `make plugins.status` | Plugin workspace | View source plugin workspace status |
-| `make init` | Database | Initialize database schema and seed data |
-| `make mock` | Database | Load demo `Mock` data |
+| `make db.init` | Database | Initialize database schema and seed data |
+| `make db.mock` | Database | Load demo `Mock` data |
 | `make release.tag.check` | Release governance | Verify `release tag` matches `framework.version` in `metadata.yaml` |
 | `make help` | Other | List all available commands |
 
@@ -397,24 +397,24 @@ Both `init` and `mock` make destructive changes to the database. To prevent acci
 
 :::
 
-### make init
+### make db.init
 
 Initializes the database schema (`DDL`) and system seed data. The backend automatically selects the `PostgreSQL` or `SQLite` dialect based on the `database.default.link` setting in `config.yaml`; `PostgreSQL 14+` is the default data store, while `SQLite` is only for local demos or smoke testing.
 
 ```bash
 # Initialize only (preserve existing data)
-make init confirm=init
+make db.init confirm=init
 
 # Rebuild the database (wipe and reinitialize)
-make init confirm=init rebuild=true
+make db.init confirm=init rebuild=true
 ```
 
-### make mock
+### make db.mock
 
-After `make init` completes, loads optional `Mock` data for local demo and development verification.
+After `make db.init` completes, loads optional `Mock` data for local demo and development verification.
 
 ```bash
-make mock confirm=mock
+make db.mock confirm=mock
 ```
 
 ## Other Commands

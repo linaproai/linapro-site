@@ -14,13 +14,13 @@ keywords:
   - config.yaml
   - database configuration
   - database initialization
-  - make init
+  - make db.init
   - make dev
   - installation verification
   - development service
   - environment setup
   - demo data
-  - make mock
+  - make db.mock
   - linactl
   - official plugin submodules
 ---
@@ -46,7 +46,7 @@ git clone --depth 1 --branch v0.1.0 https://github.com/linaproai/linapro.git lin
 
 ### Prepare PostgreSQL
 
-`LinaPro` uses `PostgreSQL 14+` as its default database. `make init` and `make dev` do not start or manage the database, so prepare a reachable `PostgreSQL` instance first. For local development, you can use this container:
+`LinaPro` uses `PostgreSQL 14+` as its default database. `make db.init` and `make dev` do not start or manage the database, so prepare a reachable `PostgreSQL` instance first. For local development, you can use this container:
 
 ```bash
 docker run \
@@ -83,13 +83,13 @@ The default configuration connects to the `linapro` database with `postgres:post
 After the config is ready, run the following command to create the database schema and write the initial data:
 
 ```bash
-make init confirm=init
+make db.init confirm=init
 ```
 
 If you use `PowerShell` on `Windows`, run:
 
 ```powershell
-.\make init confirm=init
+.\make db.init confirm=init
 ```
 
 After initialization, the database contains the basic table structure and default configuration data required by the system.
@@ -99,7 +99,7 @@ After initialization, the database contains the basic table structure and defaul
 After the config is ready, run the following command to load the official demo data:
 
 ```bash
-make mock confirm=mock
+make db.mock confirm=mock
 ```
 
 ### Check the Environment (Optional)

@@ -16,7 +16,7 @@ keywords:
   - make test
   - make image
   - make image.build
-  - make init
+  - make db.init
   - make wasm
   - make plugins.install
   - make plugins.status
@@ -57,7 +57,7 @@ go run . dev
 
 ```bash
 make help
-make init confirm=init
+make db.init confirm=init
 make dev
 ```
 
@@ -73,7 +73,7 @@ make help
 
 ```powershell
 .\make help
-.\make init confirm=init
+.\make db.init confirm=init
 .\make dev
 ```
 
@@ -111,8 +111,8 @@ make help
 | `make agents.prompts.unlink` | 智能体资源 | 移除由`agents.prompts.link`管理的提示词目录软链 |
 | `make agents.md.link` | 智能体资源 | 将支持的智能体私有规则文件软链到根目录`AGENTS.md` |
 | `make agents.md.unlink` | 智能体资源 | 移除由`agents.md.link`管理的`AGENTS.md`规则文件软链 |
-| `make init` | 数据库 | 初始化数据库表结构和种子数据 |
-| `make mock` | 数据库 | 加载演示`Mock`数据 |
+| `make db.init` | 数据库 | 初始化数据库表结构和种子数据 |
+| `make db.mock` | 数据库 | 加载演示`Mock`数据 |
 | `make release.tag.check` | 发布治理 | 校验`release tag`与`metadata.yaml`中`framework.version`一致 |
 | `make help` | 其他 | 查看所有可用指令 |
 
@@ -505,26 +505,26 @@ make agents agent=claude-code force=1
 
 :::
 
-### make init
+### make db.init
 
 初始化数据库的表结构（`DDL`）和系统必需的种子数据。命令读取`apps/lina-core/manifest/config/config.yaml`中的`database.default.link`，当前仅支持`PostgreSQL 14+`方言；`sqlite:`、`mysql:`或未知链接会在方言解析阶段快速失败，不会创建本地数据库文件或继续执行`SQL`。
 
 ```bash
 # 仅初始化（保留现有数据）
-make init confirm=init
+make db.init confirm=init
 
 # 重建数据库（清空后重新初始化）
-make init confirm=init rebuild=true
+make db.init confirm=init rebuild=true
 ```
 
 如果`PostgreSQL`无法连接，命令会提示先启动`PostgreSQL`，并输出本地`docker run`示例。`rebuild=true`会先终止目标数据库连接，再执行`DROP DATABASE IF EXISTS`和`CREATE DATABASE`，只应在确认可以清空目标库时使用。
 
-### make mock
+### make db.mock
 
-在`make init`完成之后，加载用于本地演示和开发验证的可选`Mock`数据。
+在`make db.init`完成之后，加载用于本地演示和开发验证的可选`Mock`数据。
 
 ```bash
-make mock confirm=mock
+make db.mock confirm=mock
 ```
 
 ## 其他
