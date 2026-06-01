@@ -39,7 +39,7 @@ keywords:
 | Resource | URL |
 |----------|-----|
 | **Open-source repository** | https://github.com/linaproai/linapro |
-| **Live demo** | http://demo.linapro.ai/admin <br/>Username: `admin` <br/>Password: `admin123` |
+| **Live demo** | https://demo.linapro.ai/admin <br/>Username: `admin` <br/>Password: `admin123` |
 | **Official website** | https://linapro.ai/ |
 
 :::info Tip

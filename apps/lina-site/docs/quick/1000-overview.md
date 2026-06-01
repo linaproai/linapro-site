@@ -39,7 +39,7 @@ keywords:
 | 资源 | 地址 |
 |------|------|
 | **开源仓库** | https://github.com/linaproai/linapro |
-| **后台演示** | http://demo.linapro.ai/admin <br/>账号：`admin` <br/>密码：`admin123`|
+| **后台演示** | https://demo.linapro.ai/admin <br/>账号：`admin` <br/>密码：`admin123`|
 | **官方网站** | https://linapro.ai/ |
 
 :::info 提示
