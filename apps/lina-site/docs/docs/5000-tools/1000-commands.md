@@ -17,6 +17,7 @@ keywords:
   - make image
   - make image.build
   - make db.init
+  - make db.upgrade
   - make wasm
   - make plugins.install
   - make plugins.status
@@ -112,6 +113,7 @@ make help
 | `make agents.md.link` | 智能体资源 | 将支持的智能体私有规则文件软链到根目录`AGENTS.md` |
 | `make agents.md.unlink` | 智能体资源 | 移除由`agents.md.link`管理的`AGENTS.md`规则文件软链 |
 | `make db.init` | 数据库 | 初始化数据库表结构和种子数据 |
+| `make db.upgrade` | 数据库 | 重放宿主`SQL`文件升级数据库表结构 |
 | `make db.mock` | 数据库 | 加载演示`Mock`数据 |
 | `make release.tag.check` | 发布治理 | 校验`release tag`与`metadata.yaml`中`framework.version`一致 |
 | `make help` | 其他 | 查看所有可用指令 |
@@ -518,6 +520,16 @@ make db.init confirm=init rebuild=true
 ```
 
 如果`PostgreSQL`无法连接，命令会提示先启动`PostgreSQL`，并输出本地`docker run`示例。`rebuild=true`会先终止目标数据库连接，再执行`DROP DATABASE IF EXISTS`和`CREATE DATABASE`，只应在确认可以清空目标库时使用。
+
+### make db.upgrade
+
+重放宿主框架的`SQL`文件，将数据库表结构升级到最新状态。该命令读取`apps/lina-core/manifest/sql/`目录下所有`.sql`文件，按文件名排序依次执行。所有`SQL`语句使用`CREATE TABLE IF NOT EXISTS`和`CREATE INDEX IF NOT EXISTS`等幂等语法，因此重放不会破坏已有数据，只会将缺失的表和索引补全。
+
+```bash
+make db.upgrade confirm=upgrade
+```
+
+该命令只处理宿主框架的`SQL`文件，不处理插件自带的`SQL`。如果需要升级插件的表结构，应参考各插件文档中的说明。如果`PostgreSQL`无法连接，命令会提示先启动数据库并输出`docker run`示例。
 
 ### make db.mock
 

@@ -17,6 +17,7 @@ keywords:
   - make image
   - make image.build
   - make db.init
+  - make db.upgrade
   - make wasm
   - make plugins.install
   - make plugins.status
@@ -112,6 +113,7 @@ Every `make <command>` example below can be replaced with `cd hack/tools/linactl
 | `make agents.md.link` | Agent resources | Symlink supported agents' private rule files to the root `AGENTS.md` |
 | `make agents.md.unlink` | Agent resources | Remove the `AGENTS.md` rule-file symlinks managed by `agents.md.link` |
 | `make db.init` | Database | Initialize database schema and seed data |
+| `make db.upgrade` | Database | Replay host framework `SQL` files to upgrade database schema |
 | `make db.mock` | Database | Load demo `Mock` data |
 | `make release.tag.check` | Release governance | Verify the `release tag` matches `framework.version` in `metadata.yaml` |
 | `make help` | Other | Show all available commands |
@@ -518,6 +520,16 @@ make db.init confirm=init rebuild=true
 ```
 
 If `PostgreSQL` cannot be reached, the command prompts you to start `PostgreSQL` and prints a local `docker run` example. `rebuild=true` first terminates connections to the target database, then runs `DROP DATABASE IF EXISTS` and `CREATE DATABASE`; use it only when the target database can be cleared.
+
+### make db.upgrade
+
+Replays host framework `SQL` files to upgrade the database schema to the latest state. The command reads all `.sql` files under `apps/lina-core/manifest/sql/`, executing them in filename order. All `SQL` statements use idempotent syntax such as `CREATE TABLE IF NOT EXISTS` and `CREATE INDEX IF NOT EXISTS`, so replaying them does not destroy existing data—it only adds any missing tables and indexes.
+
+```bash
+make db.upgrade confirm=upgrade
+```
+
+This command only processes host framework `SQL` files, not plugin-supplied `SQL`. To upgrade plugin schemas, refer to each plugin's documentation. If `PostgreSQL` cannot be reached, the command prompts you to start the database and prints a `docker run` example.
 
 ### make db.mock
 
