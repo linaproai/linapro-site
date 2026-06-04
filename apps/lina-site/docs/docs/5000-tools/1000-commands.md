@@ -106,12 +106,6 @@ make help
 | `make plugins.update` | 插件工作区 | 更新`apps/lina-plugins`中的源码插件 |
 | `make plugins.status` | 插件工作区 | 查看源码插件工作区状态 |
 | `make agents` | 智能体资源 | 为单个智能体一键创建或移除技能、提示词和`AGENTS.md`相关软链 |
-| `make agents.skills.link` | 智能体资源 | 将支持的智能体项目技能目录软链到`.agents/skills` |
-| `make agents.skills.unlink` | 智能体资源 | 移除由`agents.skills.link`管理的技能目录软链 |
-| `make agents.prompts.link` | 智能体资源 | 将支持的智能体命令或提示词目录软链到`.agents/prompts/...` |
-| `make agents.prompts.unlink` | 智能体资源 | 移除由`agents.prompts.link`管理的提示词目录软链 |
-| `make agents.md.link` | 智能体资源 | 将支持的智能体私有规则文件软链到根目录`AGENTS.md` |
-| `make agents.md.unlink` | 智能体资源 | 移除由`agents.md.link`管理的`AGENTS.md`规则文件软链 |
 | `make db.init` | 数据库 | 初始化数据库表结构和种子数据 |
 | `make db.upgrade` | 数据库 | 重放宿主`SQL`文件升级数据库表结构 |
 | `make db.mock` | 数据库 | 加载演示`Mock`数据 |

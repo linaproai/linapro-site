@@ -106,12 +106,6 @@ Every `make <command>` example below can be replaced with `cd hack/tools/linactl
 | `make plugins.update` | Plugin workspace | Update source plugins under `apps/lina-plugins` |
 | `make plugins.status` | Plugin workspace | Show source plugin workspace status |
 | `make agents` | Agent resources | Create or remove skill, prompt, and `AGENTS.md` symlinks for a single agent |
-| `make agents.skills.link` | Agent resources | Symlink supported agents' project skill directories to `.agents/skills` |
-| `make agents.skills.unlink` | Agent resources | Remove symlinks managed by `agents.skills.link` |
-| `make agents.prompts.link` | Agent resources | Symlink supported agents' command or prompt directories to `.agents/prompts/...` |
-| `make agents.prompts.unlink` | Agent resources | Remove symlinks managed by `agents.prompts.link` |
-| `make agents.md.link` | Agent resources | Symlink supported agents' private rule files to the root `AGENTS.md` |
-| `make agents.md.unlink` | Agent resources | Remove the `AGENTS.md` rule-file symlinks managed by `agents.md.link` |
 | `make db.init` | Database | Initialize database schema and seed data |
 | `make db.upgrade` | Database | Replay host framework `SQL` files to upgrade database schema |
 | `make db.mock` | Database | Load demo `Mock` data |
