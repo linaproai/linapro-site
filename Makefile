@@ -191,9 +191,21 @@ version:
 		yarn --cwd "$$SITE_DIR" install; \
 	fi; \
 	echo "Archiving $$SITE_NAME docs as version $$VERSION..."; \
-	cd "$$SITE_DIR" && yarn run docusaurus docs:version "$$VERSION"; \
+	yarn --cwd "$$SITE_DIR" run docusaurus docs:version "$$VERSION"; \
 	echo "Syncing versioned i18n docs for $$VERSION..."; \
-	node "$$SITE_DIR/scripts/sync-versioned-i18n-docs.js" "$$VERSION"
+	node "$$SITE_DIR/scripts/sync-versioned-i18n-docs.js" "$$VERSION"; \
+	MAJOR=$$(echo "$$VERSION" | cut -d. -f1); \
+	MINOR=$$(echo "$$VERSION" | cut -d. -f2); \
+	NEXT_MINOR=$$((MINOR + 1)); \
+	NEXT_VERSION="$${MAJOR}.$${NEXT_MINOR}.x"; \
+	NEXT_LABEL="$${NEXT_VERSION}(Latest)"; \
+	echo "Updating version label to $$NEXT_LABEL..."; \
+	sed -i.bak "s|const LATEST_VERSION_LABEL = '[^']*';|const LATEST_VERSION_LABEL = '$$NEXT_LABEL';|" "$$SITE_DIR/docusaurus.config.ts" && rm -f "$$SITE_DIR/docusaurus.config.ts.bak"; \
+	I18N_JSON="$$SITE_DIR/i18n/zh-Hans/docusaurus-plugin-content-docs/current.json"; \
+	if [ -f "$$I18N_JSON" ]; then \
+		sed -i.bak "s|\"message\": \"[^\"]*\",|\"message\": \"$$NEXT_LABEL\",|" "$$I18N_JSON" && rm -f "$$I18N_JSON.bak"; \
+	fi; \
+	echo "Version $$VERSION archived. Next development version: $$NEXT_LABEL"
 
 ## image: 将 docs/blog/i18n 中被引用的本地内容图片转换为 WebP，并更新引用、删除安全的原图 [IMAGE_FLAGS=--dry-run|--include-static] [WEBP_INCLUDE_STATIC=1|0] [WEBP_LOSSLESS=1|0] [WEBP_QUALITY=1-100]
 # 默认使用无损 WebP，避免降低图片质量；只有 WEBP_LOSSLESS=0 时 WEBP_QUALITY 才用于有损压缩。
