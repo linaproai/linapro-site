@@ -45,6 +45,6 @@ yarn-debug.log*
 yarn-error.log*
 .scripts/ai-trans/config.yaml
 .scripts/gen-seo/config.yaml
-.aiprompt.zh.md
+/localdocs/
 .tmp-site/
 .playwright-cli
