@@ -27,3 +27,10 @@
 #### Scenario: 方法概览可查阅
 - **WHEN** 插件开发者查看主要能力章节
 - **THEN** 能快速了解消费侧可用的方法
+
+### Requirement: Tenant文档说明TenantFilter子能力
+文档 SHALL 在`Tenant`父领域文档中说明`pluginhost.Services.TenantFilter()`的源码插件专属定位、`Context`和`Apply`方法、`tenant_id`注入逻辑，以及它不属于普通`capability.Services.Tenant()`的原因。
+
+#### Scenario: 租户过滤子能力归入父领域
+- **WHEN** 插件开发者需要为源码插件自有表追加租户过滤
+- **THEN** 文档引导其使用`pluginhost.Services.TenantFilter()`，并说明动态插件应使用`data`服务而不是`TenantFilter()`

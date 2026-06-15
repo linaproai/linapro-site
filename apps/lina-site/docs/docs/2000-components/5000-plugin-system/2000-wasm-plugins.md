@@ -1,6 +1,6 @@
 ---
 slug: '/docs/wasm-plugins'
-title: '动态插件'
+title: '动态插件与WASM运行时'
 hide_title: true
 description: 'WebAssembly（WASM）的核心概念与优势，包括跨平台性、安全沙箱、接近原生性能、热加载和多语言生态；LinaPro WASM 动态插件的适用场景、沙箱模型、pluginbridge 协议、导出函数、hostServices 授权、构建流程、运行时安装启用、显式升级和与源码插件的关键差异，帮助开发者理解运行时热加载扩展能力。'
 keywords:
@@ -122,7 +122,7 @@ apps/lina-plugins/<plugin-id>/
 
 构建工具会优先读取插件嵌入资源，并在需要时回退扫描目录，把`plugin.yaml`、`frontend/`资产、`manifest/sql`、`manifest/i18n`、`manifest/config/config.yaml`、`manifest/config/config.example.yaml`和`manifest/`下的其他资源写入动态产物。运行时资源会绑定到当前有效发布的校验和与生成号，安装、启用、禁用、卸载、升级或同版本刷新都会触发相应缓存失效。
 
-动态插件的配置与`manifest`资源路径语义和源码插件保持一致。`manifest/config/config.yaml`会作为动态`artifact`携带的默认配置快照，只有在没有生产外部配置和开发期配置文件时才作为回退来源；`manifest/config/config.example.yaml`只是模板。`profile.yaml`、`resources/policy.yaml`、`config/config.example.yaml`、`sql/*.sql`和`i18n/*.json`等文件都可以通过`manifest`类`hostServices`按原文读取，但必须在`resources.paths`中授权；读取原文不替代配置、`SQL`或国际化专用管线。完整说明参见[插件配置与manifest资源](/docs/plugin-config-and-manifest)。
+动态插件的配置与`manifest`资源路径语义和源码插件保持一致。`manifest/config/config.yaml`会作为动态`artifact`携带的默认配置快照，只有在没有生产外部配置和开发期配置文件时才作为回退来源；`manifest/config/config.example.yaml`只是模板。`profile.yaml`、`resources/policy.yaml`、`config/config.example.yaml`、`sql/*.sql`和`i18n/*.json`等文件都可以通过`manifest`类`hostServices`按原文读取，但必须在`resources.paths`中授权；读取原文不替代配置、`SQL`或国际化专用管线。配置管理的完整说明参见[插件配置管理](/docs/plugin-config)，`manifest`资源读取参见[Manifest交付资源](/docs/plugin-manifest)。
 
 ## WASM入口
 
@@ -170,11 +170,28 @@ func main() {}
 | `network` | 受目标地址约束的外部`HTTP`请求 |
 | `cache` | 集群感知缓存读写 |
 | `lock` | 分布式锁获取、续约和释放 |
-| `cron` | 动态插件内置任务注册 |
-| `config` | 当前插件自己的只读配置读取 |
-| `hostConfig` | 宿主公开配置白名单读取 |
+| `jobs` | 定时任务元数据读取和动态任务注册 |
+| `hostconfig` | 宿主授权配置键读取 |
 | `manifest` | 当前插件`manifest/`原始资源读取 |
-| `notify` | 主框架通知能力 |
+| `notifications` | 通知消息读取和受治理通知发送 |
+| `ai` | 文本、图片、向量、音频、视觉、文档、安全审核和视频等`AI`子能力 |
+| `plugins` | 插件注册表、插件配置、启用状态和生命周期 |
+| `auth` | 租户`token`选择或切换、代用户`token` |
+| `authz` | 权限批量获取、权限判断、平台管理员检查 |
+| `users` | 用户批量读取、搜索和可见性确认 |
+| `bizctx` | 当前请求业务上下文 |
+| `dict` | 字典标签解析 |
+| `files` | 文件批量读取和可见性确认 |
+| `i18n` | 读取`locale`、翻译消息和查找消息`key` |
+| `infra` | 基础设施组件状态 |
+| `route` | 当前动态路由元数据 |
+| `sessions` | 在线会话搜索和批量读取 |
+| `org` | 组织投影，例如部门和岗位 |
+| `tenant` | 租户上下文、可见性、成员校验和切换 |
+| `apidoc` | `API`文档本地化 |
+| `secret` | 密钥解析（预留） |
+| `event` | 事件发布（预留） |
+| `queue` | 队列入列（预留） |
 
 示例：
 
@@ -182,8 +199,8 @@ func main() {}
 hostServices:
   - service: runtime
     methods: [log.write, info.now, info.node]
-  - service: cron
-    methods: [register]
+  - service: jobs
+    methods: [jobs.register]
   - service: data
     methods: [list, get, create, update, delete]
     resources:
@@ -193,9 +210,7 @@ hostServices:
     methods: [request]
     resources:
       - url: https://api.example.com
-  - service: config
-    methods: [get]
-  - service: hostConfig
+  - service: hostconfig
     methods: [get]
     resources:
       keys:
@@ -208,7 +223,7 @@ hostServices:
         - profile.yaml
 ```
 
-`config`、`hostConfig`和`manifest`只允许`get`方法。`guest`侧`SDK`提供的`String`、`Bool`、`Int`、`Duration`、`Scan`等便捷函数会转化为`get`调用，不需要也不能作为清单授权方法声明。`hostConfig`必须声明`resources.keys`，`manifest`必须声明`resources.paths`。`manifest`资源路径相对`manifest/`目录，例如示例中的`profile.yaml`不应写成`manifest/profile.yaml`。
+`hostconfig`和`manifest`省略`methods`时默认使用`get`。`guest`侧`SDK`提供的`String`、`Bool`、`Int`、`Duration`、`Scan`等便捷函数会转化为`get`调用，不需要也不能作为清单授权方法声明。`hostconfig`必须声明`resources.keys`，`manifest`必须声明`resources.paths`。`manifest`资源路径相对`manifest/`目录，例如示例中的`profile.yaml`不应写成`manifest/profile.yaml`。
 
 ## 构建动态插件
 
@@ -248,7 +263,7 @@ menus:
 1. 构建`.wasm`产物。
 2. 在管理工作台的扩展中心上传动态插件包。
 3. 主框架验证`WASM`文件头、自定义段、嵌入清单、`ABI`版本和资源。
-4. 管理员确认`hostServices`授权；如果存在`storage`、`network`、`data`、`hostConfig`、`manifest`等资源型声明，需要确认资源范围。
+4. 管理员确认`hostServices`授权；如果存在`storage`、`network`、`data`、`hostconfig`、`manifest`等资源型声明，需要确认资源范围。
 5. 执行安装`SQL`并写入治理记录。
 6. 启用后，主框架装载`WASM`沙箱并投影路由、菜单、公开资产和资源快照。
 
@@ -261,6 +276,16 @@ menus:
 /x/linapro-demo-dynamic/backend-summary
 ```
 
+## 动态插件专属能力
+
+`Runtime()`、`Network()`和`RecordStore()`是`pluginbridge.Services`上的动态插件专属能力。它们不属于`capability.Services`，因为源码插件已经运行在宿主进程内，可以使用宿主原生等价能力。
+
+| 能力 | 公开入口 | 说明 |
+|------|----------|------|
+| `Runtime()` | `pluginbridge.Services.Runtime()` | 动态插件通过`WASI host-service`客户端写日志、读写状态、读取时间、生成`UUID`和读取节点身份；源码插件直接使用宿主原生日志和运行期上下文 |
+| `Network()` | `pluginbridge.Services.Network()` | 动态插件通过`host-service`授权访问受治理的出站`HTTP`；源码插件使用宿主原生`HTTP client`或注入的领域服务 |
+| `RecordStore()` | `pluginbridge.Services.RecordStore()` | 动态插件使用`guest`侧`facade`封装`data host-service`协议和类型化查询计划；源码插件使用自有`DAO`或提供方接缝 |
+
 ## 与源码插件的差异
 
 | 维度 | 源码插件 | `WASM`动态插件 |
@@ -268,7 +293,7 @@ menus:
 | 交付形式 | 源码参与主框架编译 | `.wasm`运行时产物 |
 | 热加载 | 需要部署新主框架 | 支持运行时上传和启用 |
 | 性能 | 原生`Go`性能 | 有沙箱和桥接开销 |
-| 主框架能力访问 | `pluginhost`稳定契约 | `hostServices`授权桥接 |
+| 主框架能力访问 | `pluginhost.Services`内嵌`capability.Services`，额外提供`Admin()`和`TenantFilter()` | `pluginbridge.Services`通过`hostServices`授权桥接，额外提供`Runtime()`、`Network()`和`RecordStore()` |
 | 隔离强度 | 命名空间隔离 | `WASM`沙箱隔离 |
 | 调试体验 | 标准`Go`调试链路 | 更依赖日志和桥接诊断 |
 | 适用场景 | 长期业务模块 | 商业分发、热加载、临时扩展 |

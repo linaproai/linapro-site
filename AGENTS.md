@@ -2,7 +2,7 @@
 
 本仓库承载`LinaPro`官方网站（`apps/lina-site/`，基于`Docusaurus 3.10`）以及配套的 `OpenSpec` 治理文件。`LinaPro`本体——也就是官网所描述的 AI 驱动全栈框架 —— 位于单独的只读参考仓库`linapro`；编写站点文案时，应以该路径中的事实内容为依据。
 
-官网发布地址为`https://linapro.ai/`，源仓库地址为`https://github.com/linaproai/linapro`（目前均未公开）。
+官网发布地址为`https://linapro.ai/`，源仓库地址为`https://github.com/linaproai/linapro`，对应的本地仓库地址为：`/Users/john/Workspace/github/linaproai/linapro`。
 
 `AGENTS.md`是指向本文件的符号链接 —— `Claude Code`、`Codex`以及其他`AI Coding Agent`会读取`AGENTS.md`的智能体应共享同一套说明。
 

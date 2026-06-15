@@ -77,7 +77,7 @@ flowchart TD
         Catalog["catalog<br/>清单发现与发布快照"]
         Dependency["dependency<br/>框架与插件依赖检查"]
         Lifecycle["lifecycle<br/>安装、启用、禁用、卸载、升级"]
-        Integration["integration<br/>菜单、权限、路由、Hook、Cron投影"]
+        Integration["integration<br/>菜单、权限、路由、Hook、定时任务投影"]
         Cache["plugin-runtime cache<br/>运行时快照与派生缓存"]
     end
 
@@ -153,16 +153,16 @@ menus:
 
 `<domain>`段用于标识插件所属的业务领域，建议从以下常见领域中选取，也可根据实际业务自行定义：
 
-| 领域 | 适用场景 | 官方插件示例 |
+| 领域 | 适用场景 | 插件命名示例 |
 |------|----------|--------------|
 | `content` | 内容管理、文章、公告、通知 | `linapro-content-notice` |
-| `monitor` | 监控、日志、审计 | `linapro-monitor-loginlog`、`linapro-monitor-operlog` |
+| `monitor` | 监控、日志、审计 | `linapro-monitor-loginlog` |
 | `org` | 组织架构、部门、岗位 | `linapro-org-core` |
 | `tenant` | 多租户、租户管理 | `linapro-tenant-core` |
 | `ops` | 运维、安全、访问控制 | `linapro-ops-demo-guard` |
 | `auth` | 认证、授权、单点登录 | — |
 | `oidc` | `OIDC`身份提供商集成 | — |
-| `ai` | 人工智能、大模型、向量检索 | — |
+| `ai` | 人工智能、大模型、向量检索 | `linapro-ai-core` |
 | `storage` | 文件存储、对象存储 | — |
 | `workflow` | 工作流、审批流 | — |
 | `message` | 消息中心、站内信、推送 | — |
@@ -170,78 +170,20 @@ menus:
 | `gateway` | 网关、限流、路由 | — |
 | `data` | 数据集成、导入导出、`ETL` | — |
 
-菜单`key`必须使用`plugin:<plugin-id>:...`格式，菜单类型使用`D`、`M`、`B`分别表示目录、页面和按钮权限。`supports_multi_tenant`是必填语义字段，用来明确插件是否参与租户级安装和开通治理。
-
-`public_assets`声明插件作者允许匿名访问的静态资源目录。主框架只会托管声明命中的资源，并统一映射到`/x-assets/{plugin-id}/{version}/...`。同一插件版本下的公开资源内容应保持稳定；资源变化应升级插件版本或引入等价的内容版本机制。
-
-动态插件还可以声明`hostServices`，申请访问主框架服务。`hostServices`是授权申请清单，不是运行时自动拥有的能力；安装或升级时需要主框架确认并写入授权快照：
-
-```yaml
-hostServices:
-  - service: data
-    methods: [list, get, create, update, delete]
-    resources:
-      tables:
-        - linapro_demo_dynamic_record
-  - service: storage
-    methods: [put, get, delete, list]
-    resources:
-      paths:
-        - linapro-demo-dynamic/
-  - service: config
-    methods: [get]
-  - service: hostConfig
-    methods: [get]
-    resources:
-      keys:
-        - workspace.basePath
-        - i18n.default
-  - service: manifest
-    methods: [get]
-    resources:
-      paths:
-        - profile.yaml
-```
-
-`config`、`hostConfig`和`manifest`都是只读服务，清单中只声明`methods: [get]`。`String`、`Bool`、`Int`、`Duration`、`Scan`等是源码插件或动态插件`SDK`在`get`之上的便捷方法，不应作为授权方法写入清单。
-
 
 ### pluginhost
 
-`pluginhost`是**源码插件**使用的稳定扩展接口。源码插件通过它注册：
+`pluginhost`是**源码插件**面向主框架的宿主接口层，位于`pkg/plugin/pluginhost`目录。它不在总览页展开每个领域能力的具体方法，而是把源码插件的声明、资源、路由、生命周期和运行期服务入口收口到稳定的公共契约中。
 
-| 接口 | 能力 |
-|------|------|
-| `Assets()` | 嵌入插件清单、语言包、`SQL`和前端资源 |
-| `HTTP()` | 注册插件`HTTP`路由 |
-| `Hooks()` | 订阅主框架事件 |
-| `Cron()` | 注册插件任务处理器 |
-| `Lifecycle()` | 注册安装、升级、禁用、卸载等生命周期回调 |
-| `Governance()` | 声明菜单和权限过滤逻辑 |
-| `HostServices()` | 获取插件作用域的配置、缓存、租户、通知、清单资源等主框架服务 |
 
-源码插件无法直接`import`主框架的`internal/`目录，只能使用主框架发布的稳定契约。各基础能力服务的架构设计和使用约束，参见[插件基础能力](/docs/plugin-capability-services)。
+源码插件无法直接`import`主框架的`internal/`目录，只能使用主框架发布的稳定契约。`pluginhost.Services`可访问哪些领域能力、可信管理命令和租户过滤能力，请阅读[领域能力设计与概览](/docs/domain-capabilities)。
 
 ### pluginbridge
 
-`pluginbridge`是**动态插件**的沙箱通信层。主框架将请求、身份、租户和权限快照封装为`BridgeRequestEnvelopeV1`传入`WASM`模块，插件返回`BridgeResponseEnvelopeV1`。
+`pluginbridge`是**动态插件**面向主框架的桥接接口层，位于`pkg/plugin/pluginbridge`目录。它负责把`WASM`插件的声明、路由处理、协议编解码和宿主能力调用隔离在沙箱边界内。
 
-动态插件访问主框架能力时发起`host_call`，主框架按安装时确认的`hostServices`授权快照校验服务、方法和资源边界。
 
-### 插件配置与manifest资源
-
-插件业务配置不应写入主框架`config.yaml`。主框架为插件提供插件作用域配置服务，读取优先级如下：
-
-| 优先级 | 配置位置 | 说明 |
-|--------|----------|------|
-| 1 | 生产配置根下`plugins/<plugin-id>/config.yaml` | 运维侧覆盖当前插件配置 |
-| 2 | `apps/lina-plugins/<plugin-id>/manifest/config/config.yaml` | 开发期插件默认配置 |
-| 3 | 动态插件产物中的`manifest/config/config.yaml` | 动态插件随发布版本携带的默认配置 |
-
-`manifest/config/config.example.yaml`只是配置模板，不是运行时默认值。源码插件通过`HostServices().Config()`读取当前插件自己的配置，通过`HostServices().HostConfig()`读取宿主公开配置白名单键，通过`HostServices().Manifest()`读取插件`manifest/`下的原始资源。动态插件对应使用`hostServices`中的`config`、`hostConfig`和`manifest`授权。
-
-`manifest`资源路径相对`manifest/`，可以读取`profile.yaml`、`resources/policy.yaml`、`config/config.example.yaml`、`sql/*.sql`或`i18n/*.json`等插件自有文件；读取原文不等于让配置、`SQL`或语言包生效。完整路径语义、读取优先级和使用示例参见[插件配置与manifest资源](/docs/plugin-config-and-manifest)。
-
+动态插件访问主框架能力时，需要通过`hostServices`声明授权范围，再由宿主按服务、方法和资源边界进行校验。详细的动态插件领域能力目录、`hostServices`授权模型和源码插件能力差异，请阅读[领域能力设计与概览](/docs/domain-capabilities)。
 
 ## 生命周期状态
 
@@ -253,7 +195,7 @@ stateDiagram-v2
     discovered --> installing: 安装
     installing --> installed: 安装SQL和治理同步完成
     installed --> enabling: 启用
-    enabling --> enabled: 路由、菜单、Hook、Cron生效
+    enabling --> enabled: 路由、菜单、Hook、定时任务生效
     enabled --> disabling: 禁用
     disabling --> disabled: 业务入口隐藏，数据保留
     disabled --> enabling: 重新启用

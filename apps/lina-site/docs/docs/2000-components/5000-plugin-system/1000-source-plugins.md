@@ -1,6 +1,6 @@
 ---
 slug: '/docs/source-plugins'
-title: '源码插件'
+title: '源码插件开发指南'
 hide_title: true
 description: '适用场景、目录结构、plugin.yaml清单、插件ID命名规范、安装SQL、API契约、服务层实现、pluginhost注册、数据库访问、前端页面、事件钩子、运行时升级和最佳实践，帮助开发者用原生Go方式扩展长期业务能力。'
 keywords:
@@ -144,7 +144,7 @@ type NoticeListReq struct {
 /x/linapro-content-notice/notices
 ```
 
-服务层通过插件自有`DAO`访问数据库。需要租户隔离时，应使用主框架发布的`TenantFilterService`追加租户条件，而不是手写不一致的过滤规则。
+服务层通过插件自有`DAO`访问数据库。需要租户隔离时，应使用主框架通过`Services().TenantFilter()`发布的源码插件专属能力追加租户条件，而不是手写不一致的过滤规则。
 
 ## 注册入口
 
@@ -152,7 +152,7 @@ type NoticeListReq struct {
 
 ```go
 func init() {
-    plugin := pluginhost.NewSourcePlugin("linapro-content-notice")
+    plugin := pluginhost.NewDeclarations("linapro-content-notice")
 
     plugin.Assets().UseEmbeddedFiles(contentnotice.EmbeddedFiles)
 
@@ -162,14 +162,17 @@ func init() {
         registerRoutes,
     )
 
-    plugin.Cron().RegisterCron(
-        pluginhost.ExtensionPointCronRegister,
+    plugin.Jobs().RegisterJobs(
+        pluginhost.ExtensionPointJobsRegister,
         pluginhost.CallbackExecutionModeBlocking,
-        registerCronJobs,
+        registerJobs,
     )
 
     plugin.Lifecycle().RegisterBeforeUpgradeHandler(beforeUpgrade)
     plugin.Lifecycle().RegisterAfterUpgradeHandler(afterUpgrade)
+
+    plugin.Access().RegisterMenuFilter(menuFilter)
+    plugin.Access().RegisterPermissionFilter(permissionFilter)
 
     pluginhost.RegisterSourcePlugin(plugin)
 }
@@ -212,21 +215,21 @@ func registerRoutes(ctx context.Context, registrar pluginhost.HTTPRegistrar) err
 
 ### 插件配置和清单资源
 
-源码插件通过`registrar.HostServices()`获取插件作用域主框架服务。与配置和`manifest`资源相关的能力包括：
+源码插件通过`registrar.Services()`获取插件作用域主框架服务。与配置和`manifest`资源相关的能力包括：
 
 | 服务 | 用途 | 架构设计 |
 |------|------|----------|
-| `Config()` | 读取当前插件自己的配置，生产覆盖路径为生产配置根下`plugins/<plugin-id>/config.yaml`，开发期默认路径为`manifest/config/config.yaml` | [ConfigService](/docs/plugin-capability-config) |
-| `HostConfig()` | 读取宿主公开配置白名单键，例如`workspace.basePath`、`i18n.default`和`i18n.enabled` | [HostConfigService](/docs/plugin-capability-config) |
-| `Manifest()` | 读取当前插件`manifest/`下的原始资源，例如`profile.yaml`、`config/config.example.yaml`或`i18n/zh-CN/plugin.json` | [ManifestService](/docs/plugin-capability-manifest) |
+| `Plugins().Config()` | 读取当前插件自己的配置，生产覆盖路径为生产配置根下`plugins/<plugin-id>/config.yaml`，开发期默认路径为`manifest/config/config.yaml` | [插件配置能力](/docs/domain-capability-config) |
+| `HostConfig()` | 读取宿主约定配置键，例如`workspace.basePath`、`i18n.default`和`i18n.enabled` | [配置管理能力](/docs/domain-capability-config) |
+| `Manifest()` | 读取当前插件`manifest/`下的原始资源，例如`profile.yaml`、`config/config.example.yaml`或`i18n/zh-CN/plugin.json` | [清单资源能力](/docs/domain-capability-manifest) |
 
-`manifest/config/config.example.yaml`只是模板，不参与默认读取。插件不应通过`g.Cfg()`扫描宿主完整配置树，也不应把插件业务配置写进主框架`config.yaml`。完整的配置读取优先级、`manifest`资源路径语义和专用资源管线边界，参见[插件配置与manifest资源](/docs/plugin-config-and-manifest)。各能力服务的架构设计和使用约束，参见[插件基础能力](/docs/plugin-capability-services)。
+`manifest/config/config.example.yaml`只是模板，不参与默认读取。插件不应通过`g.Cfg()`扫描宿主完整配置树，也不应把插件业务配置写进主框架`config.yaml`。完整的配置读取优先级参见[插件配置管理](/docs/plugin-config)，`manifest`资源路径语义和专用资源管线边界参见[Manifest交付资源](/docs/plugin-manifest)。各领域能力的架构设计和使用约束，参见[插件可用领域能力概览](/docs/plugin-domain-capabilities)。
 
 ```go
 func registerRoutes(ctx context.Context, registrar pluginhost.HTTPRegistrar) error {
-    services := registrar.HostServices()
+    services := registrar.Services()
 
-    timeout, err := services.Config().Duration(ctx, "sync.timeout", 5*time.Second)
+    timeout, err := services.Plugins().Config().Duration(ctx, "sync.timeout", 5*time.Second)
     if err != nil {
         return err
     }
@@ -269,10 +272,10 @@ component: system/plugin/dynamic-page
 插件也可以注册自己的定时任务处理器，供管理工作台创建任务时选择：
 
 ```go
-plugin.Cron().RegisterCron(
-    pluginhost.ExtensionPointCronRegister,
+plugin.Jobs().RegisterJobs(
+    pluginhost.ExtensionPointJobsRegister,
     pluginhost.CallbackExecutionModeBlocking,
-    func(registry pluginhost.CronRegistry) error {
+    func(registry pluginhost.JobsRegistry) error {
         registry.Register("content-notice:cleanup", cleanupExpiredNotices)
         return nil
     },

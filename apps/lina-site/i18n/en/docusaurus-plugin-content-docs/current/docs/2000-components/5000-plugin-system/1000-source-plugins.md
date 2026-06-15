@@ -1,27 +1,27 @@
 ---
 slug: '/docs/source-plugins'
-title: 'Source Plugins'
+title: 'Source Plugin Development Guide'
 hide_title: true
-description: 'When to use source plugins, the standard directory structure, plugin.yaml manifest, plugin ID naming conventions, installation SQL, API contracts, service-layer implementation, pluginhost registration, database access, frontend pages, event hooks, runtime upgrades, and best practices for extending long-term business capabilities with native Go.'
+description: 'Covers use cases, directory structure, plugin.yaml manifest, plugin ID naming conventions, installation SQL, API contracts, service layer implementation, pluginhost registration, database access, frontend pages, event hooks, runtime upgrades, and best practices for extending long-lived business capabilities with native Go.'
 keywords:
-  - source plugins
+  - source plugin
   - plugin development
   - pluginhost
   - plugin.yaml
   - plugin directory structure
-  - plugin ID naming convention
-  - GoFrame plugins
+  - plugin ID naming
+  - GoFrame plugin
   - plugin registration
   - installation SQL
   - runtime upgrade
   - plugin frontend
   - plugin DAO
-  - multi-tenant plugins
+  - multi-tenant plugin
   - tenant_id
   - menu declaration
   - permission declaration
-  - lifecycle callbacks
-  - LinaPro plugins
+  - lifecycle callback
+  - LinaPro plugin
   - plugin configuration
   - manifest resources
   - raw resource reading
@@ -29,17 +29,17 @@ keywords:
 
 ## Introduction
 
-Source plugins are the default and recommended extension mode in `LinaPro`. They are compiled and deployed alongside the core framework as `Go` source code, using `pluginhost` to register routes, hooks, scheduled tasks, lifecycle callbacks, and governance logic. This mode is well suited for business modules that require long-term maintenance, high performance, and a complete engineering experience.
+Source plugins are the default and recommended extension mechanism in LinaPro. They are compiled and deployed together with the core framework as Go source code, using `pluginhost` to register routes, hooks, scheduled tasks, lifecycle callbacks, and governance logic. They are well suited for business modules that require long-term maintenance, high performance, and a full engineering experience.
 
-Official source plugins live under `apps/lina-plugins/`. The main repository mounts this directory as the official plugin workspace; user projects also maintain their own business plugins in the same location.
+Official source plugins live in `apps/lina-plugins/`. The main repository mounts official plugin workspaces through this directory; user projects also maintain their own business plugins here.
 
-## When to Use Source Plugins
+## Use Cases
 
-| Scenario | Recommended? | Reason |
-|----------|-------------|--------|
-| Long-term business modules | Yes | Testable, auditable, best native performance |
-| Administration, content, monitoring, and similar back-office capabilities | Yes | Tight integration with the core framework's permissions, menus, scheduling, and multi-tenancy |
-| Runtime hot-loading | Not preferred | Source plugins require a full rebuild and redeploy of the core framework |
+| Scenario | Source Plugin Recommended? | Reason |
+|------|------------------|------|
+| Long-term business modules | Yes | Testable, auditable, best performance |
+| Organization, content, monitoring, and other backend capabilities | Yes | Tight integration with core framework permissions, menus, scheduling, and multi-tenancy |
+| Runtime hot-reloading | Not preferred | Source plugins require rebuilding and redeploying the core framework |
 | Commercial binary distribution | Not preferred | Source plugins typically expose source code |
 
 ## Standard Directory Structure
@@ -51,7 +51,7 @@ apps/lina-plugins/<plugin-id>/
 ├── backend/
 │   ├── api/                         # API DTOs and route contracts
 │   ├── hack/
-│   │   └── config.yaml              # Plugin development config (e.g. make dao)
+│   │   └── config.yaml              # Plugin development config (e.g., make dao)
 │   ├── internal/
 │   │   ├── controller/              # HTTP controllers
 │   │   ├── service/                 # Business service layer
@@ -60,23 +60,23 @@ apps/lina-plugins/<plugin-id>/
 │   └── plugin.go                    # Plugin registration entry point
 ├── frontend/
 │   ├── pages/                       # Plugin pages
-│   └── slots/                       # Slot pages (optional)
+│   └── slots/                       # Slot pages, optional
 ├── manifest/
 │   ├── config/
-│   │   ├── config.yaml              # Development-time default configuration
-│   │   └── config.example.yaml      # Configuration template (not a runtime default)
+│   │   ├── config.yaml              # Development-time default config
+│   │   └── config.example.yaml      # Config template, not used as runtime default
 │   ├── sql/                         # Installation and upgrade SQL
-│   │   ├── mock-data/               # Demo data (optional)
+│   │   ├── mock-data/               # Demo data, optional
 │   │   └── uninstall/               # Uninstallation SQL
 │   └── i18n/                        # Plugin language packs
 └── README.md
 ```
 
-`backend/internal/service/` is the canonical location for plugin service logic. Do not create a separate `service/` package at the plugin root or the `backend/` root.
+`backend/internal/service/` is the designated location for plugin service logic. Do not create an additional `service/` package at the plugin root or `backend/` root.
 
 ## Plugin Manifest
 
-`plugin.yaml` declares the plugin's identity, runtime form, multi-tenant boundaries, menus, and permissions:
+`plugin.yaml` declares the plugin's identity, runtime form, multi-tenancy boundary, menus, and permissions:
 
 ```yaml
 id: linapro-content-notice
@@ -105,11 +105,11 @@ menus:
     type: B
 ```
 
-The recommended plugin `ID` uses a three-segment `kebab-case` structure: `<author>-<domain>-<capability>`. For example, in `linapro-content-notice`, `linapro` is the author, `content` is the domain, and `notice` is the capability. The `<domain>` segment should be chosen from common business domains such as `content`, `monitor`, `org`, `tenant`, `auth`, `oidc`, `ai`, `storage`, `workflow`, `message`, and others — see [Plugin System](/docs/plugin-system) for the full list of recommended domains. Menu `key` values must be globally unique; use the `plugin:<plugin-id>:<menu-key>` format. Button permissions are attached to a menu via `type: B` and do not appear directly in the sidebar.
+Plugin IDs are recommended to use a three-segment `kebab-case` structure: `<author>-<domain>-<capability>`. For example, in `linapro-content-notice`, `linapro` is the author, `content` is the domain, and `notice` is the capability. The `<domain>` segment should be chosen from common business domains such as `content`, `monitor`, `org`, `tenant`, `auth`, `oidc`, `ai`, `storage`, `workflow`, and `message`. See [Plugin System](/docs/plugin-system) for a complete list. Menu keys must be globally unique; the `plugin:<plugin-id>:<key>` format is recommended. Button permissions use `type: B` and are nested under menus rather than appearing directly in the sidebar.
 
 ## Database and SQL
 
-Plugin installation scripts live in `manifest/sql/`, and uninstallation scripts live in `manifest/sql/uninstall/`. Installation and upgrade scripts must be idempotent — use `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`, and similar patterns.
+Installation SQL files are located in `manifest/sql/`, and uninstallation SQL files are in `manifest/sql/uninstall/`. Installation and upgrade scripts must be idempotent, typically using patterns like `CREATE TABLE IF NOT EXISTS` and `CREATE INDEX IF NOT EXISTS`.
 
 ```sql
 CREATE TABLE IF NOT EXISTS linapro_content_notice_record (
@@ -124,11 +124,11 @@ CREATE INDEX IF NOT EXISTS idx_linapro_content_notice_record_tenant
     ON linapro_content_notice_record ("tenant_id");
 ```
 
-Tables that need multi-tenant support should include a `tenant_id` column. When the `multi-tenant` plugin is not enabled, `tenant_id = 0` represents the platform context.
+Plugin tables that need to support multi-tenancy should include a `tenant_id` column. When multi-tenancy is not enabled for a plugin, `tenant_id = 0` represents the platform context.
 
 ## API and Service Layer
 
-Plugin `API` definitions also use `g.Meta` to declare paths, methods, permissions, and documentation:
+Plugin APIs also use `g.Meta` to declare paths, methods, permissions, and documentation:
 
 ```go
 type NoticeListReq struct {
@@ -138,21 +138,21 @@ type NoticeListReq struct {
 }
 ```
 
-The `path` here is the relative path after the controller is bound to the plugin route group. Source plugin business `API`s should be mounted under `/x/{plugin-id}/...` rather than occupying the core framework `/api/v1` control plane. For example, the endpoint above in the `linapro-content-notice` plugin is recommended to be exposed as:
+Here, `path` is the relative path after the controller is bound to the plugin route group. Source plugin business APIs should be mounted uniformly under `/x/{plugin-id}/...` rather than occupying the core framework's `/api/v1` control plane. For example, the above endpoint in the `linapro-content-notice` plugin is recommended to be exposed as:
 
 ```text
 /x/linapro-content-notice/notices
 ```
 
-The service layer accesses the database through the plugin's own `DAO`. When tenant isolation is required, use the core framework's `TenantFilterService` to append tenant filter conditions instead of writing inconsistent filtering rules manually.
+The service layer accesses the database through its own DAO. When tenant isolation is required, use the source-plugin-specific capability published by the core framework via `Services().TenantFilter()` to append tenant conditions, rather than writing inconsistent filtering rules manually.
 
 ## Registration Entry Point
 
-Source plugins register via `init()` in `backend/plugin.go`:
+Source plugins register in `backend/plugin.go` through `init()`:
 
 ```go
 func init() {
-    plugin := pluginhost.NewSourcePlugin("linapro-content-notice")
+    plugin := pluginhost.NewDeclarations("linapro-content-notice")
 
     plugin.Assets().UseEmbeddedFiles(contentnotice.EmbeddedFiles)
 
@@ -162,24 +162,27 @@ func init() {
         registerRoutes,
     )
 
-    plugin.Cron().RegisterCron(
-        pluginhost.ExtensionPointCronRegister,
+    plugin.Jobs().RegisterJobs(
+        pluginhost.ExtensionPointJobsRegister,
         pluginhost.CallbackExecutionModeBlocking,
-        registerCronJobs,
+        registerJobs,
     )
 
     plugin.Lifecycle().RegisterBeforeUpgradeHandler(beforeUpgrade)
     plugin.Lifecycle().RegisterAfterUpgradeHandler(afterUpgrade)
 
+    plugin.Access().RegisterMenuFilter(menuFilter)
+    plugin.Access().RegisterPermissionFilter(permissionFilter)
+
     pluginhost.RegisterSourcePlugin(plugin)
 }
 ```
 
-In full plugin mode, the core framework generates an aggregate entry point and blank-imports all configured plugins, bringing their `init()` registration logic into the core framework process.
+In full plugin mode, the core framework generates an aggregation entry point that blank-imports configured plugins, bringing their `init()` registration logic into the core framework process.
 
 ### Route Registration
 
-`HTTPRegistrar.Routes()` returns the plugin's route registrar. The registrar's `APIPrefix()` currently returns the plugin-specific namespace `/x/{plugin-id}`; the remaining path segments are organized by the plugin itself:
+`HTTPRegistrar.Routes()` returns the plugin's route registrar. The registrar's `APIPrefix()` currently returns the plugin-specific namespace `/x/{plugin-id}`; subsequent path segments are organized by the plugin:
 
 ```go
 func registerRoutes(ctx context.Context, registrar pluginhost.HTTPRegistrar) error {
@@ -208,25 +211,25 @@ func registerRoutes(ctx context.Context, registrar pluginhost.HTTPRegistrar) err
 }
 ```
 
-Source plugins may also register non-reserved public routes such as `/portal/...`, `/assets/...`, or `/` for portal pages, self-managed static files, or `SPA` fallback. These routes are not part of the plugin's `API` surface and will not automatically appear as workspace menus, permissions, or `OpenAPI` endpoints. Source plugins must not register paths belonging to other plugins under `/x`; conflicting or out-of-bound paths will be rejected at startup.
+Source plugins can still register non-reserved public routes such as `/portal/...`, `/assets/...`, or `/` for portal pages, self-managed static files, or SPA fallbacks. These routes are not plugin APIs and will not be automatically projected as workspace menus, permissions, or OpenAPI endpoints. Source plugins must not register paths belonging to other plugins under `/x`; conflicting or out-of-bounds paths will be rejected at startup.
 
 ### Plugin Configuration and Manifest Resources
 
-Source plugins obtain plugin-scoped core framework services through `registrar.HostServices()`. The capabilities related to configuration and manifest resources are:
+Source plugins obtain plugin-scoped framework services through `registrar.Services()`. Capabilities related to configuration and manifest resources include:
 
-| Service | Purpose | Architecture |
-|---------|---------|-------------|
-| `Config()` | Reads the current plugin's own configuration. The production override path is `plugins/<plugin-id>/config.yaml` under the production configuration root; the development-time default is `manifest/config/config.yaml` | [ConfigService](/docs/plugin-capability-config) |
-| `HostConfig()` | Reads allowlisted public host configuration keys such as `workspace.basePath`, `i18n.default`, and `i18n.enabled` | [HostConfigService](/docs/plugin-capability-config) |
-| `Manifest()` | Reads raw resources under the current plugin's `manifest/` directory, such as `profile.yaml`, `config/config.example.yaml`, or `i18n/zh-CN/plugin.json` | [ManifestService](/docs/plugin-capability-manifest) |
+| Service | Purpose | Design Reference |
+|------|------|----------|
+| `Plugins().Config()` | Reads the current plugin's own configuration; production override path is `plugins/<plugin-id>/config.yaml` under the production config root; development-time default is `manifest/config/config.yaml` | [Plugin Configuration Capability](/docs/domain-capability-config) |
+| `HostConfig()` | Reads host-convention configuration keys such as `workspace.basePath`, `i18n.default`, and `i18n.enabled` | [Configuration Management Capability](/docs/domain-capability-config) |
+| `Manifest()` | Reads raw resources from the current plugin's `manifest/` directory, such as `profile.yaml`, `config/config.example.yaml`, or `i18n/zh-CN/plugin.json` | [Manifest Resource Capability](/docs/domain-capability-manifest) |
 
-`manifest/config/config.example.yaml` is only a template and is not used in default reads. Plugins should not scan the host's full configuration tree through `g.Cfg()`, nor should they write plugin business configuration into the core framework `config.yaml`. For the full configuration read priority, manifest resource path semantics, and dedicated resource pipeline boundaries, see [Plugin Configuration and Manifest Resources](/docs/plugin-config-and-manifest). For the architecture and usage constraints of each capability service, see [Plugin Capability Services Overview](/docs/plugin-capability-services).
+`manifest/config/config.example.yaml` is only a template and does not participate in default value reading. Plugins should not scan the host's complete configuration tree via `g.Cfg()`, nor should they write plugin business configuration into the core framework's `config.yaml`. For the complete configuration reading priority, see [Plugin Configuration Management](/docs/plugin-config). For manifest resource path semantics and dedicated resource pipeline boundaries, see [Manifest Delivery Resources](/docs/plugin-manifest). For architecture design and usage constraints of each domain capability, see [Plugin Domain Capabilities Overview](/docs/plugin-domain-capabilities).
 
 ```go
 func registerRoutes(ctx context.Context, registrar pluginhost.HTTPRegistrar) error {
-    services := registrar.HostServices()
+    services := registrar.Services()
 
-    timeout, err := services.Config().Duration(ctx, "sync.timeout", 5*time.Second)
+    timeout, err := services.Plugins().Config().Duration(ctx, "sync.timeout", 5*time.Second)
     if err != nil {
         return err
     }
@@ -248,31 +251,31 @@ func registerRoutes(ctx context.Context, registrar pluginhost.HTTPRegistrar) err
 }
 ```
 
-Here, `profile.yaml` is just an example of a plain `YAML` resource. Paths are relative to `manifest/` and should not be written as `manifest/profile.yaml`.
+The `profile.yaml` here is just an ordinary YAML resource example. The path is relative to `manifest/` and should not be written as `manifest/profile.yaml`.
 
 ## Frontend Pages
 
-Source plugin frontend pages live in `frontend/pages/` and are loaded by the core framework workspace's dynamic page shell. The `component` field in plugin menus typically uses:
+Source plugin frontend pages are located in `frontend/pages/` and loaded by the core framework workspace's dynamic page shell. The `component` in plugin menus typically uses:
 
 ```yaml
 component: system/plugin/dynamic-page
 ```
 
-Pages can reuse the default workspace's frontend ecosystem and design conventions. When a plugin is disabled, the core framework menu API stops returning that plugin's entries, and the workspace sidebar hides them automatically.
+Pages can reuse the default workspace's frontend ecosystem and design conventions. When a plugin is disabled, the core framework's menu API no longer returns that plugin's entry, and the workspace sidebar automatically hides it.
 
-Source plugins can also declare `public_assets` to let the core framework serve publicly accessible static resources from the plugin at `/x-assets/{plugin-id}/{version}/...`. Only directories explicitly declared in `plugin.yaml` are published; tenant files, user private files, installation scripts, and configuration files should not be placed in `public_assets`.
+Source plugins can also declare `public_assets` to have the core framework host their public static resources at `/x-assets/{plugin-id}/{version}/...`. Only resource directories explicitly declared in `plugin.yaml` will be made public. Tenant files, user private files, installation scripts, and configuration files should not be placed in `public_assets`.
 
 ## Event Hooks and Scheduled Tasks
 
-Source plugins can subscribe to core framework events such as successful login, plugin enablement, and system startup. Hooks can execute synchronously with blocking or asynchronously, depending on the execution mode chosen at registration time.
+Source plugins can subscribe to core framework events such as successful login, plugin enablement, system startup, and more. Hooks can be synchronous and blocking or asynchronous, depending on the execution mode chosen at registration time.
 
-Plugins can also register their own scheduled task handlers for the admin workspace to select when creating tasks:
+Plugins can also register their own scheduled task handlers, which become available when administrators create tasks from the admin workspace:
 
 ```go
-plugin.Cron().RegisterCron(
-    pluginhost.ExtensionPointCronRegister,
+plugin.Jobs().RegisterJobs(
+    pluginhost.ExtensionPointJobsRegister,
     pluginhost.CallbackExecutionModeBlocking,
-    func(registry pluginhost.CronRegistry) error {
+    func(registry pluginhost.JobsRegistry) error {
         registry.Register("content-notice:cleanup", cleanupExpiredNotices)
         return nil
     },
@@ -281,18 +284,18 @@ plugin.Cron().RegisterCron(
 
 ## Runtime Upgrades
 
-When source plugin files are updated, the core framework compares the effective version in the database with the currently discovered version. If a higher version is found, the plugin enters the `pending_upgrade` runtime state — the core framework's basic governance capabilities remain available, while the plugin's business entry points enter a controlled state.
+When source plugin files are updated, the core framework compares the effective version in the database with the currently discovered version. If a higher version is discovered, the plugin enters the `pending_upgrade` runtime state. The core framework's basic governance capabilities remain available, but the plugin's business entry points enter a controlled state.
 
-The administrator performs an explicit runtime upgrade from the plugin management page. The upgrade flow re-reads the effective manifest and target manifest, runs dependency checks, executes the `BeforeUpgrade` callback, runs the plugin's custom upgrade logic, applies upgrade `SQL`, synchronizes governance resources, switches the effective version, and invalidates caches. On failure, the plugin enters `upgrade_failed`, where diagnostic information is available and a retry can be attempted.
+Administrators perform an explicit runtime upgrade from the plugin management page. The upgrade process re-reads the effective and target manifests, performs dependency checks, executes `BeforeUpgrade` callbacks, runs plugin-specific upgrade logic, executes upgrade SQL, synchronizes governance resources, switches the effective version, and invalidates caches. On failure, the plugin enters `upgrade_failed` state, allowing diagnosis and retry.
 
-This model avoids the assumption that overwriting files means the data and governance resources have been fully upgraded.
+This model prevents file overwrites from being mistakenly treated as completed data and governance resource upgrades.
 
 ## Best Practices
 
-- Use the three-segment `<author>-<domain>-<capability>` `kebab-case` structure for plugin `ID`s, and the corresponding `snake_case` prefix for database table names.
-- Make installation and upgrade `SQL` idempotent to prevent failures when reinstalling with retained data.
+- Use the three-segment `kebab-case` structure `<author>-<domain>-<capability>` for plugin IDs, and the corresponding `snake_case` as the database table prefix.
+- Installation and upgrade SQL must be idempotent to avoid failures when reinstalling after data preservation.
 - Place service logic in `backend/internal/service/`.
-- Depend only on stable contracts such as `pluginhost` and `pluginservice`; do not directly import the core framework's `internal/` packages.
-- Include a `tenant_id` column in multi-tenant plugin tables and use the core framework's tenant filtering service.
-- Declare menus and button permissions together to avoid pages being visible while actions lack the required permissions.
-- When uninstalling, distinguish between governance records, database data, and file data to prevent accidental deletion.
+- Plugins should only use stable contracts like `pluginhost` and `pluginservice`, not directly depend on the core framework's `internal/` packages.
+- Multi-tenant plugin tables should include a `tenant_id` column and use the core framework's tenant filtering service.
+- Declare menus and button permissions together to avoid pages being visible without corresponding operation permissions.
+- When uninstalling, distinguish between governance records, database data, and file data to avoid accidental deletion.

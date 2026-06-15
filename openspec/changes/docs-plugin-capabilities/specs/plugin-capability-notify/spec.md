@@ -1,22 +1,22 @@
 ## ADDED Requirements
 
-### Requirement: Notify文档说明通知发布模型
-文档`7300-notify.md` SHALL 说明`NotifyService`的通知发布模型：插件通过`SendNoticePublication`将通知扇入宿主收件箱管线。
+### Requirement: Notify文档说明通知领域三类入口
+文档`7300-notify.md` SHALL 说明通知能力分为普通`Notifications()`投影读取、可信源码插件`Admin().Notifications()`管理命令和动态插件`notify.send`宿主服务。
 
-#### Scenario: 发布模型可理解
-- **WHEN** 插件开发者阅读设计思路
-- **THEN** 理解通知从插件业务源扇入宿主统一收件箱的设计
+#### Scenario: 通知入口可区分
+- **WHEN** 插件开发者阅读基本介绍
+- **THEN** 理解普通能力只读，源码插件发送和删除通知走管理命令，动态插件发送通知走`notify.send`
 
-### Requirement: Notify文档说明SourceType和CategoryCode设计
-文档 SHALL 说明`SourceType`和`CategoryCode`的分类设计及其对通知路由的影响。
+### Requirement: Notify文档说明发送数据模型
+文档 SHALL 说明`SendInput`和`SendResult`的关键字段，以及`SourceType`、`CategoryCode`的分类语义。
 
-#### Scenario: 分类设计清晰
-- **WHEN** 插件开发者阅读设计约束
-- **THEN** 理解`SourceTypeNotice`和`SourceTypePlugin`的区别，以及`CategoryCode`的收件箱分类作用
+#### Scenario: 发送模型清晰
+- **WHEN** 插件开发者查看数据模型
+- **THEN** 理解收件人、来源、标题、内容、分类、发送者、消息标识和投递数量的用途
 
-### Requirement: Notify文档包含主要能力概览
-文档 SHALL 以表格形式简要列出`SendNoticePublication`和`DeleteBySource`两个方法的职责。
+### Requirement: Notify文档说明动态notify授权
+文档 SHALL 说明动态`notify`服务使用`resources[].ref`表达可发送的消息场景或分类。
 
-#### Scenario: 方法概览可查阅
-- **WHEN** 插件开发者查看主要能力章节
-- **THEN** 能快速了解每个方法的用途
+#### Scenario: 动态通知授权清晰
+- **WHEN** 动态插件开发者声明`service: notify`
+- **THEN** 文档要求声明`send`方法和资源引用

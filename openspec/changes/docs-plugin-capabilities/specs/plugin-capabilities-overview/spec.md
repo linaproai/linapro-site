@@ -1,36 +1,44 @@
 ## ADDED Requirements
 
-### Requirement: 总览文档包含Services架构说明
-总览文档`6500-capabilities.md` SHALL 包含`Services`接口的设计原则和架构定位说明，帮助插件开发者理解基础能力服务在LinaPro插件系统中的角色。
+### Requirement: 总览文档包含插件能力分层说明
+总览文档`9000-capabilities.md` SHALL 说明`capability.Services`、`pluginhost.Services`、`AdminServices`和动态`hostServices`之间的分层关系，帮助插件开发者理解源码插件、可信源码插件和动态插件各自可用的能力入口。
 
 #### Scenario: 文档结构完整
 - **WHEN** 插件开发者阅读总览文档
-- **THEN** 文档包含以下章节：基本介绍、服务架构、获取方式、服务分类速查、快速参考、相关内容
+- **THEN** 文档包含基本介绍、组件结构、能力分层、领域能力概览、源码插件专属能力、管理命令、动态`hostServices`、选型建议和设计约束
 
-### Requirement: 总览文档包含mermaid架构图
-总览文档 SHALL 使用mermaid图展示17个服务的分类关系和协作模式。
+### Requirement: 总览文档按父领域能力组织覆盖矩阵
+总览文档 SHALL 使用表格列出所有已发布给插件的父领域能力，并链接到对应领域文档；子能力不得作为独立文档入口要求。
 
-#### Scenario: 架构图展示服务分类
-- **WHEN** 插件开发者查看架构图
-- **THEN** 图中展示认证与上下文、配置与资源、数据与存储、插件治理、通知、能力提供方等服务分类
+#### Scenario: 普通能力覆盖完整
+- **WHEN** 插件开发者查看领域能力概览
+- **THEN** 表格包含`AI()`、`APIDoc()`、`Auth()`、`Users()`、`BizCtx()`、`Cache()`、`Dict()`、`Files()`、`HostConfig()`、`I18n()`、`Infra()`、`Jobs()`、`Manifest()`、`Notifications()`、`Org()`、`Plugins()`、`Route()`、`Sessions()`和`Tenant()`
 
-### Requirement: 总览文档包含服务获取方式说明
-总览文档 SHALL 说明源码插件通过`registrar.Services()`获取服务的代码模式。
+#### Scenario: 子能力收敛到父领域
+- **WHEN** 插件开发者查找`AI`文本生成、插件配置、插件状态、插件生命周期或租户过滤能力
+- **THEN** 文档分别引导到`AI`、`Plugins`、`Tenant`等父领域页面，而不是要求独立子能力页面
 
-#### Scenario: 代码示例展示获取方式
-- **WHEN** 插件开发者查看获取方式章节
-- **THEN** 文档包含`registrar.Services()`的Go代码示例
+### Requirement: 总览文档覆盖源码插件专属能力和管理命令
+总览文档 SHALL 说明`pluginhost.Services.Admin()`和`pluginhost.Services.TenantFilter()`的可用范围，并列出`AdminServices`暴露的领域管理命令。
 
-### Requirement: 总览文档包含服务分类速查表
-总览文档 SHALL 包含17个服务的分类速查表格，列出服务名称、合约类型和一句话描述。
+#### Scenario: 源码插件专属入口清晰
+- **WHEN** 插件开发者查看源码插件专属能力
+- **THEN** 文档说明`Admin()`面向可信源码插件，`TenantFilter()`面向插件自有表租户过滤且携带`gdb.Model`
 
-#### Scenario: 速查表覆盖所有服务
-- **WHEN** 插件开发者查看速查表
-- **THEN** 表格包含APIDoc、Auth、BizCtx、Cache、Config、HostConfig、I18n、Manifest、Notify、Org、PluginLifecycle、PluginState、Route、Session、Tenant、TenantFilter共16个服务条目
+### Requirement: 总览文档覆盖动态hostServices目录
+总览文档 SHALL 列出动态插件已发布的`hostServices`服务、资源声明形态、方法集合和预留未发布条目。
 
-### Requirement: 总览文档包含按场景选服务指南
-总览文档 SHALL 提供按使用场景推荐服务的快速参考指南。
+#### Scenario: 动态服务目录覆盖完整
+- **WHEN** 插件开发者查看动态服务目录
+- **THEN** 表格包含`runtime`、`cron`、`storage`、`network`、`data`、`cache`、`lock`、`notify`、`config`、`hostconfig`、`manifest`、`ai`、`org`和`tenant`
+
+#### Scenario: 预留服务不被误用
+- **WHEN** 插件开发者查看`secret`、`event`或`queue`
+- **THEN** 文档说明它们是描述符中的预留治理条目，不是已发布的`guest`可调用动态服务
+
+### Requirement: 总览文档包含按场景选能力指南
+总览文档 SHALL 提供按使用场景推荐能力入口的快速参考指南。
 
 #### Scenario: 场景指南覆盖常见需求
-- **WHEN** 插件开发者需要选择合适的服务
-- **THEN** 文档提供如"读取插件配置→Config"、"租户过滤→TenantFilter"等场景到服务的映射
+- **WHEN** 插件开发者需要选择合适入口
+- **THEN** 文档提供读取插件配置、读取宿主配置、访问插件自有表、动态对象存储、外部`HTTP`请求、分布式锁、定时任务、通知和租户过滤等场景映射

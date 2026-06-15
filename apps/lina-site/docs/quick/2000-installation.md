@@ -37,11 +37,11 @@ import TabItem from '@theme/TabItem';
 安装最新实验版本：
 
 ```bash
-git clone --depth 1 https://github.com/linaproai/linapro.git linapro
+git clone https://github.com/linaproai/linapro.git linapro
 ```
-或者指定稳定发布版本，如 v0.1.0：
+或者指定稳定发布版本，如 `v0.1.0`：
 ```bash
-git clone --depth 1 https://github.com/linaproai/linapro.git linapro --branch v0.1.0
+git clone https://github.com/linaproai/linapro.git linapro --branch v0.1.0
 ```
 
 ## 启动服务

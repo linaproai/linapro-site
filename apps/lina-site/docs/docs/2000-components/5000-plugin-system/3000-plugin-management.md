@@ -1,6 +1,6 @@
 ---
 slug: '/docs/plugin-management'
-title: '插件管理'
+title: '插件安装、升级与治理'
 hide_title: true
 description: '插件来源配置、本地插件工作区、plugins.init、plugins.install、plugins.update、plugins.status、管理端安装启用、禁用卸载、动态插件上传和运行时升级的完整链路，帮助开发者理解插件从代码获取到运行时生效的治理过程。'
 keywords:
@@ -141,7 +141,7 @@ make plugins.status
 
 动态插件安装时需要管理员确认`hostServices`授权。授权确认后，主框架才允许插件通过`pluginbridge`访问对应的服务和资源范围。
 
-如果动态插件声明了资源型`hostServices`，例如`storage.resources.paths`、`network`目标、`data.resources.tables`、`hostConfig.resources.keys`或`manifest.resources.paths`，启动自动启用也必须拥有已确认的授权快照，否则不会绕过治理直接启用。
+如果动态插件声明了资源型`hostServices`，例如`storage`的`resources.paths`、`network`的`resources[].url`、`data`的`resources.tables`、`hostconfig`的`resources.keys`或`manifest`的`resources.paths`，启动自动启用也必须拥有已确认的授权快照，否则不会绕过治理直接启用。
 
 ## 运行时升级
 
@@ -172,7 +172,7 @@ plugin:
 
 `autoEnable`条目必须是对象结构`{id, withMockData}`，不再接受裸字符串。`withMockData`缺省为`false`；设为`true`时，只在启动自动安装阶段加载插件`manifest/sql/mock-data`下的演示数据，对已经安装的插件不会重复加载。重复插件`ID`会按首次出现的条目生效并去重。
 
-对于租户级插件，启动自动启用还会同步`autoEnableForNewTenants`等租户开通策略，并请求租户提供者为既有租户补齐开通状态。生产环境应谨慎使用演示数据，动态插件还应确保授权快照已确认。
+对于租户级插件，启动自动启用还会同步`autoEnableForNewTenants`等租户开通策略，并请求租户`Provider`为既有租户补齐开通状态。生产环境应谨慎使用演示数据，动态插件还应确保授权快照已确认。
 
 ## 多租户治理
 
