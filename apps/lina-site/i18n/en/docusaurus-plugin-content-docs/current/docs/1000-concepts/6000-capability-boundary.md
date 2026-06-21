@@ -67,15 +67,18 @@ Infrastructure capabilities serve the entire runtime environment and are not tie
 
 | Capability Domain | Description |
 |--------|------|
-| **Authentication & Sessions** | JWT issuance and validation, session storage, forced logout, session activity refresh |
-| **Permission Management** | RBAC model, menu and button permissions, permission-check middleware |
+| **Authentication & Authorization** | JWT issuance and validation, RBAC permission model, menu and button permissions, permission-check middleware |
+| **Online Sessions** | Session storage, user online status queries, forced logout |
 | **Multi-Tenancy** | Tenant resolution, tenant context injection, tenant-scoped filtering services |
-| **Routing & Middleware** | Unified response serialization, CORS, request body limits, business context injection |
+| **Data Dictionary** | Dictionary label resolution, value listing, visibility enforcement |
+| **File Management** | Batch file retrieval, search by business scene and keyword, visibility control |
+| **AI Capabilities** | Unified access to text generation, image generation, vector embeddings, speech transcription, visual analysis, and other AI sub-capabilities |
 | **Scheduled Tasks** | Task scheduling, distributed leader election, task execution logging |
-| **Static Assets** | Embedded frontend build artifacts, unified plugin asset serving |
 | **Configuration Management** | Static configuration reading, runtime configuration entries |
 | **Cache Control** | Per-plugin cache namespace |
 | **Plugin Governance** | Plugin directory scanning, dependency checks, lifecycle orchestration, runtime upgrades |
+
+The table above highlights key capability domains only. The core framework also provides domain capabilities for user management, organization structure, object storage, internationalization, distributed locking, infrastructure status monitoring, and API documentation. For the complete capability catalog and interface details, see [Domain Capabilities Overview](/docs/domain-capabilities).
 
 These capabilities are encapsulated as stable service adapters and exposed to plugins. Source plugins call domain capability methods directly through `pluginhost.Services` (which embeds `capability.Services`); dynamic plugins declare `hostServices` in `plugin.yaml` and access them via `pluginbridge`'s `host_call` mechanism. The core framework never defines a dedicated interface for a specific business scenario. Instead, it provides composable general-purpose primitives, leaving it to each plugin to decide how to use them in its own logic.
 

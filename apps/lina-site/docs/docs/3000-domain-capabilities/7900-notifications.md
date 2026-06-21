@@ -66,9 +66,11 @@ keywords:
 
 | 入口 | 方法 | 说明 |
 |------|------|------|
-| `Notifications()` | `BatchGetMessages` | 批量读取可见通知消息视图 |
+| `Notifications()` | `BatchGet` | 批量读取可见通知消息视图 |
+| `Notifications()` | `BatchGetBySource` | 按业务来源批量读取可见通知消息 |
+| `Notifications()` | `EnsureVisible` | 校验目标通知消息集合对当前调用上下文可见 |
 | `Admin().Notifications()` | `Send` | 发送受管控的通知 |
-| `Admin().Notifications()` | `DeleteMessages` | 删除可见通知消息 |
+| `Admin().Notifications()` | `Delete` | 删除可见通知消息 |
 | `Admin().Notifications()` | `DeleteBySource` | 按业务来源删除通知 |
 
 ### 动态插件接口
@@ -78,6 +80,8 @@ keywords:
 | 动态方法 | 说明 |
 |----------|------|
 | `messages.batch_get` | 批量读取可见通知消息视图 |
+| `messages.batch_get_by_source` | 按业务来源批量读取可见通知消息 |
+| `messages.visible.ensure` | 校验目标通知消息集合对当前调用上下文可见 |
 | `messages.send` | 发送受管控的通知 |
 
 ## 能力使用
@@ -88,7 +92,16 @@ keywords:
 
 ```go
 // 批量读取通知消息
-result, err := services.Notifications().BatchGetMessages(ctx, capabilityCtx, messageIDs)
+result, err := services.Notifications().BatchGet(ctx, capabilityCtx, messageIDs)
+
+// 按业务来源批量读取通知消息
+sourceResult, err := services.Notifications().BatchGetBySource(ctx, capabilityCtx, notifycap.BatchGetBySourceInput{
+    SourceType: notifycap.SourceTypePlugin,
+    SourceIDs:  []string{reportID1, reportID2},
+})
+
+// 校验通知消息可见性
+err := services.Notifications().EnsureVisible(ctx, capabilityCtx, messageIDs)
 ```
 
 可信源码插件发送和管理通知：
@@ -104,6 +117,9 @@ result, err := services.Admin().Notifications().Send(ctx, capabilityCtx, notifyc
     Category:   notifycap.CategoryCode("report"),
 })
 
+// 删除通知消息
+err := services.Admin().Notifications().Delete(ctx, capabilityCtx, messageIDs)
+
 // 按业务来源删除通知
 err := services.Admin().Notifications().DeleteBySource(ctx, capabilityCtx, notifycap.SourceTypePlugin, []string{reportID})
 ```
@@ -117,6 +133,8 @@ hostServices:
   - service: notifications
     methods:
       - messages.batch_get
+      - messages.batch_get_by_source
+      - messages.visible.ensure
       - messages.send
     resources:
       - ref: inbox:business-alert
@@ -128,7 +146,13 @@ hostServices:
 notifySvc := pluginbridge.Default().Notifications()
 
 // 批量读取通知消息
-result, err := notifySvc.BatchGetMessages(ctx, capabilityCtx, messageIDs)
+result, err := notifySvc.BatchGet(ctx, capabilityCtx, messageIDs)
+
+// 按业务来源批量读取通知消息
+sourceResult, err := notifySvc.BatchGetBySource(ctx, capabilityCtx, notifycap.BatchGetBySourceInput{
+    SourceType: notifycap.SourceTypePlugin,
+    SourceIDs:  []string{reportID1, reportID2},
+})
 
 // 发送通知
 sendResult, err := notifySvc.Send(ctx, capabilityCtx, notifycap.SendInput{

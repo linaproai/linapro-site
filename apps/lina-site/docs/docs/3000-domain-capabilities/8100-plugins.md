@@ -17,6 +17,9 @@ keywords:
   - 插件状态
   - 插件生命周期
   - LinaPro
+  - plugin.<plugin-id>
+  - 独占式覆盖
+  - 配置优先级
 ---
 
 ## 基本介绍
@@ -65,9 +68,12 @@ graph TB
 
 | 优先级 | 来源 | 说明 |
 |--------|------|------|
-| 1 | 生产配置根下`plugins/<plugin-id>/config.yaml` | 运维覆盖，生产环境优先 |
-| 2 | 开发期`manifest/config/config.yaml` | 源码插件开发默认配置 |
-| 3 | 动态插件产物绑定的`manifest/config/config.yaml` | 发布产物默认配置 |
+| 1 | 宿主`config.yaml`中的`plugin.<plugin-id>`段 | 部署层统一覆盖，独占式优先级 |
+| 2 | 生产配置根下`plugins/<plugin-id>/config.yaml` | 运维覆盖，生产环境优先 |
+| 3 | 开发期`manifest/config/config.yaml` | 源码插件开发默认配置 |
+| 4 | 动态插件产物绑定的`manifest/config/config.yaml` | 发布产物默认配置 |
+
+当宿主`config.yaml`中存在`plugin.<plugin-id>`段时，该段即为该插件配置的唯一来源，文件级配置不再参与解析。详见[插件业务配置](/docs/plugin-configuration)。
 
 `manifest/config/config.example.yaml`只是配置模板，不参与运行时默认读取。
 

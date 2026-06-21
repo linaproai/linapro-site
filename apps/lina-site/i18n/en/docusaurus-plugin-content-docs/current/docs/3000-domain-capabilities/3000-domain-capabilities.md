@@ -58,22 +58,22 @@ For detailed design and usage of declaration-phase capabilities, see [Declaratio
 
 ### Declaration-Phase Capabilities
 
-Declaration-phase capabilities represent the static registration output of plugins. Source plugins register through `pluginhost.Declarations` at compile time, while dynamic plugins declare through `plugin.yaml` manifests and `pluginbridge.Declarations`.
+Declaration-phase capabilities are the static registration output of plugins. Source plugins register through `pluginhost.Declarations` at compile time, while dynamic plugins declare through `plugin.yaml` manifests and `pluginbridge.Declarations`.
 
 #### Source Plugin Declaration Phase
 
-Source plugins register the following declarations through `pluginhost.Declarations` in their `init()` function:
+Source plugins register the following declarations through `pluginhost.Declarations` in `init()`:
 
 | Declaration Entry | Description |
 |-------------------|-------------|
 | `ID()` | Returns a stable plugin identifier consistent with `plugin.yaml` |
-| `Assets()` | Binds the plugin's embedded filesystem, including manifest, frontend pages, `SQL`, and `i18n` resources |
+| `Assets()` | Binds the plugin's embedded filesystem, including manifests, frontend pages, `SQL`, and `i18n` resources |
 | `Lifecycle()` | Registers `16` lifecycle callbacks for install, upgrade, disable, uninstall, tenant disable, tenant delete, and install mode changes |
 | `Hooks()` | Subscribes to host extension point events, such as `auth.login.succeeded`, `plugin.enabled`, `system.started`, etc. |
-| `HTTP()` | Registers plugin `HTTP` route contribution callbacks, triggered uniformly when the host starts |
-| `Jobs()` | Registers scheduled task contribution callbacks, triggered uniformly during host scheduling |
+| `HTTP()` | Registers plugin `HTTP` route contribution callbacks, triggered uniformly at host startup |
+| `Jobs()` | Registers scheduled task contribution callbacks, triggered uniformly by the host scheduler |
 | `Providers()` | Declares domain capability provider factories, such as `ProvideTenant`, `ProvideOrg`, and `ProvideAIText` |
-| `Access()` | Registers menu filtering and permission filtering callbacks for runtime dynamic adjustment of workbench navigation and permissions |
+| `Access()` | Registers menu filtering and permission filtering callbacks for runtime dynamic adjustment of workspace navigation and permissions |
 
 #### Dynamic Plugin Declaration Phase
 
@@ -81,99 +81,99 @@ Dynamic plugins express declarations through `plugin.yaml` manifests and build-t
 
 | Declaration Source | Description |
 |--------------------|-------------|
-| `plugin.yaml` | Declares plugin identity, version, dependencies, menus, permissions, multi-tenant policies, public static assets, and `hostServices` authorization requests |
-| `Routes()` | Declares route group bindings specifying `API` prefix and route packages |
+| `plugin.yaml` | Declares plugin identity, version, dependencies, menus, permissions, multi-tenant strategy, public static assets, and `hostServices` authorization requests |
+| `Routes()` | Declares route group bindings, specifying `API` prefixes and route packages |
 | `Jobs()` | Registers scheduled task contracts through `host-service` calls |
-| `WASM` custom sections | Embeds metadata such as `ABI` version, runtime type, codec, and export function names in `.wasm` artifacts |
-| `protocol.BridgeSpec` | Defines bridge `ABI` contract, including version, runtime type, codec method, and `alloc`/`execute` export names |
+| `WASM` custom sections | Embeds metadata in `.wasm` artifacts such as `ABI` version, runtime type, codecs, and export function names |
+| `protocol.BridgeSpec` | Defines bridge `ABI` contracts, including version number, runtime type, codec, and `alloc`/`execute` export names |
 
 ### Runtime-Phase Capabilities
 
-Runtime-phase capabilities are the services available during plugin business logic execution. Source plugins and dynamic plugins share the same host domain capability model but with different access entry points.
+Runtime-phase capabilities are the services available during plugin business logic execution. Source plugins and dynamic plugins share the host domain capability model, but with different public entry points.
 
 #### Source Plugin Runtime
 
-Source plugins access runtime capabilities through `pluginhost.Services`. This interface embeds `capability.Services`, directly exposing all domain capability methods, and additionally provides source-plugin-specific capabilities:
+Source plugins access runtime capabilities through `pluginhost.Services`. This interface embeds `capability.Services`, directly exposing all domain capability methods, and additionally provides source-plugin-exclusive capabilities:
 
 | Capability Entry | Description |
 |------------------|-------------|
-| All domain capabilities | Including `AI`, `Auth`, `Cache`, `Storage`, and others |
-| `Admin()` | Trusted management commands such as modifying user status, replacing role permissions, revoking sessions, writing runtime config, etc. |
-| `TenantFilter()` | A database query builder that appends tenant filtering conditions to plugin-owned tables |
+| All domain capabilities | Including `AI`, `Auth`, `Cache`, `Storage`, etc. |
+| `Admin()` | Trusted management commands, such as modifying user status, replacing role permissions, revoking sessions, writing runtime configs, etc. |
+| `TenantFilter()` | Database query builder that appends tenant filtering conditions to plugin-owned tables |
 
 #### Dynamic Plugin Runtime
 
-Dynamic plugins access published runtime capabilities through `pluginbridge.Default()`. All calls are transmitted via `WASI host calls`, validated against the `hostServices` authorization snapshot by the host before dispatch. Dynamic plugins access a subset of capabilities in the dynamic service catalog, with three exclusive capabilities:
+Dynamic plugins access published runtime capabilities through `pluginbridge.Default()`. All calls are transmitted via `WASI host call` and dispatched by the host after validation against the `hostServices` authorization snapshot. Dynamic plugins access a subset of capabilities from the dynamic service catalog and have three exclusive capabilities:
 
 | Capability Entry | Description |
 |------------------|-------------|
-| Published domain capabilities | Such as `AI`, `Auth`, `Cache`, `Storage`, etc., accessed via `host-call` bridging. `I18n()` is not published as a dynamic `hostServices`. |
-| `Runtime()` | Exclusive capability: log writing, plugin state read/write, time retrieval, `UUID` generation, node identity reading |
-| `Network()` | Exclusive capability: governed outbound `HTTP` requests, requiring authorized target addresses declared in `plugin.yaml` |
-| `RecordStore()` | Exclusive capability: `data` service ORM-like wrapper, with access only to declared plugin-owned tables |
+| Published domain capabilities | Such as `AI`, `Auth`, `Cache`, `Storage`, accessed via `host-call` bridging; `I18n()` is not published as a dynamic `hostService` |
+| `Runtime()` | Exclusive: log writing, plugin state read/write, time retrieval, `UUID` generation, node identity reading |
+| `Network()` | Exclusive: governed outbound `HTTP` requests, requiring authorized target addresses declared in `plugin.yaml` |
+| `RecordStore()` | Exclusive: `ORM`-like wrapper for the `data` service, only accessing declared plugin-owned tables |
 
 #### `AdminServices` Boundary
 
-`capability.AdminServices` is the management command catalog for trusted source plugins, exposed only through `pluginhost.Services.Admin()`. Source plugins can receive domain-governed management capabilities within the host process, such as user management, permission management, notification management, forced session revocation, and plugin governance commands.
+`capability.AdminServices` is the management command catalog for trusted source plugins, exposed only through `pluginhost.Services.Admin()`. Source plugins can receive domain-governed management capabilities within the host process, such as user management, permission management, notification management, session revocation, and plugin governance commands.
 
-The `pluginbridge.Services` interface for dynamic plugins does not provide an `Admin()` entry point, so dynamic plugins cannot directly use `sessioncap.AdminService`, `notifycap.AdminService`, or other domain `AdminService` interfaces. Dynamic plugins can only call specific methods that have been published as dynamic `hostServices`, declared in `plugin.yaml`, authorized by the host, and registered in the `WASM host-service` dispatcher.
+The dynamic plugin `pluginbridge.Services` interface does not provide an `Admin()` entry, so dynamic plugins cannot directly use `sessioncap.AdminService`, `notifycap.AdminService`, or other domain `AdminService` interfaces. Dynamic plugins can only call specific methods that have been published as dynamic `hostServices`, declared in `plugin.yaml`, authorized by the host, and registered with the `WASM host-service` dispatcher.
 
-For example, the current `sessions` dynamic service only provides `sessions.search` and `sessions.batch_get`, and does not include the forced revocation command corresponding to `sessioncap.AdminService.RevokeSession`. If a management action needs to be made available to dynamic plugins in the future, the management interface will be considered for opening.
+For example, the current `sessions` dynamic service only provides `sessions.search` and `sessions.batch_get`, not the `sessioncap.AdminService.RevokeSession` force-revoke command. If dynamic plugins need a management action in the future, the management interface will be considered for opening.
 
 ## Domain Capability Overview
 
 | Method | Domain Documentation | Description |
 |--------|---------------------|-------------|
-| `AI()` | [AI Capability](/docs/domain-capability-ai) | Aggregates text, image, embedding, audio, vision, document, safety, and video sub-capabilities |
-| `APIDoc()` | [API Documentation Capability](/docs/domain-capability-apidoc) | Resolves route operation keys, localized module labels, and operation summaries |
-| `Auth()` | [Authentication and Authorization](/docs/domain-capability-auth) | Aggregates `Token()` and `Authz()` sub-capabilities |
-| `Users()` | [Users Capability](/docs/domain-capability-users) | User views, search, and visibility checks |
-| `BizCtx()` | [Business Context Capability](/docs/domain-capability-bizctx) | Reads current request user, tenant, impersonation, and platform bypass status |
+| `AI()` | [AI Capability](/docs/domain-capability-ai) | Aggregates text, image, vector, audio, vision, document, safety, and video sub-capabilities |
+| `APIDoc()` | [API Documentation Capability](/docs/domain-capability-apidoc) | Parses route operation keys, localizes module labels and operation summaries |
+| `Auth()` | [Auth Capability](/docs/domain-capability-auth) | Aggregates `Token()` and `Authz()` sub-capabilities |
+| `Users()` | [Users Capability](/docs/domain-capability-users) | User views, search, and visibility validation |
+| `BizCtx()` | [Business Context Capability](/docs/domain-capability-bizctx) | Reads current request user, tenant, impersonation, and platform bypass state |
 | `Cache()` | [Cache Capability](/docs/domain-capability-cache) | Plugin-scoped runtime cache |
-| `Dict()` | [Dictionary Capability](/docs/domain-capability-dict) | Dictionary label resolution and view refresh |
-| `Files()` | [Files Capability](/docs/domain-capability-files) | File views and visibility checks |
-| `HostConfig()` | [Configuration Management](/docs/domain-capability-hostconfig) | Reads host configuration values; dynamic plugins must declare `keys` |
-| `I18n()` | [Internationalization Capability](/docs/domain-capability-i18n) | Runtime translation for source plugins; no corresponding `host service` for dynamic plugins |
+| `Dict()` | [Dict Capability](/docs/domain-capability-dict) | Dictionary label resolution and refresh views |
+| `Files()` | [Files Capability](/docs/domain-capability-files) | File views and visibility validation |
+| `HostConfig()` | [Host Config Capability](/docs/domain-capability-hostconfig) | Reads host configuration values; dynamic plugins must declare `keys` |
+| `I18n()` | [i18n Capability](/docs/domain-capability-i18n) | Source plugin runtime translation; not exposed as a dynamic `host service` |
 | `Infra()` | [Infrastructure Capability](/docs/domain-capability-infra) | Infrastructure component status views |
-| `Jobs()` | [Jobs and Scheduling](/docs/domain-capability-jobs) | Scheduled task view reading |
-| `Manifest()` | [Manifest Resource Capability](/docs/domain-capability-manifest) | Reads read-only resources under the current plugin's `manifest/` directory |
-| `Notifications()` | [Notification Capability](/docs/domain-capability-notifications) | Notification message view reading |
-| `Org()` | [Organization Capability](/docs/domain-capability-org) | Optional organization capability for reading user department and position views |
-| `Plugins()` | [Plugin Governance](/docs/domain-capability-plugins) | Aggregates plugin registry, plugin configuration, plugin state, and lifecycle sub-capabilities |
+| `Jobs()` | [Jobs Capability](/docs/domain-capability-jobs) | Scheduled task view reading |
+| `Manifest()` | [Manifest Resources Capability](/docs/domain-capability-manifest) | Reads read-only resources under the current plugin's `manifest/` |
+| `Notifications()` | [Notifications Capability](/docs/domain-capability-notifications) | Notification message view reading |
+| `Org()` | [Org Capability](/docs/domain-capability-org) | Optional org capability, reads user department and position views |
+| `Plugins()` | [Plugin Governance Capability](/docs/domain-capability-plugins) | Aggregates plugin registry, plugin config, plugin state, and lifecycle sub-capabilities |
 | `Route()` | [Dynamic Route Capability](/docs/domain-capability-route) | Reads current dynamic route metadata |
-| `Sessions()` | [Online Sessions Capability](/docs/domain-capability-sessions) | Online session search and batch reading |
-| `Storage()` | [Files Capability](/docs/domain-capability-files) | Plugin-scoped object storage operations |
-| `Tenant()` | [Tenant Capability](/docs/domain-capability-tenant) | Optional tenant capability for reading current tenant, visibility, switch validation, and source plugin tenant filtering |
-| `Lock()` | [Distributed Lock Capability](/docs/domain-capability-lock) | Plugin-visible distributed lock acquisition, renewal, and release |
+| `Sessions()` | [Sessions Capability](/docs/domain-capability-sessions) | Online session search and batch reading |
+| `Storage()` | [Storage Capability](/docs/domain-capability-storage) | Plugin-scoped object storage operations |
+| `Tenant()` | [Tenant Capability](/docs/domain-capability-tenant) | Optional tenant capability, reads current tenant, visibility, switch validation, and source plugin tenant filtering |
+| `Lock()` | [Lock Capability](/docs/domain-capability-lock) | Plugin-visible distributed lock acquisition, renewal, and release |
 
 Plugin-scoped capabilities are bound to the plugin identity by the host. For example, `Plugins().Config()` only reads the current plugin's own `config.yaml`, `Manifest()` only reads the current plugin's `manifest/` resources, and `AI()` injects the source plugin `ID` into subsequent provider requests.
 
-## SPI Architecture Design
+## SPI Architecture
 
-Some domain capabilities are optional framework capabilities. They are not built into the core framework but are implemented by provider plugins and injected into the host runtime. Capabilities currently using the `SPI` pattern include `AI`, `Org`, and `Tenant`, with their corresponding official provider plugins being `linapro-ai-core`, `linapro-org-core`, and `linapro-tenant-core` respectively.
+Some domain capabilities are optional framework capabilities — they are not built into the main framework but are implemented by provider plugins and injected into the host runtime. Current capabilities using the `SPI` pattern include `AI`, `Org`, and `Tenant`, with official provider plugins `linapro-ai-core`, `linapro-org-core`, and `linapro-tenant-core` respectively.
 
 ### Architecture Design
 
-The core idea of the `SPI` (Service Provider Interface) pattern is to separate the capability contract from the capability implementation. The host defines the public interfaces for domain capabilities (the `SPI` contracts), while provider plugins implement the specific business logic. The host uses deferred construction to avoid hard dependencies on optional plugins during startup. Only when a capability is first consumed does the host instantiate the provider.
+The `SPI` (`Service Provider Interface`) pattern's core idea is separating capability contracts from capability implementations. The host defines the public interface for a domain capability (the `SPI` contract), and provider plugins implement the actual business logic. The host uses deferred construction to avoid hard dependencies on optional plugins during startup — the provider is only instantiated when the capability is first consumed.
 
 ```mermaid
 graph TB
-    Host["Host Startup"] --> Lazy["Capability First Consumed"]
-    Lazy --> Check{"Provider Registered and Available?"}
-    Check -->|"Yes"| Construct["Construct Provider Instance"]
+    Host["Host Startup"] --> Lazy["Capability first consumed"]
+    Lazy --> Check{"Provider registered and available?"}
+    Check -->|"Yes"| Construct["Construct provider instance"]
     Construct --> Inject["Inject ProviderEnv"]
-    Inject --> Serve["Execute Provider Logic"]
-    Check -->|"No"| Degrade["Safe Degradation: Return Empty Result or Unavailable State"]
-    Plugin["Provider Plugin init()"] -->|"Register Factory"| Registry["Provider Registry"]
+    Inject --> Serve["Execute provider logic"]
+    Check -->|"No"| Degrade["Graceful degradation: return empty result or unavailable state"]
+    Plugin["Provider plugin init()"] -->|"Register factory"| Registry["Provider registry"]
     Registry --> Check
 ```
 
-| Design Aspect | Description |
-|---------------|-------------|
-| Deferred Construction | The host only constructs a provider instance when the capability is first consumed, avoiding hard dependencies on optional plugins during startup |
-| Safe Degradation | When no provider is available, the capability returns an empty result or unavailable state instead of `nil` or an error |
-| Source Injection | The host injects request context, plugin identity, and helper capabilities into the provider via `ProviderEnv` |
-| Enablement State Isolation | Provider state is independent of business entry visibility. A plugin's business entry may be invisible to the current tenant, but it can still serve as a platform capability provider |
+| Design Point | Description |
+|--------------|-------------|
+| Deferred construction | The host only constructs provider instances when the capability is first consumed, avoiding hard dependencies on optional plugins during startup |
+| Graceful degradation | When no provider is available, the capability returns an empty result or unavailable state, not `nil` or an error |
+| Source injection | The host injects request context, plugin identity, and auxiliary capabilities into the provider via `ProviderEnv` |
+| Enable state isolation | Provider state is independent of business entry visibility — a plugin's business entry may be invisible to the current tenant but still available as a platform capability provider |
 
 ### SPI Service Registration
 
@@ -186,8 +186,8 @@ sequenceDiagram
     participant Host as Host Runtime
     participant Provider as Provider Instance
 
-    Init->>Registry: Register Factory Function(pluginID, factory)
-    Note over Init,Registry: Registration completed at compile time
+    Init->>Registry: Register factory function(pluginID, factory)
+    Note over Init,Registry: Registration complete at compile time
 
     Host->>Host: Business code calls capability method
     Host->>Registry: Query registered factory
@@ -197,32 +197,32 @@ sequenceDiagram
     Host->>Provider: Forward capability call
 ```
 
-`ProviderEnv` is the runtime context injected by the host into the provider, typically including:
+`ProviderEnv` is the runtime context injected by the host into the provider, typically containing:
 
 | Injection Item | Description |
 |----------------|-------------|
-| Plugin Identity | The `ID` of the current provider plugin, used for auditing and isolation |
-| Request Context | The current request's tenant, user, and other business context |
-| Helper Capabilities | Host capabilities needed by the provider implementation, such as `TenantFilter`, user views, etc. |
+| Plugin identity | The current provider plugin's `ID`, for auditing and isolation |
+| Request context | Current request's tenant, user, and other business context |
+| Auxiliary capabilities | Host capabilities needed by the provider implementation, such as `TenantFilter`, user views, etc. |
 
-### SPI Provider State Check
+### SPI Provider Status Check
 
-The host uses `Plugins().State().IsProviderEnabled()` to determine whether a provider is available. This check has different semantics from `IsEnabled`:
+The host uses `Plugins().State().IsProviderEnabled()` to determine if a provider is available. This check has different semantics from `IsEnabled`:
 
 | Check Method | Semantics | Use Case |
 |--------------|-----------|----------|
 | `IsEnabled` | Whether the plugin's business entry is visible to the current tenant | Menu filtering, route visibility, permission filtering |
-| `IsProviderEnabled` | Whether the plugin is platform-enabled and can accept framework capability provider calls | Pre-check before `AI`, `Org`, `Tenant`, and other capability calls |
+| `IsProviderEnabled` | Whether the plugin is platform-enabled and can serve as a framework capability provider | Pre-check before `AI`, `Org`, `Tenant` capability calls |
 
-Provider checks ensure that platform-level capabilities continue to function even when business entries are disabled at the tenant level.
+The provider check ensures that even if a business entry is disabled at the tenant level, platform-level capabilities can still serve normally.
 
-### Implementing an SPI Provider as a Plugin
+### Plugin Implementing SPI Providers
 
 Implementing an `SPI` provider as a source plugin involves two steps: registration and implementation. Using the `Org` capability as an example:
 
-**Registering an SPI Factory:**
+**Registering the `SPI` factory:**
 
-The provider plugin registers a factory function through the `Providers()` declaration entry in its `init()` function:
+The provider plugin registers a factory function through the `Providers()` declaration entry in `init()`:
 
 ```go
 func init() {
@@ -239,9 +239,9 @@ func init() {
 }
 ```
 
-**Implementing the SPI Contract:**
+**Implementing the `SPI` contract:**
 
-The provider must implement the `Provider` interface defined in the capability's domain package. Using `orgcap.Provider` as an example, the provider needs to implement complete organization capabilities such as department views and position views:
+The provider must implement the `Provider` interface defined in the capability domain package. Using `orgcap.Provider` as an example, the provider must implement complete org capabilities including department views, position views, etc.:
 
 ```go
 type myOrgProvider struct {
@@ -249,8 +249,8 @@ type myOrgProvider struct {
 }
 
 func (p *myOrgProvider) ListUserDeptAssignments(ctx context.Context, userIDs []string) ([]DeptAssignment, error) {
-    // Query the provider's own organization data
-    // Access host-injected helper capabilities through p.env
+    // Query the provider's own org data
+    // Can access host-injected auxiliary capabilities via p.env
 }
 
 func (p *myOrgProvider) GetUserDeptInfo(ctx context.Context, userID string) (*DeptInfo, error) {
@@ -258,25 +258,25 @@ func (p *myOrgProvider) GetUserDeptInfo(ctx context.Context, userID string) (*De
 }
 ```
 
-Each capability's provider interface is defined in its corresponding domain capability package:
+Each capability's provider interface is defined in the corresponding domain capability package:
 
 | Capability | `SPI` Interface | `SPI` Package | Official Plugin |
-|------------|----------------|---------------|-----------------|
+|------------|-----------------|---------------|-----------------|
 | `AI` | Independent interfaces per sub-capability | `aicap` | `linapro-ai-core` |
 | `Org` | `orgcap.Provider` | `orgcap` | `linapro-org-core` |
 | `Tenant` | `tenantcap.Provider` + `tenantcap.Resolver` | `tenantcap` | `linapro-tenant-core` |
 
-The `Tenant` capability additionally provides the `tenantcap.Resolver` interface, which is responsible for resolving tenant identity from `HTTP` requests. It can compose a chain of responsibility based on request headers, domains, paths, tokens, or other strategies.
+The `Tenant` capability additionally provides the `tenantcap.Resolver` interface, responsible for resolving tenant identity from `HTTP` requests, composable as a chain of responsibility based on request headers, domains, paths, tokens, or other strategies.
 
 ### Dynamic Plugins and SPI
 
-Dynamic plugins cannot directly register `SPI` factories because providers must implement `Go` interfaces and run within the host process. Dynamic plugins interact with `SPI` capabilities in the following ways:
+Dynamic plugins cannot directly register `SPI` factories because providers need to implement `Go` interfaces and run within the host process. Dynamic plugins interact with `SPI` capabilities as follows:
 
 | Interaction Method | Description |
 |--------------------|-------------|
-| Consuming `SPI` capabilities | Calling published `SPI` capability methods through `hostServices` declarations, such as `service: ai`, `service: org`, `service: tenant` |
-| Checking `SPI` provider state | Using the `plugins.provider_enabled.check` dynamic method to determine provider availability |
-| Status queries | Using `capability.available` and `capability.status` dynamic methods to query capability availability and active providers |
+| Consume `SPI` capabilities | Invoke published `SPI` capability methods through `hostServices` declarations, e.g., `service: ai`, `service: org`, `service: tenant` |
+| Check `SPI` provider status | Use the `plugins.provider_enabled.check` dynamic method to determine provider availability |
+| Status query | Use `capability.available` and `capability.status` dynamic methods to query capability availability and active providers |
 
 Dynamic plugins declare consumption of `SPI` capabilities in `plugin.yaml`:
 
@@ -295,7 +295,7 @@ hostServices:
 
 ## Dynamic `hostServices`
 
-Dynamic plugins cannot directly access host implementation packages, nor can they use the `AdminServices` management command catalog exclusive to source plugins. They declare the host services they need to call through `hostServices` in `plugin.yaml`. A typical `hostServices` declaration in `plugin.yaml` looks like this:
+Dynamic plugins cannot directly access host implementation packages or use source-plugin-exclusive `AdminServices` management command catalogs. They declare the host services they need to call through `hostServices` in `plugin.yaml`. A typical `plugin.yaml` `hostServices` declaration looks like this:
 
 ```yaml
 hostServices:
@@ -340,64 +340,64 @@ hostServices:
       - text.generate
 ```
 
-### Resource Declaration Formats
+### Resource Declaration Forms
 
-| Resource Type | Declaration Field | Service |
-|---------------|-------------------|---------|
+| Resource Type | Declaration Field | Services |
+|---------------|-------------------|----------|
 | `none` | No `resources` declared | `runtime`, `apidoc`, `auth`, `authz`, `ai`, `users`, `bizctx`, `dict`, `files`, `infra`, `jobs`, `notifications`, `plugins`, `route`, `sessions`, `org`, `tenant` |
 | `path` | `resources.paths` | `storage`, `manifest` |
 | `table` | `resources.tables` | `data` |
 | `key` | `resources.keys` | `hostconfig` |
 | `resource` | `resources[].url` or `resources[].ref` with service-specific attributes | `network`, `cache`, `lock`, `notifications` (only `messages.send`) |
 
-Production validation requires that `data` service tables belong to the plugin's own namespace. Dynamic plugins must not declare host core tables such as `sys_*`, nor should they target host table names for plugin data capabilities.
+Production validation requires `data` service tables to belong to the plugin's own namespace. Dynamic plugins must not declare host core tables like `sys_*`, nor should they use host table names as targets for plugin data capabilities.
 
 ### Dynamic Service Catalog
 
 | Service | Domain Documentation | Resource Type | Methods |
 |---------|---------------------|---------------|---------|
 | `runtime` | <span style={{whiteSpace: 'nowrap'}}>[Dynamic Runtime Capability](/docs/domain-capability-runtime)</span> | `none` | `log.write`, `state.get`, `state.set`, `state.delete`, `info.now`, `info.uuid`, `info.node` |
-| `storage` | [Files Capability](/docs/domain-capability-files) | `path` | `put`, `get`, `delete`, `list`, `stat` |
-| `network` | [External Network Capability](/docs/domain-capability-network) | `resource` | `request` |
+| `storage` | [Files Capability](/docs/domain-capability-files) | `path` | `put`, `get`, `delete`, `delete_many`, `list`, `list_cursor`, `stat`, `batch_stat` |
+| `network` | [Network Capability](/docs/domain-capability-network) | `resource` | `request` |
 | `data` | [Record Store Capability](/docs/domain-capability-recordstore) | `table` | `list`, `get`, `create`, `update`, `delete`, `transaction` |
 | `cache` | [Cache Capability](/docs/domain-capability-cache) | `resource` | `get`, `set`, `delete`, `incr`, `expire` |
-| `lock` | [Distributed Lock Capability](/docs/domain-capability-lock) | `resource` | `acquire`, `renew`, `release` |
-| `hostconfig` | [Configuration Management](/docs/domain-capability-hostconfig) | `key` | `get` |
-| `manifest` | [Manifest Resource Capability](/docs/domain-capability-manifest) | `path` | `get` |
+| `lock` | [Lock Capability](/docs/domain-capability-lock) | `resource` | `acquire`, `renew`, `release` |
+| `hostconfig` | [Host Config Capability](/docs/domain-capability-hostconfig) | `key` | `get` |
+| `manifest` | [Manifest Resources Capability](/docs/domain-capability-manifest) | `path` | `get` |
 | `apidoc` | [API Documentation Capability](/docs/domain-capability-apidoc) | `none` | `route_text.resolve`, `route_texts.resolve`, `route_title_operation_keys.find` |
-| `auth` | [Authentication and Authorization](/docs/domain-capability-auth) | `none` | `tenant.select`, `tenant.switch`, `impersonation_token.issue`, `impersonation_token.revoke` |
-| `authz` | [Authentication and Authorization](/docs/domain-capability-auth) | `none` | `permissions.batch_get`, `permissions.has`, `users.platform_admin.check` |
+| `auth` | [Auth Capability](/docs/domain-capability-auth) | `none` | `tenant.select`, `tenant.switch`, `impersonation_token.issue`, `impersonation_token.revoke` |
+| `authz` | [Auth Capability](/docs/domain-capability-auth) | `none` | `permissions.batch_get`, `permissions.batch_has`, `permissions.has`, `users.platform_admin.check` |
 | `ai` | [AI Capability](/docs/domain-capability-ai) | `none` | `text.generate`, `image.generate`, `image.edit`, `embedding.create`, `audio.transcribe`, `audio.synthesize`, `vision.analyze`, `document.analyze`, `document.cite`, `safety.moderate`, `video.generate`, `video.edit`, `video.extend`, `video.operation.get`, `video.operation.cancel` |
-| `users` | [Users Capability](/docs/domain-capability-users) | `none` | `users.batch_get`, `users.search`, `users.visible.ensure` |
+| `users` | [Users Capability](/docs/domain-capability-users) | `none` | `users.current`, `users.batch_get`, `users.batch_resolve`, `users.search`, `users.visible.ensure` |
 | `bizctx` | [Business Context Capability](/docs/domain-capability-bizctx) | `none` | `current.get` |
-| `dict` | [Dictionary Capability](/docs/domain-capability-dict) | `none` | `labels.resolve` |
-| `files` | [Files Capability](/docs/domain-capability-files) | `none` | `files.batch_get`, `files.visible.ensure` |
+| `dict` | [Dict Capability](/docs/domain-capability-dict) | `none` | `labels.resolve`, `labels.list`, `labels.visible.ensure` |
+| `files` | [Files Capability](/docs/domain-capability-files) | `none` | `files.batch_get`, `files.search`, `files.visible.ensure` |
 | `infra` | [Infrastructure Capability](/docs/domain-capability-infra) | `none` | `status.batch_get` |
-| `jobs` | [Jobs and Scheduling](/docs/domain-capability-jobs) | `none` | `jobs.batch_get`, `jobs.register` |
-| `notifications` | [Notification Capability](/docs/domain-capability-notifications) | No resource for reads; `messages.send` uses `resources[].ref` | `messages.batch_get`, `messages.send` |
-| `plugins` | [Plugin Governance](/docs/domain-capability-plugins) | `none` | `plugins.batch_get`, `plugins.tenant.list`, `plugins.enabled.check`, `plugins.provider_enabled.check`, `plugins.enabled_authoritative.check`, `config.get`, `lifecycle.tenant_plugin_disable.ensure`, `lifecycle.tenant_plugin_disabled.notify`, `lifecycle.tenant_delete.ensure`, `lifecycle.tenant_deleted.notify` |
+| `jobs` | [Jobs Capability](/docs/domain-capability-jobs) | `none` | `jobs.batch_get`, `jobs.search`, `jobs.visible.ensure`, `jobs.register` |
+| `notifications` | [Notifications Capability](/docs/domain-capability-notifications) | Read no resource; `messages.send` uses `resources[].ref` | `messages.batch_get`, `messages.batch_get_by_source`, `messages.visible.ensure`, `messages.send` |
+| `plugins` | [Plugin Governance Capability](/docs/domain-capability-plugins) | `none` | `plugins.batch_get`, `plugins.tenant.list`, `plugins.enabled.check`, `plugins.provider_enabled.check`, `plugins.enabled_authoritative.check`, `config.get`, `lifecycle.tenant_plugin_disable.ensure`, `lifecycle.tenant_plugin_disabled.notify`, `lifecycle.tenant_delete.ensure`, `lifecycle.tenant_deleted.notify` |
 | `route` | [Dynamic Route Capability](/docs/domain-capability-route) | `none` | `metadata.get` |
-| `sessions` | [Online Sessions Capability](/docs/domain-capability-sessions) | `none` | `sessions.search`, `sessions.batch_get` |
-| `org` | [Organization Capability](/docs/domain-capability-org) | `none` | `capability.available`, `capability.status`, `users.dept_assignments.list`, `users.dept_info.get`, `users.dept_name.get`, `users.dept_ids.get`, `users.post_ids.get` |
-| `tenant` | [Tenant Capability](/docs/domain-capability-tenant) | `none` | `capability.available`, `capability.status`, `tenants.current`, `tenants.platform_bypass`, `tenants.visible.ensure`, `users.tenant_membership.validate`, `users.tenants.list`, `tenants.switch.validate` |
+| `sessions` | [Sessions Capability](/docs/domain-capability-sessions) | `none` | `sessions.current`, `sessions.search`, `sessions.batch_get`, `sessions.batch_get_user_online_status`, `sessions.visible.ensure` |
+| `org` | [Org Capability](/docs/domain-capability-org) | `none` | `capability.available`, `capability.status`, `users.dept_assignments.list`, `users.org_profiles.batch_get`, `users.dept_info.get`, `users.dept_name.get`, `users.dept_ids.get`, `users.post_ids.get`, `departments.tree.list`, `departments.search`, `departments.visible.ensure`, `posts.options.list`, `posts.visible.ensure` |
+| `tenant` | [Tenant Capability](/docs/domain-capability-tenant) | `none` | `capability.available`, `capability.status`, `tenants.current`, `tenants.current_info`, `tenants.platform_bypass`, `tenants.visible.ensure`, `tenants.batch_get`, `tenants.search`, `tenants.visible.batch_ensure`, `users.tenant_membership.validate`, `users.tenants.list`, `users.tenants.batch_list`, `tenants.switch.validate` |
 | `secret` | Reserved | `resource` | `resolve` |
 | `event` | Reserved | `resource` | `publish` |
 | `queue` | Reserved | `resource` | `enqueue` |
 
 ### Dynamic Plugin Exclusive Capabilities
 
-`Runtime()`, `Network()`, and `RecordStore()` are exclusive capabilities on the `pluginbridge.Default()` catalog for dynamic plugins. They are not part of `capability.Services` because source plugins already run within the host process and can use the host's native equivalents.
+`Runtime()`, `Network()`, and `RecordStore()` are dynamic plugin exclusive capabilities on the `pluginbridge.Default()` catalog. They are not part of `capability.Services` because source plugins already run within the host process and can use native host equivalents.
 
-| Capability | Access Entry | Description |
-|------------|-------------|-------------|
-| `Runtime()` | `pluginbridge.Default().Runtime()` | Dynamic plugins use the `WASI host-service` client to write logs, read/write state, read time, generate `UUID`s, and read node identity. Source plugins use the host's native logging and runtime context directly. |
-| `Network()` | `pluginbridge.Default().Network()` | Dynamic plugins use `host-service` authorization for governed outbound `HTTP`. Source plugins use the host's native `HTTP client` or injected domain services. |
-| `RecordStore()` | `pluginbridge.Default().RecordStore()` | Dynamic plugins use the `pluginbridge`-side facade to wrap `data host-service` protocols and typed query plans. Source plugins use their own `DAO`s or provider seams. |
+| Capability | Public Entry | Description |
+|------------|--------------|-------------|
+| `Runtime()` | `pluginbridge.Default().Runtime()` | Dynamic plugins use the `WASI host-service` client to write logs, read/write state, read time, generate `UUID`s, and read node identity; source plugins use native host logging and runtime context directly |
+| `Network()` | `pluginbridge.Default().Network()` | Dynamic plugins access governed outbound `HTTP` through `host-service` authorization; source plugins use native host `HTTP client` or injected domain services |
+| `RecordStore()` | `pluginbridge.Default().RecordStore()` | Dynamic plugins use the `pluginbridge`-side `facade` wrapping the `data host-service` protocol and typed query plans; source plugins use their own `DAO` or provider seams |
 
-## Related Documentation
+## Related Documents
 
 - [AI Capability](/docs/domain-capability-ai)
-- [Configuration Management](/docs/domain-capability-hostconfig)
+- [Host Config Capability](/docs/domain-capability-hostconfig)
 - [Tenant Capability](/docs/domain-capability-tenant)
 - [Record Store Capability](/docs/domain-capability-recordstore)
 - [Infrastructure Capability](/docs/domain-capability-infra)

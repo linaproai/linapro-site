@@ -84,10 +84,15 @@ graph LR
 | `Available` | 判断租户能力是否有可用提供方 |
 | `Status` | 返回能力状态、活跃提供方和冲突原因 |
 | `Current` | 返回当前请求租户，缺失时返回平台租户 |
+| `CurrentTenantInfo` | 返回当前请求租户投影，包含`ID`、`Code`、`Name`和`Status` |
 | `PlatformBypass` | 判断当前请求是否允许绕过租户过滤 |
 | `EnsureTenantVisible` | 校验当前用户是否可访问指定租户 |
 | `ValidateUserInTenant` | 校验指定用户是否属于指定租户 |
 | `ListUserTenants` | 列出用户可见的活跃租户 |
+| `BatchGetTenants` | 批量读取可见租户投影 |
+| `SearchTenants` | 按关键词搜索可见租户候选 |
+| `BatchListUserTenants` | 批量读取用户可访问租户列表 |
+| `EnsureTenantsVisible` | 批量校验当前用户可访问指定租户 |
 | `SwitchTenant` | 校验租户切换目标是否合法 |
 
 源码插件专属接口（通过`pluginhost.Services.TenantFilter()`访问）：
@@ -104,10 +109,15 @@ graph LR
 | `capability.available` | 判断租户能力是否有可用提供方 |
 | `capability.status` | 返回能力状态和活跃提供方 |
 | `tenants.current` | 返回当前请求租户 |
+| `tenants.current_info` | 返回当前请求租户投影 |
 | `tenants.platform_bypass` | 判断是否允许绕过租户过滤 |
 | `tenants.visible.ensure` | 校验当前用户是否可访问指定租户 |
+| `tenants.batch_get` | 批量读取可见租户投影 |
+| `tenants.search` | 按关键词搜索可见租户候选 |
+| `tenants.visible.batch_ensure` | 批量校验当前用户可访问指定租户 |
 | `users.tenant_membership.validate` | 校验指定用户是否属于指定租户 |
 | `users.tenants.list` | 列出用户可见的活跃租户 |
+| `users.tenants.batch_list` | 批量读取用户可访问租户列表 |
 | `tenants.switch.validate` | 校验租户切换目标是否合法 |
 
 ## 能力使用
@@ -126,11 +136,29 @@ if !services.Tenant().Available(ctx) {
 // 获取当前租户
 tenant := services.Tenant().Current(ctx)
 
+// 获取当前租户投影
+tenantInfo, err := services.Tenant().CurrentTenantInfo(ctx)
+
 // 校验租户可见性
 err := services.Tenant().EnsureTenantVisible(ctx, targetTenantID)
 
 // 列出用户可见租户
 tenants, err := services.Tenant().ListUserTenants(ctx, userID)
+
+// 批量读取租户投影
+batchResult, err := services.Tenant().BatchGetTenants(ctx, tenantIDs)
+
+// 搜索租户候选
+page, err := services.Tenant().SearchTenants(ctx, tenantcap.SearchInput{
+    Keyword: "科技",
+    Page:    pageRequest,
+})
+
+// 批量读取用户可访问租户
+userTenants, err := services.Tenant().BatchListUserTenants(ctx, userIDs)
+
+// 批量校验租户可见性
+err := services.Tenant().EnsureTenantsVisible(ctx, tenantIDs)
 ```
 
 源码插件使用`TenantFilter()`给插件自有表追加租户过滤：
@@ -158,8 +186,12 @@ hostServices:
   - service: tenant
     methods:
       - tenants.current
+      - tenants.current_info
       - tenants.visible.ensure
+      - tenants.batch_get
+      - tenants.search
       - users.tenants.list
+      - users.tenants.batch_list
 ```
 
 `tenant`是`none`资源类型，不声明`paths`、`tables`、`keys`或`resources`。在动态插件侧使用：
@@ -170,11 +202,26 @@ tenantSvc := pluginbridge.Default().Tenant()
 // 获取当前租户
 tenant := tenantSvc.Current(ctx)
 
+// 获取当前租户投影
+tenantInfo, err := tenantSvc.CurrentTenantInfo(ctx)
+
 // 校验租户可见性
 err := tenantSvc.EnsureTenantVisible(ctx, targetTenantID)
 
 // 列出用户可见租户
 tenants, err := tenantSvc.ListUserTenants(ctx, userID)
+
+// 批量读取租户投影
+batchResult, err := tenantSvc.BatchGetTenants(ctx, tenantIDs)
+
+// 搜索租户候选
+page, err := tenantSvc.SearchTenants(ctx, tenantcap.SearchInput{
+    Keyword: "科技",
+    Page:    pageRequest,
+})
+
+// 批量读取用户可访问租户
+userTenants, err := tenantSvc.BatchListUserTenants(ctx, userIDs)
 ```
 
 动态插件访问插件自有表时，应声明`service: data`和授权`resources.tables`，由宿主数据服务执行租户边界治理。

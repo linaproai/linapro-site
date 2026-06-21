@@ -2,7 +2,7 @@
 slug: '/docs/domain-capability-manifest'
 title: 'Manifest'
 hide_title: true
-description: "`ManifestService` provides read-only access to raw resources under the current plugin's `manifest/` directory, supporting byte reads, existence checks, and YAML resource scanning. Source plugins consume it through `services.Manifest()`; dynamic plugins consume it after declaring authorized paths through `hostServices.manifest`."
+description: '`ManifestService` provides read-only access to raw resources under the current plugin's `manifest/` directory, supporting byte reading, existence checking, and `YAML` resource scanning. Source plugins consume it through `services.Manifest()`, while dynamic plugins consume it through `hostServices.manifest` after declaring authorized paths.'
 keywords:
   - ManifestService
   - manifestcap
@@ -15,37 +15,37 @@ keywords:
   - SQL scripts
   - plugin resources
   - embedded files
-  - Wasm artifacts
+  - Wasm artifact
   - hostServices
   - plugin capability
   - LinaPro
 ---
 
-## Overview
+## Introduction
 
-`services.Manifest()` returns the `manifest` resource read service scoped to the current plugin. Paths are always relative to the `manifest/` directory; for example, to read `manifest/profile.yaml`, pass `profile.yaml`.
+`services.Manifest()` returns the current plugin-scoped `manifest` resource reading service. Paths are always relative to the `manifest/` directory — for example, to read `manifest/profile.yaml`, pass `profile.yaml`.
 
 Dynamic plugins use the same semantics but must declare the `manifest` service and allowed `paths` in `plugin.yaml`.
 
-**Capability phase**: Runtime
+**Capability Phase**: Runtime
 
-**Type support**: Source plugins, dynamic plugins
+**Supported Plugin Types**: Source plugins, Dynamic plugins
 
 ## Capability Design
 
 ### Resource Binding Mechanism
 
-Resources are bound to the current plugin: source plugins come from an embedded file system, dynamic plugins from published artifacts or host-bound artifact resources. Paths must be canonical, using forward slash separators, and escaping the current plugin's `manifest/` root through relative paths is prohibited.
+Resources are bound to the current plugin: for source plugins they come from the embedded filesystem, for dynamic plugins from the published artifact or host-bound artifact resources. Paths must be canonical, using forward slashes, and escaping the current plugin's `manifest/` root through relative paths is prohibited.
 
 ### Resource Types
 
 | Path Example | Description |
 |--------------|-------------|
-| `profile.yaml` | Plugin summary or display metadata |
-| `config/config.example.yaml` | Configuration template; does not participate in runtime default reading |
-| `config/config.yaml` | One of the plugin's default configuration sources |
-| `i18n/zh-CN/plugin.json` | Chinese language resource |
-| `sql/install.sql` | Raw installation script resource |
+| `profile.yaml` | Plugin profile or display metadata |
+| `config/config.example.yaml` | Config template, not used for runtime default reads |
+| `config/config.yaml` | One of the plugin's default config sources |
+| `i18n/zh-CN/plugin.json` | Chinese language resources |
+| `sql/install.sql` | Install script raw resource |
 
 ```mermaid
 graph TB
@@ -59,7 +59,7 @@ graph TB
 
 ### Read-Only Raw Resource Semantics
 
-Reading a resource does not mean executing SQL, registering language packs, or applying configuration. Configuration reading has a dedicated capability; for runtime configuration values use `Plugins().Config()` or dynamic `config.get`, and do not read `config/config.yaml` directly to bypass priority.
+Reading resources does not mean executing `SQL`, registering language packs, or applying configuration. Configuration reading has dedicated capabilities. Runtime config values use `Plugins().Config()` or dynamic `config.get`; do not read `config/config.yaml` directly to bypass priority.
 
 ## Interface Definitions
 
@@ -67,25 +67,38 @@ Reading a resource does not mean executing SQL, registering language packs, or a
 
 | Method | Description |
 |--------|-------------|
-| `Get` | Reads the raw byte content at the specified path |
-| `Exists` | Checks whether a resource exists at the specified path |
-| `Scan` | Scans a YAML resource or a nested key within it into the target struct |
+| `Get` | Reads the raw byte content at a specified path |
+| `GetMany` | Batch-reads raw resource content for a set of specified paths |
+| `List` | Returns resource metadata list under a specified prefix |
+| `Exists` | Checks whether a resource at a specified path exists |
+| `Scan` | Scans a `YAML` resource or nested key within it into the target struct |
 
 ### Dynamic Plugin Interface
 
-| Dynamic Method | Dynamic SDK Method | Description |
-|----------------|-------------------|-------------|
-| `get` | `Manifest().Get`, `Manifest().Exists`, `Manifest().Scan` | Reads raw resources under authorized paths |
+| Dynamic Method | Dynamic `SDK` Method | Description |
+|----------------|---------------------|-------------|
+| `get` | `Manifest().Get`, `Manifest().GetMany`, `Manifest().List`, `Manifest().Exists`, `Manifest().Scan` | Reads raw resources under authorized paths |
 
-## Usage
+## Capability Usage
 
 ### Source Plugin Usage
 
 Source plugins read resources shipped with the plugin through `services.Manifest()`:
 
 ```go
-// Read plugin summary
+// Read plugin profile
 content, err := services.Manifest().Get(ctx, "profile.yaml")
+
+// Batch-read multiple resources
+result, err := services.Manifest().GetMany(ctx, manifestcap.GetManyInput{
+    Paths: []string{"profile.yaml", "config/config.yaml"},
+})
+
+// List resource metadata
+listResult, err := services.Manifest().List(ctx, manifestcap.ListInput{
+    Prefix: "i18n/",
+    Limit:  50,
+})
 
 // Check if a resource exists
 exists, err := services.Manifest().Exists(ctx, "i18n/zh-CN/plugin.json")
@@ -110,10 +123,10 @@ hostServices:
         - i18n/zh-CN/plugin.json
 ```
 
-When `manifest` omits `methods`, it defaults to `get`. `resources.paths` must be paths relative to `manifest/`, not written as `manifest/profile.yaml`. Usage on the dynamic plugin side:
+When `manifest` omits `methods`, it defaults to `get`. `resources.paths` must be paths relative to `manifest/`, not `manifest/profile.yaml`. Usage on the dynamic plugin side:
 
 ```go
-// Read plugin summary
+// Read plugin profile
 content, err := pluginbridge.Default().Manifest().Get(ctx, "profile.yaml")
 
 // Check if a resource exists
@@ -122,13 +135,13 @@ exists, err := pluginbridge.Default().Manifest().Exists(ctx, "i18n/zh-CN/plugin.
 
 ## Design Constraints
 
-- **Read-only raw resources.** Reading a resource does not mean executing SQL, registering language packs, or applying configuration.
-- **Configuration reading has a dedicated capability.** For runtime configuration values use `Plugins().Config()` or dynamic `config.get`, and do not read `config/config.yaml` directly to bypass priority.
-- **Resources are bound to the current plugin.** Source plugins come from an embedded file system, dynamic plugins from published artifacts or host-bound artifact resources.
-- **Paths must be canonical.** Use forward slash separators; escaping the current plugin's `manifest/` root through relative paths is prohibited.
+- **Read-only raw resources.** Reading resources does not mean executing `SQL`, registering language packs, or applying configuration.
+- **Configuration reading has dedicated capabilities.** Runtime config values use `Plugins().Config()` or dynamic `config.get`; do not read `config/config.yaml` directly to bypass priority.
+- **Resources are bound to the current plugin.** For source plugins they come from the embedded filesystem, for dynamic plugins from the published artifact or host-bound artifact resources.
+- **Paths must be canonical.** Use forward slashes; escaping the current plugin's `manifest/` root through relative paths is prohibited.
 
 ## Related Services
 
-- [HostConfig Capability](/docs/domain-capability-hostconfig)
-- [I18n Capability](/docs/domain-capability-i18n)
+- [Host Config Capability](/docs/domain-capability-hostconfig)
+- [i18n Capability](/docs/domain-capability-i18n)
 - [Domain Capabilities Overview](/docs/domain-capabilities)

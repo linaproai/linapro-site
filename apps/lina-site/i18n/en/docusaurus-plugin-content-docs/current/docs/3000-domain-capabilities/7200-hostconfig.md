@@ -2,9 +2,9 @@
 slug: '/docs/domain-capability-hostconfig'
 title: 'HostConfig'
 hide_title: true
-description: 'Configuration management in the plugin system spans three domains: plugin self-configuration via `Plugins().Config()`, host configuration reading via `HostConfig()`, and managed runtime configuration via `Admin().HostConfig()`. Dynamic plugins declare their read scope through `plugins.config.get` and `hostconfig.get` respectively. This page explains the relationship between these configuration capabilities so plugin authors can choose the correct entry point.'
+description: 'Configuration management in the plugin system spans three domains: plugin governance (`Plugins().Config()` reads the current plugin's own static config), host config override via the `plugin.<plugin-id>` section in host `config.yaml`, host config reading (`HostConfig()`), and runtime config management (`Admin().HostConfig()` writes governed runtime config). Dynamic plugins declare read scopes through `plugins.config.get` and `hostconfig.get` respectively. This page serves as a configuration capability relationship guide to help plugin authors choose the correct entry point.'
 keywords:
-  - configuration management
+  - configuration capability
   - Plugins().Config
   - HostConfig
   - Admin().HostConfig
@@ -15,64 +15,61 @@ keywords:
   - config.yaml
   - config.example.yaml
   - SetRuntimeConfigJSON
-  - plugin config
-  - host config
+  - plugin configuration
+  - host configuration
   - LinaPro
+  - plugin.<plugin-id>
+  - exclusive override
+  - configuration priority
 ---
 
-## Overview
+## Introduction
 
-Configuration capabilities should be understood by domain boundary, not by method name:
+Configuration-related capabilities should be understood by domain boundary, not by method name:
 
 | Config Domain | Source Plugin Entry | Dynamic Service | Description |
-|---------------|---------------------|-----------------|-------------|
-| Plugin static config | `services.Plugins().Config()` | `plugins.config.get` | Reads the current plugin's own `config.yaml` |
-| Host config reading | `services.HostConfig()` | `hostconfig.get` | Reads host configuration values; dynamic plugins must declare `resources.keys` |
-| Runtime config management | `services.Admin().HostConfig()` | No standard dynamic service | Trusted source plugins write managed runtime configuration |
+|---------------|--------------------|-----------------| ------------|
+| <span style={{whiteSpace: 'nowrap'}}>Plugin static config</span> | `services.Plugins().Config()` | `plugins.config.get` | Read the current plugin's own `config.yaml` |
+| <span style={{whiteSpace: 'nowrap'}}>Host config reading</span> | `services.HostConfig()` | `hostconfig.get` | Read host config values; dynamic plugins must declare `resources.keys` |
+| <span style={{whiteSpace: 'nowrap'}}>Runtime config management</span> | `services.Admin().HostConfig()` | No standard dynamic service | Trusted source plugins write governed runtime config |
 
-Among these, `Plugins().Config()` is a sub-capability of the plugin governance domain; `HostConfig()` is the host configuration reading capability in the general capability catalog; `Admin().HostConfig()` belongs to the trusted source plugin management commands. All three involve configuration, but they differ in source, scope, governance model, and intended user.
+`Plugins().Config()` belongs to the plugin governance capability sub-system; `HostConfig()` is the host config reading capability in the standard capability catalog; `Admin().HostConfig()` belongs to trusted source plugin management commands. All three deal with configuration, but differ in source, scope, governance, and user.
 
-**Capability phase**: Runtime
+**Capability Phase**: Runtime
 
-**Type support**: Source plugins, dynamic plugins
+**Supported Plugin Types**: Source plugins, Dynamic plugins
 
 ## Capability Design
 
-### Configuration Domain Layers
+### Configuration Domain Layering
 
 ```mermaid
 graph TB
-    Plugin["Source Plugin"] --> PluginsConfig["Plugins().Config()<br/>Plugin Static Config"]
-    Plugin --> HostConfig["HostConfig()<br/>Host Config Reading"]
-    Trusted["Trusted Source Plugin"] --> AdminConfig["Admin().HostConfig()<br/>Runtime Config Management"]
+    Plugin["Source Plugin"] --> PluginsConfig["Plugins().Config()<br/>Plugin static config"]
+    Plugin --> HostConfig["HostConfig()<br/>Host config reading"]
+    Trusted["Trusted Source Plugin"] --> AdminConfig["Admin().HostConfig()<br/>Runtime config management"]
     Dynamic["Dynamic Plugin"] --> ConfigGet["hostServices.plugins.config.get"]
     Dynamic --> HostConfigGet["hostServices.hostconfig.get"]
     PluginsConfig --> PluginFile["Current plugin config.yaml"]
     HostConfig --> HostTree["Host config tree"]
-    AdminConfig --> RuntimeConfig["Managed runtime config"]
+    AdminConfig --> RuntimeConfig["Governed runtime config"]
 ```
 
 ### Plugin Static Configuration
 
-A plugin's own static configuration is read through `Plugins().Config()`. It is bound to the current plugin ID and will not read configuration from other plugins or the host global config.
+The plugin's own static configuration is read through `Plugins().Config()`. It is bound to the current plugin `ID` and will not read other plugins' or the host's global configuration.
 
-Read priority:
-
-| Priority | Source | Description |
-|----------|--------|-------------|
-| 1 | `plugins/<plugin-id>/config.yaml` under the production config root | Operations override, production environment takes precedence |
-| 2 | `manifest/config/config.yaml` during development | Default config for source plugin development |
-| 3 | `manifest/config/config.yaml` bound in the dynamic plugin artifact | Default config for published artifacts |
-
-`manifest/config/config.example.yaml` is a configuration template only and does not participate in runtime default reading.
+:::tip Configuration Priority and Override Mechanism
+For detailed documentation on the four-level read priority, exclusive override mechanism, and the `plugin.<plugin-id>` config section, see [Plugin Business Configuration](/docs/plugin-configuration).
+:::
 
 ### Host Config Reading
 
-Source plugins read host configuration values through `services.HostConfig()`. The current source implementation obtains values through a config reader injected during host startup, and no longer applies a hardcoded public key list to source plugins.
+Source plugins read host config values through `services.HostConfig()`. The current source implementation uses a config reader injected at host startup and no longer applies a hardcoded public key list to source plugins.
 
 ### Runtime Config Management
 
-Runtime configuration management belongs to trusted source plugin management commands and is not a standard read capability. `SetRuntimeConfigJSON` requires the caller to pass the domain-required `CapabilityContext`. The host adapter remains responsible for config key visibility, tenant boundaries, audit reasons, and write validation.
+Runtime config management belongs to trusted source plugin management commands, not standard read capabilities. `SetRuntimeConfigJSON` requires the caller to pass the domain-required `CapabilityContext`. The host adapter continues to handle config key visibility, tenant boundaries, audit reasons, and write validation.
 
 ## Interface Definitions
 
@@ -80,19 +77,19 @@ Runtime configuration management belongs to trusted source plugin management com
 
 | Method | Description |
 |--------|-------------|
-| `Get` | Returns the raw configuration value |
+| `Get` | Returns the raw config value |
 | `Exists` | Checks whether a config key exists |
-| `Scan` | Scans a configuration section into the target struct |
-| `String` | Reads a string value; returns the default when missing or blank |
-| `Bool` | Reads a boolean value; returns the default when missing |
-| `Int` | Reads an integer value; returns the default when missing |
-| `Duration` | Reads a duration value; returns the default when missing or blank |
+| `Scan` | Scans a config section into the target struct |
+| `String` | Reads a string value, returning default when missing or blank |
+| `Bool` | Reads a boolean value, returning default when missing |
+| `Int` | Reads an integer value, returning default when missing |
+| `Duration` | Reads a duration value, returning default when missing or blank |
 
 ### Host Config Interface
 
 | Method | Description |
 |--------|-------------|
-| `Get` | Reads the raw host configuration value |
+| `Get` | Reads the raw host config value |
 | `Exists` | Checks whether a host config key exists |
 | `String` | Reads a string value |
 | `Bool` | Reads a boolean value |
@@ -103,36 +100,36 @@ Runtime configuration management belongs to trusted source plugin management com
 
 | Entry | Method | Description |
 |-------|--------|-------------|
-| `Admin().HostConfig()` | `SetRuntimeConfigJSON` | Writes a managed runtime configuration value |
+| `Admin().HostConfig()` | `SetRuntimeConfigJSON` | Writes a governed runtime config value |
 
 ### Dynamic Plugin Interface
 
 | Dynamic Service | Method | Description |
 |-----------------|--------|-------------|
-| `plugins` | `config.get` | Reads the current plugin-scoped configuration |
-| `hostconfig` | `get` | Reads host config values; must declare authorized `resources.keys` |
+| `plugins` | `config.get` | Reads current plugin-scoped config |
+| `hostconfig` | `get` | Reads host config values; authorized `resources.keys` must be declared |
 
-## Usage
+## Capability Usage
 
 ### Source Plugin Usage
 
-Source plugins select the correct entry point based on the configuration domain:
+Source plugins choose the correct entry based on the configuration domain:
 
 ```go
-// Read the plugin's own configuration
+// Read the plugin's own config
 value, err := services.Plugins().Config().String(ctx, "api.endpoint", "https://default.example.com")
 enabled, err := services.Plugins().Config().Bool(ctx, "features.export", false)
 
-// Read host configuration
+// Read host config
 basePath, err := services.HostConfig().String(ctx, "workspace.basePath", "")
 
-// Write runtime configuration (trusted source plugin)
+// Write runtime config (trusted source plugin)
 err := services.Admin().HostConfig().SetRuntimeConfigJSON(ctx, capabilityCtx, "plugin.reports.maxExport", jsonValue)
 ```
 
 ### Dynamic Plugin Usage
 
-Dynamic plugins declare the `plugins` and `hostconfig` services separately in `plugin.yaml`:
+Dynamic plugins declare `plugins` and `hostconfig` services separately in `plugin.yaml`:
 
 ```yaml
 hostServices:
@@ -148,26 +145,26 @@ hostServices:
         - i18n.default
 ```
 
-The `config.get` method on `plugins` reads the current plugin's configuration. Authorization boundaries for `hostconfig` are controlled by `resources.keys`; undeclared keys should not be returned by the host. Usage on the dynamic plugin side:
+`plugins`'s `config.get` reads the current plugin config. `hostconfig`'s authorization boundary is controlled by `resources.keys`; undeclared keys should not be returned by the host (the whitelist validation flow is detailed in [Plugin Business Configuration](/docs/plugin-configuration)). Usage on the dynamic plugin side:
 
 ```go
-// Read plugin configuration
+// Read plugin config
 endpoint, err := pluginbridge.Default().Plugins().Config().String(ctx, "api.endpoint", "https://default.example.com")
 
-// Read host configuration
+// Read host config
 basePath, err := pluginbridge.Default().HostConfig().String(ctx, "workspace.basePath", "")
 ```
 
 ## Design Constraints
 
-- **Put business parameters into plugin configuration.** Do not use `HostConfig()` or the host `g.Cfg()` to read a plugin's own parameters.
-- **Be cautious when reading host configuration.** Although source plugins can read host config via `HostConfig()`, plugin documentation and code should only depend on explicitly agreed-upon keys.
-- **Dynamic plugins must declare keys.** Authorization for the `hostconfig` dynamic service comes from `resources.keys`; do not declare root configs or ambiguous keys as a regular practice.
-- **Runtime writes go through management commands.** Both plugin config reading and host config reading are read-only capabilities; writing configuration is only exposed to trusted source plugins through `Admin().HostConfig()`.
-- **Templates are not runtime configuration.** `config.example.yaml` is used for documentation and example generation and does not participate in runtime priority.
+- **Plugin business parameters go into plugin config.** Do not use `HostConfig()` or host `g.Cfg()` to read the plugin's own parameters.
+- **Host config reads should be cautious.** Although source plugins can read host config through `HostConfig()`, plugin documentation and code should only depend on explicitly agreed-upon keys.
+- **Dynamic plugins must declare keys.** The `hostconfig` dynamic service's authorization comes from `resources.keys`; do not declare root configs or ambiguous keys as regular practice.
+- **Runtime writes go through management commands.** Standard plugin config reads and host config reads are read-only capabilities; writing config is exposed only through `Admin().HostConfig()` to trusted source plugins.
+- **Templates are not runtime config.** `config.example.yaml` is for documentation and example generation; it does not participate in runtime priority.
 
 ## Related Services
 
 - [Plugins Capability](/docs/domain-capability-plugins)
-- [Manifest Resource Capability](/docs/domain-capability-manifest)
+- [Manifest Resources Capability](/docs/domain-capability-manifest)
 - [Domain Capabilities Overview](/docs/domain-capabilities)

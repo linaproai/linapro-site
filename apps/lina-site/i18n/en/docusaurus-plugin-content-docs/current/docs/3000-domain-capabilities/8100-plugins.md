@@ -2,7 +2,7 @@
 slug: '/docs/domain-capability-plugins'
 title: 'Plugins'
 hide_title: true
-description: '`Plugins()` is the plugin governance domain capability namespace, aggregating plugin registry views, plugin local configuration, plugin enable state, capability provider status, and tenant-level lifecycle orchestration. This capability lets source plugins read plugin governance state and handle plugin configuration from a single domain entry point, while providing pre-checks and post-notifications for governance operations such as tenant-level plugin disabling and tenant deletion.'
+description: '`Plugins()` is the plugin governance domain capability namespace, aggregating plugin registry views, plugin-local configuration, plugin enable state, capability provider status, and tenant-level lifecycle orchestration. This capability lets source plugins read plugin governance state, handle plugin configuration, and provides pre-checks and post-notifications for governance operations like tenant plugin disable or tenant deletion — all within a single domain entry.'
 keywords:
   - Plugins capability
   - plugincap
@@ -13,90 +13,96 @@ keywords:
   - IsEnabled
   - IsProviderEnabled
   - plugin registry
-  - plugin configuration
+  - plugin config
   - plugin state
   - plugin lifecycle
   - LinaPro
+  - plugin.<plugin-id>
+  - exclusive override
+  - configuration priority
 ---
 
-## Overview
+## Introduction
 
-`services.Plugins()` returns the plugin governance domain capability namespace. Source plugins access it through `services.Plugins()`, while dynamic plugins declare `service: plugins` in `plugin.yaml` and access it via `pluginbridge.Default().Plugins()`. It is not a single method set but an aggregation of multiple plugin governance sub-capabilities:
+`services.Plugins()` returns the plugin governance domain capability namespace. Source plugins access it through `services.Plugins()`, while dynamic plugins declare `service: plugins` in `plugin.yaml` and access it through the `pluginbridge.Default().Plugins()` client. It is not a single method collection but aggregates multiple plugin governance sub-capabilities:
 
-| Sub-capability | Description |
+| Sub-Capability | Description |
 |----------------|-------------|
-| `Registry()` | Reads plugin governance views, such as plugin version, installation status, enable state, and tenant-controllable plugin list |
+| `Registry()` | Reads plugin governance views, such as plugin versions, install status, enable state, and tenant-controllable plugin lists |
 | `Config()` | Reads the current plugin's own static configuration |
 | `State()` | Queries plugin enable state, authoritative enable state, and capability provider status |
-| `Lifecycle()` | Orchestrates pre-checks and post-notifications for tenant-level plugin disabling and tenant deletion |
+| `Lifecycle()` | Orchestrates tenant-level plugin disable and tenant deletion pre-checks and post-notifications |
 
-`Plugins()` also implements registry read methods, so callers can use `services.Plugins().BatchGetPlugins` and `services.Plugins().ListTenantPlugins` to read plugin views directly, or use `Registry()` to express dependency intent explicitly.
+`Plugins()` also implements registry read methods, so callers can directly use `services.Plugins().BatchGetPlugins` and `services.Plugins().ListTenantPlugins` to read plugin views, or explicitly express dependency intent through `Registry()`.
 
 **Capability Phase**: Runtime
 
-**Supported Types**: Source plugins, dynamic plugins
+**Supported Plugin Types**: Source plugins, Dynamic plugins
 
 ## Capability Design
 
-### Sub-capability Architecture
+### Sub-Capability System
 
 ```mermaid
 graph TB
-    Plugins["services.Plugins()"] --> Registry["Registry<br/>Plugin registry views"]
-    Plugins --> Config["Config<br/>Plugin local config"]
+    Plugins["services.Plugins()"] --> Registry["Registry<br/>Registry views"]
+    Plugins --> Config["Config<br/>Plugin-local config"]
     Plugins --> State["State<br/>Enable state"]
     Plugins --> Lifecycle["Lifecycle<br/>Tenant-level lifecycle"]
 ```
 
-### Registry Sub-capability
+### Registry Sub-Capability
 
-The registry capability reads plugin governance views without exposing the host's `sys_plugin` table or internal runtime cache state. Plugin views typically include plugin `ID`, version, installation status, enable state, and lifecycle status. Tenant views additionally include name, type, description, installation mode, scope nature, and tenant-level enable state.
+The registry capability is for reading plugin governance views and does not expose the host `sys_plugin` table or runtime internal cache state. Plugin views typically contain plugin `ID`, version, install status, enable state, and lifecycle status. Tenant views additionally contain name, type, description, install mode, scope nature, and tenant-level enable state.
 
-### Config Sub-capability
+### Config Sub-Capability
 
 `Plugins().Config()` reads the current plugin's own static configuration. Its responsibility differs from `HostConfig()`:
 
 | Capability | Read Scope |
 |------------|------------|
-| `Plugins().Config()` | `config.yaml` under the current plugin's scope |
-| `HostConfig()` | Host configuration values; dynamic plugins must declare authorized `keys` to read |
+| `Plugins().Config()` | Current plugin-scoped `config.yaml` |
+| `HostConfig()` | Host config values; dynamic plugins must declare authorized `keys` |
 
-Plugin configuration read priority:
+The plugin configuration read priority is:
 
 | Priority | Source | Description |
 |----------|--------|-------------|
-| 1 | `plugins/<plugin-id>/config.yaml` under the production config root | Ops override, production environment takes precedence |
-| 2 | `manifest/config/config.yaml` during development | Default config for source plugin development |
-| 3 | `manifest/config/config.yaml` bundled in dynamic plugin artifacts | Default config from published artifacts |
+| 1 | `plugin.<plugin-id>` section in host `config.yaml` | Deployment-level unified override, exclusive priority |
+| 2 | `plugins/<plugin-id>/config.yaml` under production config root | Ops override, production priority |
+| 3 | Development-time `manifest/config/config.yaml` | Source plugin development default config |
+| 4 | `manifest/config/config.yaml` bound to dynamic plugin artifact | Published artifact default config |
 
-`manifest/config/config.example.yaml` is only a configuration template and does not participate in runtime default reads.
+When a `plugin.<plugin-id>` section exists in the host `config.yaml`, that section is the sole source for that plugin's config — file-level config no longer participates in resolution. See [Plugin Business Configuration](/docs/plugin-configuration) for details.
 
-### State Sub-capability
+`manifest/config/config.example.yaml` is only a config template and does not participate in runtime default reads.
 
-`Plugins().State()` provides three query semantics, each serving different consistency and performance requirements:
+### State Sub-Capability
+
+`Plugins().State()` provides three query semantics, each serving different consistency and performance needs:
 
 | Method | Data Source and Semantics | Use Case |
-|--------|---------------------------|----------|
-| `IsEnabled` | Reads the in-process local enable cache state, preserving tenant, request scope, and runtime gates | High-frequency checks such as menu filtering, route visibility, and permission filtering |
-| `IsEnabledAuthoritative` | Bypasses local cache state, forces a read of persisted plugin governance state | Global middleware, write protection, controls that need immediate response to admin state changes |
-| `IsProviderEnabled` | Checks whether the plugin is platform-enabled and can accept framework capability provider calls | Pre-checks before calling AI, org, tenant, and other capability providers |
+|--------|--------------------------|----------|
+| `IsEnabled` | Reads process-local enable cache state, preserving tenant, request scope, and runtime gates | High-frequency checks like menu filtering, route visibility, permission filtering |
+| `IsEnabledAuthoritative` | Bypasses local cache state, forces reading persisted plugin governance state | Global middleware, write protection, controls that need immediate response to admin state changes |
+| `IsProviderEnabled` | Checks whether the plugin is platform-enabled and can serve as a framework capability provider | Pre-check before `AI`, Org, Tenant capability provider calls |
 
 ```mermaid
 graph TB
     State["Plugins().State()"] --> Snapshot["IsEnabled<br/>Local cache state"]
     State --> Authoritative["IsEnabledAuthoritative<br/>Persisted read"]
-    State --> Provider["IsProviderEnabled<br/>Provider status"]
+    State --> Provider["IsProviderEnabled<br/>Provider state"]
 ```
 
-### Lifecycle Sub-capability
+### Lifecycle Sub-Capability
 
-`Plugins().Lifecycle()` targets governance modules such as tenant management and plugin management. It is used to ask registered plugins whether an operation may proceed before governance actions, and to notify plugins to perform cleanup or observation logic after operations complete.
+`Plugins().Lifecycle()` targets governance modules like tenant management and plugin management. It is used to ask registered plugins whether an operation may proceed before a governance action, and to notify plugins to execute cleanup or observation logic after the operation completes.
 
 It differs from `pluginhost.SourcePlugin.Lifecycle()`:
 
-| Entry Point | Purpose |
-|-------------|---------|
-| `pluginhost.SourcePlugin.Lifecycle()` | A single source plugin registers its own callbacks for install, upgrade, disable, uninstall, tenant disable, tenant delete, and installation mode changes |
+| Entry | Role |
+|-------|------|
+| `pluginhost.SourcePlugin.Lifecycle()` | A single source plugin registers its own install, upgrade, disable, uninstall, tenant disable, tenant delete, and install mode change callbacks |
 | `services.Plugins().Lifecycle()` | Governance modules orchestrate cross-plugin tenant-level pre-checks and post-notifications |
 
 ```mermaid
@@ -104,98 +110,98 @@ stateDiagram-v2
     [*] --> PreCheck: Governance action triggered
     PreCheck --> Blocked: Any plugin rejects
     PreCheck --> Execute: All pass
-    Execute --> Notify: Operation complete
+    Execute --> Notify: Action complete
     Notify --> [*]
     Blocked --> [*]
 ```
 
 ## Interface Definitions
 
-### Registry Sub-capability Interface
+### Registry Sub-Capability Interface
 
 | Method | Description |
 |--------|-------------|
-| `BatchGetPlugins` | Batch-reads visible plugin views; missing results do not reveal specific reasons |
-| `ListTenantPlugins` | Reads the current tenant's controllable plugin list, including global and tenant-level enable states |
-| `Registry` | Returns the same registry read interface, useful for dependency injection to expose only registry capability |
+| `BatchGetPlugins` | Batch-reads visible plugin views; missing results don't reveal specific reasons |
+| `ListTenantPlugins` | Reads current tenant-controllable plugin list, including global enable state and tenant enable state |
+| `Registry` | Returns the same registry read interface, convenient for dependency injection to expose only registry capability |
 
-### Config Sub-capability Interface
-
-| Method | Description |
-|--------|-------------|
-| `Get` | Returns the raw configuration value |
-| `Exists` | Checks whether a configuration key exists |
-| `Scan` | Scans a configuration section into a target struct |
-| `String` | Reads a string value, returning the default if missing or blank |
-| `Bool` | Reads a boolean value, returning the default if missing |
-| `Int` | Reads an integer value, returning the default if missing |
-| `Duration` | Reads a duration value, returning the default if missing or blank |
-
-### State Sub-capability Interface
+### Config Sub-Capability Interface
 
 | Method | Description |
 |--------|-------------|
-| `IsEnabled` | Reads the in-process local enable cache state, suitable for high-frequency checks |
-| `IsEnabledAuthoritative` | Forces a read of persisted state, suitable for global controls |
-| `IsProviderEnabled` | Checks whether a capability provider is available |
+| `Get` | Returns the raw config value |
+| `Exists` | Checks whether a config key exists |
+| `Scan` | Scans a config section into the target struct |
+| `String` | Reads a string value, returning default when missing or blank |
+| `Bool` | Reads a boolean value, returning default when missing |
+| `Int` | Reads an integer value, returning default when missing |
+| `Duration` | Reads a duration value, returning default when missing or blank |
 
-### Lifecycle Sub-capability Interface
+### State Sub-Capability Interface
 
 | Method | Description |
 |--------|-------------|
-| `EnsureTenantPluginDisableAllowed` | Runs a pre-check before disabling a plugin for a tenant; blocks if any plugin rejects |
-| `NotifyTenantPluginDisabled` | Best-effort notification after a tenant disables a plugin |
-| `EnsureTenantDeleteAllowed` | Runs a pre-check before tenant deletion |
+| `IsEnabled` | Reads process-local enable cache state, suitable for high-frequency checks |
+| `IsEnabledAuthoritative` | Forces reading persisted state, suitable for global control |
+| `IsProviderEnabled` | Checks whether capability provider is available |
+
+### Lifecycle Sub-Capability Interface
+
+| Method | Description |
+|--------|-------------|
+| `EnsureTenantPluginDisableAllowed` | Pre-check before tenant disables a plugin; any plugin rejection blocks the operation |
+| `NotifyTenantPluginDisabled` | Best-effort notification after tenant disables a plugin |
+| `EnsureTenantDeleteAllowed` | Pre-check before tenant deletion |
 | `NotifyTenantDeleted` | Best-effort notification after tenant deletion |
 
-### Admin Command Interface
+### Management Command Interface
 
-| Entry Point | Method | Description |
-|-------------|--------|-------------|
-| `Admin().Plugins()` | `SetPluginEnabled` | Changes plugin enable state, subject to tenant, lifecycle, and state machine checks |
-| `Admin().Plugins()` | `ProvisionTenantDefaults` | Backfills default plugin provisioning state for a specified tenant |
+| Entry | Method | Description |
+|-------|--------|-------------|
+| `Admin().Plugins()` | `SetPluginEnabled` | Changes plugin enable state, with tenant, lifecycle, and state machine checks |
+| `Admin().Plugins()` | `ProvisionTenantDefaults` | Fills default plugin supply state for a specified tenant |
 
 ### Dynamic Plugin Interface
 
 | Dynamic Method | Description |
 |----------------|-------------|
 | `plugins.batch_get` | Batch-reads visible plugin views |
-| `plugins.tenant.list` | Reads the current tenant's controllable plugin list |
+| `plugins.tenant.list` | Reads current tenant-controllable plugin list |
 | `plugins.enabled.check` | Checks whether a plugin is enabled |
-| `plugins.provider_enabled.check` | Checks whether a capability provider is available |
-| `plugins.enabled_authoritative.check` | Forces a read of persisted enable state |
-| `config.get` | Reads the current plugin-scope configuration |
-| `lifecycle.tenant_plugin_disable.ensure` | Pre-check for tenant-level plugin disabling |
-| `lifecycle.tenant_plugin_disabled.notify` | Post-notification for tenant-level plugin disabling |
-| `lifecycle.tenant_delete.ensure` | Pre-check for tenant deletion |
-| `lifecycle.tenant_deleted.notify` | Post-notification for tenant deletion |
+| `plugins.provider_enabled.check` | Checks whether capability provider is available |
+| `plugins.enabled_authoritative.check` | Forces reading persisted enable state |
+| `config.get` | Reads current plugin-scoped config |
+| `lifecycle.tenant_plugin_disable.ensure` | Tenant plugin disable pre-check |
+| `lifecycle.tenant_plugin_disabled.notify` | Tenant plugin disable post-notification |
+| `lifecycle.tenant_delete.ensure` | Tenant deletion pre-check |
+| `lifecycle.tenant_deleted.notify` | Tenant deletion post-notification |
 
-Dynamic plugin lifecycle is orchestrated through the `lifecycle` methods listed above in the bridge contract.
+Dynamic plugin lifecycles are orchestrated through the above `lifecycle` methods in the bridge contract.
 
-## Usage
+## Capability Usage
 
 ### Source Plugin Usage
 
-Source plugins access sub-capabilities through `services.Plugins()` and explicitly pass the domain-required `CapabilityContext` when reading plugin views:
+Source plugins access sub-capabilities through `services.Plugins()`, explicitly passing the domain-required `CapabilityContext` when reading plugin views:
 
 ```go
 // Read plugin views
 result, err := services.Plugins().BatchGetPlugins(ctx, capabilityCtx, pluginIDs)
 
-// Read the current tenant's controllable plugin list
+// Read current tenant-controllable plugin list
 tenantPlugins, err := services.Plugins().ListTenantPlugins(ctx, capabilityCtx)
 
-// Read plugin configuration
+// Read plugin config
 endpoint, err := services.Plugins().Config().String(ctx, "api.endpoint", "")
 
-// High-frequency check for plugin enable state
+// High-frequency check if plugin is enabled
 if !services.Plugins().State().IsEnabled(ctx, pluginID) {
-    return errors.New("plugin is not enabled")
+    return errors.New("plugin not enabled")
 }
 
-// Global control using authoritative read
+// Global control uses authoritative read
 if !services.Plugins().State().IsEnabledAuthoritative(ctx, pluginID) {
-    return errors.New("plugin is disabled")
+    return errors.New("plugin disabled")
 }
 
 // Capability provider check
@@ -204,7 +210,7 @@ if services.Plugins().State().IsProviderEnabled(ctx, "linapro-ai-core") {
 }
 ```
 
-Trusted source plugins execute admin commands:
+Trusted source plugins executing management commands:
 
 ```go
 err := services.Admin().Plugins().SetPluginEnabled(ctx, capabilityCtx, pluginID, true)
@@ -224,25 +230,25 @@ hostServices:
       - plugins.enabled.check
 ```
 
-Dynamic plugin lifecycle is managed through the bridge contract, including callback registration for install, upgrade, disable, and uninstall phases. Usage on the dynamic plugin side:
+Dynamic plugin lifecycles are managed through bridge contracts, including callback registration for install, upgrade, disable, and uninstall phases. Usage on the dynamic plugin side:
 
 ```go
-// Read plugin configuration
+// Read plugin config
 value, err := pluginbridge.Default().Plugins().Config().String(ctx, "api.endpoint", "")
 ```
 
 ## Design Constraints
 
-- **Prefer `IsEnabled` for high-frequency checks.** It is designed for menu, route, and permission filtering to avoid frequent access to persisted state.
-- **Use `IsEnabledAuthoritative` for global controls.** When stale cache state could cause security or governance errors, use the authoritative read.
-- **Provider status is independent of business entry visibility.** Some plugin business entries may not be visible to the current tenant but may still be available as platform capability providers.
-- **`Ensure*` can block.** When a lifecycle pre-check returns an error, the governance operation should not proceed.
-- **`Notify*` is best-effort.** Post-notifications do not return errors; plugin callback failures should only be logged and not roll back completed governance operations.
-- **Dynamic plugin lifecycle uses the bridge contract.** The lifecycle contract for dynamic plugin artifacts resides in `pluginbridge/contract` and is not exposed as a standard callable service through dynamic `hostServices`.
+- **High-frequency checks prefer `IsEnabled`.** It is designed for menu, route, and permission filtering, avoiding frequent access to persisted state.
+- **Global control uses `IsEnabledAuthoritative`.** When stale cache state would cause security or governance errors, use the authoritative read.
+- **Provider state is independent of business entry visibility.** Some plugin business entries may be invisible to the current tenant but still available as platform capability providers.
+- **`Ensure*` can block.** When lifecycle pre-checks return errors, governance operations should not proceed.
+- **`Notify*` is best-effort.** Post-notifications don't return errors; plugin callback failures should only be logged, not roll back completed governance operations.
+- **Dynamic plugin lifecycles go through bridge contracts.** Dynamic plugin artifact lifecycle contracts are in `pluginbridge/contract` and are not exposed as standard callable services through dynamic `hostServices`.
 
 ## Related Services
 
-- [Domain Capability Overview](/docs/domain-capabilities)
-- [HostConfig Capability](/docs/domain-capability-hostconfig)
+- [Domain Capabilities Overview](/docs/domain-capabilities)
+- [Host Config Capability](/docs/domain-capability-hostconfig)
 - [AI Capability](/docs/domain-capability-ai)
 - [Tenant Capability](/docs/domain-capability-tenant)

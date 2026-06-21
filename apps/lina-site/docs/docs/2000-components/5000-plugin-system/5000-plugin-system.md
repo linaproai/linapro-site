@@ -104,39 +104,220 @@ flowchart TD
 每个插件都必须提供`plugin.yaml`。它是插件身份、依赖、菜单、多租户策略、公开静态资源和动态插件主框架能力授权的统一入口。
 
 ```yaml
+# 插件唯一标识，必须在宿主和源码插件目录中保持唯一，使用 kebab-case 命名风格
+# 推荐格式：<author>-<domain>-<capability>，例如 linapro-content-notice
 id: linapro-content-notice
+
+# 插件显示名称，用于插件管理页面、开发文档和展示
 name: 内容通知
+
+# 插件语义化版本号，建议统一使用带 v 前缀的写法
 version: v0.1.0
+
+# 插件类型枚举
+# source: 随宿主源码编译交付，适合长期维护的业务能力
+# dynamic: 作为运行时动态插件产物加载，适合热加载和商业分发
 type: source
+
+# 多租户作用域枚举
+# platform_only: 仅平台上下文可见和治理
+# tenant_aware: 按租户上下文治理（默认值）
 scope_nature: tenant_aware
+
+# 多租户支持标记，true 表示插件支持租户级安装与开通治理
 supports_multi_tenant: true
+
+# 默认安装模式枚举
+# global: 全局统一安装启用
+# tenant_scoped: 按租户独立启用或禁用（默认值）
 default_install_mode: tenant_scoped
+
+# 插件能力说明，概述插件的能力边界
 description: 提供内容变更通知的发布与订阅能力
+
+# 插件作者或归属团队
 author: linapro
+
+# 插件主页或文档地址，用于补充项目介绍、设计文档或外部说明链接
 homepage: https://example.com/plugins/linapro-content-notice
+
+# 插件许可证标识
 license: Apache-2.0
+
+# 发行方式声明（可选）
+distribution: bundled
+
+# 插件国际化配置，与宿主 i18n 配置结构保持一致
 i18n:
+  # 是否启用多语言支持
   enabled: true
+  # 默认语言
   default: zh-CN
+  # 启用的语言列表
   locales:
+    # 语言代码
     - locale: en-US
+      # 语言本地名称
       nativeName: English
     - locale: zh-CN
       nativeName: 简体中文
+
+# 插件依赖声明
 dependencies:
+  # LinaPro 框架语义化版本范围，支持 >=, <=, >, <, = 操作符，多个约束用空格分隔
   framework:
     version: ">=0.1.0 <1.0.0"
+  # 插件间依赖声明
+  plugins:
+    # 依赖插件 ID
+    - id: linapro-org-core
+      # 依赖插件语义化版本范围
+      version: ">=0.1.0"
+
+# 声明式公开静态资源目录，由宿主托管到 /x-assets/{plugin-id}/{version}/...
+# 动态插件通常需要声明，源码插件可选
 public_assets:
+  # 插件相对目录或资源前缀
   - source: frontend/pages
+    # URL 挂载点
     mount: /
+    # 默认入口文件
     index: index.html
+
+# 插件菜单声明列表，宿主按该列表同步菜单、按钮权限和路由入口
 menus:
-  - key: plugin:linapro-content-notice:list
+  # 菜单唯一键，必须使用 plugin:<plugin-id>:<menu-key> 格式
+  - key: plugin:linapro-content-notice:main-entry
+    # 父级菜单键，指向宿主内置目录或父菜单 key
+    parent_key: extension
+    # 菜单显示名称
     name: 内容通知
+    # 前端路由路径（源码插件使用宿主内路由片段，动态插件使用完整托管路径）
     path: linapro-content-notice-list
+    # 菜单渲染组件，动态页壳用于承载插件页面
     component: system/plugin/dynamic-page
-    perms: content-notice:notice:view
+    # 菜单访问权限标识
+    perms: linapro-content-notice:notice:view
+    # 菜单图标，使用 Iconify 图标名称
+    icon: lucide:bell
+    # 菜单类型枚举
+    # D: 目录
+    # M: 菜单页面
+    # B: 按钮权限点
     type: M
+    # 菜单排序值，数值越小越靠前
+    sort: 10
+    # 可见性：0 隐藏，1 显示（可选）
+    visible: 1
+    # iframe 标记：0 否，1 是（可选）
+    is_frame: 0
+    # 缓存标记：0 否，1 是（可选）
+    is_cache: 0
+    # 路由查询参数（可选，动态插件常用）
+    query:
+      pluginAccessMode: embedded-mount
+    # 菜单备注，写入宿主菜单治理数据（可选）
+    remark: 内容通知管理菜单
+
+  # 按钮权限点示例
+  - key: plugin:linapro-content-notice:notice-create
+    # 父级菜单键，指向所属菜单页面
+    parent_key: plugin:linapro-content-notice:main-entry
+    # 按钮显示名称
+    name: 创建通知
+    # 按钮权限标识
+    perms: linapro-content-notice:notice:create
+    # 按钮权限点类型
+    type: B
+    # 按钮排序值
+    sort: 1
+
+# 宿主服务声明列表（动态插件专用），用于申请调用宿主 service、method 与资源边界
+hostServices:
+  # runtime 服务：提供日志、状态和运行时信息能力
+  - service: runtime
+    methods:
+      # 写入宿主结构化日志
+      - log.write
+      # 读取插件隔离状态
+      - state.get
+      # 写入插件隔离状态
+      - state.set
+      # 删除插件隔离状态
+      - state.delete
+      # 读取宿主当前时间
+      - info.now
+      # 生成宿主侧 UUID
+      - info.uuid
+
+  # storage 服务：访问插件隔离存储对象
+  - service: storage
+    methods:
+      # 写入存储对象
+      - put
+      # 启动分片存储对象上传
+      - put.init
+      # 追加一个存储对象上传分片
+      - put.chunk
+      # 提交分片存储对象上传
+      - put.commit
+      # 中止分片存储对象上传
+      - put.abort
+      # 读取存储对象
+      - get
+      # 删除存储对象
+      - delete
+      # 列出存储对象
+      - list
+      # 读取存储对象元数据
+      - stat
+    # 资源边界声明，限定可访问的存储路径前缀
+    resources:
+      paths:
+        - notice-files/
+
+  # network 服务：发起受治理的外部网络请求
+  - service: network
+    methods:
+      # 发起外部网络请求
+      - request
+    # 资源边界声明，限定可访问的 URL
+    resources:
+      - url: https://api.example.com
+
+  # data 服务：访问被授权的数据表
+  - service: data
+    methods:
+      # 分页查询多条记录
+      - list
+      # 按主键读取单条记录
+      - get
+      # 新增记录
+      - create
+      # 更新记录
+      - update
+      # 删除记录
+      - delete
+      # 执行单表结构化事务
+      - transaction
+    # 资源边界声明，限定可访问的数据表
+    resources:
+      tables:
+        - plugin_linapro_content_notice_record
+
+  # plugins 服务：读取当前插件自己的运行期配置
+  - service: plugins
+    methods:
+      - config.get
+
+  # hostConfig 服务：读取白名单内的宿主公开配置
+  - service: hostConfig
+    methods:
+      - get
+    resources:
+      keys:
+        - workspace.basePath
+        - i18n.default
 ```
 
 ### 插件ID命名规范

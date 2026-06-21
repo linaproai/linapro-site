@@ -59,9 +59,12 @@ keywords:
 
 | 入口 | 方法 | 说明 |
 |------|------|------|
-| `Sessions()` | `SearchSessions` | 按用户名、`IP`和分页条件搜索可见会话 |
-| `Sessions()` | `BatchGetSessions` | 批量读取可见会话视图 |
-| `Admin().Sessions()` | `RevokeSession` | 吊销一个可见在线会话 |
+| `Sessions()` | `Current` | 返回当前令牌的可见会话视图 |
+| `Sessions()` | `Search` | 按用户名、`IP`和分页条件搜索可见会话 |
+| `Sessions()` | `BatchGet` | 批量读取可见会话视图 |
+| `Sessions()` | `BatchGetUserOnlineStatus` | 批量读取用户在线状态 |
+| `Sessions()` | `EnsureVisible` | 校验目标会话集合对当前调用上下文可见 |
+| `Admin().Sessions()` | `Revoke` | 吊销一个可见在线会话 |
 
 ### 动态插件接口
 
@@ -69,8 +72,11 @@ keywords:
 
 | 动态方法 | 说明 |
 |----------|------|
+| `sessions.current` | 返回当前令牌的可见会话视图 |
 | `sessions.search` | 按用户名、`IP`和分页条件搜索可见会话 |
 | `sessions.batch_get` | 批量读取可见会话视图 |
+| `sessions.batch_get_user_online_status` | 批量读取用户在线状态 |
+| `sessions.visible.ensure` | 校验目标会话集合对当前调用上下文可见 |
 
 ## 能力使用
 
@@ -79,20 +85,29 @@ keywords:
 源码插件通过`services.Sessions()`读取和管理会话，并显式传入领域要求的`CapabilityContext`：
 
 ```go
+// 获取当前会话视图
+current, err := services.Sessions().Current(ctx, capabilityCtx)
+
 // 搜索在线会话
-page, err := services.Sessions().SearchSessions(ctx, capabilityCtx, sessioncap.SearchInput{
+page, err := services.Sessions().Search(ctx, capabilityCtx, sessioncap.SearchInput{
     Username: keyword,
     Page:     pageRequest,
 })
 
 // 批量读取会话视图
-result, err := services.Sessions().BatchGetSessions(ctx, capabilityCtx, sessionIDs)
+result, err := services.Sessions().BatchGet(ctx, capabilityCtx, sessionIDs)
+
+// 批量读取用户在线状态
+onlineStatus, err := services.Sessions().BatchGetUserOnlineStatus(ctx, capabilityCtx, userIDs)
+
+// 校验会话可见性
+err := services.Sessions().EnsureVisible(ctx, capabilityCtx, sessionIDs)
 ```
 
 可信源码插件吊销会话：
 
 ```go
-err := services.Admin().Sessions().RevokeSession(ctx, capabilityCtx, sessionID)
+err := services.Admin().Sessions().Revoke(ctx, capabilityCtx, sessionID)
 ```
 
 ### 动态插件使用
@@ -103,8 +118,11 @@ err := services.Admin().Sessions().RevokeSession(ctx, capabilityCtx, sessionID)
 hostServices:
   - service: sessions
     methods:
+      - sessions.current
       - sessions.search
       - sessions.batch_get
+      - sessions.batch_get_user_online_status
+      - sessions.visible.ensure
 ```
 
 动态插件通过`pluginbridge.Default().Sessions()`客户端调用：
@@ -112,14 +130,20 @@ hostServices:
 ```go
 sessionsSvc := pluginbridge.Default().Sessions()
 
+// 获取当前会话视图
+current, err := sessionsSvc.Current(ctx, capabilityCtx)
+
 // 搜索在线会话
-page, err := sessionsSvc.SearchSessions(ctx, capabilityCtx, sessioncap.SearchInput{
+page, err := sessionsSvc.Search(ctx, capabilityCtx, sessioncap.SearchInput{
     Username: keyword,
     Page:     pageRequest,
 })
 
 // 批量读取会话视图
-result, err := sessionsSvc.BatchGetSessions(ctx, capabilityCtx, sessionIDs)
+result, err := sessionsSvc.BatchGet(ctx, capabilityCtx, sessionIDs)
+
+// 批量读取用户在线状态
+onlineStatus, err := sessionsSvc.BatchGetUserOnlineStatus(ctx, capabilityCtx, userIDs)
 ```
 
 ## 设计约束

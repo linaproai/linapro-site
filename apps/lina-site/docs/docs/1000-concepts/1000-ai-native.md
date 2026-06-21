@@ -2,7 +2,7 @@
 slug: '/docs/ai-native'
 title: 'AI原生设计'
 hide_title: true
-description: 'AI 原生的核心含义——将 AI 作为产品主路径而非附加功能。LinaPro 的 AI 原生设计体现在两个维度：其一是规范驱动的 AI 研发工作流，让 AI 贯穿需求分析、系统设计、代码实现和测试验证全流程；其二是覆盖研发全生命周期的 AI 技能体系，涵盖后端开发、前端设计、E2E 测试、性能审计、版本管理等十余个专属技能，让 AI 在每个具体工作场景下都能做出符合框架约束的专业决策，从根本上提升团队的开发效率与交付质量。'
+description: 'AI 原生的核心含义——将 AI 作为产品主路径而非附加功能。LinaPro 的 AI 原生设计体现在两个维度：其一是规范驱动的 AI 研发工作流，让 AI 贯穿需求分析、系统设计、代码实现和测试验证全流程；其二是覆盖研发全生命周期的 AI 技能体系，内置数十项专属技能涵盖 OpenSpec 工作流、项目治理、前端开发、社区自动化、版本管理等领域，让 AI 在每个具体工作场景下都能做出符合框架约束的专业决策，从根本上提升团队的开发效率与交付质量。'
 keywords:
   - AI原生
   - AI原生框架
@@ -21,12 +21,25 @@ keywords:
   - SDD
   - 全流程AI
   - AI技能体系
-  - goframe-v2
   - lina-review
+  - lina-feedback
   - lina-e2e
   - lina-perf-audit
-  - lina-upgrade
+  - openspec-propose
+  - openspec-explore
+  - openspec-apply-change
+  - openspec-archive-change
+  - lina-openspec-archive-changes
+  - lina-openspec-archive-consolidate
+  - lina-community-issue-review
+  - lina-community-pr-review
   - frontend-design
+  - frontend-patterns
+  - vben
+  - playwright-cli
+  - git-commit-push
+  - git-worktree
+  - karpathy-guidelines
   - 性能审计
   - 技能生态
   - AGENTS.md
@@ -91,21 +104,25 @@ flowchart TD
 
 ### 框架内置 AI 技能体系
 
-`AI`原生不仅仅意味着一套研发工作流，更意味着框架为`AI`的每一个工作环节都提供了深度定制的技能（`Skill`）支撑。`LinaPro`内置了覆盖研发全生命周期的`AI`技能体系，让`AI`在每个具体场景下都能以最高效的方式工作，而无需在每次对话中重复向`AI`解释项目规范。以下是部分内置技能示例：
+`AI`原生不仅仅意味着一套研发工作流，更意味着框架为`AI`的每一个工作环节都提供了深度定制的技能（`Skill`）支撑。`LinaPro`内置了数十项覆盖研发全生命周期的`AI`技能，让`AI`在每个具体场景下都能以最高效的方式工作，而无需在每次对话中重复向`AI`解释项目规范。以下是完整的内置技能体系：
 
 | 类别 | 技能 | 核心能力 |
 |------|------|----------|
-| **研发工作流** | `openspec-*` | 需求探索、方案提案、设计文档生成 |
-| **研发工作流** | `lina-review` | 代码与规范合规性审查，`OpenSpec`变更前的质量门禁 |
-| **研发工作流** | `lina-feedback` | 问题追踪、缺陷修复、`E2E`测试覆盖闭环 |
+| **AI 工作流** | `openspec-*` | 规范驱动的`AI`原生研发工作流，包括探索、提案、实现和归档等环节 |
+| **项目治理** | `lina-review` | 代码与规范合规性审查，`OpenSpec`变更前的质量门禁 |
+| **项目治理** | `lina-feedback` | 用户反馈分诊与执行闭环，问题追踪、缺陷修复、回归测试 |
+| **项目治理** | `lina-e2e` | `Playwright E2E`测试用例命名、组织与编写规范 |
+| **项目治理** | `lina-perf-audit` | 后端`API`全量性能审计，发现`N+1`查询、缺失索引等性能风险 |
+| **归档管理** | `lina-openspec-archive-changes` | 扫描并归档已完成的所有`OpenSpec`活跃变更 |
+| **归档管理** | `lina-openspec-archive-consolidate` | 按功能职责对已归档变更进行聚合分类和摘要压缩 |
 | **前端开发** | `frontend-design` | 生产级前端界面设计，避免「千篇一律」的通用`AI`界面风格 |
 | **前端开发** | `frontend-patterns` | 前端开发模式，状态管理、性能优化、表单处理最佳实践 |
-| **测试保障** | `lina-e2e` | `Playwright E2E`测试用例命名、组织与编写规范 |
-| **测试保障** | `playwright-cli` | 浏览器自动化，用于`E2E`测试执行与调试 |
-| **质量审计** | `lina-perf-audit` | 后端`API`性能审计，发现`N+1`查询、缺失索引等性能风险 |
-| **质量基线** | `karpathy-guidelines` | 规避常见`LLM`编码误区，确保实现精准、不过度设计 |
+| **前端开发** | `vben` | `Vben Admin 5.0`前端框架开发指导，涵盖路由、权限、主题等 |
+| **社区自动化** | `lina-community-*` | 自动化处理社区相关任务，如`GitHub Issues`和`PR`审查 |
+| **浏览器自动化** | `playwright-cli` | 浏览器自动化操作，用于`E2E`测试执行与调试 |
 | **版本管理** | `git-commit-push` | 分析变更差异，自动生成符合仓库规范的提交信息并推送 |
 | **版本管理** | `git-worktree` | 为并行任务创建隔离的`Git`工作树，避免互相干扰 |
+| **编码规范** | `karpathy-guidelines` | 规避常见`LLM`编码误区，确保实现精准、不过度设计 |
 
 这些技能以领域知识的形式内嵌于框架的`AI`协作规范（`.agents/skills/`）中，项目内置技能随源码自动加载，`AI`工具在处理对应场景时会自动激活相关技能。`OpenSpec CLI`、`goframe-v2`、`find-skills`等外部工具或技能仍建议按需安装，以获得完整的规范驱动和后端开发体验。丰富的技能体系带来的直接收益是：**`AI`在每一个具体工作场景下，都能做出符合`LinaPro`框架约束的决策**，而不是依赖模型的通用知识生成不符合项目规范的代码或文档。
 

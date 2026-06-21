@@ -93,9 +93,10 @@ graph TB
 
 | 入口 | 方法 | 说明 |
 |------|------|------|
-| `Files()` | `BatchGetFiles` | 批量读取可见文件视图 |
-| `Files()` | `EnsureFilesVisible` | 校验目标文件集合对当前调用上下文可见 |
-| `Admin().Files()` | `DeleteFiles` | 删除可见文件，由宿主执行场景和目标校验 |
+| `Files()` | `BatchGet` | 批量读取可见文件视图 |
+| `Files()` | `Search` | 按业务场景、关键词和媒体类型搜索可见文件候选 |
+| `Files()` | `EnsureVisible` | 校验目标文件集合对当前调用上下文可见 |
+| `Admin().Files()` | `Delete` | 删除可见文件，由宿主执行场景和目标校验 |
 
 ### 动态插件接口
 
@@ -106,6 +107,7 @@ graph TB
 | 动态方法 | 能力常量 | 说明 |
 |----------|----------|------|
 | `files.batch_get` | `host:files` | 批量读取可见文件视图 |
+| `files.search` | `host:files` | 按业务场景、关键词和媒体类型搜索可见文件候选 |
 | `files.visible.ensure` | `host:files` | 校验文件可见性 |
 
 **`storage`服务——插件作用域对象存储：**
@@ -115,8 +117,11 @@ graph TB
 | `storage.put` | 写入对象 |
 | `storage.get` | 读取对象 |
 | `storage.delete` | 删除对象 |
+| `storage.delete_many` | 批量删除对象 |
 | `storage.list` | 列举对象 |
+| `storage.list_cursor` | 游标分页列举对象 |
 | `storage.stat` | 查询对象元数据 |
+| `storage.batch_stat` | 批量查询对象元数据 |
 
 ## 能力使用
 
@@ -126,16 +131,24 @@ graph TB
 
 ```go
 // 批量读取文件视图
-result, err := services.Files().BatchGetFiles(ctx, capabilityCtx, fileIDs)
+result, err := services.Files().BatchGet(ctx, capabilityCtx, fileIDs)
+
+// 搜索可见文件候选
+page, err := services.Files().Search(ctx, capabilityCtx, filecap.SearchInput{
+    BusinessScene: "avatar",
+    Keyword:       "profile",
+    MimeType:      "image/png",
+    Page:          pageRequest,
+})
 
 // 校验文件可见性
-err := services.Files().EnsureFilesVisible(ctx, capabilityCtx, fileIDs)
+err := services.Files().EnsureVisible(ctx, capabilityCtx, fileIDs)
 ```
 
 可信源码插件删除文件：
 
 ```go
-err := services.Admin().Files().DeleteFiles(ctx, capabilityCtx, fileIDs)
+err := services.Admin().Files().Delete(ctx, capabilityCtx, fileIDs)
 ```
 
 ### 动态插件使用
@@ -146,8 +159,9 @@ err := services.Admin().Files().DeleteFiles(ctx, capabilityCtx, fileIDs)
 hostServices:
   - service: files
     methods:
-      - batch_get
-      - visible.ensure
+      - files.batch_get
+      - files.search
+      - files.visible.ensure
 ```
 
 ## 设计约束

@@ -356,7 +356,7 @@ hostServices:
 | 服务 | 领域文档 | 资源类型 | 方法 |
 |------|----------|----------|------|
 | `runtime` | <span style={{whiteSpace: 'nowrap'}}>[动态`Runtime`能力](/docs/domain-capability-runtime)</span> | `none` | `log.write`、`state.get`、`state.set`、`state.delete`、`info.now`、`info.uuid`、`info.node` |
-| `storage` | [文件能力](/docs/domain-capability-files) | `path` | `put`、`get`、`delete`、`list`、`stat` |
+| `storage` | [文件能力](/docs/domain-capability-files) | `path` | `put`、`get`、`delete`、`delete_many`、`list`、`list_cursor`、`stat`、`batch_stat` |
 | `network` | [外部网络能力](/docs/domain-capability-network) | `resource` | `request` |
 | `data` | [数据记录能力](/docs/domain-capability-recordstore) | `table` | `list`、`get`、`create`、`update`、`delete`、`transaction` |
 | `cache` | [缓存能力](/docs/domain-capability-cache) | `resource` | `get`、`set`、`delete`、`incr`、`expire` |
@@ -365,20 +365,20 @@ hostServices:
 | `manifest` | [清单资源能力](/docs/domain-capability-manifest) | `path` | `get` |
 | `apidoc` | [接口文档能力](/docs/domain-capability-apidoc) | `none` | `route_text.resolve`、`route_texts.resolve`、`route_title_operation_keys.find` |
 | `auth` | [认证与授权能力](/docs/domain-capability-auth) | `none` | `tenant.select`、`tenant.switch`、`impersonation_token.issue`、`impersonation_token.revoke` |
-| `authz` | [认证与授权能力](/docs/domain-capability-auth) | `none` | `permissions.batch_get`、`permissions.has`、`users.platform_admin.check` |
+| `authz` | [认证与授权能力](/docs/domain-capability-auth) | `none` | `permissions.batch_get`、`permissions.batch_has`、`permissions.has`、`users.platform_admin.check` |
 | `ai` | [AI能力](/docs/domain-capability-ai) | `none` | `text.generate`、`image.generate`、`image.edit`、`embedding.create`、`audio.transcribe`、`audio.synthesize`、`vision.analyze`、`document.analyze`、`document.cite`、`safety.moderate`、`video.generate`、`video.edit`、`video.extend`、`video.operation.get`、`video.operation.cancel` |
-| `users` | [用户能力](/docs/domain-capability-users) | `none` | `users.batch_get`、`users.search`、`users.visible.ensure` |
+| `users` | [用户能力](/docs/domain-capability-users) | `none` | `users.current`、`users.batch_get`、`users.batch_resolve`、`users.search`、`users.visible.ensure` |
 | `bizctx` | [业务上下文能力](/docs/domain-capability-bizctx) | `none` | `current.get` |
-| `dict` | [字典能力](/docs/domain-capability-dict) | `none` | `labels.resolve` |
-| `files` | [文件能力](/docs/domain-capability-files) | `none` | `files.batch_get`、`files.visible.ensure` |
+| `dict` | [字典能力](/docs/domain-capability-dict) | `none` | `labels.resolve`、`labels.list`、`labels.visible.ensure` |
+| `files` | [文件能力](/docs/domain-capability-files) | `none` | `files.batch_get`、`files.search`、`files.visible.ensure` |
 | `infra` | [基础设施能力](/docs/domain-capability-infra) | `none` | `status.batch_get` |
-| `jobs` | [任务与定时能力](/docs/domain-capability-jobs) | `none` | `jobs.batch_get`、`jobs.register` |
-| `notifications` | [通知能力](/docs/domain-capability-notifications) | 读取无资源；`messages.send`使用`resources[].ref` | `messages.batch_get`、`messages.send` |
+| `jobs` | [任务与定时能力](/docs/domain-capability-jobs) | `none` | `jobs.batch_get`、`jobs.search`、`jobs.visible.ensure`、`jobs.register` |
+| `notifications` | [通知能力](/docs/domain-capability-notifications) | 读取无资源；`messages.send`使用`resources[].ref` | `messages.batch_get`、`messages.batch_get_by_source`、`messages.visible.ensure`、`messages.send` |
 | `plugins` | [插件治理能力](/docs/domain-capability-plugins) | `none` | `plugins.batch_get`、`plugins.tenant.list`、`plugins.enabled.check`、`plugins.provider_enabled.check`、`plugins.enabled_authoritative.check`、`config.get`、`lifecycle.tenant_plugin_disable.ensure`、`lifecycle.tenant_plugin_disabled.notify`、`lifecycle.tenant_delete.ensure`、`lifecycle.tenant_deleted.notify` |
 | `route` | [动态路由能力](/docs/domain-capability-route) | `none` | `metadata.get` |
-| `sessions` | [在线会话能力](/docs/domain-capability-sessions) | `none` | `sessions.search`、`sessions.batch_get` |
-| `org` | [组织能力](/docs/domain-capability-org) | `none` | `capability.available`、`capability.status`、`users.dept_assignments.list`、`users.dept_info.get`、`users.dept_name.get`、`users.dept_ids.get`、`users.post_ids.get` |
-| `tenant` | [租户能力](/docs/domain-capability-tenant) | `none` | `capability.available`、`capability.status`、`tenants.current`、`tenants.platform_bypass`、`tenants.visible.ensure`、`users.tenant_membership.validate`、`users.tenants.list`、`tenants.switch.validate` |
+| `sessions` | [在线会话能力](/docs/domain-capability-sessions) | `none` | `sessions.current`、`sessions.search`、`sessions.batch_get`、`sessions.batch_get_user_online_status`、`sessions.visible.ensure` |
+| `org` | [组织能力](/docs/domain-capability-org) | `none` | `capability.available`、`capability.status`、`users.dept_assignments.list`、`users.org_profiles.batch_get`、`users.dept_info.get`、`users.dept_name.get`、`users.dept_ids.get`、`users.post_ids.get`、`departments.tree.list`、`departments.search`、`departments.visible.ensure`、`posts.options.list`、`posts.visible.ensure` |
+| `tenant` | [租户能力](/docs/domain-capability-tenant) | `none` | `capability.available`、`capability.status`、`tenants.current`、`tenants.current_info`、`tenants.platform_bypass`、`tenants.visible.ensure`、`tenants.batch_get`、`tenants.search`、`tenants.visible.batch_ensure`、`users.tenant_membership.validate`、`users.tenants.list`、`users.tenants.batch_list`、`tenants.switch.validate` |
 | `secret` | 预留 | `resource` | `resolve` |
 | `event` | 预留 | `resource` | `publish` |
 | `queue` | 预留 | `resource` | `enqueue` |

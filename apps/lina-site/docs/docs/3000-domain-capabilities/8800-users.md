@@ -68,10 +68,12 @@ graph TB
 
 | 入口 | 方法 | 说明 |
 |------|------|------|
-| `Users()` | `BatchGetUsers` | 批量读取可见用户视图，返回`BatchResult` |
-| `Users()` | `SearchUsers` | 按关键词和分页条件搜索可见用户候选 |
-| `Users()` | `EnsureUsersVisible` | 校验目标用户集合对当前调用上下文可见 |
-| `Admin().Users()` | `SetUserStatus` | 改变一个可见用户的生命周期状态 |
+| `Users()` | `Current` | 返回当前操作者的可见用户视图 |
+| `Users()` | `BatchGet` | 批量读取可见用户视图，返回`BatchResult` |
+| `Users()` | `BatchResolve` | 按用户`ID`、用户名、邮箱或手机号批量解析可见用户 |
+| `Users()` | `Search` | 按关键词和分页条件搜索可见用户候选 |
+| `Users()` | `EnsureVisible` | 校验目标用户集合对当前调用上下文可见 |
+| `Admin().Users()` | `SetStatus` | 改变一个可见用户的生命周期状态 |
 
 ### 动态插件接口
 
@@ -79,7 +81,9 @@ graph TB
 
 | 动态方法 | 说明 |
 |----------|------|
+| `users.current` | 返回当前操作者的可见用户视图 |
 | `users.batch_get` | 批量读取可见用户视图 |
+| `users.batch_resolve` | 按用户`ID`、用户名、邮箱或手机号批量解析可见用户 |
 | `users.search` | 按关键词和分页条件搜索可见用户候选 |
 | `users.visible.ensure` | 校验目标用户集合对当前调用上下文可见 |
 
@@ -90,23 +94,33 @@ graph TB
 源码插件通过`services.Users()`读取用户视图，并显式传入领域要求的`CapabilityContext`：
 
 ```go
+// 获取当前操作者用户视图
+current, err := services.Users().Current(ctx, capabilityCtx)
+
 // 批量读取用户视图
-result, err := services.Users().BatchGetUsers(ctx, capabilityCtx, userIDs)
+result, err := services.Users().BatchGet(ctx, capabilityCtx, userIDs)
+
+// 按多种维度批量解析用户
+resolveResult, err := services.Users().BatchResolve(ctx, capabilityCtx, usercap.BatchResolveInput{
+    IDs:       userIDs,
+    Usernames: usernames,
+    Contacts:  emails,
+})
 
 // 搜索可见用户候选
-page, err := services.Users().SearchUsers(ctx, capabilityCtx, usercap.SearchInput{
+page, err := services.Users().Search(ctx, capabilityCtx, usercap.SearchInput{
     Keyword: keyword,
     Page:    pageRequest,
 })
 
 // 校验用户可见性
-err := services.Users().EnsureUsersVisible(ctx, capabilityCtx, userIDs)
+err := services.Users().EnsureVisible(ctx, capabilityCtx, userIDs)
 ```
 
 可信源码插件执行用户状态管理：
 
 ```go
-err := services.Admin().Users().SetUserStatus(ctx, capabilityCtx, userID, newStatus)
+err := services.Admin().Users().SetStatus(ctx, capabilityCtx, userID, newStatus)
 ```
 
 ### 动态插件使用
@@ -117,7 +131,9 @@ err := services.Admin().Users().SetUserStatus(ctx, capabilityCtx, userID, newSta
 hostServices:
   - service: users
     methods:
+      - users.current
       - users.batch_get
+      - users.batch_resolve
       - users.search
 ```
 
@@ -126,11 +142,21 @@ hostServices:
 ```go
 usersSvc := pluginbridge.Default().Users()
 
+// 获取当前操作者用户视图
+current, err := usersSvc.Current(ctx, capabilityCtx)
+
 // 批量读取用户视图
-result, err := usersSvc.BatchGetUsers(ctx, capabilityCtx, userIDs)
+result, err := usersSvc.BatchGet(ctx, capabilityCtx, userIDs)
+
+// 按多种维度批量解析用户
+resolveResult, err := usersSvc.BatchResolve(ctx, capabilityCtx, usercap.BatchResolveInput{
+    IDs:       userIDs,
+    Usernames: usernames,
+    Contacts:  emails,
+})
 
 // 搜索可见用户候选
-page, err := usersSvc.SearchUsers(ctx, capabilityCtx, usercap.SearchInput{
+page, err := usersSvc.Search(ctx, capabilityCtx, usercap.SearchInput{
     Keyword: keyword,
     Page:    pageRequest,
 })

@@ -2,7 +2,7 @@
 slug: '/docs/domain-capability-hostconfig'
 title: 'HostConfig（配置管理）'
 hide_title: true
-description: '插件体系中的配置管理横跨插件治理、宿主配置读取和运行时配置管理三个领域：`Plugins().Config()`读取当前插件自己的静态配置，`HostConfig()`读取宿主配置，`Admin().HostConfig()`写入受管控的运行时配置；动态插件分别通过`plugins.config.get`和`hostconfig.get`声明读取范围。该页面作为配置能力关系介绍页，帮助插件作者选择正确入口。'
+description: '插件体系中的配置管理横跨插件治理、宿主配置读取和运行时配置管理三个领域：`Plugins().Config()`读取当前插件自己的静态配置，宿主`config.yaml`中`plugin.<plugin-id>`段提供独占式覆盖机制，`HostConfig()`读取宿主配置，`Admin().HostConfig()`写入受管控的运行时配置；动态插件分别通过`plugins.config.get`和`hostconfig.get`声明读取范围。该页面作为配置能力关系介绍页，帮助插件作者选择正确入口。'
 keywords:
   - 配置管理能力
   - Plugins().Config
@@ -18,6 +18,9 @@ keywords:
   - 插件配置
   - 宿主配置
   - LinaPro
+  - plugin.<plugin-id>
+  - 独占式覆盖
+  - 配置优先级
 ---
 
 ## 基本介绍
@@ -26,9 +29,9 @@ keywords:
 
 | 配置领域 | 源码插件入口 | 动态服务 | 说明 |
 |----------|--------------|----------|------|
-| 插件静态配置 | `services.Plugins().Config()` | `plugins.config.get` | 读取当前插件自己的`config.yaml` |
-| 宿主配置读取 | `services.HostConfig()` | `hostconfig.get` | 读取宿主配置值；动态插件必须声明`resources.keys` |
-| 运行时配置管理 | `services.Admin().HostConfig()` | 无普通动态服务 | 可信源码插件写入受管控的运行时配置 |
+| <span style={{whiteSpace: 'nowrap'}}>插件静态配置</span> | `services.Plugins().Config()` | `plugins.config.get` | 读取当前插件自己的`config.yaml` |
+| <span style={{whiteSpace: 'nowrap'}}>宿主配置读取</span> | `services.HostConfig()` | `hostconfig.get` | 读取宿主配置值；动态插件必须声明`resources.keys` |
+| <span style={{whiteSpace: 'nowrap'}}>运行时配置管理</span> | `services.Admin().HostConfig()` | 无普通动态服务 | 可信源码插件写入受管控的运行时配置 |
 
 其中`Plugins().Config()`属于插件治理能力的子能力；`HostConfig()`是普通能力目录中的宿主配置读取能力；`Admin().HostConfig()`属于可信源码插件管理命令。三者都叫配置，但来源、作用域、治理和使用者不同。
 
@@ -56,15 +59,9 @@ graph TB
 
 插件自己的静态配置由`Plugins().Config()`读取。它绑定当前插件`ID`，不会读取其他插件或宿主全局配置。
 
-读取优先级为：
-
-| 优先级 | 来源 | 说明 |
-|--------|------|------|
-| 1 | 生产配置根下`plugins/<plugin-id>/config.yaml` | 运维覆盖，生产环境优先 |
-| 2 | 开发期`manifest/config/config.yaml` | 源码插件开发默认配置 |
-| 3 | 动态插件产物绑定的`manifest/config/config.yaml` | 发布产物默认配置 |
-
-`manifest/config/config.example.yaml`只是配置模板，不参与运行时默认读取。
+:::tip 配置优先级与覆盖机制
+插件配置的四级读取优先级、独占式覆盖机制、`plugin.<plugin-id>`配置段的详细说明，请参见[插件业务配置](/docs/plugin-configuration)。
+:::
 
 ### 宿主配置读取
 
@@ -148,7 +145,7 @@ hostServices:
         - i18n.default
 ```
 
-`plugins`的`config.get`用于读取当前插件配置。`hostconfig`的授权边界由`resources.keys`控制；未声明键不应被宿主返回。在动态插件侧使用：
+`plugins`的`config.get`用于读取当前插件配置。`hostconfig`的授权边界由`resources.keys`控制；未声明键不应被宿主返回（白名单校验流程详见[插件业务配置](/docs/plugin-configuration)）。在动态插件侧使用：
 
 ```go
 // 读取插件配置

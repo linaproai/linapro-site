@@ -68,6 +68,8 @@ graph TB
 | 方法 | 说明 |
 |------|------|
 | `Get` | 读取指定路径的原始字节内容 |
+| `GetMany` | 批量读取指定路径集合的原始资源内容 |
+| `List` | 返回指定前缀下的资源元数据列表 |
 | `Exists` | 判断指定路径资源是否存在 |
 | `Scan` | 将`YAML`资源或其中的嵌套键扫描到目标结构体 |
 
@@ -75,7 +77,7 @@ graph TB
 
 | 动态方法 | 动态`SDK`方法 | 说明 |
 |----------|-------------|------|
-| `get` | `Manifest().Get`、`Manifest().Exists`、`Manifest().Scan` | 读取授权路径下的原始资源 |
+| `get` | `Manifest().Get`、`Manifest().GetMany`、`Manifest().List`、`Manifest().Exists`、`Manifest().Scan` | 读取授权路径下的原始资源 |
 
 ## 能力使用
 
@@ -86,6 +88,17 @@ graph TB
 ```go
 // 读取插件简介
 content, err := services.Manifest().Get(ctx, "profile.yaml")
+
+// 批量读取多个资源
+result, err := services.Manifest().GetMany(ctx, manifestcap.GetManyInput{
+    Paths: []string{"profile.yaml", "config/config.yaml"},
+})
+
+// 列举资源元数据
+listResult, err := services.Manifest().List(ctx, manifestcap.ListInput{
+    Prefix: "i18n/",
+    Limit:  50,
+})
 
 // 判断资源是否存在
 exists, err := services.Manifest().Exists(ctx, "i18n/zh-CN/plugin.json")

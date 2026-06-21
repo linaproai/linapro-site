@@ -2,17 +2,17 @@
 slug: '/docs/ai-engineering-quality'
 title: 'AI Engineering Quality'
 hide_title: true
-description: 'the engineering management challenges that arise when AI is introduced into software development, and how LinaPro builds a complete AI engineering quality assurance system through the SDD spec-driven workflow, two layers of project specifications, interface abstraction and anti-leakage API contracts, and high-density test coverage where test code accounts for 39% of the total codebase.'
+description: 'The engineering management challenges that arise when AI is introduced into software development, and how LinaPro builds a complete AI engineering quality assurance system through four dimensions: the SDD spec-driven workflow, two layers of project specifications, interface abstraction and anti-leakage API contracts, and high-density test coverage where test code accounts for 39% of the total codebase. Also explains how business development teams using the framework directly inherit these quality capabilities without building them from scratch.'
 keywords:
   - AI engineering quality
-  - engineering quality assurance
+  - quality assurance
   - AI code quality
   - SDD
   - spec-driven development
   - OpenSpec
   - AGENTS.md
   - CLAUDE.md
-  - project specifications
+  - project specification constraints
   - interface abstraction
   - API contract testing
   - unit testing
@@ -22,220 +22,220 @@ keywords:
   - vibe coding
   - code consistency
   - dependency injection
-  - quality gates
+  - quality gate
   - acceptance testing
-  - backend consistency specs
-  - business team quality benefits
+  - backend consistency spec
+  - team quality dividend
   - plugin development quality
   - stable foundation
   - LinaPro
   - AI-native development
 ---
 
-## AI Makes Code Faster. Who Keeps It Correct?
+## AI Makes Code Faster — But Who Ensures Quality
 
-`AI`-assisted programming is changing the speed equation of software development. A developer who uses `AI` programming tools well can produce several times, sometimes even ten times, more code in the same amount of time than with traditional development. But behind that speed is a new engineering management problem: **as the amount of code grows, who ensures that the code is correct, consistent, and maintainable?**
+AI-assisted programming is profoundly changing the speed equation of software development. A developer proficient with AI coding tools can produce several times — even ten times — more code per unit of time than with traditional methods. However, behind this speed boost lies a new engineering management dilemma: **there's more and more code, but who ensures it's correct, consistent, and maintainable?**
 
-In practice, teams face more than the simple problem of "`AI` wrote something wrong." They face deeper engineering challenges: inconsistent style, blurred interface boundaries, long-term architectural drift, hollow specifications, and security risks from data leakage that are easy to miss. These problems also exist in traditional development, but high-speed `AI` iteration greatly amplifies both how quickly they appear and how widely they spread.
+In practice, teams face not just the simple problem of "AI wrote it wrong," but a series of deeper engineering challenges: from everyday style inconsistencies and fuzzy interface boundaries, to long-term architectural drift and specification gaps, to nearly imperceptible security data leakage risks. These problems exist in traditional development too, but under AI's high-speed iteration, both the speed and scale of their exposure are dramatically amplified.
 
-From the beginning, `LinaPro` treats engineering quality assurance as a core part of its AI-native design. This page starts from the real challenges now facing the industry and explains how `LinaPro` builds a complete `AI` engineering quality system through spec-driven workflows, interface abstraction, high-density testing, and related practices.
+`LinaPro` established engineering quality assurance as a core pillar of its AI-native design from the very beginning of the project. This article starts from the industry's real challenges and systematically introduces how `LinaPro` builds a complete AI engineering quality assurance system through spec-driven workflows, interface abstraction, and high-density testing.
 
-## Quality Challenges in Current AI Engineering
+## Current AI Engineering Quality Challenges
 
-### Challenge 1: Code Consistency Breaks Down Quickly
+### Challenge 1: Rapid Code Consistency Breakdown
 
-Before `AI` programming entered the picture, a team's codebase usually accumulated a relatively consistent style over months or years: variable naming patterns, error handling conventions, logging habits, layering rules, and so on. These habits were often unwritten, but they formed the team's "code culture." New members could understand what counted as the "right" way to work in the project by reading existing code.
+Before introducing AI coding, a team's codebase typically undergoes months or years of refinement, forming relatively consistent style and habits: variable naming patterns, error handling approaches, logging conventions, layered calling patterns... These habits are often unwritten but form the team's "code culture" — new members can quickly understand what constitutes "correct" practice in the project by reading the code.
 
-`AI` programming tools disrupt that accumulation mechanism. In each session, `AI` makes decisions based on its training data and the current context. Different context, different prompts, or even different model versions can produce very different output styles. As the number of features grows, the codebase can start to contain multiple dependency injection styles, several error handling patterns, and incompatible naming conventions. **Codebase consistency is not usually destroyed on purpose. It quietly disappears through countless "good enough" edits.**
+AI coding tools break this accumulation mechanism. In each session, `AI` makes decisions based on its training data and current context. Different contexts, different prompts, and even different model versions can produce wildly different outputs. As features accumulate, the codebase starts to harbor multiple coexisting dependency injection styles, several sets of error handling patterns, and incompatible naming conventions. **The codebase's consistency wasn't intentionally destroyed — it quietly vanished in countless "good enough" moments.**
 
-### Challenge 2: Architectural Drift and Lost Design Intent
+### Challenge 2: Architectural Drift and Design Intent Amnesia
 
-Software architecture is not a few diagrams in a file. It is a team's shared understanding of system boundaries, responsibility allocation, and evolution paths. In traditional development, that shared understanding is passed forward through code review and team discussion. In teams where `AI` leads coding work, architectural agreement often exists only inside the context window of a single conversation.
+Software architecture isn't a few diagrams in a file — it's the team's consensus on system boundaries, responsibility allocation, and evolution paths. In traditional development, this consensus is continuously transmitted through code reviews and team discussions. In AI-led coding teams, architectural consensus often exists only within a single conversation's context window.
 
-Once that session ends, `AI` "forgets" the architectural decisions reached in the conversation. In the next session, `AI` may introduce a dependency from one domain into another to satisfy a local requirement, silently breaking existing module boundaries. Each individual change may look reasonable, but over time the system architecture can become unrecognizable. **Everyone knows there is a problem, but nobody knows where to start fixing it.**
+Once the session ends, `AI` "forgets" the architectural decisions reached during that exchange. In the next conversation, `AI` might introduce cross-domain dependencies within a single domain to fulfill a local requirement, quietly breaking established module boundaries. Each such change looks reasonable in isolation, but accumulated enough, the system's architecture becomes unrecognizable — **everyone knows the problem exists, but nobody knows where to start fixing it.**
 
 ### Challenge 3: Vibe Coding and Missing Quality Gates
 
-"Vibe coding" has become a common practice style in the `AI` programming community: move by intuition, iterate quickly, avoid spending too much time on code structure, and treat "it runs" as the main rule. This can be useful during prototyping, but as a formal engineering method it has a serious downside: **in a codebase without quality gates, technical debt accumulates faster than the efficiency gains brought by `AI`.**
+"Vibe Coding" is a practice style that has emerged in the AI coding community in recent years — intuition-driven, fast-iteration, not overthinking code structure, making "if it runs, it's fine" the guiding principle. This approach has value during prototyping, but as a formal engineering methodology, its problems are serious: **a codebase without quality gates accumulates technical debt far faster than AI's efficiency gains.**
 
-Without clear pass/fail criteria, a team cannot tell whether an `AI` change has broken existing behavior. Without automated tests, a regression on a critical path may only be found after release. Without interface contract constraints, an internal field accidentally exposed by an `API` can become an entry point for a security issue.
+Without clear pass/fail criteria, teams cannot tell whether an AI modification broke existing functionality. Without automated testing, a regression on a critical path might not be discovered until after release. Without interface contract constraints, an accidentally exposed internal field can become a security vulnerability entry point.
 
-### Challenge 4: Hollow Tests and an Acceptance Vacuum
+### Challenge 4: Test Gaps and Acceptance Vacuum
 
-Even when teams understand the importance of testing, test coverage in `AI` programming still faces structural difficulties. When `AI` generates business logic, tests are often postponed until "there is time" unless the workflow explicitly requires test code to be generated at the same time. That time almost never arrives.
+Even when teams recognize the importance of testing, test coverage in AI coding scenarios faces structural difficulties. When `AI` generates business logic, if it's not required to simultaneously produce test code, testing is often deferred to "when there's time" — and that time almost never comes.
 
-The more subtle issue is that even when `AI` does generate tests, those tests may only cover the happy path while missing boundary conditions, error rollback, permission isolation, and other critical cases. **The presence of test files does not equal test coverage, and a coverage number does not equal quality assurance.**
+A more insidious problem: even when `AI` does generate test code, those tests may only verify happy paths while missing boundary conditions, error rollbacks, permission isolation, and other critical scenarios. **The existence of a test file does not equal test coverage, and the existence of a coverage number does not equal quality assurance.**
 
-### Challenge 5: Blurred Interface Boundaries and Data Leakage Risk
+### Challenge 5: Fuzzy Interface Boundaries and Data Leakage Risk
 
-One common and dangerous pattern in rapidly generated `AI` code is **returning database entities directly as `API` responses**. Database tables often contain internal governance fields, such as soft-delete flags, password hashes, and internal paths. Exposing these fields directly violates `API` design principles and can create security risks. When `AI` sees both entity definitions and controller code in the same context, the most "natural" path is often to return the entity directly. That is exactly the dangerous path.
+In AI-generated code, a common and dangerous pattern is **directly exposing database entities as `API` responses**. Database table fields often contain internal governance information (such as soft-delete flags, password hashes, internal paths, etc.). Directly exposing these fields violates `API` design principles and may introduce security risks. When `AI` sees both entity definitions and controller code in the same context, the most "natural" approach is often to return the entity directly — which is precisely the most dangerous approach.
 
 ## LinaPro's Quality Assurance System
 
-`LinaPro`'s quality assurance system is built on four mutually reinforcing dimensions: spec-first development, interface constraints, code layering, and automated acceptance. Together, they form a layered safety net that keeps every piece of `AI`-generated code operating inside structured constraints.
+`LinaPro`'s quality assurance system is built on four complementary dimensions: spec-first, interface constraints, code layering, and automated acceptance. Together they form a multi-layered defense net, ensuring every piece of `AI`-generated code operates under structured constraints.
 
 ```mermaid
 flowchart TD
-    A["AI-generated code"] --> B["SDD spec-driven<br/>OpenSpec workflow"]
-    A --> C["Interface abstraction<br/>anti-leakage contracts"]
-    A --> D["Project specifications<br/>complete spec files"]
-    A --> E["Automated acceptance<br/>unit tests + E2E tests"]
-    B --> F["Design before implementation<br/>spec-anchored consistency"]
-    C --> G["API contract guard<br/>entities stay internal"]
-    D --> H["Layering constraints<br/>dependency injection rules"]
-    E --> I["39% test code<br/>rich E2E coverage"]
+    A["AI generates code"] --> B["SDD spec-driven\nOpenSpec workflow"]
+    A --> C["Interface abstraction\nAnti-leakage contracts"]
+    A --> D["Project specifications\nFull Spec files"]
+    A --> E["Automated acceptance\nUnit tests + E2E tests"]
+    B --> F["Design before implementation\nSpecs anchor consistency"]
+    C --> G["API contract guard\nEntities don't leak"]
+    D --> H["Layered constraints\nDependency injection norms"]
+    E --> I["39% test code\nRich E2E cases"]
     F & G & H & I --> J["Sustainable high-quality delivery"]
 ```
 
-### Dimension 1: The SDD Spec-Driven Workflow
+### Dimension 1: SDD Spec-Driven Workflow
 
-`LinaPro`'s core development workflow is **Specification-Driven Development (`SDD`)**. Its central idea is simple: **specifications exist before code, and code is produced from specifications**. A feature iteration does not start with code. It starts with a structured set of documents:
+`LinaPro`'s core development workflow is **Specification-Driven Development (`SDD`)**. Its core philosophy is: **specifications exist before code, and code is driven into existence by specifications**. Each feature iteration doesn't start with writing code — it starts with a set of structured documents:
 
-- `proposal.md`: Defines the requirement boundary and implementation goals
-- `design.md`: Describes database design, `API` definitions, and frontend page structure
-- `tasks.md`: Breaks implementation into actionable checklist items
-- `specs/`: Captures incremental capability specs that become persistent baselines after archival
+- `proposal.md` — Defines requirement boundaries and implementation goals
+- `design.md` — Describes database design, `API` interface definitions, and frontend page structure
+- `tasks.md` — Breaks down into an implementation task list that can be completed item by item
+- `specs/` — Incremental specification files after implementation, archived as persistent baselines
 
-These documents are not a summary produced after delivery. They are the **input that drives implementation**. Before writing code, `AI` reads the specs. After completing the implementation, `AI` updates and archives the specs. Specifications stay aligned with the code instead of degrading into abandoned historical documents.
+These documents are not post-delivery summaries — they are **inputs that drive implementation**. `AI` understands the specifications before writing code; `AI` updates and archives the specifications after completing implementation. Specifications stay in sync with code at all times, rather than becoming abandoned historical documents over time.
 
-Spec-driven development improves quality in several ways:
+The quality value of spec-driven development manifests in the following areas:
 
-| Quality dimension | Traditional approach | SDD approach |
-|-------------------|----------------------|--------------|
-| **Architectural consistency** | Depends on developer memory and oral knowledge transfer | Spec documents act as the constraint baseline, and `AI` starts from them every time |
-| **Change traceability** | Commit history rarely captures design intent clearly | Every change has corresponding `proposal.md` and `design.md` |
-| **Cross-session consistency** | `AI` starts over in each conversation | Specs provide stable cross-session context anchors |
-| **Architectural drift detection** | Usually found only through code review | `E2E` tests act as a hard gate; drift causes failure |
+| Quality Dimension | Traditional Approach | SDD Approach |
+|-------------------|---------------------|--------------|
+| **Architecture consistency** | Relies on developer memory and oral tradition | Spec documents serve as constraint baselines; `AI` starts from specs every time |
+| **Change traceability** | Code commit history can't reflect design intent | Every change has a corresponding `proposal.md` and `design.md` |
+| **Cross-session consistency** | `AI` starts from zero understanding every conversation | Spec documents provide stable cross-session context anchors |
+| **Architectural drift detection** | Can only be found through code review | `E2E` tests serve as hard gates; drift equals failure |
 
-`LinaPro` implements the `SDD` workflow through `OpenSpec`, supporting a complete five-stage development loop. For details, see [AI Spec-Driven Development](/docs/spec-driven-development).
+`LinaPro` implements the SDD workflow through the `OpenSpec` tool, supporting the complete five-stage development loop. For details, see: [Spec-Driven Development](/docs/spec-driven-development).
 
-### Dimension 2: Two Layers of Project Specification Constraints
+### Dimension 2: Two-Layer Project Specification Constraint System
 
-`LinaPro` uses two complementary kinds of specification files to cover the full constraint surface of `AI` coding behavior. One is a set of **resident constraint files** loaded at the start of every `AI` session and applied across the whole project. The other is a set of **capability-domain baseline specs** that evolve with features and define precise acceptance scenarios. They serve different roles and work together as a complete specification constraint system.
+`LinaPro` covers all aspects of `AI` coding behavior through two complementary specification file types: one is the **persistent constraint file** loaded instantly at the start of every `AI` session, covering the entire project; the other is **capability-domain baseline specifications** that are continuously refined as features evolve, precise down to acceptance scenarios. The two have clear divisions of labor and work together to form a complete specification constraint system.
 
-#### Resident Constraint Files: AGENTS.md
+#### Persistent Constraint File: AGENTS.md
 
-`AGENTS.md`, which is also linked as `CLAUDE.md`, is the **project-level specification file** that `AI` coding agents in `LinaPro` must read first at the beginning of every session. Unlike capability-domain specs under `openspec/specs/`, `AGENTS.md` is a set of **resident, cross-iteration global constraints**. No matter which feature the current iteration touches, these constraints remain in force.
+`AGENTS.md` (also serving as a symlink for `CLAUDE.md`) is the **project-level specification file** that `AI` coding agents in `LinaPro` projects must prioritize reading at the start of every session. Unlike the capability-domain specifications in `openspec/specs/`, `AGENTS.md` is a set of **persistent, cross-iteration global constraints** that remain effective regardless of what feature the current iteration involves.
 
-`AGENTS.md` covers the following core constraint dimensions:
+The core constraint dimensions covered by `AGENTS.md` include:
 
-- **Architecture constraints**: Defines the project positioning and the `lina-core` boundary, preventing tight coupling between the core domain and workspace presentation structure.
-- **Module design rules**: Business modules must support on-demand disabling with coordinated frontend hiding; data permission filtering must happen at the database query layer; source plugin directory layout is fixed.
-- **Interface design constraints**: Enforces `RESTful` semantics throughout the repository; action-style path names are prohibited.
-- **Code quality rules**: Runtime dependencies must be injected through constructors; errors must be wrapped with `bizerr`; logging must pass `ctx` along the call chain; cached state must be coordinated across instances in cluster mode.
-- **API response contracts**: Time-point fields must return Unix millisecond integers (`int64`); `DTO` fields must carry English documentation tags; development tools must be cross-platform executable.
-- **Compilation and testing gates**: Production `Go` code changes must pass a `go test` smoke test, and interface signature changes must also pass startup binding tests, before being marked complete.
-- **Continuous governance requirements**: Every change must assess `i18n` impact; cache design must distinguish single-node from cluster deployments; bug fixes must be accompanied by automated tests.
+- **Architecture design constraints**: Defines the project positioning and `lina-core` main framework boundaries, preventing the core domain from being tightly bound to workspace display structures, and maintaining the stability of core domain contracts.
+- **Module design norms**: Business modules support on-demand disabling with frontend联动 hiding; data permissions must be explicitly injected at the query layer — in-memory filtering as a substitute is not allowed; source plugin directory structure is strictly fixed.
+- **Interface design constraints**: Mandates `RESTful` semantics, prohibits action-oriented path naming, and maintains consistent resource path style across the entire repository.
+- **Code quality norms**: Runtime dependencies must be explicitly injected; errors must be wrapped through `bizerr`; logs must pass `ctx` along the call chain; caches must coordinate across instances in cluster mode.
+- **`API` response contracts**: Timestamp fields must return `Unix` millisecond integers; `DTO` fields must include English documentation tags; development tools must be cross-platform executable.
+- **Compilation and test gates**: `Go` production code changes must run `go test` smoke tests first; interface signature changes additionally require passing startup binding package tests — relying solely on static analysis to confirm compilability is not allowed.
+- **Continuous governance requirements**: Feature changes must assess `i18n` impact; cache design must distinguish between single-node and cluster strategies; bug fixes must include automated tests.
 
-These constraints are not suggestions. They are the **behavioral rules** for `AI` agents. Before generating code, `AI` must make decisions against these rules, and any deviation is called out during code review. This means that even in a brand-new session, `AI` does not produce output that drifts from project style simply because it "does not know the project conventions." **The specification file itself is `AI`'s memory.**
+These constraints are not soft suggestions — they are **behavioral norms** for `AI` agents. `AI` must use these rules as the baseline for every code generation decision, and any deviation will be explicitly flagged during code review. This means that even in a brand-new session, `AI` won't produce output that deviates from project style due to "not knowing the project conventions" — **the specification file itself is `AI`'s memory**.
 
-These constraints apply at the repository level, covering both framework code and business plugin code. Teams do not need to define their own layering constraints, interface design rules, or data permission rules for every plugin from scratch. The framework specification files already provide the global behavioral baseline for `AI`; teams only need to add business-specific constraints as needed.
+These constraints are repository-level: both framework code and business plugin code fall under their coverage. Teams don't need to separately define layered constraints, interface design norms, or data permission rules for their own plugins — the framework's specification files already constitute `AI`'s global behavioral baseline. Teams only need to supplement on top of this based on business needs.
 
-#### Capability-Domain Baseline Specs: openspec/specs/
+#### Capability-Domain Baseline Specifications: openspec/specs/
 
-Under `LinaPro`'s `openspec/specs/` directory, baseline spec files cover the system's capability domains. These are not abstract vision documents. They are engineering constraints written down to scenario-level precision: each requirement uses explicit `SHALL`/`MUST NOT` semantics, and each `Scenario` describes concrete acceptance conditions.
+In `LinaPro`'s `openspec/specs/` directory, **baseline specification files** covering various capability domains of the system are deposited. These specifications are not conceptual-level vision descriptions — they are engineering constraints precise down to the scenario level: each specification has clear `SHALL`/`MUST NOT` semantics, with accompanying `Scenario` descriptions specifying concrete acceptance conditions.
 
-The backend consistency spec, for example, covers dependency injection patterns, service component granularity, database operation conventions, and error handling rules down to scenario-level precision. These spec files provide context for `AI` code generation and serve as concrete reference points for code review. When a piece of `AI`-generated code does not comply with a spec, the issue can be identified explicitly instead of depending on the reviewer's subjective judgment.
+Using the backend consistency specification as an example, it covers scenario-level engineering constraints such as dependency injection patterns, service component granularity, database operation norms, and error handling conventions. These specification files serve as context for `AI` during code generation and as a benchmark during code review. When `AI`-generated code doesn't conform to specifications, the issue can be precisely identified rather than relying on the reviewer's subjective judgment.
 
-#### How the Two Layers Divide Responsibilities
+#### Division of Labor Between the Two Specification Layers
 
-| Specification layer | Files | Scope | When updated |
-|---------------------|-------|-------|--------------|
-| **Resident constraints** | `AGENTS.md` | Whole project, all iterations, every `AI` session | Revised when architectural decisions change |
-| **Capability baselines** | `openspec/specs/<domain>/spec.md` | Acceptance scenarios for a specific capability domain | Consolidated after each feature iteration is archived |
+| Specification Layer | File | Scope | Update Timing |
+|---------------------|------|-------|---------------|
+| **Persistent constraints** | `AGENTS.md` | Entire project, all iterations, all `AI` sessions | Revised when architectural decisions change |
+| **Capability-domain baselines** | `openspec/specs/<domain>/spec.md` | Acceptance scenarios for specific capability domains | Deposited after each feature iteration is archived |
 
-The two layers constrain `AI` coding behavior at different levels of granularity. Resident constraints provide the global baseline, ensuring that `AI` output in any session does not violate the project's fundamental design principles. Capability baselines provide local precision, ensuring that the implementation details of each concrete feature satisfy that capability's acceptance expectations.
+The two specification layers cover `AI`'s coding behavior at different granularities: persistent constraints provide a global baseline, ensuring `AI` output in any session doesn't deviate from the project's fundamental design principles; capability-domain baselines provide local precision, ensuring each specific feature's implementation details meet that capability's acceptance expectations.
 
 ### Dimension 3: Interface Abstraction and API Anti-Leakage Contracts
 
-Clear interface boundaries are essential for long-term maintainability, and they are also one of the areas where `AI`-generated code is most likely to go wrong. When `AI` sees database entity definitions and `API` controller code in the same context, the most "natural" implementation is often to return entities directly to callers. That shortcut may look harmless in the short term, but it silently couples the `API` contract to internal data structures. Every future database change can then unintentionally change external interface behavior.
+Clear interface boundaries are the foundation of long-term system maintainability and the area where `AI`-generated code is most prone to problems. When `AI` sees both database entity definitions and `API` controller code in the same context, the most "natural" approach is often to return the entity directly to the caller. This shortcut looks fine in the short term, but it quietly couples the `API` contract to the internal data structure — every subsequent database change could inadvertently alter the external interface behavior.
 
-`LinaPro`'s design principle is that **the `API` layer is the stable contract between the system and the outside world, not a transparent window into internal implementation**. Internal data models can evolve, but `API` contracts should remain independently controlled. Based on this principle, the framework follows two core interface design rules:
+`LinaPro`'s design philosophy is: **the `API` layer is a stable contract between the system and the outside world, not a transparent window into internal implementation**. Regardless of how the internal data model evolves, the `API` contract should remain independently controlled. Based on this philosophy, the framework has established two core principles for interface design:
 
-**Principle 1: Strictly separate API responses from database entities**
+**Principle 1: Interface responses are strictly isolated from database entities**
 
-`API` responses must use independently defined data structures that explicitly map the fields allowed to be exposed externally, rather than passing database entities through directly. This has two benefits. First, database fields can be added, renamed, or restructured without passively changing the external `API` contract; the database model and the external contract can evolve at their own pace. Second, internal governance fields such as soft-delete flags, password hashes, system paths, and storage engines never leak into external responses by accident, eliminating an entire class of data leakage risks at the source.
+`API` responses must use independently defined data structures with explicit mapping of fields allowed for external exposure, rather than directly passing through database entities. The benefits are twofold: on one hand, database field additions, renames, or structural changes won't passively alter the external `API` contract — the two can evolve at their own pace. On the other hand, internal governance fields — such as soft-delete flags, password hashes, system paths, storage engines, etc. — will never appear in external responses due to oversight, eliminating an entire class of data leakage risk at the source.
 
-**Principle 2: Continuously guard interface boundaries with automated contract tests**
+**Principle 2: Interface boundaries are continuously guarded by automated contract tests**
 
-Maintaining interface boundaries through design documents and code review alone is fragile. In high-speed `AI` code generation, a rule can be bypassed silently in one iteration and go unnoticed. `LinaPro` addresses this with dedicated **`API` contract guard tests**. During every build, these tests scan all `API` packages and verify that public response structures do not depend on database entities and that sensitive fields do not appear in `JSON` serialization. Any violation immediately fails the build.
+Maintaining interface boundaries through design documents and code review alone is fragile — in AI's high-speed code generation scenario, specifications may be quietly bypassed during an iteration without anyone noticing. `LinaPro` addresses this with dedicated **`API` contract guard tests**: every build automatically scans all `API` packages, verifying that public response structures don't introduce database entity dependencies and that sensitive fields don't appear in `JSON` serialization. Any violation causes the build to fail immediately.
 
-**Interface boundaries are not maintained by code review alone. They are guarded by automated tests.** This is `LinaPro`'s basic stance on interface quality. Specifications written in documents are ultimately soft constraints. Only when boundary checks become executable tests can interface security be continuously guaranteed across every iteration, instead of depending on team members' memory and self-discipline.
+**Interface boundaries are not maintained through code review — they are guarded by automated tests.** This is `LinaPro`'s fundamental stance on interface quality. Specifications written in documents are ultimately just soft constraints. Only by turning boundary checks into executable tests can interface security be continuously guaranteed with every iteration, rather than relying on team members' memory and self-discipline.
 
-It is also important that these contract tests **do not require developers to trigger them manually**. The capability is automatically executed through `LinaPro`'s project specifications and built-in `AI` skills. After generating interface-related code, `AI` runs contract verification according to the project rules; developers do not need to remember when to run which tests. For teams using `LinaPro`, interface quality protection is a built-in default behavior of the framework, not an extra habit to establish. This reduces cognitive load and makes the framework easier to use correctly in `AI` programming scenarios.
+It's worth emphasizing that triggering these contract tests **does not require manual developer intervention**. This capability is automatically executed through `LinaPro`'s project specifications and built-in `AI` skills — after `AI` completes interface-related code generation, it automatically triggers contract verification per project conventions, without developers needing to remember when to run which tests. For teams using `LinaPro`, interface quality guarding is a built-in default behavior of the framework, not a development habit that needs to be separately established. This significantly reduces the mental burden on developers and makes the framework easier to use correctly in AI coding scenarios.
 
 ### Dimension 4: High-Density Test Coverage
 
-One of `LinaPro`'s most visible engineering quality characteristics is its very high **test code density**. Across the codebase, **test code accounts for `39%` of total code**. This proportion is far above the industry average and is one of the clearest expressions of `LinaPro`'s engineering quality philosophy.
+One of `LinaPro`'s most distinctive engineering quality characteristics is its extremely high **test code density**. Across the entire codebase, **test code accounts for 39% of total code volume** — a ratio far exceeding the industry average and the most direct embodiment of `LinaPro`'s engineering quality philosophy.
 
-The test system has two layers, each with its own responsibility:
+The testing system operates at two levels, each with its own responsibilities:
 
-#### Unit Tests: Precise Verification of Service-Layer Behavior
+#### Unit Tests: Precisely Verifying Service Layer Behavior
 
-Backend unit tests cover all critical service-layer logic in the framework core and official plugins. Tests are built directly around the service layer, bypassing the `HTTP` layer and replacing external services such as databases, caches, and plugin runtimes through dependency injection, allowing each behavior to be verified precisely.
+Backend unit tests cover all critical service layer logic in the framework core and official plugins. Tests are built directly at the service layer, bypassing the `HTTP` layer, and replace external services (databases, caches, plugin runtimes, etc.) through dependency injection to precisely verify the correctness of individual behaviors.
 
-Typical test scenarios include:
+Typical test scenarios include but are not limited to:
 
-- **Plugin lifecycle**: Verifies installation, enablement, disablement, uninstallation, dependency resolution, and rollback behavior
-- **Multi-tenant isolation**: Verifies transaction rollback when tenant creation fails, ensuring no partially created tenant state remains
-- **Startup consistency checks**: Verifies that illegal plugin governance configuration combinations are rejected at service startup, preventing unrecoverable runtime states
-- **Security boundaries**: Verifies that single-node mode does not create multi-node state projections and that platform-level operations remain isolated from tenant-level plugins
+- **Plugin lifecycle**: Verifying the correctness of state transitions for install, enable, disable, and uninstall, as well as automatic dependency resolution and rollback behavior
+- **Multi-tenant isolation**: Verifying transaction rollback when tenant creation fails, ensuring no half-created state is left behind
+- **Startup consistency checks**: Verifying that illegal plugin governance configuration combinations are rejected at service startup, preventing unrecoverable states at runtime
+- **Security boundaries**: Verifying that single-node mode doesn't produce multi-node state projections, and that platform-level operations maintain isolation from tenant-level plugins
 
-This test requirement is **driven automatically by project specifications and built-in framework `AI` skills, without requiring developers to trigger it manually**.
+This testing requirement is **automatically driven by project specifications and the framework's built-in `AI` skills, without requiring manual developer triggers**.
 
-#### E2E Tests: Full Browser-Level Acceptance
+#### E2E Tests: Full-Chain Browser-Level Acceptance
 
-End-to-end tests are built on `Playwright` and drive the complete frontend and backend chain through a real browser. Every feature iteration is expected to add corresponding `E2E` test cases. `LinaPro` already covers core capability domains including authentication, permission management, dictionaries and configuration, file management, task scheduling, multi-tenancy, and plugin extensions. The number of test cases continues to grow with each iteration.
+End-to-end tests are based on `Playwright`, driving the complete frontend-backend chain through a real browser for acceptance. Every feature iteration requires corresponding `E2E` test cases to be added in sync. `LinaPro` already covers core capability domains including user authentication, permission management, dictionaries and configuration, file management, task scheduling, multi-tenancy, and plugin extensions, with test case counts continuously growing as the project iterates.
 
-`E2E` tests are not optional "nice-to-have" additions. They are a **hard prerequisite** for functional changes. In `LinaPro`'s `SDD` workflow, each change must have corresponding `E2E` tests passing before it can be archived. If official plugin `E2E` cases are missing, the nightly container image release is blocked.
+`E2E` tests are not an optional "bonus" — they are a **hard prerequisite** for feature changes. In `LinaPro`'s `SDD` workflow, each change must have corresponding `E2E` tests passing before it can be archived. If official plugin `E2E` cases are missing, the nightly build (`Nightly`) image release will be blocked.
 
-`E2E` execution requirements are likewise **embedded in the `SDD` workflow itself rather than relying on developer memory**. `LinaPro` hardens acceptance requirements into workflow stages, turning "write tests" from a habit that depends on self-discipline into a non-skippable step in an `AI`-driven process. This greatly reduces dependence on developer discipline.
+The `E2E` test execution requirement is similarly **embedded in the `SDD` workflow itself, rather than relying on developer memory**. `LinaPro` bakes acceptance requirements into workflow nodes, transforming "writing tests" from a habit requiring self-discipline into an unskippable step in the `AI`-driven process. This significantly reduces dependence on developer discipline.
 
-#### How the Two Layers Work Together
+#### How the Two Levels Work Together
 
 ```mermaid
 flowchart LR
-    subgraph unit["Unit tests"]
-        U1["Precise verification<br/>of service-layer behavior"]
-        U2["Dependency isolation<br/>fast execution"]
-        U3["Boundary conditions<br/>error rollback"]
+    subgraph unit["Unit Tests"]
+        U1["Precisely verify\nservice layer behavior"]
+        U2["Dependency isolation\nfast execution"]
+        U3["Boundary conditions\nerror rollback"]
     end
-    subgraph e2e["E2E tests"]
-        E1["End-to-end acceptance<br/>real browser"]
-        E2["User perspective<br/>correct behavior"]
-        E3["Continuously growing<br/>domain-wide coverage"]
+    subgraph e2e["E2E Tests"]
+        E1["Full-chain acceptance\nreal browser"]
+        E2["User perspective\nfunctional correctness"]
+        E3["Continuous growth\ndomain-wide coverage"]
     end
     A["Code change"] --> unit
     A --> e2e
-    unit --> B["Correct service-layer behavior"]
-    e2e --> C["Usable end-to-end functionality"]
-    B & C --> D["Releasable delivery"]
+    unit --> B["Service layer behavior correct"]
+    e2e --> C["End-to-end functionality works"]
+    B & C --> D["Release-ready artifact"]
 ```
 
-Unit tests and `E2E` tests provide quality assurance at different levels of granularity. They complement rather than replace each other: unit tests ensure precise correctness of service-layer logic, while `E2E` tests ensure the whole system presents correct behavior to users.
+Unit tests and `E2E` tests provide quality assurance at different granularities. They complement rather than replace each other: unit tests ensure the precise correctness of service layer logic, while `E2E` tests ensure the entire system presents correct behavior to users.
 
-## Overall Effect of the Quality System
+## The Overall Effect of Quality Assurance
 
-When these four dimensions work together, `LinaPro` forms a complete quality chain from specification design to automated acceptance:
+Combining the safeguards from all four dimensions, `LinaPro` forms a complete quality chain from specification design to automated acceptance:
 
 ```mermaid
 flowchart LR
-    A["Requirement intent"] -->|"SDD workflow"| B["Spec documents<br/>(proposal + design)"]
+    A["Requirement intent"] -->|"SDD workflow"| B["Spec documents\n(proposal + design)"]
     B -->|"Spec constraints"| C["AI code implementation"]
-    C -->|"API contract tests"| D["Safe API boundaries"]
-    C -->|"Code consistency specs"| E["Consistent code style"]
+    C -->|"Interface contract tests"| D["API boundary safety"]
+    C -->|"Code consistency norms"| E["Unified code style"]
     C -->|"Unit tests"| F["Correct service behavior"]
     C -->|"E2E tests"| G["End-to-end functionality"]
-    D & E & F & G --> H["Spec archival<br/>quality consolidation"]
+    D & E & F & G --> H["Spec archived\nquality crystallized"]
 ```
 
-The core value of this system is that **quality assurance is systematic, not dependent on the self-discipline of individual developers**. Specifications are machine-readable, gates are automated, and tests are mandatory. Even when `AI` iterates quickly and produces large amounts of code, quality standards do not quietly drop because "we are in a hurry today" or "we can skip it this time."
+The core value this system delivers is: **quality assurance is systematic, not dependent on individual developer discipline**. Specifications are machine-readable, gates are automated, tests are mandatory — this means that even under AI's high-speed iteration and massive code output scenarios, quality standards won't be quietly lowered because "we're in a rush today" or "we'll skip it this time."
 
-For teams using `LinaPro`, this means:
+For teams using `LinaPro`, this system means:
 
-- Any code that violates the `API` contract fails automatically in `CI` and does not enter the main branch
-- Any change that breaks functionality is caught by `E2E` tests before reaching the release process
-- Any implementation that deviates from the specs has explicit documents to compare against, giving reviewers concrete evidence
-- Every design decision produced during an iteration is preserved through spec archival instead of disappearing when the conversation ends
+- Any code violating `API` contracts fails automatically in `CI` and never enters the main branch
+- Any change breaking functionality is caught by `E2E` tests and never enters the release pipeline
+- Any implementation deviating from specifications has clear documentation for comparison — reviews have evidence to rely on
+- Design decisions from every iteration are permanently preserved through spec archival, not lost when a session ends
 
-In the `AI` era, speed is the starting point, not the destination. `LinaPro`'s goal is to keep quality from falling behind while `AI` moves at full speed.
+In the AI era, speed is the starting point, not the destination.

@@ -127,8 +127,11 @@ graph TB
 | `Put` | 写入对象，支持`ContentType`和`Overwrite`控制 |
 | `Get` | 读取对象内容和元数据 |
 | `Delete` | 删除授权路径下的对象 |
+| `DeleteMany` | 批量删除授权路径下的对象 |
 | `List` | 按前缀列出对象 |
+| `ListCursor` | 按前缀列出对象，支持游标分页 |
 | `Stat` | 读取对象元数据，不返回内容 |
+| `BatchStat` | 批量读取对象元数据 |
 | `ProviderStatuses` | 查询所有注册的`Provider`状态（仅源码插件可用） |
 
 `Put`的`Overwrite`参数控制覆盖行为：设为`false`时，若对象已存在则返回`PLUGIN_STORAGE_OBJECT_EXISTS`错误。
@@ -144,8 +147,11 @@ graph TB
 | `put.abort` | — | 取消分块上传，清理临时文件 |
 | `get` | `Storage().Get` | 读取对象内容和元数据 |
 | `delete` | `Storage().Delete` | 删除授权路径下的对象 |
+| `delete_many` | `Storage().DeleteMany` | 批量删除授权路径下的对象 |
 | `list` | `Storage().List` | 按前缀列出对象 |
+| `list_cursor` | `Storage().ListCursor` | 按前缀列出对象，支持游标分页 |
 | `stat` | `Storage().Stat` | 读取对象元数据，不返回内容 |
+| `batch_stat` | `Storage().BatchStat` | 批量读取对象元数据 |
 
 动态插件的`Guest SDK`在写入时自动选择模式：对象体不超过`1 MB`使用直接上传（单次调用），超过`1 MB`或大小未知时自动切换为分块上传（`1 MB`分块）。分块上传的宿主侧最大分块为`4 MB`，会话有效期`15`分钟。分块失败时自动尝试`abort`清理临时文件。
 
@@ -171,10 +177,37 @@ output, err := services.Storage().Get(ctx, storagecap.GetInput{
     Path: "exports/report.csv",
 })
 
+// 删除对象
+err := services.Storage().Delete(ctx, storagecap.DeleteInput{
+    Path: "exports/report.csv",
+})
+
+// 批量删除对象
+err := services.Storage().DeleteMany(ctx, storagecap.DeleteManyInput{
+    Paths: []string{"exports/report1.csv", "exports/report2.csv"},
+})
+
 // 列出对象
 list, err := services.Storage().List(ctx, storagecap.ListInput{
     Prefix: "exports/",
     Limit:  100,
+})
+
+// 游标分页列出对象
+cursorList, err := services.Storage().ListCursor(ctx, storagecap.ListCursorInput{
+    Prefix: "exports/",
+    Cursor: lastCursor,
+    Limit:  100,
+})
+
+// 查询对象元数据
+stat, err := services.Storage().Stat(ctx, storagecap.StatInput{
+    Path: "exports/report.csv",
+})
+
+// 批量查询对象元数据
+batchStat, err := services.Storage().BatchStat(ctx, storagecap.BatchStatInput{
+    Paths: []string{"exports/report1.csv", "exports/report2.csv"},
 })
 
 // 查询Provider状态
@@ -192,8 +225,11 @@ hostServices:
       - put
       - get
       - delete
+      - delete_many
       - list
+      - list_cursor
       - stat
+      - batch_stat
     resources:
       paths:
         - exports/
@@ -219,9 +255,36 @@ output, err := storageSvc.Get(ctx, storagecap.GetInput{
     Path: "exports/report-2024.csv",
 })
 
+// 删除对象
+err := storageSvc.Delete(ctx, storagecap.DeleteInput{
+    Path: "exports/report-2024.csv",
+})
+
+// 批量删除对象
+err := storageSvc.DeleteMany(ctx, storagecap.DeleteManyInput{
+    Paths: []string{"exports/report1.csv", "exports/report2.csv"},
+})
+
 // 列出对象
 list, err := storageSvc.List(ctx, storagecap.ListInput{
     Prefix: "exports/",
+})
+
+// 游标分页列出对象
+cursorList, err := storageSvc.ListCursor(ctx, storagecap.ListCursorInput{
+    Prefix: "exports/",
+    Cursor: lastCursor,
+    Limit:  100,
+})
+
+// 查询对象元数据
+stat, err := storageSvc.Stat(ctx, storagecap.StatInput{
+    Path: "exports/report-2024.csv",
+})
+
+// 批量查询对象元数据
+batchStat, err := storageSvc.BatchStat(ctx, storagecap.BatchStatInput{
+    Paths: []string{"exports/report1.csv", "exports/report2.csv"},
 })
 ```
 
