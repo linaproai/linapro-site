@@ -116,5 +116,5 @@ This service is the orchestration bridge from governance operations to plugin ca
 
 ## Related Services
 
-- [PluginStateService](/docs/plugin-capability-plugin-state) - Queries plugin enablement status, complementing lifecycle orchestration
-- [TenantService](/docs/plugin-capability-tenant) - The tenant management module uses PluginLifecycleService to orchestrate tenant-level events
+- [PluginStateService](./7600-plugin-state.md) - Queries plugin enablement status, complementing lifecycle orchestration
+- [TenantService](./7900-tenant.md) - The tenant management module uses PluginLifecycleService to orchestrate tenant-level events

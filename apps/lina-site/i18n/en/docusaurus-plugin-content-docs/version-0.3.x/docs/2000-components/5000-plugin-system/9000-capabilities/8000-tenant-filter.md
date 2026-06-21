@@ -120,6 +120,6 @@ The reason for this design is that `TenantFilterService` methods carry a `*gdb.M
 
 ## Related Services
 
-- [BizCtxService](/docs/plugin-capability-bizctx) - Identity information in TenantFilterContext comes from BizCtx
-- [TenantService](/docs/plugin-capability-tenant) - Tenant capability provides tenant resolution; TenantFilter uses tenant information to filter data
-- [CacheService](/docs/plugin-capability-cache) - Tenant isolation in cache keys complements TenantFilter's query filtering
+- [BizCtxService](./6800-bizctx.md) - Identity information in TenantFilterContext comes from BizCtx
+- [TenantService](./7900-tenant.md) - Tenant capability provides tenant resolution; TenantFilter uses tenant information to filter data
+- [CacheService](./6900-cache.md) - Tenant isolation in cache keys complements TenantFilter's query filtering

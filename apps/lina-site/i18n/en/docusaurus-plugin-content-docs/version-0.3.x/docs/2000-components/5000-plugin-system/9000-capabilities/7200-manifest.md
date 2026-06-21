@@ -103,5 +103,5 @@ This service forms a complementary relationship with the following services:
 
 ## Related Services
 
-- [ConfigService](/docs/plugin-capability-config) - Reads plugin configuration values resolved through priority layers
-- [I18nService](/docs/plugin-capability-i18n) - Runtime translation capability; language pack files are read through ManifestService
+- [ConfigService](./7000-config.md) - Reads plugin configuration values resolved through priority layers
+- [I18nService](./7100-i18n.md) - Runtime translation capability; language pack files are read through ManifestService

@@ -104,5 +104,5 @@ graph TB
 
 ## 相关服务
 
-- [TenantFilterService](/docs/plugin-capability-tenant-filter) - 缓存键中的租户隔离与`TenantFilter`的租户过滤互补
-- [ConfigService](/docs/plugin-capability-config) - 配置是持久数据，缓存是失真性运行时数据
+- [TenantFilterService](./8000-tenant-filter.md) - 缓存键中的租户隔离与`TenantFilter`的租户过滤互补
+- [ConfigService](./7000-config.md) - 配置是持久数据，缓存是失真性运行时数据

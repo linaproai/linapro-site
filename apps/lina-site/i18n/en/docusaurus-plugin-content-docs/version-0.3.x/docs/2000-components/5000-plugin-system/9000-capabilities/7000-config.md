@@ -129,5 +129,5 @@ Both services share the same method signatures:
 
 ## Related Services
 
-- [ManifestService](/docs/plugin-capability-manifest) - Reads raw resource files under `manifest/`, complementary to the configuration services
-- [I18nService](/docs/plugin-capability-i18n) - Keys like `i18n.default` in configuration affect translation behavior
+- [ManifestService](./7200-manifest.md) - Reads raw resource files under `manifest/`, complementary to the configuration services
+- [I18nService](./7100-i18n.md) - Keys like `i18n.default` in configuration affect translation behavior

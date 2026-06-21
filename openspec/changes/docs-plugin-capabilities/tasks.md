@@ -45,3 +45,4 @@
 - [x] **FB-2**: 拆分`Infra`基础设施领域能力与动态插件专属`Runtime`能力文档边界
 - [x] **FB-3**: 根据`linapro`源码修正领域能力文档中的接口签名、动态插件SDK入口、`hostServices`资源结构和示例代码
 - [x] **FB-4**: 根据最新`linapro`源码将声明期`Governance()`能力文档更名并修正为`Access()`/`AccessDeclarations`
+- [x] **FB-5**: 修复`make build`报告的当前版和`0.3.x`版本文档坏链

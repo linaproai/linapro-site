@@ -26,7 +26,7 @@ keywords:
 
 Every plugin version carries a set of owned resource files, including installation and upgrade SQL, internationalization language packs, frontend pages, configuration templates, and other custom files. These resources are collectively called Manifest delivery resources and reside in the plugin's `manifest/` and `frontend/` directories.
 
-Manifest resources differ from plugin configuration: configuration allows production environment overrides, while Manifest resources are more like a part of the plugin version -- they are compiled into the binary with the source code or packaged into the dynamic plugin's `.wasm` artifact, and they switch with the effective release version on upgrade or rollback. For plugin configuration management, see [Plugin Configuration Management](/docs/plugin-config).
+Manifest resources differ from plugin configuration: configuration allows production environment overrides, while Manifest resources are more like a part of the plugin version -- they are compiled into the binary with the source code or packaged into the dynamic plugin's `.wasm` artifact, and they switch with the effective release version on upgrade or rollback. For plugin configuration management, see [Plugin Business Configuration](/docs/plugin-configuration).
 
 ## Directory Structure
 

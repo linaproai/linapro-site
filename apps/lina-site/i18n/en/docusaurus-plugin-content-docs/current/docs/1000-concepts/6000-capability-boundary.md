@@ -124,7 +124,7 @@ workspace:
 
 In a standard single-domain deployment, it is recommended to keep `/admin` so that the root path and other public paths remain available for portal pages, source plugin-managed pages, or static assets. When using a dedicated admin domain, you can set `workspace.basePath` to `/` so that the entire domain serves only the admin workspace.
 
-Regardless of which entry path is used, it must not occupy the core framework's reserved namespaces -- for example, the control-plane `/api`, the unified plugin API namespace `/x`, the plugin public asset namespace `/x-assets`, and other reserved paths. After changing this configuration, the core framework's public configuration, frontend route base, and deployment entry must remain consistent.
+Regardless of which entry path is used, it must not occupy the core framework's reserved namespaces -- for example, the control-plane `/api`, the unified plugin API namespace `/x`, the plugin public asset namespace `/x-assets`, and other reserved paths. After changing this configuration, the core framework's public configuration, frontend route base, and deployment entry must remain consistent. For details, see [Default Admin Workspace](/docs/admin-workspace).
 
 ### Workspace-Plugin Integration
 
@@ -162,7 +162,7 @@ This mechanism allows plugin management UIs to be fully declared and maintained 
 
 The workspace is a standard consumer of the core framework's APIs, not a definer of business logic. The core framework provides API contracts; the workspace uses these contracts to display data and provide action entry points. Plugins extend the core framework's APIs, and the workspace accommodates plugin pages through the same unified menu and dynamic page shell mechanism, without needing to modify frontend code for each plugin.
 
-Developers can completely replace the built-in workspace with a custom frontend. As long as the new frontend follows the core framework's published RESTful API and permission model, it can use the same backend capabilities.
+Developers can completely replace the built-in workspace with a custom frontend. As long as the new frontend follows the core framework's published RESTful API and permission model, it can use the same backend capabilities. For details, see [Default Admin Workspace](/docs/admin-workspace).
 
 The core framework control-plane API, the unified plugin API, and the default admin workspace represent three independent boundaries:
 
@@ -301,7 +301,7 @@ The core framework performs strict path validation on declarations. The followin
 | Symlinks escaping the plugin root | May read files outside the plugin |
 | `index` not in filename form | Directory default files must be safe relative filenames |
 
-Public asset URLs use `{plugin-id, version}` as the cache boundary. Public asset content under the same plugin version must remain stable. If resource content changes, the plugin needs to upgrade its `plugin.yaml` version or introduce an equivalent content versioning mechanism. When a plugin is not installed, not enabled, or unavailable for the current tenant, `/x-assets/{plugin-id}/{version}/...` returns 404 by default. Dynamic plugins can continue serving installed or currently activated versioned resources as long as the plugin remains enabled; source plugins resolve declared resources from the plugin resources compiled into the core framework or from the plugin directory.
+Public asset URLs use `{plugin-id, version}` as the cache boundary. Public asset content under the same plugin version must remain stable. If resource content changes, the plugin needs to upgrade its `plugin.yaml` version or introduce an equivalent content versioning mechanism. When a plugin is not installed, not enabled, or unavailable for the current tenant, `/x-assets/{plugin-id}/{version}/...` returns 404 by default. Dynamic plugins can continue serving installed or currently activated versioned resources as long as the plugin remains enabled; source plugins resolve declared resources from the plugin resources compiled into the core framework or from the plugin directory. For details, see [Static Assets and Frontend Resources](/docs/static-assets).
 
 ### Domain Capabilities
 
@@ -393,7 +393,7 @@ func registerRoutes(ctx context.Context, registrar pluginhost.HTTPRegistrar) err
 }
 ```
 
-In this example, `/portal` is the plugin-managed public portal entry, `/x/my-plugin/api/v1/portal/articles` is the plugin portal API, and `/x/my-plugin/api/v1/admin/articles` is the plugin admin API. The admin workspace only knows about menu entries contributed by plugins through `plugin.yaml`'s `menus`; it does not automatically generate workspace routes, menus, or permission nodes just because a plugin registers HTTP routes. Admin API permission identifiers are declared through the `permission` field in `g.Meta`, and the corresponding menu entries and permission items are configured in `plugin.yaml`'s `menus`. These are ultimately displayed to administrators through the workspace's extension center:
+In this example, `/portal` is the plugin-managed public portal entry, `/x/my-plugin/api/v1/portal/articles` is the plugin portal API, and `/x/my-plugin/api/v1/admin/articles` is the plugin admin API. The admin workspace only knows about menu entries contributed by plugins through `plugin.yaml`'s `menus`; it does not automatically generate workspace routes, menus, or permission nodes just because a plugin registers HTTP routes. Admin API permission identifiers are declared through the `permission` field in `g.Meta`, and the corresponding menu entries and permission items are configured in `plugin.yaml`'s `menus`. These are ultimately displayed to administrators through the workspace's extension center. For details, see [Permission Management Strategy](/docs/permission):
 
 ```go
 // Admin endpoint DTO example

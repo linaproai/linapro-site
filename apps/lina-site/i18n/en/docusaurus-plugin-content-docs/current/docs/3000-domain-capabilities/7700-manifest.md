@@ -2,7 +2,7 @@
 slug: '/docs/domain-capability-manifest'
 title: 'Manifest'
 hide_title: true
-description: '`ManifestService` provides read-only access to raw resources under the current plugin's `manifest/` directory, supporting byte reading, existence checking, and `YAML` resource scanning. Source plugins consume it through `services.Manifest()`, while dynamic plugins consume it through `hostServices.manifest` after declaring authorized paths.'
+description: "`ManifestService` provides read-only access to raw resources under the current plugin's `manifest/` directory, supporting byte reading, existence checking, and `YAML` resource scanning. Source plugins consume it through `services.Manifest()`, while dynamic plugins consume it through `hostServices.manifest` after declaring authorized paths."
 keywords:
   - ManifestService
   - manifestcap

@@ -96,6 +96,6 @@ graph TB
 
 ## 相关服务
 
-- [AuthService](/docs/plugin-capability-auth) - `AuthService`在认证流程中注册会话，`SessionService`在管理流程中查询会话
-- [BizCtxService](/docs/plugin-capability-bizctx) - 当前请求的会话信息投影到`BizCtx`中
-- [OrgService](/docs/plugin-capability-org) - `Session`中的`DeptName`来自组织能力投影
+- [AuthService](./6700-auth.md) - `AuthService`在认证流程中注册会话，`SessionService`在管理流程中查询会话
+- [BizCtxService](./6800-bizctx.md) - 当前请求的会话信息投影到`BizCtx`中
+- [OrgService](./7400-org.md) - `Session`中的`DeptName`来自组织能力投影

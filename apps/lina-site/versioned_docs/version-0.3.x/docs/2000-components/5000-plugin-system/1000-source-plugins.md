@@ -105,7 +105,7 @@ menus:
     type: B
 ```
 
-插件`ID`推荐使用`<author>-<domain>-<capability>`三段式`kebab-case`结构，例如`linapro-content-notice`中`linapro`为作者、`content`为领域、`notice`为能力。`<domain>`段建议从`content`、`monitor`、`org`、`tenant`、`auth`、`oidc`、`ai`、`storage`、`workflow`、`message`等常见业务领域中选取，完整领域建议参见[插件系统](/docs/plugin-system)。菜单`key`必须全局唯一，推荐使用`plugin:<plugin-id>:<menu-key>`格式。按钮权限通过`type: B`挂在菜单下，不直接出现在侧边栏中。
+插件`ID`推荐使用`<author>-<domain>-<capability>`三段式`kebab-case`结构，例如`linapro-content-notice`中`linapro`为作者、`content`为领域、`notice`为能力。`<domain>`段建议从`content`、`monitor`、`org`、`tenant`、`auth`、`oidc`、`ai`、`storage`、`workflow`、`message`等常见业务领域中选取，完整领域建议参见[插件系统](./5000-plugin-system.md)。菜单`key`必须全局唯一，推荐使用`plugin:<plugin-id>:<menu-key>`格式。按钮权限通过`type: B`挂在菜单下，不直接出现在侧边栏中。
 
 ## 数据库与SQL
 
@@ -216,11 +216,11 @@ func registerRoutes(ctx context.Context, registrar pluginhost.HTTPRegistrar) err
 
 | 服务 | 用途 | 架构设计 |
 |------|------|----------|
-| `Config()` | 读取当前插件自己的配置，生产覆盖路径为生产配置根下`plugins/<plugin-id>/config.yaml`，开发期默认路径为`manifest/config/config.yaml` | [ConfigService](/docs/plugin-capability-config) |
-| `HostConfig()` | 读取宿主公开配置白名单键，例如`workspace.basePath`、`i18n.default`和`i18n.enabled` | [HostConfigService](/docs/plugin-capability-config) |
-| `Manifest()` | 读取当前插件`manifest/`下的原始资源，例如`profile.yaml`、`config/config.example.yaml`或`i18n/zh-CN/plugin.json` | [ManifestService](/docs/plugin-capability-manifest) |
+| `Config()` | 读取当前插件自己的配置，生产覆盖路径为生产配置根下`plugins/<plugin-id>/config.yaml`，开发期默认路径为`manifest/config/config.yaml` | [ConfigService](./9000-capabilities/7000-config.md) |
+| `HostConfig()` | 读取宿主公开配置白名单键，例如`workspace.basePath`、`i18n.default`和`i18n.enabled` | [HostConfigService](./9000-capabilities/7000-config.md) |
+| `Manifest()` | 读取当前插件`manifest/`下的原始资源，例如`profile.yaml`、`config/config.example.yaml`或`i18n/zh-CN/plugin.json` | [ManifestService](./9000-capabilities/7200-manifest.md) |
 
-`manifest/config/config.example.yaml`只是模板，不参与默认读取。插件不应通过`g.Cfg()`扫描宿主完整配置树，也不应把插件业务配置写进主框架`config.yaml`。完整的配置读取优先级、`manifest`资源路径语义和专用资源管线边界，参见[插件配置与manifest资源](/docs/plugin-config-and-manifest)。各能力服务的架构设计和使用约束，参见[插件基础能力](/docs/plugin-capability-services)。
+`manifest/config/config.example.yaml`只是模板，不参与默认读取。插件不应通过`g.Cfg()`扫描宿主完整配置树，也不应把插件业务配置写进主框架`config.yaml`。完整的配置读取优先级、`manifest`资源路径语义和专用资源管线边界，参见[插件配置与manifest资源](./4000-plugin-config-and-manifest.md)。各能力服务的架构设计和使用约束，参见[插件基础能力](./9000-capabilities/9000-capabilities.md)。
 
 ```go
 func registerRoutes(ctx context.Context, registrar pluginhost.HTTPRegistrar) error {

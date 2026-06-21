@@ -104,5 +104,5 @@ graph TB
 
 ## Related Services
 
-- [TenantFilterService](/docs/plugin-capability-tenant-filter) - Tenant isolation in cache keys complements TenantFilter's data filtering
-- [ConfigService](/docs/plugin-capability-config) - Configuration is persistent data, while cache is lossy runtime data
+- [TenantFilterService](./8000-tenant-filter.md) - Tenant isolation in cache keys complements TenantFilter's data filtering
+- [ConfigService](./7000-config.md) - Configuration is persistent data, while cache is lossy runtime data

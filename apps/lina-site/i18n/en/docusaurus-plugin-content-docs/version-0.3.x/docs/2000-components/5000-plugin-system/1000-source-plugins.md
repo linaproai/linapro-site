@@ -216,11 +216,11 @@ Source plugins obtain plugin-scoped core framework services through `registrar.H
 
 | Service | Purpose | Architecture |
 |---------|---------|-------------|
-| `Config()` | Reads the current plugin's own configuration. The production override path is `plugins/<plugin-id>/config.yaml` under the production configuration root; the development-time default is `manifest/config/config.yaml` | [ConfigService](/docs/plugin-capability-config) |
-| `HostConfig()` | Reads allowlisted public host configuration keys such as `workspace.basePath`, `i18n.default`, and `i18n.enabled` | [HostConfigService](/docs/plugin-capability-config) |
-| `Manifest()` | Reads raw resources under the current plugin's `manifest/` directory, such as `profile.yaml`, `config/config.example.yaml`, or `i18n/zh-CN/plugin.json` | [ManifestService](/docs/plugin-capability-manifest) |
+| `Config()` | Reads the current plugin's own configuration. The production override path is `plugins/<plugin-id>/config.yaml` under the production configuration root; the development-time default is `manifest/config/config.yaml` | [ConfigService](./9000-capabilities/7000-config.md) |
+| `HostConfig()` | Reads allowlisted public host configuration keys such as `workspace.basePath`, `i18n.default`, and `i18n.enabled` | [HostConfigService](./9000-capabilities/7000-config.md) |
+| `Manifest()` | Reads raw resources under the current plugin's `manifest/` directory, such as `profile.yaml`, `config/config.example.yaml`, or `i18n/zh-CN/plugin.json` | [ManifestService](./9000-capabilities/7200-manifest.md) |
 
-`manifest/config/config.example.yaml` is only a template and is not used in default reads. Plugins should not scan the host's full configuration tree through `g.Cfg()`, nor should they write plugin business configuration into the core framework `config.yaml`. For the full configuration read priority, manifest resource path semantics, and dedicated resource pipeline boundaries, see [Plugin Configuration and Manifest Resources](/docs/plugin-config-and-manifest). For the architecture and usage constraints of each capability service, see [Plugin Capability Services Overview](/docs/plugin-capability-services).
+`manifest/config/config.example.yaml` is only a template and is not used in default reads. Plugins should not scan the host's full configuration tree through `g.Cfg()`, nor should they write plugin business configuration into the core framework `config.yaml`. For the full configuration read priority, manifest resource path semantics, and dedicated resource pipeline boundaries, see [Plugin Configuration and Manifest Resources](./4000-plugin-config-and-manifest.md). For the architecture and usage constraints of each capability service, see [Plugin Capability Services Overview](./9000-capabilities/9000-capabilities.md).
 
 ```go
 func registerRoutes(ctx context.Context, registrar pluginhost.HTTPRegistrar) error {

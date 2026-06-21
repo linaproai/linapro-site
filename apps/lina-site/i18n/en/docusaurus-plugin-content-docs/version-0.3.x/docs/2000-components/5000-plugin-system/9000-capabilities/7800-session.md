@@ -96,6 +96,6 @@ graph TB
 
 ## Related Services
 
-- [AuthService](/docs/plugin-capability-auth) - AuthService registers sessions in the authentication flow; SessionService queries sessions in the management flow
-- [BizCtxService](/docs/plugin-capability-bizctx) - Current request session information is projected into BizCtx
-- [OrgService](/docs/plugin-capability-org) - The DeptName field in Session is projected from the organization capability
+- [AuthService](./6700-auth.md) - AuthService registers sessions in the authentication flow; SessionService queries sessions in the management flow
+- [BizCtxService](./6800-bizctx.md) - Current request session information is projected into BizCtx
+- [OrgService](./7400-org.md) - The DeptName field in Session is projected from the organization capability

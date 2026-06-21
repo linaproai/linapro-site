@@ -94,6 +94,6 @@ For helper functions, `BuildOperationKeyFromHandler` handles static routes, `Bui
 
 ## Related Services
 
-- [BizCtxService](/docs/plugin-capability-bizctx) - Provides request-level identity and tenant context
-- [RouteService](/docs/plugin-capability-route) - Provides dynamic route metadata
-- [I18nService](/docs/plugin-capability-i18n) - Provides runtime translation capabilities
+- [BizCtxService](./6800-bizctx.md) - Provides request-level identity and tenant context
+- [RouteService](./7700-route.md) - Provides dynamic route metadata
+- [I18nService](./7100-i18n.md) - Provides runtime translation capabilities

@@ -87,5 +87,5 @@ sequenceDiagram
 
 ## 相关服务
 
-- [BizCtxService](/docs/plugin-capability-bizctx) - 获取当前用户`ID`作为通知发送者
-- [I18nService](/docs/plugin-capability-i18n) - 通知内容可能需要翻译
+- [BizCtxService](./6800-bizctx.md) - 获取当前用户`ID`作为通知发送者
+- [I18nService](./7100-i18n.md) - 通知内容可能需要翻译

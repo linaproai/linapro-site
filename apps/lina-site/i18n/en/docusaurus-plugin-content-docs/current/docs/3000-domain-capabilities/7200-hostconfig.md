@@ -2,7 +2,7 @@
 slug: '/docs/domain-capability-hostconfig'
 title: 'HostConfig'
 hide_title: true
-description: 'Configuration management in the plugin system spans three domains: plugin governance (`Plugins().Config()` reads the current plugin's own static config), host config override via the `plugin.<plugin-id>` section in host `config.yaml`, host config reading (`HostConfig()`), and runtime config management (`Admin().HostConfig()` writes governed runtime config). Dynamic plugins declare read scopes through `plugins.config.get` and `hostconfig.get` respectively. This page serves as a configuration capability relationship guide to help plugin authors choose the correct entry point.'
+description: "Configuration management in the plugin system spans three domains: plugin governance (`Plugins().Config()` reads the current plugin's own static config), host config override via the `plugin.<plugin-id>` section in host `config.yaml`, host config reading (`HostConfig()`), and runtime config management (`Admin().HostConfig()` writes governed runtime config). Dynamic plugins declare read scopes through `plugins.config.get` and `hostconfig.get` respectively. This page serves as a configuration capability relationship guide to help plugin authors choose the correct entry point."
 keywords:
   - configuration capability
   - Plugins().Config

@@ -147,7 +147,7 @@ Provider plugins must register their factory in `init()`, and the host lazily co
 
 ## Related Services
 
-- [OrgService](/docs/plugin-capability-org) - Organization capability and tenant capability complement each other, jointly forming the multi-tenant + organization data model
-- [BizCtxService](/docs/plugin-capability-bizctx) - Tenant resolution results are projected into BizCtx's TenantID field
-- [AuthService](/docs/plugin-capability-auth) - TenantService validates legitimacy before tenant switching
-- [TenantFilterService](/docs/plugin-capability-tenant-filter) - Uses tenant information from Tenant to filter data
+- [OrgService](./7400-org.md) - Organization capability and tenant capability complement each other, jointly forming the multi-tenant + organization data model
+- [BizCtxService](./6800-bizctx.md) - Tenant resolution results are projected into BizCtx's TenantID field
+- [AuthService](./6700-auth.md) - TenantService validates legitimacy before tenant switching
+- [TenantFilterService](./8000-tenant-filter.md) - Uses tenant information from Tenant to filter data

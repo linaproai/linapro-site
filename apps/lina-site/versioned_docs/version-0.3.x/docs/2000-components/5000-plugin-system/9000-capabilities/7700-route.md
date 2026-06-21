@@ -89,5 +89,5 @@ sequenceDiagram
 
 ## 相关服务
 
-- [APIDocService](/docs/plugin-capability-apidoc) - 使用路由元数据中的操作键进行文档本地化
-- [BizCtxService](/docs/plugin-capability-bizctx) - 路由元数据与业务上下文共同构成请求全貌
+- [APIDocService](./6600-apidoc.md) - 使用路由元数据中的操作键进行文档本地化
+- [BizCtxService](./6800-bizctx.md) - 路由元数据与业务上下文共同构成请求全貌

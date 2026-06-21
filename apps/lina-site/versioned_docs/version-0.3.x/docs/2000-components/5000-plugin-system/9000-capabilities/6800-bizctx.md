@@ -99,6 +99,6 @@ sequenceDiagram
 
 ## 相关服务
 
-- [AuthService](/docs/plugin-capability-auth) - 认证中间件使用`AuthService`写入用户身份
-- [TenantService](/docs/plugin-capability-tenant) - 租户解析中间件写入租户信息
-- [TenantFilterService](/docs/plugin-capability-tenant-filter) - 使用`BizCtx`中的`TenantID`和`PlatformBypass`过滤数据
+- [AuthService](./6700-auth.md) - 认证中间件使用`AuthService`写入用户身份
+- [TenantService](./7900-tenant.md) - 租户解析中间件写入租户信息
+- [TenantFilterService](./8000-tenant-filter.md) - 使用`BizCtx`中的`TenantID`和`PlatformBypass`过滤数据

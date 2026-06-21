@@ -102,6 +102,6 @@ graph TB
 
 ## 相关服务
 
-- [PluginLifecycleService](/docs/plugin-capability-plugin-lifecycle) - 生命周期编排改变插件状态，`PluginStateService`查询插件状态
-- [OrgService](/docs/plugin-capability-org) - 使用`IsProviderEnabled`判断组织能力提供方是否可用
-- [TenantService](/docs/plugin-capability-tenant) - 使用`IsProviderEnabled`判断租户能力提供方是否可用
+- [PluginLifecycleService](./7500-plugin-lifecycle.md) - 生命周期编排改变插件状态，`PluginStateService`查询插件状态
+- [OrgService](./7400-org.md) - 使用`IsProviderEnabled`判断组织能力提供方是否可用
+- [TenantService](./7900-tenant.md) - 使用`IsProviderEnabled`判断租户能力提供方是否可用

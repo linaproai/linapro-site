@@ -103,5 +103,5 @@ graph TB
 
 ## 相关服务
 
-- [ConfigService](/docs/plugin-capability-config) - 读取经过优先级解析的插件配置值
-- [I18nService](/docs/plugin-capability-i18n) - 运行时翻译能力，语言包文件通过`ManifestService`读取
+- [ConfigService](./7000-config.md) - 读取经过优先级解析的插件配置值
+- [I18nService](./7100-i18n.md) - 运行时翻译能力，语言包文件通过`ManifestService`读取

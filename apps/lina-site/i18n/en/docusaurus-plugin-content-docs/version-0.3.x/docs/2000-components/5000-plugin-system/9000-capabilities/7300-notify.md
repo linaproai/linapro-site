@@ -87,5 +87,5 @@ This service is a one-way publish channel; it does not provide notification stat
 
 ## Related Services
 
-- [BizCtxService](/docs/plugin-capability-bizctx) - Retrieves the current user ID as the notification sender
-- [I18nService](/docs/plugin-capability-i18n) - Notification content may require translation
+- [BizCtxService](./6800-bizctx.md) - Retrieves the current user ID as the notification sender
+- [I18nService](./7100-i18n.md) - Notification content may require translation

@@ -99,6 +99,6 @@ This service is a "consumer" of request context information, with data provided 
 
 ## Related Services
 
-- [AuthService](/docs/plugin-capability-auth) - The authentication middleware uses AuthService to write user identity
-- [TenantService](/docs/plugin-capability-tenant) - The tenant resolution middleware writes tenant information
-- [TenantFilterService](/docs/plugin-capability-tenant-filter) - Uses TenantID and PlatformBypass from BizCtx to filter data
+- [AuthService](./6700-auth.md) - The authentication middleware uses AuthService to write user identity
+- [TenantService](./7900-tenant.md) - The tenant resolution middleware writes tenant information
+- [TenantFilterService](./8000-tenant-filter.md) - Uses TenantID and PlatformBypass from BizCtx to filter data

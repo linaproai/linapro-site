@@ -102,6 +102,6 @@ graph TB
 
 ## Related Services
 
-- [PluginLifecycleService](/docs/plugin-capability-plugin-lifecycle) - Lifecycle orchestration changes plugin state; PluginStateService queries plugin state
-- [OrgService](/docs/plugin-capability-org) - Uses `IsProviderEnabled` to determine whether the organization capability provider is available
-- [TenantService](/docs/plugin-capability-tenant) - Uses `IsProviderEnabled` to determine whether the tenant capability provider is available
+- [PluginLifecycleService](./7500-plugin-lifecycle.md) - Lifecycle orchestration changes plugin state; PluginStateService queries plugin state
+- [OrgService](./7400-org.md) - Uses `IsProviderEnabled` to determine whether the organization capability provider is available
+- [TenantService](./7900-tenant.md) - Uses `IsProviderEnabled` to determine whether the tenant capability provider is available

@@ -89,5 +89,5 @@ This service is the information bridge between dynamic plugins and source plugin
 
 ## Related Services
 
-- [APIDocService](/docs/plugin-capability-apidoc) - Uses the operation key from route metadata for document localization
-- [BizCtxService](/docs/plugin-capability-bizctx) - Route metadata and business context together form the complete request picture
+- [APIDocService](./6600-apidoc.md) - Uses the operation key from route metadata for document localization
+- [BizCtxService](./6800-bizctx.md) - Route metadata and business context together form the complete request picture

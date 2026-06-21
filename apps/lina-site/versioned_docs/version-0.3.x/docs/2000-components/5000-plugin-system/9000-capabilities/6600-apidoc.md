@@ -95,6 +95,6 @@ sequenceDiagram
 
 ## 相关服务
 
-- [BizCtxService](/docs/plugin-capability-bizctx) - 提供请求级身份和租户上下文
-- [RouteService](/docs/plugin-capability-route) - 提供动态路由元数据
-- [I18nService](/docs/plugin-capability-i18n) - 提供运行时翻译能力
+- [BizCtxService](./6800-bizctx.md) - 提供请求级身份和租户上下文
+- [RouteService](./7700-route.md) - 提供动态路由元数据
+- [I18nService](./7100-i18n.md) - 提供运行时翻译能力

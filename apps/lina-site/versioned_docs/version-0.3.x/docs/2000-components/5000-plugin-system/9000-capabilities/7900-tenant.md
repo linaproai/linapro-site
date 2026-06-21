@@ -147,7 +147,7 @@ graph TB
 
 ## 相关服务
 
-- [OrgService](/docs/plugin-capability-org) - 组织能力与租户能力互补，共同构成多租户+组织的数据模型
-- [BizCtxService](/docs/plugin-capability-bizctx) - 租户解析结果投影到`BizCtx`的`TenantID`字段
-- [AuthService](/docs/plugin-capability-auth) - 租户切换前使用`TenantService`校验合法性
-- [TenantFilterService](/docs/plugin-capability-tenant-filter) - 使用`Tenant`中的租户信息过滤数据
+- [OrgService](./7400-org.md) - 组织能力与租户能力互补，共同构成多租户+组织的数据模型
+- [BizCtxService](./6800-bizctx.md) - 租户解析结果投影到`BizCtx`的`TenantID`字段
+- [AuthService](./6700-auth.md) - 租户切换前使用`TenantService`校验合法性
+- [TenantFilterService](./8000-tenant-filter.md) - 使用`Tenant`中的租户信息过滤数据

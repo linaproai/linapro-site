@@ -129,5 +129,5 @@ graph TB
 
 ## 相关服务
 
-- [ManifestService](/docs/plugin-capability-manifest) - 读取`manifest/`下的原始资源文件，与配置服务互补
-- [I18nService](/docs/plugin-capability-i18n) - 配置中的`i18n.default`等键影响翻译行为
+- [ManifestService](./7200-manifest.md) - 读取`manifest/`下的原始资源文件，与配置服务互补
+- [I18nService](./7100-i18n.md) - 配置中的`i18n.default`等键影响翻译行为

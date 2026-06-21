@@ -116,5 +116,5 @@ graph TB
 
 ## 相关服务
 
-- [PluginStateService](/docs/plugin-capability-plugin-state) - 查询插件启用状态，与生命周期编排互补
-- [TenantService](/docs/plugin-capability-tenant) - 租户管理模块使用`PluginLifecycleService`编排租户级事件
+- [PluginStateService](./7600-plugin-state.md) - 查询插件启用状态，与生命周期编排互补
+- [TenantService](./7900-tenant.md) - 租户管理模块使用`PluginLifecycleService`编排租户级事件

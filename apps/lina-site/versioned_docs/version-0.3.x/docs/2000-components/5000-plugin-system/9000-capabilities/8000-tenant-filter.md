@@ -119,6 +119,6 @@ graph TB
 
 ## 相关服务
 
-- [BizCtxService](/docs/plugin-capability-bizctx) - `TenantFilterContext`中的身份信息来自`BizCtx`
-- [TenantService](/docs/plugin-capability-tenant) - 租户能力提供租户解析，`TenantFilter`使用租户信息过滤数据
-- [CacheService](/docs/plugin-capability-cache) - 缓存键中的租户隔离与`TenantFilter`的查询过滤互补
+- [BizCtxService](./6800-bizctx.md) - `TenantFilterContext`中的身份信息来自`BizCtx`
+- [TenantService](./7900-tenant.md) - 租户能力提供租户解析，`TenantFilter`使用租户信息过滤数据
+- [CacheService](./6900-cache.md) - 缓存键中的租户隔离与`TenantFilter`的查询过滤互补
