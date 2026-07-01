@@ -1,6 +1,6 @@
 ---
 slug: '/docs/plugin-manifest'
-title: 'Manifest交付资源'
+title: '交付资源管理'
 hide_title: true
 description: '插件Manifest交付资源的目录结构、源码插件embed编译流程、动态插件产物打包机制、Manifest资源读取接口、动态插件资源授权、路径安全约束和设计收益，帮助开发者理解插件版本如何携带和管理SQL、i18n、前端页面和自定义资源文件。'
 keywords:

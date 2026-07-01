@@ -129,8 +129,8 @@ graph TB
 
 | 子存储 | 职责 | Redis实现 |
 |--------|------|-----------|
-| `LockStore` | 分布式锁，支持续约和隔离令牌 | `SET` + `EXPIRE` + Lua脚本 |
-| `KVStore` | 短期键值状态，原生TTL、原子递增、`SetNX` | Redis原生命令 |
+| `LockStore` | 分布式锁，支持续约和隔离令牌 | `SET` + `EXPIRE` + `Lua`脚本 |
+| `KVStore` | 短期键值状态，原生TTL、原子递增、`SetNX` | `Redis`原生命令 |
 | `RevisionStore` | 单调递增修订号，按领域和作用域隔离 | `INCR` + `GET` |
 | `EventBus` | 跨节点事件广播 | `Pub/Sub` |
 | `HealthChecker` | 后端健康监测 | `PING` |
