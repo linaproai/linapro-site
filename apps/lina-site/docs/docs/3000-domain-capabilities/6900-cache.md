@@ -2,7 +2,7 @@
 slug: '/docs/domain-capability-cache'
 title: 'Cache（缓存能力）'
 hide_title: true
-description: '`CacheService`为源码插件和动态插件提供插件作用域运行时缓存，支持字符串值、整数值、删除、递增和过期策略更新。宿主负责绑定插件身份和租户范围，缓存只能作为易失性加速数据，不能作为权限、配置、插件状态或业务记录的权威来源。'
+description: '`CacheService`为源码插件和动态插件提供插件作用域运行时缓存，支持字符串值、整数值、批量读写删除、递增和过期策略更新。宿主负责绑定插件身份和租户范围，缓存只能作为易失性加速数据，不能作为权限、配置、插件状态或业务记录的权威来源。'
 keywords:
   - CacheService
   - cachecap
@@ -64,18 +64,24 @@ graph TB
 | 方法 | 说明 |
 |------|------|
 | `Get` | 读取未过期缓存项，返回`CacheItem`和是否命中 |
-| `Set` | 写入字符串缓存，`ttl=0`表示不过期 |
+| `GetMany` | 批量读取未过期缓存项，最多支持`100`个键 |
+| `Set` | 写入字符串缓存，`ttl`必须为正 |
+| `SetMany` | 批量写入字符串缓存，每项`ttl`必须为正，总负载上限`1MB` |
 | `Delete` | 删除缓存项，缺失时为空操作 |
+| `DeleteMany` | 批量删除缓存项，缺失时为空操作 |
 | `Incr` | 按`delta`递增整数缓存，适合计数器 |
-| `Expire` | 更新过期策略，`ttl=0`表示清除过期 |
+| `Expire` | 更新过期策略，`ttl`必须为正 |
 
 ### 动态插件接口
 
 | 动态方法 | 动态`SDK`方法 | 说明 |
 |----------|-------------|------|
 | `get` | `Cache().Get` | 读取未过期缓存项 |
+| `get_many` | `Cache().GetMany` | 批量读取未过期缓存项 |
 | `set` | `Cache().Set` | 写入字符串缓存 |
+| `set_many` | `Cache().SetMany` | 批量写入字符串缓存 |
 | `delete` | `Cache().Delete` | 删除缓存项 |
+| `delete_many` | `Cache().DeleteMany` | 批量删除缓存项 |
 | `incr` | `Cache().Incr` | 递增整数缓存 |
 | `expire` | `Cache().Expire` | 更新过期策略 |
 
@@ -91,6 +97,12 @@ item, err := services.Cache().Set(ctx, "reports", "last_generated", value, time.
 
 // 读取缓存
 item, hit, err := services.Cache().Get(ctx, "reports", "last_generated")
+
+// 批量读取
+result, err := services.Cache().GetMany(ctx, cachecap.GetManyInput{
+    Namespace: "reports",
+    Keys:      []string{"last_generated", "export_count"},
+})
 
 // 递增计数器
 countItem, err := services.Cache().Incr(ctx, "reports", "export_count", 1, time.Hour)
@@ -130,7 +142,8 @@ item, hit, err := pluginbridge.Default().Cache().Get(ctx, "reports", "last_gener
 
 - **缓存是易失数据。** 缓存可能过期、被淘汰或丢失，不应作为权限、租户边界、配置、插件状态或业务记录的权威来源。
 - **命名空间由插件定义。** `namespace`用于插件内部逻辑分组，宿主会额外绑定插件和租户范围。
-- **`ttl=0`语义取决于方法。** `Set`中表示不过期，`Expire`中表示清除过期策略。
+- **`ttl`必须为正。** `Set`、`SetMany`和`Incr`的`ttl`必须为正，`Expire`的`ttl`也必须为正。
+- **批量操作有上限。** 单次批量最多`100`个键，单键最大`256`字节，批量写入总负载上限`1MB`。
 - **后端由宿主控制。** 插件不能选择内存、`Redis`或其他缓存后端。
 
 ## 相关服务

@@ -39,13 +39,19 @@ keywords:
 
 | 字段 | 说明 |
 |------|------|
+| `TokenID` | 当前认证令牌或在线会话标识 |
 | `UserID` | 当前认证用户标识 |
 | `Username` | 当前认证用户名 |
 | `TenantID` | 当前请求租户标识，`0`通常表示平台上下文 |
 | `ActingUserID` | 模拟场景下的真实平台用户标识 |
 | `ActingAsTenant` | 当前请求是否以租户视角操作 |
 | `IsImpersonation` | 当前令牌是否代表模拟登录 |
-| `PlatformBypass` | 当前请求是否允许绕过租户过滤 |
+| `Permissions` | 当前请求的生效权限标识列表 |
+| `DataScope` | 生效角色数据范围快照 |
+| `DataScopeUnsupported` | 角色快照是否包含不支持的数据范围 |
+| `UnsupportedDataScope` | 首个不支持的数据范围值 |
+| `IsSuperAdmin` | 当前调用者是否绕过常规权限检查 |
+| `PlatformBypass` | 当前请求是否运行在平台范围 |
 
 当`WithCurrentContext`注入的`TenantID`为`0`时，`PlatformBypass`会被自动标记为`true`。插件不应自行修改该标记，而应把它视为宿主对当前请求范围的判断。
 
@@ -94,6 +100,9 @@ if current.UserID == 0 {
 if current.IsImpersonation {
     // 记录模拟登录审计
     log.Infof("用户 %d 正在模拟访问租户 %d", current.ActingUserID, current.TenantID)
+}
+if current.IsSuperAdmin {
+    // 平台超级管理员，跳过常规权限检查
 }
 ```
 

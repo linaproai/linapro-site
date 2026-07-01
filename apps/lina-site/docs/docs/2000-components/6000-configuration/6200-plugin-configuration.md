@@ -145,7 +145,7 @@ plugin:
 
 #### 插件自定义参数
 
-业务插件可以在`sys_config`表中注册自定义的运行时参数，通常由业务插件的安装 `SQL` 文件声明初始数据，并通过`AdminServices.HostConfig()`接口在运行时管理。这些参数与内置参数存储在同一个表中，通过`HostConfig()`服务以完全相同的方式读取。
+业务插件可以在`sys_config`表中注册自定义的运行时参数，通常由业务插件的安装 `SQL` 文件声明初始数据，并通过`HostConfig().SysConfig()`接口在运行时管理。这些参数与内置参数存储在同一个表中，通过`HostConfig()`服务以完全相同的方式读取。
 
 ##### SQL 文件声明初始参数
 
@@ -170,37 +170,41 @@ ON CONFLICT DO NOTHING;
 | `ON CONFLICT DO NOTHING` | 幂等保护，重复安装不会覆盖已有的运行时值 |
 | 键名前缀 | 建议以**插件标识**为前缀（如`my-plugin.`），避免与内置参数或其他插件冲突 |
 
-##### AdminServices.HostConfig() 运行时管理
+##### HostConfig().SysConfig() 运行时管理
 
-源码插件可以通过`AdminServices.HostConfig()`接口在运行时批量查询和更新已有的运行时参数。此方式适合在插件业务逻辑中动态读写配置值。
+源码插件可以通过`HostConfig().SysConfig()`接口在运行时批量查询和更新已有的运行时参数。此方式适合在插件业务逻辑中动态读写配置值。
 
 | 方法 | 说明 |
 |------|------|
-| `BatchGetRuntimeConfig(ctx, capCtx, keys)` | 批量查询运行时参数，返回可见的参数投影和缺失键列表 |
-| `SetRuntimeConfigJSON(ctx, capCtx, key, valueJSON)` | 更新已有运行时参数的值，写入后自动推进共享修订号以触发快照刷新 |
+| `Get(ctx, key)` | 读取一个可见的运行时配置值 |
+| `BatchGet(ctx, keys)` | 批量查询运行时参数，返回可见的参数投影和缺失键列表 |
+| `List(ctx, input)` | 按关键词搜索可见的运行时配置 |
+| `SetValue(ctx, key, value)` | 更新已有运行时参数的值，写入后自动推进共享修订号以触发快照刷新 |
+| `Reset(ctx, key)` | 将运行时参数重置为默认值 |
+| `EnsureVisible(ctx, keys)` | 校验配置键是否在调用方可见范围内 |
 
 ```go
 // 批量读取运行时参数
-result, err := services.Admin().HostConfig().BatchGetRuntimeConfig(ctx, capCtx,
-    []hostconfigcap.RuntimeConfigKey{
+result, err := services.HostConfig().SysConfig().BatchGet(ctx,
+    []hostconfigcap.SysConfigKey{
         "my-plugin.api.endpoint",
         "my-plugin.retry.max",
     },
 )
-for key, proj := range result.Items {
-    fmt.Printf("%s = %s\n", key, string(proj.ValueJSON))
+for key, info := range result.Items {
+    fmt.Printf("%s = %s\n", key, info.Value)
 }
 // result.MissingIDs 中包含表里不存在的键
 
 // 更新已有参数的值（键必须已存在于 sys_config 表中）
-err = services.Admin().HostConfig().SetRuntimeConfigJSON(ctx, capCtx,
+err = services.HostConfig().SysConfig().SetValue(ctx,
     "my-plugin.api.endpoint",
-    []byte(`"https://new-api.example.com"`),
+    "https://new-api.example.com",
 )
 ```
 
-:::caution SetRuntimeConfigJSON 仅更新不创建
-`SetRuntimeConfigJSON`只能更新`sys_config`表中**已存在的**键。若键不存在，接口会返回权限拒绝错误。因此，插件的初始参数应通过 `SQL` 文件声明，后续在业务逻辑中通过`SetRuntimeConfigJSON`更新值。
+:::caution SetValue 仅更新不创建
+`SetValue`只能更新`sys_config`表中**已存在的**键。若键不存在，接口会返回权限拒绝错误。因此，插件的初始参数应通过 `SQL` 文件声明，后续在业务逻辑中通过`SetValue`更新值。
 :::
 
 ##### 读取参数

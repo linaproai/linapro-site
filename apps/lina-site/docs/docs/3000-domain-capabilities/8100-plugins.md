@@ -154,12 +154,12 @@ stateDiagram-v2
 | `EnsureTenantDeleteAllowed` | 租户删除前执行前置检查 |
 | `NotifyTenantDeleted` | 租户删除后进行最佳努力通知 |
 
-### 管理命令接口
+### 租户插件治理接口
 
 | 入口 | 方法 | 说明 |
 |------|------|------|
-| `Admin().Plugins()` | `SetPluginEnabled` | 修改插件启用状态，并经过租户、生命周期和状态机检查 |
-| `Admin().Plugins()` | `ProvisionTenantDefaults` | 为指定租户补齐默认插件供给状态 |
+| `Tenant().Plugins()` | `SetTenantPluginEnabled` | 修改租户插件启用状态，经过调用方和租户策略检查 |
+| `Tenant().Plugins()` | `ProvisionTenantPluginDefaults` | 为指定租户补齐默认插件供给状态 |
 
 ### 动态插件接口
 
@@ -210,11 +210,11 @@ if services.Plugins().State().IsProviderEnabled(ctx, "linapro-ai-core") {
 }
 ```
 
-可信源码插件执行管理命令：
+源码插件执行租户插件治理操作：
 
 ```go
-err := services.Admin().Plugins().SetPluginEnabled(ctx, capabilityCtx, pluginID, true)
-err := services.Admin().Plugins().ProvisionTenantDefaults(ctx, capabilityCtx, tenantID)
+err := services.Tenant().Plugins().SetTenantPluginEnabled(ctx, pluginID, true)
+err := services.Tenant().Plugins().ProvisionTenantPluginDefaults(ctx, tenantID)
 ```
 
 ### 动态插件使用

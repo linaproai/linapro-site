@@ -134,7 +134,6 @@ For example, the current `sessions` dynamic service only provides `sessions.sear
 | `Files()` | [Files Capability](/docs/domain-capability-files) | File views and visibility validation |
 | `HostConfig()` | [Host Config Capability](/docs/domain-capability-hostconfig) | Reads host configuration values; dynamic plugins must declare `keys` |
 | `I18n()` | [i18n Capability](/docs/domain-capability-i18n) | Source plugin runtime translation; not exposed as a dynamic `host service` |
-| `Infra()` | [Infrastructure Capability](/docs/domain-capability-infra) | Infrastructure component status views |
 | `Jobs()` | [Jobs Capability](/docs/domain-capability-jobs) | Scheduled task view reading |
 | `Manifest()` | [Manifest Resources Capability](/docs/domain-capability-manifest) | Reads read-only resources under the current plugin's `manifest/` |
 | `Notifications()` | [Notifications Capability](/docs/domain-capability-notifications) | Notification message view reading |
@@ -344,7 +343,7 @@ hostServices:
 
 | Resource Type | Declaration Field | Services |
 |---------------|-------------------|----------|
-| `none` | No `resources` declared | `runtime`, `apidoc`, `auth`, `authz`, `ai`, `users`, `bizctx`, `dict`, `files`, `infra`, `jobs`, `notifications`, `plugins`, `route`, `sessions`, `org`, `tenant` |
+| `none` | No `resources` declared | `runtime`, `apidoc`, `auth`, `authz`, `ai`, `users`, `bizctx`, `dict`, `files`, `jobs`, `notifications`, `plugins`, `route`, `sessions`, `org`, `tenant` |
 | `path` | `resources.paths` | `storage`, `manifest` |
 | `table` | `resources.tables` | `data` |
 | `key` | `resources.keys` | `hostconfig` |
@@ -372,7 +371,6 @@ Production validation requires `data` service tables to belong to the plugin's o
 | `bizctx` | [Business Context Capability](/docs/domain-capability-bizctx) | `none` | `current.get` |
 | `dict` | [Dict Capability](/docs/domain-capability-dict) | `none` | `labels.resolve`, `labels.list`, `labels.visible.ensure` |
 | `files` | [Files Capability](/docs/domain-capability-files) | `none` | `files.batch_get`, `files.search`, `files.visible.ensure` |
-| `infra` | [Infrastructure Capability](/docs/domain-capability-infra) | `none` | `status.batch_get` |
 | `jobs` | [Jobs Capability](/docs/domain-capability-jobs) | `none` | `jobs.batch_get`, `jobs.search`, `jobs.visible.ensure`, `jobs.register` |
 | `notifications` | [Notifications Capability](/docs/domain-capability-notifications) | Read no resource; `messages.send` uses `resources[].ref` | `messages.batch_get`, `messages.batch_get_by_source`, `messages.visible.ensure`, `messages.send` |
 | `plugins` | [Plugin Governance Capability](/docs/domain-capability-plugins) | `none` | `plugins.batch_get`, `plugins.tenant.list`, `plugins.enabled.check`, `plugins.provider_enabled.check`, `plugins.enabled_authoritative.check`, `config.get`, `lifecycle.tenant_plugin_disable.ensure`, `lifecycle.tenant_plugin_disabled.notify`, `lifecycle.tenant_delete.ensure`, `lifecycle.tenant_deleted.notify` |
@@ -400,6 +398,5 @@ Production validation requires `data` service tables to belong to the plugin's o
 - [Host Config Capability](/docs/domain-capability-hostconfig)
 - [Tenant Capability](/docs/domain-capability-tenant)
 - [Record Store Capability](/docs/domain-capability-recordstore)
-- [Infrastructure Capability](/docs/domain-capability-infra)
 - [Dynamic Runtime Capability](/docs/domain-capability-runtime)
 - [Dynamic Plugins and WASM Runtime](/docs/wasm-plugins)

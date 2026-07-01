@@ -180,10 +180,8 @@ func main() {}
 | `authz` | 权限批量获取、权限判断、平台管理员检查 |
 | `users` | 用户批量读取、搜索和可见性确认 |
 | `bizctx` | 当前请求业务上下文 |
-| `dict` | 字典标签解析 |
-| `files` | 文件批量读取和可见性确认 |
-| `i18n` | 读取`locale`、翻译消息和查找消息`key` |
-| `infra` | 基础设施组件状态 |
+| `dict` | 字典类型和值的生命周期管理、标签解析 |
+| `files` | 文件读取、上传、流式打开和可见性确认 |
 | `route` | 当前动态路由元数据 |
 | `sessions` | 在线会话搜索和批量读取 |
 | `org` | 组织投影，例如部门和岗位 |
@@ -293,7 +291,7 @@ menus:
 | 交付形式 | 源码参与主框架编译 | `.wasm`运行时产物 |
 | 热加载 | 需要部署新主框架 | 支持运行时上传和启用 |
 | 性能 | 原生`Go`性能 | 有沙箱和桥接开销 |
-| 主框架能力访问 | `pluginhost.Services`内嵌`capability.Services`，额外提供`Admin()`和`TenantFilter()` | `pluginbridge.Services`通过`hostServices`授权桥接，额外提供`Runtime()`、`Network()`和`RecordStore()` |
+| 主框架能力访问 | `pluginhost.Services`内嵌`capability.Services`，额外提供`TenantFilter()` | `pluginbridge.Services`通过`hostServices`授权桥接，额外提供`Runtime()`、`Network()`和`RecordStore()` |
 | 隔离强度 | 命名空间隔离 | `WASM`沙箱隔离 |
 | 调试体验 | 标准`Go`调试链路 | 更依赖日志和桥接诊断 |
 | 适用场景 | 长期业务模块 | 商业分发、热加载、临时扩展 |

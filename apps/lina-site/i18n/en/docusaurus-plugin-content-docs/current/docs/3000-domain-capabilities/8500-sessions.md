@@ -2,7 +2,7 @@
 slug: '/docs/domain-capability-sessions'
 title: 'Sessions'
 hide_title: true
-description: '`Sessions()` provides online session search and batch reading views for source plugins and dynamic plugins. Source plugins access it through `services.Sessions()`, while dynamic plugins declare `service: sessions` in `plugin.yaml` and access it through the `pluginbridge.Default().Sessions()` client. Trusted source plugins can revoke sessions through `Admin().Sessions().RevokeSession`.'
+description: 'Sessions() provides source-code plugins with online session search, batch retrieval, and revocation capabilities. Dynamic plugins declare service: sessions in plugin.yaml and use the pluginbridge.Default().Sessions() client to access published read-only methods.'
 keywords:
   - SessionService
   - sessioncap
@@ -10,104 +10,105 @@ keywords:
   - online sessions
   - SearchSessions
   - BatchGetSessions
-  - RevokeSession
+  - Revoke
   - token management
   - ClientType
   - DeptName
   - session view
   - session revocation
-  - AdminServices
-  - plugin capability
+  - plugin capabilities
   - LinaPro
 ---
 
-## Introduction
+## Overview
 
-Source plugins read online session views through `services.Sessions()`. Dynamic plugins declare `service: sessions` in `plugin.yaml` and access it through the `pluginbridge.Default().Sessions()` client. When session revocation is needed, trusted source plugins execute governed management commands through `services.Admin().Sessions().RevokeSession`.
+Source-code plugins access online session read and revocation capabilities through `services.Sessions()`. Dynamic plugins declare `service: sessions` in `plugin.yaml` and use the `pluginbridge.Default().Sessions()` client to access published read-only methods.
 
 **Capability Phase**: Runtime
 
-**Supported Plugin Types**: Source plugins, Dynamic plugins
+**Supported Types**: Source-code plugins, dynamic plugins
 
 ## Capability Design
 
 ### Session View Model
 
-Session views are used for online user monitoring, session governance, and security auditing scenarios. They do not expose session storage tables or `JWT` internal implementation:
+The session view is designed for online user monitoring, session governance, and security auditing. It does not expose session storage tables or `JWT` internals:
 
 | Field | Description |
-|-------|-------------|
+|------|------|
 | `ID` | Session domain identifier |
 | `TenantID` | Current tenant identifier |
 | `UserID`, `Username` | Session user |
-| `ClientType` | Client type, e.g., `web`, `mobile`, `desktop`, `cli` |
-| `DeptName` | Department name captured or assembled at login |
-| `Ip`, `Browser`, `Os` | Login environment info |
+| `ClientType` | Client type, e.g. `web`, `mobile`, `desktop`, `cli` |
+| `DeptName` | Department name captured or assembled at login time |
+| `Ip`, `Browser`, `Os` | Login environment information |
 | `LoginAt`, `LastActiveAt` | Login time and last active time |
 
-### Read-Write Separation Design
+### Read and Write Operations
 
-The session capability follows a read-write separation pattern: standard `Sessions()` provides read-only view capabilities, while `Admin().Sessions()` provides governed write commands. Session revocation immediately affects tokens — after revocation, the corresponding token should not be able to pass the host authentication middleware.
+`Sessions()` provides unified read and revocation operations. `Revoke` and `RevokeMany` are executed after tenant, data scope, target visibility, and audit validation. Session revocation takes immediate effect on the token -- after revocation, the corresponding token should no longer pass host authentication middleware.
 
 ### Department Name View
 
-`DeptName` is a view field and may be empty when the org capability is not available.
+`DeptName` is a view field and may be empty when the organization capability is unavailable.
 
 ## Interface Definitions
 
-### Source Plugin Interface
+### Source-Code Plugin Interface
 
-| Entry | Method | Description |
-|-------|--------|-------------|
-| `Sessions()` | `Current` | Returns the visible session view for the current token |
-| `Sessions()` | `Search` | Searches visible sessions by username, `IP`, and pagination |
-| `Sessions()` | `BatchGet` | Batch-reads visible session views |
-| `Sessions()` | `BatchGetUserOnlineStatus` | Batch-reads user online status |
-| `Sessions()` | `EnsureVisible` | Validates that target session set is visible to the current call context |
-| `Admin().Sessions()` | `Revoke` | Revokes a visible online session |
+| Method | Description |
+|------|------|
+| `Current` | Returns the visible session view for the current token |
+| `Get` | Retrieves a single visible session view |
+| `List` | Searches visible sessions by username, `IP`, and pagination |
+| `BatchGet` | Batch-retrieves visible session views |
+| `BatchGetUserOnlineStatus` | Batch-retrieves user online status |
+| `EnsureVisible` | Validates that a target session set is visible to the current caller |
+| `Revoke` | Revokes a visible online session, subject to tenant, data scope, target visibility, and audit validation |
+| `RevokeMany` | Batch-revokes visible online sessions; any invisible target rejects the entire operation |
 
 ### Dynamic Plugin Interface
 
 Dynamic plugins declare authorized read-only methods through `hostServices.sessions`:
 
 | Dynamic Method | Description |
-|----------------|-------------|
+|----------|------|
 | `sessions.current` | Returns the visible session view for the current token |
-| `sessions.search` | Searches visible sessions by username, `IP`, and pagination |
-| `sessions.batch_get` | Batch-reads visible session views |
-| `sessions.batch_get_user_online_status` | Batch-reads user online status |
-| `sessions.visible.ensure` | Validates that target session set is visible to the current call context |
+| `sessions.list` | Searches visible sessions by username, `IP`, and pagination |
+| `sessions.batch_get` | Batch-retrieves visible session views |
+| `sessions.batch_get_user_online_status` | Batch-retrieves user online status |
+| `sessions.visible.ensure` | Validates that a target session set is visible to the current caller |
 
-## Capability Usage
+## Usage
 
-### Source Plugin Usage
+### Source-Code Plugin Usage
 
-Source plugins read and manage sessions through `services.Sessions()`, explicitly passing the domain-required `CapabilityContext`:
+Source-code plugins use `services.Sessions()` to read and manage sessions, passing the domain-required `CapabilityContext` explicitly:
 
 ```go
-// Get current session view
-current, err := services.Sessions().Current(ctx, capabilityCtx)
+// Get the current session view
+current, err := services.Sessions().Current(ctx)
 
 // Search online sessions
-page, err := services.Sessions().Search(ctx, capabilityCtx, sessioncap.SearchInput{
+page, err := services.Sessions().List(ctx, sessioncap.ListInput{
     Username: keyword,
     Page:     pageRequest,
 })
 
-// Batch-read session views
-result, err := services.Sessions().BatchGet(ctx, capabilityCtx, sessionIDs)
+// Batch-retrieve session views
+result, err := services.Sessions().BatchGet(ctx, sessionIDs)
 
-// Batch-read user online status
-onlineStatus, err := services.Sessions().BatchGetUserOnlineStatus(ctx, capabilityCtx, userIDs)
+// Batch-retrieve user online status
+onlineStatus, err := services.Sessions().BatchGetUserOnlineStatus(ctx, userIDs)
 
 // Validate session visibility
-err := services.Sessions().EnsureVisible(ctx, capabilityCtx, sessionIDs)
-```
+err := services.Sessions().EnsureVisible(ctx, sessionIDs)
 
-Trusted source plugins revoking sessions:
+// Revoke a single session
+err := services.Sessions().Revoke(ctx, sessionID)
 
-```go
-err := services.Admin().Sessions().Revoke(ctx, capabilityCtx, sessionID)
+// Batch-revoke sessions
+err := services.Sessions().RevokeMany(ctx, sessionIDs)
 ```
 
 ### Dynamic Plugin Usage
@@ -125,33 +126,33 @@ hostServices:
       - sessions.visible.ensure
 ```
 
-Dynamic plugins call through the `pluginbridge.Default().Sessions()` client:
+Dynamic plugins invoke through the `pluginbridge.Default().Sessions()` client:
 
 ```go
 sessionsSvc := pluginbridge.Default().Sessions()
 
-// Get current session view
-current, err := sessionsSvc.Current(ctx, capabilityCtx)
+// Get the current session view
+current, err := sessionsSvc.Current(ctx)
 
 // Search online sessions
-page, err := sessionsSvc.Search(ctx, capabilityCtx, sessioncap.SearchInput{
+page, err := sessionsSvc.List(ctx, sessioncap.ListInput{
     Username: keyword,
     Page:     pageRequest,
 })
 
-// Batch-read session views
-result, err := sessionsSvc.BatchGet(ctx, capabilityCtx, sessionIDs)
+// Batch-retrieve session views
+result, err := sessionsSvc.BatchGet(ctx, sessionIDs)
 
-// Batch-read user online status
-onlineStatus, err := sessionsSvc.BatchGetUserOnlineStatus(ctx, capabilityCtx, userIDs)
+// Batch-retrieve user online status
+onlineStatus, err := sessionsSvc.BatchGetUserOnlineStatus(ctx, userIDs)
 ```
 
 ## Design Constraints
 
-- **Standard capability is read-only.** Session revocation is a management command, not part of standard `Sessions()`.
-- **Missing results don't reveal specific reasons.** Batch reads don't distinguish between sessions that don't exist, are invisible, or are rejected.
-- **Department name is a view field.** `DeptName` may be empty when the org capability is not available.
-- **Session revocation immediately affects tokens.** After revocation, the corresponding token should not be able to pass the host authentication middleware.
+- **Session revocation is subject to governance validation.** `Revoke` and `RevokeMany` are executed after tenant, data scope, target visibility, and audit validation.
+- **Missing results do not reveal specific reasons.** Batch retrieval does not distinguish between sessions that do not exist, are invisible, or are denied.
+- **Department name is a view field.** `DeptName` may be empty when the organization capability is unavailable.
+- **Session revocation takes immediate effect on the token.** After revocation, the corresponding token should no longer pass host authentication middleware.
 
 ## Related Services
 

@@ -2,7 +2,7 @@
 slug: '/docs/domain-capability-sessions'
 title: 'Sessions（会话管理）'
 hide_title: true
-description: '`Sessions()`为源码插件和动态插件提供在线会话搜索和批量读取视图。源码插件通过`services.Sessions()`访问，动态插件通过`plugin.yaml`声明`service: sessions`后使用`pluginbridge.Default().Sessions()`客户端访问。可信源码插件可通过`Admin().Sessions().RevokeSession`吊销会话。'
+description: '`Sessions()`为源码插件提供在线会话搜索、批量读取和吊销能力。动态插件通过`plugin.yaml`声明`service: sessions`后使用`pluginbridge.Default().Sessions()`客户端访问已发布的只读方法。'
 keywords:
   - SessionService
   - sessioncap
@@ -10,20 +10,19 @@ keywords:
   - 在线会话
   - SearchSessions
   - BatchGetSessions
-  - RevokeSession
+  - Revoke
   - Token管理
   - ClientType
   - DeptName
   - 会话视图
   - 会话吊销
-  - AdminServices
   - 插件能力
   - LinaPro
 ---
 
 ## 基本介绍
 
-源码插件通过`services.Sessions()`读取在线会话视图，动态插件通过`plugin.yaml`声明`service: sessions`后使用`pluginbridge.Default().Sessions()`客户端访问。需要吊销会话时，可信源码插件通过`services.Admin().Sessions().RevokeSession`执行受管控的管理命令。
+源码插件通过`services.Sessions()`访问在线会话的读取和吊销能力，动态插件通过`plugin.yaml`声明`service: sessions`后使用`pluginbridge.Default().Sessions()`客户端访问已发布的只读方法。
 
 **能力阶段**：运行期
 
@@ -45,9 +44,9 @@ keywords:
 | `Ip`、`Browser`、`Os` | 登录环境信息 |
 | `LoginAt`、`LastActiveAt` | 登录时间和最近活跃时间 |
 
-### 读写分离设计
+### 读写操作
 
-会话能力遵循读写分离模式：普通`Sessions()`提供只读视图能力，`Admin().Sessions()`提供受管控的写入命令。会话吊销即时影响令牌，吊销后对应令牌应无法继续通过宿主认证中间件。
+`Sessions()`统一提供读取和吊销操作。`Revoke`和`RevokeMany`经过租户、数据范围、目标可见性和审计校验后执行。会话吊销即时影响令牌，吊销后对应令牌应无法继续通过宿主认证中间件。
 
 ### 部门名称视图
 
@@ -57,14 +56,16 @@ keywords:
 
 ### 源码插件接口
 
-| 入口 | 方法 | 说明 |
-|------|------|------|
-| `Sessions()` | `Current` | 返回当前令牌的可见会话视图 |
-| `Sessions()` | `Search` | 按用户名、`IP`和分页条件搜索可见会话 |
-| `Sessions()` | `BatchGet` | 批量读取可见会话视图 |
-| `Sessions()` | `BatchGetUserOnlineStatus` | 批量读取用户在线状态 |
-| `Sessions()` | `EnsureVisible` | 校验目标会话集合对当前调用上下文可见 |
-| `Admin().Sessions()` | `Revoke` | 吊销一个可见在线会话 |
+| 方法 | 说明 |
+|------|------|
+| `Current` | 返回当前令牌的可见会话视图 |
+| `Get` | 读取单个可见会话视图 |
+| `List` | 按用户名、`IP`和分页条件搜索可见会话 |
+| `BatchGet` | 批量读取可见会话视图 |
+| `BatchGetUserOnlineStatus` | 批量读取用户在线状态 |
+| `EnsureVisible` | 校验目标会话集合对当前调用上下文可见 |
+| `Revoke` | 吊销一个可见在线会话，经过租户、数据范围、目标可见性和审计校验 |
+| `RevokeMany` | 批量吊销可见在线会话，任何不可见目标会拒绝整个操作 |
 
 ### 动态插件接口
 
@@ -73,7 +74,7 @@ keywords:
 | 动态方法 | 说明 |
 |----------|------|
 | `sessions.current` | 返回当前令牌的可见会话视图 |
-| `sessions.search` | 按用户名、`IP`和分页条件搜索可见会话 |
+| `sessions.list` | 按用户名、`IP`和分页条件搜索可见会话 |
 | `sessions.batch_get` | 批量读取可见会话视图 |
 | `sessions.batch_get_user_online_status` | 批量读取用户在线状态 |
 | `sessions.visible.ensure` | 校验目标会话集合对当前调用上下文可见 |
@@ -86,28 +87,28 @@ keywords:
 
 ```go
 // 获取当前会话视图
-current, err := services.Sessions().Current(ctx, capabilityCtx)
+current, err := services.Sessions().Current(ctx)
 
 // 搜索在线会话
-page, err := services.Sessions().Search(ctx, capabilityCtx, sessioncap.SearchInput{
+page, err := services.Sessions().List(ctx, sessioncap.ListInput{
     Username: keyword,
     Page:     pageRequest,
 })
 
 // 批量读取会话视图
-result, err := services.Sessions().BatchGet(ctx, capabilityCtx, sessionIDs)
+result, err := services.Sessions().BatchGet(ctx, sessionIDs)
 
 // 批量读取用户在线状态
-onlineStatus, err := services.Sessions().BatchGetUserOnlineStatus(ctx, capabilityCtx, userIDs)
+onlineStatus, err := services.Sessions().BatchGetUserOnlineStatus(ctx, userIDs)
 
 // 校验会话可见性
-err := services.Sessions().EnsureVisible(ctx, capabilityCtx, sessionIDs)
-```
+err := services.Sessions().EnsureVisible(ctx, sessionIDs)
 
-可信源码插件吊销会话：
+// 吊销单个会话
+err := services.Sessions().Revoke(ctx, sessionID)
 
-```go
-err := services.Admin().Sessions().Revoke(ctx, capabilityCtx, sessionID)
+// 批量吊销会话
+err := services.Sessions().RevokeMany(ctx, sessionIDs)
 ```
 
 ### 动态插件使用
@@ -131,24 +132,24 @@ hostServices:
 sessionsSvc := pluginbridge.Default().Sessions()
 
 // 获取当前会话视图
-current, err := sessionsSvc.Current(ctx, capabilityCtx)
+current, err := sessionsSvc.Current(ctx)
 
 // 搜索在线会话
-page, err := sessionsSvc.Search(ctx, capabilityCtx, sessioncap.SearchInput{
+page, err := sessionsSvc.List(ctx, sessioncap.ListInput{
     Username: keyword,
     Page:     pageRequest,
 })
 
 // 批量读取会话视图
-result, err := sessionsSvc.BatchGet(ctx, capabilityCtx, sessionIDs)
+result, err := sessionsSvc.BatchGet(ctx, sessionIDs)
 
 // 批量读取用户在线状态
-onlineStatus, err := sessionsSvc.BatchGetUserOnlineStatus(ctx, capabilityCtx, userIDs)
+onlineStatus, err := sessionsSvc.BatchGetUserOnlineStatus(ctx, userIDs)
 ```
 
 ## 设计约束
 
-- **普通能力只读。** 会话吊销属于管理命令，不在普通`Sessions()`中。
+- **会话吊销经过治理校验。** `Revoke`和`RevokeMany`经过租户、数据范围、目标可见性和审计校验后执行。
 - **缺失结果不透露具体原因。** 批量读取不会区分会话不存在、不可见或被拒绝。
 - **部门名称是视图字段。** 组织能力不可用时，`DeptName`可能为空。
 - **会话吊销即时影响令牌。** 吊销后对应令牌应无法继续通过宿主认证中间件。

@@ -2,7 +2,7 @@
 slug: '/docs/domain-capability-users'
 title: 'Users'
 hide_title: true
-description: '`Users()` provides protected read capabilities in the user domain for source plugins and dynamic plugins, including batch reading user views, searching visible user candidates, and validating target user visibility. Trusted source plugins can execute user status management commands through `Admin().Users()`. Dynamic plugins declare `service: users` in `plugin.yaml` and access it through the `pluginbridge.Default().Users()` client.'
+description: 'Users() provides source-code and dynamic plugins with protected user-domain capabilities, including reading user views, batch-resolving users, searching visible user candidates, validating target user visibility, and governed user creation, update, deletion, status management, and password reset. Dynamic plugins declare service: users in plugin.yaml and use the pluginbridge.Default().Users() client to access capabilities.'
 keywords:
   - Users capability
   - usercap
@@ -11,116 +11,135 @@ keywords:
   - SearchUsers
   - EnsureUsersVisible
   - SetUserStatus
-  - AdminServices
+  - LinaPro
   - user view
   - user search
   - visibility validation
   - CapabilityContext
-  - source plugin
+  - source-code plugin
   - dynamic plugin
   - LinaPro
 ---
 
-## Introduction
+## Overview
 
-Source plugins read user domain views through `services.Users()`. Dynamic plugins declare `service: users` in `plugin.yaml` and access it through the `pluginbridge.Default().Users()` client. This capability only returns plugin-visible display fields and does not expose the `sys_user` table, user entities, password fields, role relationships, or host `DAO`.
-
-When user lifecycle state changes are needed, trusted source plugins execute governed management commands through `services.Admin().Users().SetUserStatus`. Standard `Users()` remains read-only.
+Source-code plugins access user-domain capabilities through `services.Users()`. Dynamic plugins declare `service: users` in `plugin.yaml` and use the `pluginbridge.Default().Users()` client to access capabilities. This capability only returns display fields visible to the plugin and does not expose the `sys_user` table, user entities, password fields, role relationships, or host `DAO`.
 
 **Capability Phase**: Runtime
 
-**Supported Plugin Types**: Source plugins, Dynamic plugins
+**Supported Types**: Source-code plugins, dynamic plugins
 
 ## Capability Design
 
 ### User View Model
 
-User views are for display, candidate selection, and audit context — they are not host user entities. Missing results don't reveal whether the target user doesn't exist, is invisible, or is rejected:
+The user view is designed for display, candidate selection, and audit contexts -- it is not the host user entity. Missing results do not reveal whether the target user does not exist, is invisible, or is denied:
 
 | Field | Description |
-|-------|-------------|
+|------|------|
 | `ID` | User domain identifier |
 | `Username` | Stable login name |
 | `Nickname` | Display name |
 | `Avatar` | Avatar `URL` or protected file reference |
-| `Status` | User lifecycle state |
-| `TenantID` | User's tenant identifier |
-| `LabelKey`, `Label` | Optional localized labels for synthetic or special users |
+| `Status` | User lifecycle status |
+| `TenantID` | Identifier of the tenant the user belongs to |
+| `LabelKey`, `Label` | Optional localized label for synthetic or special users |
 
-### Read-Write Separation Design
+### Read and Write Capability Design
 
-The user capability follows a read-write separation pattern: standard `Users()` provides read-only view capabilities, while `Admin().Users()` provides governed write commands. Organization information is not maintained in the user capability — optional org views like departments and positions come from the `Org` capability.
+The user capability provides both read and write methods: read methods (`Current`, `Get`, `BatchGet`, `BatchResolve`, `List`) return protected views; write methods (`Create`, `Update`, `Delete`, `SetStatus`, `ResetPassword`, `Assignment().ReplaceRoles`) are executed after visibility, tenant boundary, state machine, and audit validation. Organization information is not maintained in the user capability; optional organization views such as departments and positions come from the `Org` capability.
 
 ```mermaid
 graph TB
-    Plugin["Source Plugin"] --> Users["services.Users()"]
-    Users --> Scope["CapabilityContext<br/>Plugin, operator, tenant"]
-    Scope --> Projection["UserProjection"]
-    Dynamic["Dynamic Plugin"] --> GuestUsers["pluginbridge.Users()"]
-    GuestUsers --> Scope
-    Admin["services.Admin().Users()"] --> Guard["State and visibility governance"]
-    Guard --> Command["SetUserStatus"]
+    Plugin["Source-code plugin"] --> Users["services.Users()"]
+    Users --> Read["Read methods<br/>Current / Get / BatchGet / BatchResolve / List"]
+    Users --> Write["Write methods<br/>Create / Update / Delete / SetStatus / ResetPassword"]
+    Users --> Assignment["Assignment().ReplaceRoles"]
+    Dynamic["Dynamic plugin"] --> GuestUsers["pluginbridge.Users()"]
+    GuestUsers --> Read
 ```
 
 ## Interface Definitions
 
-### Source Plugin Interface
+### Source-Code Plugin Interface
 
-| Entry | Method | Description |
-|-------|--------|-------------|
-| `Users()` | `Current` | Returns the current operator's visible user view |
-| `Users()` | `BatchGet` | Batch-reads visible user views, returns `BatchResult` |
-| `Users()` | `BatchResolve` | Batch-resolves visible users by user `ID`, username, email, or phone number |
-| `Users()` | `Search` | Searches visible user candidates by keyword and pagination |
-| `Users()` | `EnsureVisible` | Validates that target user set is visible to the current call context |
-| `Admin().Users()` | `SetStatus` | Changes a visible user's lifecycle state |
+| Method | Description |
+|------|------|
+| `Current` | Returns the current actor's visible user view |
+| `Get` | Retrieves a single visible user view |
+| `BatchGet` | Batch-retrieves visible user views, returning `BatchResult` |
+| `BatchResolve` | Batch-resolves visible users by user `ID`, username, email, or phone number |
+| `List` | Searches visible user candidates by keyword and pagination |
+| `EnsureVisible` | Validates that a target user set is visible to the current caller |
+| `Create` | Creates a user, subject to username uniqueness, tenant boundary, and role validation |
+| `Update` | Updates a visible user's information, subject to target visibility and tenant boundary validation |
+| `Delete` | Deletes a visible user, subject to target visibility and tenant boundary validation |
+| `SetStatus` | Changes a visible user's lifecycle status |
+| `ResetPassword` | Resets a visible user's password |
+| `Assignment().ReplaceRoles` | Replaces a visible user's role associations |
 
 ### Dynamic Plugin Interface
 
 Dynamic plugins declare authorized read-only methods through `hostServices.users`:
 
 | Dynamic Method | Description |
-|----------------|-------------|
-| `users.current` | Returns the current operator's visible user view |
-| `users.batch_get` | Batch-reads visible user views |
+|----------|------|
+| `users.current` | Returns the current actor's visible user view |
+| `users.batch_get` | Batch-retrieves visible user views |
 | `users.batch_resolve` | Batch-resolves visible users by user `ID`, username, email, or phone number |
-| `users.search` | Searches visible user candidates by keyword and pagination |
-| `users.visible.ensure` | Validates that target user set is visible to the current call context |
+| `users.list` | Searches visible user candidates by keyword and pagination |
+| `users.visible.ensure` | Validates that a target user set is visible to the current caller |
 
-## Capability Usage
+## Usage
 
-### Source Plugin Usage
+### Source-Code Plugin Usage
 
-Source plugins read user views through `services.Users()`, explicitly passing the domain-required `CapabilityContext`:
+Source-code plugins access user capabilities through `services.Users()`:
 
 ```go
-// Get current operator user view
-current, err := services.Users().Current(ctx, capabilityCtx)
+// Get the current actor's user view
+current, err := services.Users().Current(ctx)
 
-// Batch-read user views
-result, err := services.Users().BatchGet(ctx, capabilityCtx, userIDs)
+// Batch-retrieve user views
+result, err := services.Users().BatchGet(ctx, userIDs)
 
-// Batch-resolve users by multiple dimensions
-resolveResult, err := services.Users().BatchResolve(ctx, capabilityCtx, usercap.BatchResolveInput{
+// Batch-resolve users across multiple dimensions
+resolveResult, err := services.Users().BatchResolve(ctx, usercap.BatchResolveInput{
     IDs:       userIDs,
     Usernames: usernames,
     Contacts:  emails,
 })
 
 // Search visible user candidates
-page, err := services.Users().Search(ctx, capabilityCtx, usercap.SearchInput{
+page, err := services.Users().List(ctx, usercap.ListInput{
     Keyword: keyword,
     Page:    pageRequest,
 })
 
 // Validate user visibility
-err := services.Users().EnsureVisible(ctx, capabilityCtx, userIDs)
-```
+err := services.Users().EnsureVisible(ctx, userIDs)
 
-Trusted source plugins executing user status management:
+// Create a user
+userID, err := services.Users().Create(ctx, usercap.CreateInput{
+    Username: "newuser",
+    Password: "hashed",
+    Nickname: "New User",
+})
 
-```go
-err := services.Admin().Users().SetStatus(ctx, capabilityCtx, userID, newStatus)
+// Update a user
+err := services.Users().Update(ctx, usercap.UpdateInput{
+    ID:       userID,
+    Nickname: ptr("New Nickname"),
+})
+
+// Change user status
+err := services.Users().SetStatus(ctx, userID, statusflag.EnabledTrue)
+
+// Reset password
+err := services.Users().ResetPassword(ctx, userID, "newHashedPassword")
+
+// Replace role associations
+err := services.Users().Assignment().ReplaceRoles(ctx, userID, roleIDs)
 ```
 
 ### Dynamic Plugin Usage
@@ -137,26 +156,26 @@ hostServices:
       - users.search
 ```
 
-Dynamic plugins call through the `pluginbridge.Default().Users()` client:
+Dynamic plugins invoke through the `pluginbridge.Default().Users()` client:
 
 ```go
 usersSvc := pluginbridge.Default().Users()
 
-// Get current operator user view
-current, err := usersSvc.Current(ctx, capabilityCtx)
+// Get the current actor's user view
+current, err := usersSvc.Current(ctx)
 
-// Batch-read user views
-result, err := usersSvc.BatchGet(ctx, capabilityCtx, userIDs)
+// Batch-retrieve user views
+result, err := usersSvc.BatchGet(ctx, userIDs)
 
-// Batch-resolve users by multiple dimensions
-resolveResult, err := usersSvc.BatchResolve(ctx, capabilityCtx, usercap.BatchResolveInput{
+// Batch-resolve users across multiple dimensions
+resolveResult, err := usersSvc.BatchResolve(ctx, usercap.BatchResolveInput{
     IDs:       userIDs,
     Usernames: usernames,
     Contacts:  emails,
 })
 
 // Search visible user candidates
-page, err := usersSvc.Search(ctx, capabilityCtx, usercap.SearchInput{
+page, err := usersSvc.List(ctx, usercap.ListInput{
     Keyword: keyword,
     Page:    pageRequest,
 })
@@ -164,10 +183,10 @@ page, err := usersSvc.Search(ctx, capabilityCtx, usercap.SearchInput{
 
 ## Design Constraints
 
-- **No host storage exposed.** Plugins cannot access passwords, salts, role tables, menu tables, or raw `sys_user` records through the user capability.
+- **Host storage is not exposed.** Plugins cannot access passwords, salt values, role tables, menu tables, or raw `sys_user` records through the user capability.
 - **Searches must be bounded.** `SearchUsers` uses `PageRequest` to limit result size, preventing plugins from pulling the entire user table.
-- **Visibility failures don't reveal specific reasons.** `EnsureUsersVisible` only expresses that the current call cannot proceed, without exposing specific rejection reasons to standard plugins.
-- **Status values are defined by the host domain.** Plugins should not invent user states not accepted by the host state machine.
+- **Visibility failures do not reveal specific reasons.** `EnsureUsersVisible` only indicates that the current call cannot proceed; it does not expose specific denial reasons to ordinary plugins.
+- **Status values are defined by the host domain.** Plugins should not invent user statuses not accepted by the host state machine.
 
 ## Related Services
 

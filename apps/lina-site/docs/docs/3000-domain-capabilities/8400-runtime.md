@@ -2,7 +2,7 @@
 slug: '/docs/domain-capability-runtime'
 title: 'Runtime（运行时能力）'
 hide_title: true
-description: '`Runtime()`是动态插件专属的运行时宿主服务客户端，对应`plugin.yaml`中的`service: runtime`声明。它为`WASM guest`提供结构化日志写入、插件作用域状态读写、宿主时间读取、`UUID`生成和节点身份读取。该能力不属于`capability.Services`普通领域目录，源码插件应使用宿主原生日志、上下文和注入的领域服务；基础设施组件状态读取则使用独立的`Infra()`和`service: infra`能力。'
+description: '`Runtime()`是动态插件专属的运行时宿主服务客户端，对应`plugin.yaml`中的`service: runtime`声明。它为`WASM guest`提供结构化日志写入、插件作用域状态读写、宿主时间读取、`UUID`生成和节点身份读取。该能力不属于`capability.Services`普通领域目录，源码插件应使用宿主原生日志、上下文和注入的领域服务。'
 keywords:
   - Runtime能力
   - 动态插件运行时
@@ -51,17 +51,6 @@ graph TB
     HostService --> Info["时间、UUID、节点身份"]
     Source["源码插件"] --> Native["宿主原生日志和上下文"]
 ```
-
-### 与`Infra()`的边界
-
-`Runtime()`读取的是动态插件运行时原语；`Infra()`读取的是基础设施组件状态。两者不能互相替代：
-
-| 能力 | 所属边界 | 主要职责 |
-|------|----------|----------|
-| `Runtime()` | 动态插件专属能力 | 日志、插件状态、时间、`UUID`和节点身份 |
-| `Infra()` | 源码插件和动态插件共享的普通领域能力 | 基础设施组件状态视图 |
-
-如果动态插件需要判断某个基础设施组件是否可用，应声明`service: infra`，而不是把`runtime.info.*`当作组件状态能力。
 
 ## 主要能力
 
@@ -135,11 +124,9 @@ node, err := runtime.Node()
 - **运行状态不是缓存替代品。** `runtime.state.*`适合保存少量插件作用域状态；跨插件共享、计数器和过期策略应使用[缓存能力](/docs/domain-capability-cache)。
 - **日志字段应短小稳定。** 动态插件写日志时不要把大正文、密钥、令牌或个人敏感信息放入字段。
 - **信息读取不是健康检查。** `info.now`、`info.uuid`和`info.node`只提供运行时基础信息，不表达组件可用性。
-- **基础设施状态走`Infra()`。** 组件状态读取应使用[基础设施能力](/docs/domain-capability-infra)和`service: infra`。
 
 ## 相关服务
 
-- [基础设施能力](/docs/domain-capability-infra)
 - [缓存能力](/docs/domain-capability-cache)
 - [动态插件与WASM运行时](/docs/wasm-plugins)
 - [插件可用领域能力概览](/docs/domain-capabilities)

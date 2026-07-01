@@ -27,7 +27,9 @@ keywords:
 
 ## 基本介绍
 
-源码插件通过`services.Tenant()`消费普通租户能力。租户能力是可选框架能力，官方提供方插件标识为`linapro-tenant-core`。没有活跃提供方时，服务会降级到平台租户`0`的单租户语义。
+源码插件通过`services.Tenant()`消费租户能力。租户能力是可选框架能力，官方提供方插件标识为`linapro-tenant-core`。没有活跃提供方时，服务会降级到平台租户`0`的单租户语义。
+
+`Tenant`能力采用子服务模式，聚合`Context()`（当前租户上下文）、`Directory()`（租户目录）、`Membership()`（用户租户成员关系）、`Plugins()`（租户插件治理）和`Filter()`（租户过滤上下文）。
 
 动态插件可声明`service: tenant`调用已发布的租户能力方法。
 
@@ -50,50 +52,79 @@ graph TB
     Tenant --> Provider["linapro-tenant-core"]
 ```
 
-### 安全降级
+### 子服务体系
 
-当没有租户提供方时，系统会降级为平台租户的单租户模式。普通`Tenant()`不会暴露`RequestResolver`、`ScopeService`、用户租户成员关系写入或启动一致性检查等接口，这些属于宿主内部的中间件、数据库过滤或治理流程。
-
-### 源码插件专属：TenantFilter
-
-源码插件如果需要查询插件自有表，可以通过`pluginhost.Services.TenantFilter()`获取`tenantcap.PluginTableFilterService`。它属于租户领域能力，但不属于普通`capability.Services.Tenant()`；原因是它直接接收并返回`*gdb.Model`查询构建器，只适合运行在宿主进程内的源码插件使用。
-
-| 方法 | 说明 |
-|------|------|
-| `Context` | 返回当前请求的租户、用户、真实操作者、模拟状态和平台绕过信息 |
-| `Apply` | 向查询模型追加`tenant_id`条件；当前请求允许平台绕过时返回原模型 |
-
-`TenantFilterContext`包含`UserID`、`TenantID`、`ActingUserID`、`OnBehalfOfTenantID`、`ActingAsTenant`、`IsImpersonation`和`PlatformBypass`。其中`ActingUserID`适合写入审计记录，`PlatformBypass`由宿主策略判定，插件不应自行构造。
+`Tenant`能力采用子服务模式，分别处理不同租户领域操作：
 
 ```mermaid
-graph LR
-    Model["插件查询模型"] --> Apply["TenantFilter.Apply"]
-    Apply --> Bypass{"PlatformBypass?"}
-    Bypass -->|"true"| Same["返回原模型"]
-    Bypass -->|"false"| Filtered["追加tenant_id条件"]
+graph TB
+    Tenant["services.Tenant()"] --> Avail["Available / Status"]
+    Tenant --> Ctx["Context()<br/>当前租户上下文"]
+    Tenant --> Dir["Directory()<br/>租户目录"]
+    Tenant --> Mem["Membership()<br/>用户租户成员关系"]
+    Tenant --> Plugins["Plugins()<br/>租户插件治理"]
+    Tenant --> Filter["Filter()<br/>租户过滤上下文"]
+    Ctx --> CtxMethods["Current / Info / PlatformBypass"]
+    Dir --> DirMethods["Get / BatchGet / List / EnsureVisible"]
+    Mem --> MemMethods["ListByUser / Validate"]
 ```
 
-动态插件不使用`TenantFilter()`。动态插件访问插件自有表时应声明`service: data`和授权`resources.tables`，由宿主`data`服务执行租户、授权和表命名空间治理。
+### 安全降级
+
+当没有租户提供方时，系统会降级为平台租户的单租户模式。`Tenant()`不会暴露`RequestResolver`、`ScopeService`、用户租户成员关系写入或启动一致性检查等接口，这些属于宿主内部的中间件、数据库过滤或治理流程。
 
 ## 接口定义
 
 ### 源码插件接口
 
+**`Tenant()`根方法：**
+
 | 方法 | 说明 |
 |------|------|
 | `Available` | 判断租户能力是否有可用提供方 |
 | `Status` | 返回能力状态、活跃提供方和冲突原因 |
-| `Current` | 返回当前请求租户，缺失时返回平台租户 |
-| `CurrentTenantInfo` | 返回当前请求租户投影，包含`ID`、`Code`、`Name`和`Status` |
+| `Context()` | 返回当前租户上下文子服务 |
+| `Directory()` | 返回租户目录子服务 |
+| `Membership()` | 返回用户租户成员关系子服务 |
+| `Plugins()` | 返回租户插件治理子服务 |
+| `Filter()` | 返回租户过滤上下文子服务 |
+
+**`Tenant().Context()`子服务：**
+
+| 方法 | 说明 |
+|------|------|
+| `Current` | 返回当前请求租户标识，缺失时返回平台租户 |
+| `Info` | 返回当前请求租户信息，包含`ID`、`Code`、`Name`和`Status` |
 | `PlatformBypass` | 判断当前请求是否允许绕过租户过滤 |
-| `EnsureTenantVisible` | 校验当前用户是否可访问指定租户 |
-| `ValidateUserInTenant` | 校验指定用户是否属于指定租户 |
-| `ListUserTenants` | 列出用户可见的活跃租户 |
-| `BatchGetTenants` | 批量读取可见租户投影 |
-| `SearchTenants` | 按关键词搜索可见租户候选 |
-| `BatchListUserTenants` | 批量读取用户可访问租户列表 |
-| `EnsureTenantsVisible` | 批量校验当前用户可访问指定租户 |
-| `SwitchTenant` | 校验租户切换目标是否合法 |
+
+**`Tenant().Directory()`子服务：**
+
+| 方法 | 说明 |
+|------|------|
+| `Get` | 读取单个可见租户信息 |
+| `BatchGet` | 批量读取可见租户信息，返回`BatchResult` |
+| `List` | 按关键词搜索可见租户候选 |
+| `EnsureVisible` | 校验当前用户是否可访问指定租户集合 |
+
+**`Tenant().Membership()`子服务：**
+
+| 方法 | 说明 |
+|------|------|
+| `ListByUser` | 列出用户可见的活跃租户 |
+| `Validate` | 校验指定用户是否属于指定租户 |
+
+**`Tenant().Plugins()`子服务：**
+
+| 方法 | 说明 |
+|------|------|
+| `SetTenantPluginEnabled` | 更新租户插件启用状态，经过调用方和租户策略校验 |
+| `ProvisionTenantPluginDefaults` | 为租户创建缺失的默认插件行 |
+
+**`Tenant().Filter()`子服务（源码插件专属）：**
+
+| 方法 | 说明 |
+|------|------|
+| `Context` | 返回当前请求的租户、用户、真实操作者、模拟状态和平台绕过信息 |
 
 源码插件专属接口（通过`pluginhost.Services.TenantFilter()`访问）：
 
@@ -108,11 +139,11 @@ graph LR
 |----------|------|
 | `capability.available` | 判断租户能力是否有可用提供方 |
 | `capability.status` | 返回能力状态和活跃提供方 |
-| `tenants.current` | 返回当前请求租户 |
-| `tenants.current_info` | 返回当前请求租户投影 |
+| `tenants.current` | 返回当前请求租户标识 |
+| `tenants.current_info` | 返回当前请求租户信息 |
 | `tenants.platform_bypass` | 判断是否允许绕过租户过滤 |
 | `tenants.visible.ensure` | 校验当前用户是否可访问指定租户 |
-| `tenants.batch_get` | 批量读取可见租户投影 |
+| `tenants.batch_get` | 批量读取可见租户信息 |
 | `tenants.search` | 按关键词搜索可见租户候选 |
 | `tenants.visible.batch_ensure` | 批量校验当前用户可访问指定租户 |
 | `users.tenant_membership.validate` | 校验指定用户是否属于指定租户 |
@@ -133,49 +164,46 @@ if !services.Tenant().Available(ctx) {
     return
 }
 
-// 获取当前租户
-tenant := services.Tenant().Current(ctx)
+// 获取当前租户标识
+tenantID := services.Tenant().Context().Current(ctx)
 
-// 获取当前租户投影
-tenantInfo, err := services.Tenant().CurrentTenantInfo(ctx)
+// 获取当前租户信息
+tenantInfo, err := services.Tenant().Context().Info(ctx)
+
+// 判断平台绕过
+bypass := services.Tenant().Context().PlatformBypass(ctx)
 
 // 校验租户可见性
-err := services.Tenant().EnsureTenantVisible(ctx, targetTenantID)
+err := services.Tenant().Directory().EnsureVisible(ctx, []tenantcap.TenantID{targetTenantID})
 
 // 列出用户可见租户
-tenants, err := services.Tenant().ListUserTenants(ctx, userID)
+tenants, err := services.Tenant().Membership().ListByUser(ctx, userID)
 
-// 批量读取租户投影
-batchResult, err := services.Tenant().BatchGetTenants(ctx, tenantIDs)
+// 批量读取租户信息
+batchResult, err := services.Tenant().Directory().BatchGet(ctx, tenantIDs)
 
 // 搜索租户候选
-page, err := services.Tenant().SearchTenants(ctx, tenantcap.SearchInput{
+page, err := services.Tenant().Directory().List(ctx, tenantcap.ListInput{
     Keyword: "科技",
     Page:    pageRequest,
 })
 
-// 批量读取用户可访问租户
-userTenants, err := services.Tenant().BatchListUserTenants(ctx, userIDs)
-
-// 批量校验租户可见性
-err := services.Tenant().EnsureTenantsVisible(ctx, tenantIDs)
+// 校验用户租户成员关系
+err := services.Tenant().Membership().Validate(ctx, userID, targetTenantID)
 ```
 
-源码插件使用`TenantFilter()`给插件自有表追加租户过滤：
+源码插件通过`Filter().Context()`获取租户过滤上下文，用于自行构建查询条件：
 
 ```go
-model := g.DB().Model("plugin_record")
-model = services.TenantFilter().Apply(ctx, model, "")
-result, err := model.Where("status", "active").All()
+filterCtx := services.Tenant().Filter().Context(ctx)
+if filterCtx.TenantID > 0 {
+    model = model.Where("tenant_id", filterCtx.TenantID)
+}
+if filterCtx.IsImpersonation {
+    // 记录模拟登录审计
+    log.Infof("模拟用户 %d 访问租户 %d", filterCtx.ActingUserID, filterCtx.TenantID)
+}
 ```
-
-`Apply`的第三个参数是表名或别名限定符：
-
-| `qualifier` | 结果 |
-|-------------|------|
-| 空字符串 | 使用`tenant_id` |
-| `plugin_record` | 使用`plugin_record.tenant_id` |
-| `r` | 使用`r.tenant_id` |
 
 ### 动态插件使用
 
@@ -199,29 +227,26 @@ hostServices:
 ```go
 tenantSvc := pluginbridge.Default().Tenant()
 
-// 获取当前租户
-tenant := tenantSvc.Current(ctx)
+// 获取当前租户标识
+tenantID := tenantSvc.Context().Current(ctx)
 
-// 获取当前租户投影
-tenantInfo, err := tenantSvc.CurrentTenantInfo(ctx)
+// 获取当前租户信息
+tenantInfo, err := tenantSvc.Context().Info(ctx)
 
 // 校验租户可见性
-err := tenantSvc.EnsureTenantVisible(ctx, targetTenantID)
+err := tenantSvc.Directory().EnsureVisible(ctx, []tenantcap.TenantID{targetTenantID})
 
 // 列出用户可见租户
-tenants, err := tenantSvc.ListUserTenants(ctx, userID)
+tenants, err := tenantSvc.Membership().ListByUser(ctx, userID)
 
-// 批量读取租户投影
-batchResult, err := tenantSvc.BatchGetTenants(ctx, tenantIDs)
+// 批量读取租户信息
+batchResult, err := tenantSvc.Directory().BatchGet(ctx, tenantIDs)
 
 // 搜索租户候选
-page, err := tenantSvc.SearchTenants(ctx, tenantcap.SearchInput{
+page, err := tenantSvc.Directory().List(ctx, tenantcap.ListInput{
     Keyword: "科技",
     Page:    pageRequest,
 })
-
-// 批量读取用户可访问租户
-userTenants, err := tenantSvc.BatchListUserTenants(ctx, userIDs)
 ```
 
 动态插件访问插件自有表时，应声明`service: data`和授权`resources.tables`，由宿主数据服务执行租户边界治理。
@@ -229,10 +254,9 @@ userTenants, err := tenantSvc.BatchListUserTenants(ctx, userIDs)
 ## 设计约束
 
 - **能力可选。** 没有租户提供方时，系统按平台租户单租户模式降级。
-- **查询过滤不在普通服务中。** 需要数据库查询构建器的租户范围能力是宿主内部`ScopeService`或源码插件专属`TenantFilter()`。
-- **`TenantFilter()`只用于插件自有表。** 不要用它操作宿主核心表，也不要在插件代码里手写不一致的租户条件。
-- **联合查询要传限定符。** 当多个表都包含`tenant_id`时，应传入表名或别名，避免列名歧义。
-- **租户切换只做校验。** `SwitchTenant`校验目标合法性，重新签发令牌仍由`Auth().Token().SwitchTenant`完成。
+- **查询过滤不在普通服务中。** 需要数据库查询构建器的租户范围能力是宿主内部`ScopeService`。
+- **`Filter().Context()`返回只读上下文。** 插件根据返回的`TenantFilterContext`自行构建查询条件，不要用它操作宿主核心表。
+- **租户切换只做校验。** `Membership().Validate`校验目标合法性，重新签发令牌仍由`Auth().Token().SwitchTenant`完成。
 - **平台绕过由宿主判定。** 插件不应自行构造跨租户访问状态。
 
 ## 相关服务

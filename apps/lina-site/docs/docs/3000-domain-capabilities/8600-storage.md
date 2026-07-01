@@ -25,9 +25,10 @@ keywords:
 
 ## 基本介绍
 
-源码插件通过`services.Storage()`使用对象存储能力。动态插件通过`plugin.yaml`声明`service: storage`后使用`pluginbridge.Default().Storage()`客户端。
-
 `Storage`能力为每个插件提供独立的对象存储沙箱。插件在声明的授权路径前缀下读写对象，宿主负责路径校验、插件隔离和存储后端管理。
+
+- 源码插件通过`services.Storage()`使用对象存储能力。
+- 动态插件通过`plugin.yaml`声明`service: storage`后使用`pluginbridge.Default().Storage()`客户端。
 
 **能力阶段**：运行期
 
@@ -93,6 +94,26 @@ graph TB
 
 `Storage`支持可插拔的存储`Provider`架构：
 
+从插件视角看，`Storage`是一层稳定的对象存储抽象。插件只依赖逻辑路径和统一的对象操作方法，不直接耦合`S3`、`OSS`、`MinIO`、本地磁盘或私有存储协议。不同协议的实现通过`Provider`接入，宿主在委托给后端前继续负责路径授权、插件/租户隔离和对象键映射。
+
+```mermaid
+graph LR
+    Source["源码插件"] --> Storage["Storage能力抽象"]
+    Dynamic["动态插件"] --> Storage
+    Storage --> Guard["路径授权<br/>插件/租户隔离<br/>对象键映射"]
+    Guard --> SPI["Provider SPI<br/>Put/Get/Delete/List/Stat"]
+    SPI --> LocalProvider["local Provider<br/>本地磁盘"]
+    SPI --> S3Provider["S3 Provider<br/>S3 API"]
+    SPI --> OSSProvider["OSS Provider<br/>OSS API"]
+    SPI --> MinIOProvider["MinIO Provider<br/>S3兼容API"]
+    SPI --> CustomProvider["自定义Provider<br/>私有协议"]
+    LocalProvider --> LocalDisk["本地文件系统"]
+    S3Provider --> S3Backend["S3兼容对象存储"]
+    OSSProvider --> OSSBackend["阿里云OSS"]
+    MinIOProvider --> MinIOBackend["MinIO集群"]
+    CustomProvider --> CustomBackend["私有云或专有存储"]
+```
+
 | Provider | 说明 |
 |--------|------|
 | `local` | 内置本地磁盘`Provider`，存储在`.capability-storage/`目录下 |
@@ -110,13 +131,13 @@ graph TB
 ### 与Files能力的区别
 
 | 维度 | Files | Storage |
-|------|-------|---------|
-| 用途 | 宿主文件管理系统的只读视图 | 插件作用域的对象存储沙箱 |
-| 数据库 | `sys_file`表，完整元数据 | 无数据库，纯对象存储 |
-| 隔离 | 租户+数据范围 | 插件+租户路径隔离 |
-| 操作 | 只读视图+受控删除 | 完整CRUD |
-| 大小限制 | 由`upload.maxSize`配置 | 无限制 |
-| `Provider` | 内置本地存储 | 可插拔`Provider`注册 |
+|:------:|-------|---------|
+| **用途** | 宿主文件管理系统的只读视图 | 插件作用域的对象存储沙箱 |
+| **数据库** | `sys_file`表，完整元数据 | 无数据库，纯对象存储 |
+| **隔离** | 租户+数据范围 | 插件+租户路径隔离 |
+| **操作** | 只读视图+受控删除 | 完整`CRUD` |
+| **大小限制** | 由`upload.maxSize`配置 | 无限制 |
+| **Provider** | 内置本地存储 | 可插拔`Provider`注册 |
 
 ## 接口定义
 
