@@ -2,11 +2,8 @@
 name: linasite-sync-i18n-dirty
 description: >-
   只同步当前 git 工作区中有变化的 apps/lina-site/docs/ 中文 Markdown 文档到
-  apps/lina-site/i18n/en/docusaurus-plugin-content-docs/current/。当用户只想处理本次新增、修改、
-  重命名或删除的文档，而不是做全量 i18n 审查时必须使用本技能。执行时以 git status/diff 中的
-  docs 变更为唯一同步范围：新增和修改要翻译到英文镜像路径，重命名要同步新路径并处理旧路径决策，
-  删除要报告并在确认后删除对应英文 i18n 文件。英文标题应尽可能与 slug/路径表达的路由名称一致；
-  正文必须地道、专业、自然，绝不逐字翻译。
+  apps/lina-site/i18n/en/docusaurus-plugin-content-docs/current/。
+  需要手动调用该技能，禁止自动调用。
 ---
 
 # linasite-sync-i18n-dirty：只同步当前变更文档

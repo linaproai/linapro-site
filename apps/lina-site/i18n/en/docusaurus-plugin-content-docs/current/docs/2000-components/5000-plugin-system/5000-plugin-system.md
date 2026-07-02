@@ -27,35 +27,24 @@ keywords:
 
 ## Introduction
 
-The plugin system is `LinaPro`'s core extension mechanism for delivering business capabilities. Each plugin is a self-contained module that can declare `API` routes, database resources, frontend pages, menu permissions, language packs, scheduled tasks, and lifecycle callbacks.
+The plugin system is LinaPro's core extension mechanism for delivering business capabilities. Each plugin is a self-contained module that can declare API routes, database resources, frontend pages, menu permissions, language packs, scheduled tasks, and lifecycle callbacks.
 
-`LinaPro` supports two delivery modes simultaneously:
+LinaPro supports two delivery modes simultaneously:
 
-- **Source plugins**: Participate in main framework compilation as `Go` source code, suitable for long-term maintained business capabilities.
+- **Source plugins**: Participate in main framework compilation as Go source code, suitable for long-term maintained business capabilities.
 - **Dynamic plugins**: Uploaded and loaded at runtime as `.wasm` artifacts, suitable for binary distribution, hot-reload, and temporary extensions.
 
 The two modes differ in runtime form but share the same plugin governance surface. The admin side sees the same plugin lifecycle, dependencies, permissions, state, multi-tenant strategy, public static assets, and plugin configuration.
 
 Source plugins and dynamic plugins also converge in directory structure: the root contains `plugin.yaml`, backend capabilities live in `backend/`, frontend resources in `frontend/`, and install scripts, language packs, configuration, and plugin-owned resources in `manifest/`. Source plugins embed these resources into the main framework build artifact via `plugin_embed.go`; dynamic plugins write similar resources into `.wasm` artifacts through build tooling and bind them to the currently active published version at runtime.
 
-## Plugins Don't Need to Include Frontend Pages
-
-`LinaPro`'s plugin system does not require every plugin to provide frontend pages. Whether a plugin solves a problem depends not on whether it has a UI, but on whether it implements the extension capabilities the main framework needs.
-
-Many plugins derive their entire value from extending backend behavior without any user interface. Typical examples include:
-
-- **Storage backend plugins**: Integrate with Qiniu Cloud, `AWS S3`, or other object storage services, taking over the main framework's file upload and read logic. Once the plugin is enabled, the main framework's file storage behavior switches automatically without modifying any caller code — the UI side is completely unaware.
-- **Authentication method plugins**: Integrate with `LDAP` directory services or `OIDC` identity providers to extend user login capabilities. The main framework calls the plugin's specific implementation through the authentication interface, and the business layer is completely transparent to the underlying protocol.
-
-For these purely backend plugins, the `menus` field in `plugin.yaml` is typically empty. The plugin only needs to register `HTTP` routes through `pluginhost` or implement main framework extension point interfaces, and the main framework consumes plugin capabilities through interface calls. Frontend and backend modularization are two natural choices within the same plugin model, not a mandatory requirement for all plugins.
-
-## Why Dual Modes Are Needed
+## Dual-Mode Design
 
 A single plugin form can hardly satisfy development efficiency, runtime performance, hot-reload, and commercial distribution simultaneously.
 
 | Need | More Suitable Mode | Reason |
 |------|-------------------|--------|
-| **Long-term business modules** | Source plugin | Native `Go` performance, complete toolchain, easy to test and maintain |
+| **Long-term business modules** | Source plugin | Native Go performance, complete toolchain, easy to test and maintain |
 | **Urgent fixes or temporary capabilities** | Dynamic plugin | Can be uploaded and enabled at runtime, reducing deployment impact |
 | **Commercial plugin distribution** | Dynamic plugin | Can distribute only binary artifacts without exposing source code |
 | **Deep collaboration with main framework capabilities** | Source plugin | Can use main framework capabilities through stable `pluginhost` contracts |
@@ -70,7 +59,7 @@ The plugin system is not simply scanning directories and registering routes — 
 flowchart TD
     subgraph Delivery["Delivery Entry"]
         Source["Source Plugin<br/>apps/lina-plugins/*"]
-        Dynamic["WASM Dynamic Plugin<br/>.wasm artifact"]
+        Dynamic["Dynamic Plugin<br/>.wasm artifact"]
     end
 
     subgraph Pipeline["Main Framework Governance Chain"]
@@ -91,7 +80,7 @@ flowchart TD
 
 | Source Component | Component Responsibility |
 |------------------|-------------------------|
-| `catalog` | Reads `plugin.yaml` or `WASM` custom sections, generating auditable publish snapshots |
+| `catalog` | Reads `plugin.yaml` or WASM custom sections, generating auditable publish snapshots |
 | `dependency` | Checks framework version ranges, plugin dependencies, and circular dependencies |
 | `lifecycle` | Orchestrates install, enable, disable, uninstall, and runtime upgrade |
 | `integration` | Projects menus, permissions, routes, hooks, and scheduled tasks into the main framework runtime |
@@ -144,8 +133,11 @@ homepage: https://example.com/plugins/linapro-content-notice
 # Plugin license identifier
 license: Apache-2.0
 
-# Distribution method declaration (optional)
-distribution: bundled
+# Distribution governance enum
+# managed: Regular plugin, governable through plugin management page or plugin.autoEnable (default)
+# builtin: Project built-in source plugin, auto-installed, auto-enabled, and safely auto-upgraded at startup; not operable through management UI
+# Note: builtin only allows type: source plugins; dynamic plugins must use managed
+distribution: managed
 
 # Plugin i18n configuration, consistent with host i18n config structure
 i18n:
@@ -322,7 +314,7 @@ hostServices:
 
 ### Plugin ID Naming Convention
 
-The plugin `ID` is the unique identifier that runs through the entire plugin lifecycle, used for directory naming, `API` route namespaces, database table prefixes, menu `keys`, and static asset paths. `LinaPro` recommends a three-segment `kebab-case` structure for plugin IDs: `<author>-<domain>-<capability>`:
+The plugin ID is the unique identifier that runs through the entire plugin lifecycle, used for directory naming, API route namespaces, database table prefixes, menu keys, and static asset paths. LinaPro recommends a three-segment `kebab-case` structure for plugin IDs: `<author>-<domain>-<capability>`:
 
 | Segment | Meaning | Example |
 |---------|---------|---------|
@@ -330,36 +322,50 @@ The plugin `ID` is the unique identifier that runs through the entire plugin lif
 | `<domain>` | Business domain | `content`, `monitor`, `org`, `tenant` |
 | `<capability>` | Specific capability, may contain multiple `kebab` segments | `notice`, `loginlog`, `demo-guard` |
 
-`<author>-<domain>-<capability>` is the official recommended naming convention and repository governance standard, not a runtime enforcement rule. Runtime validation only ensures the `ID` is non-empty, max `64` characters, and valid `kebab-case`. The main framework's `ParsePluginID` function will attempt to split `Author`, `Domain`, and `Capability` segments from the `ID`, but IDs with fewer than three segments are also accepted.
+`<author>-<domain>-<capability>` is the official recommended naming convention and repository governance standard, not a runtime enforcement rule. Runtime validation only ensures the ID is non-empty, max 64 characters, and valid `kebab-case`. The main framework's `ParsePluginID` function will attempt to split `Author`, `Domain`, and `Capability` segments from the ID, but IDs with fewer than three segments are also accepted.
 
 The `<domain>` segment identifies the plugin's business domain. It is recommended to select from common domains below, or define your own based on actual business:
 
-| Domain | Use Case | Plugin Name Example |
-|--------|----------|---------------------|
-| `content` | Content management, articles, announcements, notifications | `linapro-content-notice` |
-| `monitor` | Monitoring, logs, auditing | `linapro-monitor-loginlog` |
-| `org` | Organizational structure, departments, positions | `linapro-org-core` |
-| `tenant` | Multi-tenancy, tenant management | `linapro-tenant-core` |
-| `ops` | Operations, security, access control | `linapro-ops-demo-guard` |
-| `auth` | Authentication, authorization, SSO | — |
-| `oidc` | `OIDC` identity provider integration | — |
-| `ai` | AI, large models, vector search | `linapro-ai-core` |
-| `storage` | File storage, object storage | — |
-| `workflow` | Workflows, approval flows | — |
-| `message` | Message center, in-app messaging, push | — |
-| `payment` | Payments, orders, billing | — |
-| `gateway` | Gateway, rate limiting, routing | — |
-| `data` | Data integration, import/export, `ETL` | — |
+| Domain | Use Case |
+|--------|----------|
+| `content` | Content management, articles, announcements, notifications |
+| `monitor` | Monitoring, logs, metrics, alerts |
+| `audit` | Audit logs, operation trails, compliance reports |
+| `org` | Organizational structure, departments, positions |
+| `user` | User profiles, account extensions, user portraits |
+| `tenant` | Multi-tenancy, tenant management |
+| `auth` | Authentication, authorization, SSO |
+| `oidc` | OIDC identity provider integration |
+| `security` | Security policies, risk control, access protection |
+| `ops` | Operations management, releases, inspections, access control |
+| `ai` | AI, large models, vector search |
+| `search` | Search, indexing, full-text search |
+| `storage` | File storage, object storage |
+| `media` | Images, audio, video, and asset processing |
+| `workflow` | Workflows, process orchestration |
+| `message` | Message center, in-app messaging, push |
+| `notification` | Notification channels, reminders, subscriptions |
+| `payment` | Payments, orders, billing |
+| `order` | Orders, transactions, fulfillment |
+| `crm` | Customer management, leads, opportunities |
+| `report` | Reports, dashboards, exports |
+| `analytics` | Data analytics, event tracking, metric insights |
+| `gateway` | Gateway, rate limiting, routing |
+| `integration` | Third-party system integration, webhooks, open platforms |
+| `data` | Data integration, import/export, ETL |
+| `backup` | Backup, archiving, recovery |
+| `devtools` | Development tools, debugging, scaffolding |
+| `i18n` | Internationalization, language packs, localization |
 
 ### pluginhost
 
-`pluginhost` is the host interface layer for **source plugins** facing the main framework, located in the `pkg/plugin/pluginhost` directory. It does not expand each domain capability's specific methods on this overview page, but consolidates source plugin declarations, resources, routes, lifecycle, and runtime service entries into stable public contracts.
+`pluginhost` is the host interface layer for source plugins facing the main framework, located in the `pkg/plugin/pluginhost` directory. It does not expand each domain capability's specific methods on this overview page, but consolidates source plugin declarations, resources, routes, lifecycle, and runtime service entries into stable public contracts.
 
 Source plugins cannot directly `import` the main framework's `internal/` directory — they can only use stable published contracts. For which domain capabilities, trusted management commands, and tenant filtering capabilities `pluginhost.Services` can access, see [Domain Capabilities Design and Overview](/docs/domain-capabilities).
 
 ### pluginbridge
 
-`pluginbridge` is the bridge interface layer for **dynamic plugins** facing the main framework, located in the `pkg/plugin/pluginbridge` directory. It isolates `WASM` plugin declarations, route handling, protocol encoding/decoding, and host capability calls within the sandbox boundary.
+`pluginbridge` is the bridge interface layer for dynamic plugins facing the main framework, located in the `pkg/plugin/pluginbridge` directory. It isolates WASM plugin declarations, route handling, protocol encoding/decoding, and host capability calls within the sandbox boundary.
 
 When dynamic plugins access main framework capabilities, they must declare authorization scope through `hostServices`, which is then validated by the host by service, method, and resource boundary. For the detailed dynamic plugin domain capability catalog, `hostServices` authorization model, and source plugin capability differences, see [Domain Capabilities Design and Overview](/docs/domain-capabilities).
 
@@ -387,7 +393,7 @@ stateDiagram-v2
     upgrade_failed --> upgrade_running: Retry upgrade
 ```
 
-Plugin file updates do not automatically switch the active version. After the main framework starts or scans and discovers a higher version, it marks the plugin as `pending_upgrade`. Administrators preview and explicitly execute the runtime upgrade on the plugin management page. The upgrade process executes dependency pre-checks, lifecycle callbacks, upgrade `SQL`, governance resource sync, active publish switch, cache invalidation, and cluster notification.
+Plugin file updates do not automatically switch the active version. After the main framework starts or scans and discovers a higher version, it marks the plugin as `pending_upgrade`. Administrators preview and explicitly execute the runtime upgrade on the plugin management page. The upgrade process executes dependency pre-checks, lifecycle callbacks, upgrade SQL, governance resource sync, active publish switch, cache invalidation, and cluster notification.
 
 Dynamic plugin upgrades that involve resource-type `hostServices` changes require re-confirmation of the authorization snapshot. Source plugin upgrades compare the current compile-time discovered version against the database's active version to avoid mistaking file overwrite for runtime upgrade completion.
 
@@ -395,7 +401,7 @@ Dynamic plugin upgrades that involve resource-type `hostServices` changes requir
 
 ### Database Namespace
 
-Plugin-owned tables must use the `snake_case` prefix derived from the plugin `ID`:
+Plugin-owned tables must use the `snake_case` prefix derived from the plugin ID:
 
 ```text
 Main framework tables: sys_user, sys_role, sys_menu
@@ -408,16 +414,16 @@ If a plugin needs multi-tenant support, it must design tables containing a `tena
 
 ### File Namespace
 
-Plugin file storage should use the plugin `ID` as the path namespace:
+Plugin file storage should use the plugin ID as the path namespace:
 
 ```text
 temp/upload/linapro-content-notice/
 temp/upload/linapro-demo-dynamic/
 ```
 
-### Sandbox Isolation
+### WASM Sandbox Isolation
 
-`WASM` dynamic plugins cannot directly access the main framework's filesystem, network, or database. All access goes through `hostServices` bridging and is constrained by the authorization snapshot.
+WASM dynamic plugins cannot directly access the main framework's filesystem, network, or database. All access goes through `hostServices` bridging and is constrained by the authorization snapshot.
 
 ## Multi-Tenant Fields
 
@@ -429,7 +435,7 @@ Plugins declare multi-tenant boundaries through three fields:
 | `supports_multi_tenant` | `true` / `false` | Whether it supports tenant-level install, provisioning, and data isolation |
 | `default_install_mode` | `global` / `tenant_scoped` | Whether globally enabled by default or independently enabled/disabled per tenant |
 
-For example, the `multi-tenant` plugin itself is a platform-level governance plugin using `platform_only` and `global`; content, organization, and audit plugins are typically `tenant_aware`.
+For example, the multi-tenant plugin itself is a platform-level governance plugin using `platform_only` and `global`; content, organization, and audit plugins are typically `tenant_aware`.
 
 ## Main Framework and Plugin Boundary
 
@@ -437,9 +443,22 @@ For example, the `multi-tenant` plugin itself is a platform-level governance plu
 |------|--------|
 | Plugins do not directly depend on the main framework's `internal/` packages | Main framework internal implementation can evolve; stable contracts are provided by `pkg/` |
 | Plugin menus use the `plugin:<plugin-id>:<key>` format | Avoids conflicts with the main framework or other plugins |
-| Install `SQL` must be idempotent | Supports re-execution, data-preserving reinstall, and upgrade recovery |
+| Install SQL must be idempotent | Supports re-execution, data-preserving reinstall, and upgrade recovery |
 | Plugin service logic goes in `backend/internal/service/` | Keeps plugin backend structure consistent, avoids package naming confusion |
-| Plugin `API` uses `/x/{plugin-id}/...` | Source and dynamic plugins share a unified plugin `API` namespace, avoiding occupying the main framework `/api/v1` control plane |
+| Plugin API uses `/x/{plugin-id}/...` | Source and dynamic plugins share a unified plugin API namespace, avoiding occupying the main framework `/api/v1` control plane |
 | Public static assets must declare `public_assets` | The main framework only hosts plugin explicitly authorized public resource directories |
 | Plugin config is read through plugin-scoped config service | Avoids plugins directly depending on host global config structure |
 | Plugin uninstall distinguishes data preservation from data cleanup | Reduces accidental deletion risk, allows data reuse on subsequent reinstall |
+
+## Frequently Asked Questions
+
+### Do Plugins Need to Include Frontend Pages?
+
+No. LinaPro's plugin system does not require every plugin to provide frontend pages. Whether a plugin solves a problem depends not on whether it has a UI, but on whether it implements the extension capabilities the main framework needs.
+
+Many plugins derive their entire value from extending backend behavior without any user interface. Typical examples include:
+
+- **Storage backend plugins**: Integrate with Qiniu Cloud, AWS S3, or other object storage services, taking over the main framework's file upload and read logic. Once the plugin is enabled, the main framework's file storage behavior switches automatically without modifying any caller code — the UI side is completely unaware.
+- **Authentication method plugins**: Integrate with LDAP directory services or OIDC identity providers to extend user login capabilities. The main framework calls the plugin's specific implementation through the authentication interface, and the business layer is completely transparent to the underlying protocol.
+
+For these purely backend plugins, the `menus` field in `plugin.yaml` is typically empty. The plugin only needs to register HTTP routes through `pluginhost` or implement main framework extension point interfaces, and the main framework consumes plugin capabilities through interface calls. Frontend and backend modularization are two natural choices within the same plugin model, not a mandatory requirement for all plugins.

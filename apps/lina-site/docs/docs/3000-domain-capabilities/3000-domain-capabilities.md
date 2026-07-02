@@ -58,7 +58,7 @@ graph TB
 |------|----------|---------|------|
 | `AI()` | [AI能力](/docs/domain-capability-ai) | 支持 | 聚合文本、图片、向量、音频、视觉、文档、安全和视频子能力 |
 | `APIDoc()` | [接口文档](/docs/domain-capability-apidoc) | - | 解析路由操作键、本地化模块标签和操作摘要 |
-| `Auth()` | [认证与授权](/docs/domain-capability-auth) | - | 聚合`Token()`和`Authz()`子能力 |
+| `Auth()` | [认证与授权](/docs/domain-capability-auth) | - | 认证令牌签发、租户切换、模拟令牌和授权权限视图读取与判断 |
 | `Users()` | [用户管理](/docs/domain-capability-users) | - | 用户视图、搜索和可见性校验 |
 | `BizCtx()` | [业务上下文](/docs/domain-capability-bizctx) | - | 读取当前请求用户、租户、模拟登录和平台绕过状态 |
 | `Cache()` | [缓存能力](/docs/domain-capability-cache) | - | 插件作用域运行时缓存 |
@@ -67,7 +67,7 @@ graph TB
 | `HostConfig()` | [配置管理](/docs/domain-capability-hostconfig) | - | 读取宿主配置值；动态插件读取时必须声明`keys` |
 | `I18n()` | [国际化能力](/docs/domain-capability-i18n) | - | 源码插件运行时翻译能力；动态插件不开放对应`host service` |
 | `Jobs()` | [定时任务](/docs/domain-capability-jobs) | - | 定时任务生命周期管理 |
-| `Manifest()` | [清单资源](/docs/domain-capability-manifest) | - | 读取当前插件`manifest/`下的只读资源 |
+| `Manifest()` | [清单资源](/docs/domain-capability-manifest) | - | 读取当前已打包的插件`manifest/`下的只读资源 |
 | `Notifications()` | [通知能力](/docs/domain-capability-notifications) | - | 通知消息的生命周期管理 |
 | `Org()` | [组织管理](/docs/domain-capability-org) | 支持 | 可选组织能力，部门和岗位的生命周期管理 |
 | `Plugins()` | [插件治理](/docs/domain-capability-plugins) | - | 聚合插件注册表、插件配置、插件状态和生命周期子能力 |

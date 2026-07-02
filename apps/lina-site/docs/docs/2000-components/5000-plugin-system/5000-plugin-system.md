@@ -38,18 +38,7 @@ keywords:
 
 源码插件和动态插件的目录结构也趋于一致：根目录包含`plugin.yaml`，后端能力位于`backend/`，前端资源位于`frontend/`，安装脚本、语言包、配置和插件自有资源位于`manifest/`。源码插件通过`plugin_embed.go`把这些资源嵌入主框架编译产物；动态插件通过构建工具把同类资源写入`.wasm`产物，并在运行时绑定到当前有效发布版本。
 
-## 插件不必包含前端页面
-
-`LinaPro`的插件系统没有强制要求每个插件都提供前端页面。插件能否解决问题，不取决于它是否有界面，而取决于它是否实现了主框架所需的扩展能力。
-
-许多插件的全部价值在于扩展后端行为，而不需要任何用户界面。典型的例子包括：
-
-- **存储后端插件**：对接七牛云、`AWS S3`或其他对象存储服务，接管主框架的文件上传与读取逻辑。插件启用后，主框架的文件存储行为自动切换，无需修改任何调用方代码，界面侧完全无感。
-- **认证方式插件**：对接`LDAP`目录服务或`OIDC`身份提供商，扩展用户登录能力。主框架通过认证接口调用插件提供的具体实现，业务层对底层协议完全透明。
-
-对于这类纯后端插件，`plugin.yaml`中的`menus`字段通常为空，插件只需通过`pluginhost`注册`HTTP`路由或实现主框架扩展点接口，主框架以接口调用的方式消费插件能力。前端和后端的模块化是同一插件模型下的两个自然选择，并非对所有插件的强制要求。
-
-## 为什么需要双模式
+## 双模式设计
 
 单一插件形态很难同时满足研发效率、运行性能、热加载和商业分发。
 
@@ -70,7 +59,7 @@ keywords:
 flowchart TD
     subgraph Delivery["交付入口"]
         Source["源码插件<br/>apps/lina-plugins/*"]
-        Dynamic["WASM动态插件<br/>.wasm产物"]
+        Dynamic["动态插件<br/>.wasm产物"]
     end
 
     subgraph Pipeline["主框架治理主链"]
@@ -144,8 +133,11 @@ homepage: https://example.com/plugins/linapro-content-notice
 # 插件许可证标识
 license: Apache-2.0
 
-# 发行方式声明（可选）
-distribution: bundled
+# 插件分发治理枚举
+# managed: 普通插件，可通过插件管理页面或 plugin.autoEnable 显式治理（默认值）
+# builtin: 项目内建源码插件，启动时自动安装、启用和安全升级，普通管理入口不可操作
+# 注意：builtin 仅允许 type: source 的插件使用，动态插件必须使用 managed
+distribution: managed
 
 # 插件国际化配置，与宿主 i18n 配置结构保持一致
 i18n:
@@ -334,37 +326,50 @@ hostServices:
 
 `<domain>`段用于标识插件所属的业务领域，建议从以下常见领域中选取，也可根据实际业务自行定义：
 
-| 领域 | 适用场景 | 插件命名示例 |
-|------|----------|--------------|
-| `content` | 内容管理、文章、公告、通知 | `linapro-content-notice` |
-| `monitor` | 监控、日志、审计 | `linapro-monitor-loginlog` |
-| `org` | 组织架构、部门、岗位 | `linapro-org-core` |
-| `tenant` | 多租户、租户管理 | `linapro-tenant-core` |
-| `ops` | 运维、安全、访问控制 | `linapro-ops-demo-guard` |
-| `auth` | 认证、授权、单点登录 | — |
-| `oidc` | `OIDC`身份提供商集成 | — |
-| `ai` | 人工智能、大模型、向量检索 | `linapro-ai-core` |
-| `storage` | 文件存储、对象存储 | — |
-| `workflow` | 工作流、审批流 | — |
-| `message` | 消息中心、站内信、推送 | — |
-| `payment` | 支付、订单、账单 | — |
-| `gateway` | 网关、限流、路由 | — |
-| `data` | 数据集成、导入导出、`ETL` | — |
-
+| 领域 | 适用场景 |
+|------|----------|
+| `content` | 内容管理、文章、公告、通知 |
+| `monitor` | 监控、日志、指标、告警 |
+| `audit` | 审计日志、操作留痕、合规报表 |
+| `org` | 组织架构、部门、岗位 |
+| `user` | 用户资料、账号扩展、用户画像 |
+| `tenant` | 多租户、租户管理 |
+| `auth` | 认证、授权、单点登录 |
+| `oidc` | `OIDC`身份提供商集成 |
+| `security` | 安全策略、风险控制、访问防护 |
+| `ops` | 运维管理、发布、巡检、访问控制 |
+| `ai` | 人工智能、大模型、向量检索 |
+| `search` | 搜索、索引、全文检索 |
+| `storage` | 文件存储、对象存储 |
+| `media` | 图片、音频、视频和素材处理 |
+| `workflow` | 工作流、流程编排 |
+| `message` | 消息中心、站内信、推送 |
+| `notification` | 通知渠道、提醒、订阅 |
+| `payment` | 支付、订单、账单 |
+| `order` | 订单、交易、履约 |
+| `crm` | 客户管理、线索、商机 |
+| `report` | 报表、看板、导出 |
+| `analytics` | 数据分析、埋点、指标洞察 |
+| `gateway` | 网关、限流、路由 |
+| `integration` | 第三方系统集成、`Webhook`、开放平台 |
+| `data` | 数据集成、导入导出、`ETL` |
+| `backup` | 备份、归档、恢复 |
+| `devtools` | 开发工具、调试、脚手架 |
+| `i18n` | 国际化、语言包、本地化 |
 
 ### pluginhost
 
-`pluginhost`是**源码插件**面向主框架的宿主接口层，位于`pkg/plugin/pluginhost`目录。它不在总览页展开每个领域能力的具体方法，而是把源码插件的声明、资源、路由、生命周期和运行期服务入口收口到稳定的公共契约中。
+`pluginhost`是**源码插件**面向主框架的宿主接口层，位于`apps/lina-core/pkg/plugin/pluginhost`目录。它不在总览页展开每个领域能力的具体方法，而是把源码插件的声明、资源、路由、生命周期和运行期服务入口收口到稳定的公共契约中。
 
 
-源码插件无法直接`import`主框架的`internal/`目录，只能使用主框架发布的稳定契约。`pluginhost.Services`可访问哪些领域能力、可信管理命令和租户过滤能力，请阅读[领域能力设计与概览](/docs/domain-capabilities)。
+源码插件无法直接`import`主框架的`internal/`目录，只能使用主框架发布的稳定契约。`pluginhost.Services`可访问哪些领域能力、可信管理命令和租户过滤能力，请参考：[领域能力设计与概览](/docs/domain-capabilities)。
 
 ### pluginbridge
 
-`pluginbridge`是**动态插件**面向主框架的桥接接口层，位于`pkg/plugin/pluginbridge`目录。它负责把`WASM`插件的声明、路由处理、协议编解码和宿主能力调用隔离在沙箱边界内。
+`pluginbridge`是**动态插件**面向主框架的桥接接口层，位于`apps/lina-core/pkg/plugin/pluginbridge`目录。它负责把`WASM`插件的声明、路由处理、协议编解码和宿主能力调用隔离在沙箱边界内。
 
 
-动态插件访问主框架能力时，需要通过`hostServices`声明授权范围，再由宿主按服务、方法和资源边界进行校验。详细的动态插件领域能力目录、`hostServices`授权模型和源码插件能力差异，请阅读[领域能力设计与概览](/docs/domain-capabilities)。
+动态插件访问主框架能力时，需要通过`hostServices`声明授权范围，再由宿主按服务、方法和资源边界进行校验。详细的动态插件领域能力目录、`hostServices`授权模型和源码插件能力差异，请参考：[领域能力设计与概览](/docs/domain-capabilities)。
 
 ## 生命周期状态
 
@@ -401,11 +406,11 @@ stateDiagram-v2
 插件自有表必须使用插件`ID`转换后的`snake_case`前缀：
 
 ```text
-主框架表：sys_user、sys_role、sys_menu
+框架表：sys_user、sys_role、sys_menu
 插件表：linapro_content_notice_record、linapro_org_core_dept、linapro_demo_dynamic_record
 ```
 
-系统表使用`sys_`前缀，插件表使用`<plugin_id>_`前缀。主框架能力和插件能力的数据完全隔离，避免命名冲突和权限误用。
+框架表使用`sys_`前缀，插件表使用`<plugin_id>_`前缀。主框架能力和插件能力的数据完全隔离，避免命名冲突和权限误用。
 
 插件如果需要支持多租户，那么需要自行设计包含`tenant_id`列，并通过主框架发布的租户过滤能力追加过滤条件。
 
@@ -418,7 +423,7 @@ temp/upload/linapro-content-notice/
 temp/upload/linapro-demo-dynamic/
 ```
 
-### 沙箱隔离
+### WASM沙箱隔离
 
 `WASM`动态插件不能直接访问主框架文件系统、网络或数据库。所有访问都通过`hostServices`桥接，并受授权快照约束。
 
@@ -446,3 +451,16 @@ temp/upload/linapro-demo-dynamic/
 | 公开静态资源必须声明`public_assets` | 主框架只托管插件显式授权公开的资源目录 |
 | 插件配置通过插件作用域配置服务读取 | 避免插件直接依赖宿主全局配置结构 |
 | 插件卸载区分保留数据和清理数据 | 降低误删风险，允许后续重新安装复用数据 |
+
+## 常见问题
+
+### 插件是否必须包含前端页面？
+
+不需要。`LinaPro`的插件系统没有强制要求每个插件都提供前端页面。插件能否解决问题，不取决于它是否有界面，而取决于它是否实现了主框架所需的扩展能力。
+
+许多插件的全部价值在于扩展后端行为，而不需要任何用户界面。典型的例子包括：
+
+- **存储后端插件**：对接七牛云、`AWS S3`或其他对象存储服务，接管主框架的文件上传与读取逻辑。插件启用后，主框架的文件存储行为自动切换，无需修改任何调用方代码，界面侧完全无感。
+- **认证方式插件**：对接`LDAP`目录服务或`OIDC`身份提供商，扩展用户登录能力。主框架通过认证接口调用插件提供的具体实现，业务层对底层协议完全透明。
+
+对于这类纯后端插件，`plugin.yaml`中的`menus`字段通常为空，插件只需通过`pluginhost`注册`HTTP`路由或实现主框架扩展点接口，主框架以接口调用的方式消费插件能力。前端和后端的模块化是同一插件模型下的两个自然选择，并非对所有插件的强制要求。

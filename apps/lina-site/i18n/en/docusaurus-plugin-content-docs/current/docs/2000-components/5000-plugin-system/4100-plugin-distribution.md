@@ -6,7 +6,7 @@ description: 'Covers the core concepts of plugin distribution governance, the de
 keywords:
   - distribution
   - distribution governance
-  - marketplace
+  - managed
   - builtin
   - built-in plugin
   - marketplace plugin
@@ -33,13 +33,13 @@ LinaPro supports two distribution governance modes:
 
 | Distribution Type | Semantics | Lifecycle Characteristics | Use Cases |
 |----------|------|--------------|----------|
-| `marketplace` | Regular plugin, explicitly manageable by platform administrators | Requires explicit installation, enablement, and upgrade, or managed enablement via `plugin.autoEnable` | Third-party plugins, optional feature modules |
+| `managed` | Regular plugin, explicitly manageable by platform administrators | Requires explicit installation, enablement, and upgrade, or managed enablement via `plugin.autoEnable` | Third-party plugins, optional feature modules |
 | `builtin` | Project built-in source plugin, part of the project | Auto-installed, auto-enabled, and safely auto-upgraded at startup; not operable through the plugin management UI | Core business plugins, essential project features |
 
 For enterprises or teams building their own business systems on LinaPro, business plugins are typically declared with the `builtin` distribution mode. This is because business plugins are core components of the system that need to be compiled, deployed, and upgraded together with the main framework, ensuring they are always available and version-consistent in production.
 
 :::info
-The default value of the `distribution` field is `marketplace`. If this field is not declared in `plugin.yaml`, the plugin will be governed as a marketplace plugin.
+The default value of the `distribution` field is `managed`. If this field is not declared in `plugin.yaml`, the plugin will be governed as a marketplace plugin.
 :::
 
 ## Configuration Examples
@@ -52,7 +52,7 @@ id: linapro-ai-core
 name: AI Hub
 version: 0.1.0
 type: source
-distribution: marketplace
+distribution: managed
 scope_nature: tenant_aware
 ```
 
@@ -169,7 +169,7 @@ If `plugin.autoEnable` contains a plugin already declared as `builtin`, the syst
 ## Best Practices
 
 1. **Use `builtin` for core features**: Declare essential business plugins as `builtin` to ensure they are always available
-2. **Use `marketplace` for optional features**: Declare optional feature modules as `marketplace` to allow flexible administrator management
+2. **Use `managed` for optional features**: Declare optional feature modules as `managed` to allow flexible administrator management
 3. **Prefer `builtin` for enterprise business plugins**: When building business systems on LinaPro, declare self-developed business plugins as `builtin` for unified compilation and deployment with the main framework, avoiding omissions or version inconsistencies in production
 4. **Follow dual-factor constraints**: When declaring `builtin`, ensure both type and registration constraints are satisfied
 5. **Plan dependency order properly**: Built-in plugins start in dependency topological order; ensure dependency relationships are correct

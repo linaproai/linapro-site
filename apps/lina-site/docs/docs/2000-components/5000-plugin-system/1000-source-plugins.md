@@ -46,30 +46,35 @@ keywords:
 
 ```text
 apps/lina-plugins/<plugin-id>/
-├── plugin.yaml
-├── plugin_embed.go
-├── backend/
+├── plugin.yaml                      # 插件元数据与能力声明
+├── plugin_embed.go                  # 插件源码嵌入宿主编译入口
+├── Makefile                         # 插件make指令入口
+├── backend/                         # 插件后端源码
 │   ├── api/                         # API DTO与路由契约
-│   ├── hack/
-│   │   └── config.yaml              # make dao等插件开发配置
-│   ├── internal/
+│   ├── internal/                    # 插件内部业务逻辑封装
 │   │   ├── controller/              # HTTP控制器
 │   │   ├── service/                 # 业务服务层
 │   │   ├── dao/                     # make dao生成
 │   │   └── model/                   # do/entity模型
+│   ├── pkg/                         # 插件对外暴露的能力
 │   └── plugin.go                    # 插件注册入口
-├── frontend/
+├── frontend/                        # 插件前端资源
 │   ├── pages/                       # 插件页面
 │   └── slots/                       # 插槽页面，可选
-├── manifest/
-│   ├── config/
+├── hack/                            # 插件自身脚本和工具
+│   ├── config.yaml                  # 插件开发期工具配置入口，包含代码生成、自定义构建等配置
+│   └── tests/                       # 插件测试内容
+│       └── e2e/                     # 插件 e2e 测试内容
+├── manifest/                        # 插件清单与资源
+│   ├── config/                      # 插件运行期配置
 │   │   ├── config.yaml              # 开发期默认配置
 │   │   └── config.example.yaml      # 配置模板，不作为运行时默认值
 │   ├── sql/                         # 安装与升级SQL
 │   │   ├── mock-data/               # 演示数据，可选
 │   │   └── uninstall/               # 卸载SQL
 │   └── i18n/                        # 插件语言包
-└── README.md
+├── README.md                        # 插件说明文档
+└── README.zh-CN.md                  # 插件中文说明文档
 ```
 
 `backend/internal/service/`是插件服务逻辑的固定位置，不要在插件根目录或`backend/`根目录另建`service/`包。

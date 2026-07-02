@@ -97,27 +97,34 @@ sequenceDiagram
 ```text
 apps/lina-plugins/<plugin-id>/
 ├── main.go                          # WASM导出函数入口
-├── plugin.yaml
-├── plugin_embed.go
-├── backend/
+├── plugin.yaml                      # 插件元数据与能力声明
+├── plugin_embed.go                  # 插件源码嵌入宿主编译入口
+├── Makefile                         # 插件make指令入口
+├── backend/                         # 插件后端源码
 │   ├── api/                         # API DTO与路由契约
-│   ├── internal/
+│   ├── internal/                    # 插件内部业务逻辑封装
 │   │   ├── controller/              # HTTP控制器
 │   │   ├── service/                 # 业务服务层
-│   │   ├── dao/                     # gf gen dao生成
+│   │   ├── dao/                     # make dao生成
 │   │   └── model/                   # do/entity模型
 │   └── plugin.go                    # 插件注册入口
-├── frontend/
-│   └── pages/                       # 动态插件前端资产
-├── manifest/
-│   ├── config/
-│   │   ├── config.yaml              # 动态产物携带的默认配置
+├── frontend/                        # 插件前端资源
+│   ├── pages/                       # 插件页面
+│   └── slots/                       # 插槽页面，可选
+├── hack/                            # 插件自身脚本和工具
+│   ├── config.yaml                  # 插件开发期工具配置入口，包含代码生成、自定义构建等配置
+│   └── tests/                       # 插件测试内容
+│       └── e2e/                     # 插件 e2e 测试内容
+├── manifest/                        # 插件清单与资源
+│   ├── config/                      # 插件运行期配置
+│   │   ├── config.yaml              # 开发期默认配置
 │   │   └── config.example.yaml      # 配置模板，不作为运行时默认值
 │   ├── sql/                         # 安装与升级SQL
 │   │   ├── mock-data/               # 演示数据，可选
 │   │   └── uninstall/               # 卸载SQL
 │   └── i18n/                        # 插件语言包
-└── README.md
+├── README.md                        # 插件说明文档
+└── README.zh-CN.md                  # 插件中文说明文档
 ```
 
 构建工具会优先读取插件嵌入资源，并在需要时回退扫描目录，把`plugin.yaml`、`frontend/`资产、`manifest/sql`、`manifest/i18n`、`manifest/config/config.yaml`、`manifest/config/config.example.yaml`和`manifest/`下的其他资源写入动态产物。运行时资源会绑定到当前有效发布的校验和与生成号，安装、启用、禁用、卸载、升级或同版本刷新都会触发相应缓存失效。

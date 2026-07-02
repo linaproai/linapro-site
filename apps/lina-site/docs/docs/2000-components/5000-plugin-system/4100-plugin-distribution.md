@@ -6,7 +6,7 @@ description: '插件分发治理模式的核心概念、两种分发类型的定
 keywords:
   - distribution
   - 分发治理
-  - marketplace
+  - managed
   - builtin
   - 内建插件
   - 市场插件
@@ -33,13 +33,13 @@ keywords:
 
 | 分发类型 | 语义 | 生命周期特征 | 适用场景 |
 |----------|------|--------------|----------|
-| `marketplace` | 普通插件，可被平台管理员显式管理 | 需要显式安装、启用、升级，或由`plugin.autoEnable`托管启用 | 第三方插件、可选功能模块 |
+| `managed` | 普通插件，可被平台管理员显式管理 | 需要显式安装、启用、升级，或由`plugin.autoEnable`托管启用 | 第三方插件、可选功能模块 |
 | `builtin` | 项目内建源码插件，是项目组成部分 | 启动时自动安装、启用、安全升级；普通插件管理入口不可操作 | 核心业务插件、项目必需功能 |
 
 对于基于`LinaPro`开发自身业务系统的企业或团队，通常将业务插件声明为`builtin`分发模式。这是因为业务插件是系统的核心组成部分，需要随主框架一起编译、部署和升级，确保在生产环境中始终可用且版本一致。
 
 :::info 提示
-`distribution`字段的默认值为`marketplace`。如果`plugin.yaml`中未声明该字段，插件将按照市场插件的模式进行治理。
+`distribution`字段的默认值为`managed`。如果`plugin.yaml`中未声明该字段，插件将按照市场插件的模式进行治理。
 :::
 
 ## 配置示例
@@ -52,7 +52,7 @@ id: linapro-ai-core
 name: AI Hub
 version: 0.1.0
 type: source
-distribution: marketplace
+distribution: managed
 scope_nature: tenant_aware
 ```
 
@@ -169,8 +169,8 @@ flowchart TD
 ## 最佳实践
 
 1. **核心功能使用`builtin`**：将项目必需的核心业务插件声明为`builtin`，确保它们始终可用
-2. **可选功能使用`marketplace`**：将可选的功能模块声明为`marketplace`，允许管理员灵活管理
-3. **企业业务插件优先选择`builtin`**：基于 LinaPro 开发业务系统时，将自研业务插件声明为`builtin`，与主框架统一编译部署，避免生产环境遗漏或版本不一致
+2. **可选功能使用`managed`**：将可选的功能模块声明为`managed`，允许管理员灵活管理
+3. **企业业务插件优先选择`builtin`**：基于 `LinaPro` 开发业务系统时，将自研业务插件声明为`builtin`，与主框架统一编译部署，避免生产环境遗漏或版本不一致
 4. **遵循双因子约束**：声明`builtin`时确保同时满足类型和注册约束
 5. **合理规划依赖顺序**：内建插件按依赖拓扑排序启动，确保依赖关系正确
 6. **避免配置重叠**：不要将`builtin`插件同时添加到`plugin.autoEnable`

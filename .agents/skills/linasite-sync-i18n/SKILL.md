@@ -3,10 +3,7 @@ name: linasite-sync-i18n
 description: >-
   检测 apps/lina-site/docs/ 中文主稿与 apps/lina-site/i18n/en/docusaurus-plugin-content-docs/current/
   英文翻译之间的缺漏和内容差异，并进行补全修复。当 docs/ 中新增或更新了文档、或需要全量同步审查时使用。
-  执行时必须优先检查 apps/lina-site/docs/ 的 git status；如果存在已修改、新增、重命名或删除的 Markdown 文档，
-  必须先把这些变更同步到英文 i18n 中，再考虑全量审查。
-  翻译和文档标题都必须采用地道、专业、自然的英文表达；标题应尽可能与 slug/路径表达的英文路由名称一致，
-  绝不逐字翻译中文，确保英文版本在英语环境下自然流畅。
+  需要手动调用该技能，禁止自动调用。
 ---
 
 # linasite-sync-i18n：文档 i18n 同步与翻译
