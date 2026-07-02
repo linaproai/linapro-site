@@ -112,13 +112,11 @@ Dynamic plugins access published runtime capabilities through `pluginbridge.Defa
 | `Network()` | Exclusive: governed outbound `HTTP` requests, requiring authorized target addresses declared in `plugin.yaml` |
 | `RecordStore()` | Exclusive: `ORM`-like wrapper for the `data` service, only accessing declared plugin-owned tables |
 
-#### `AdminServices` Boundary
+#### Capability Differences Between Source and Dynamic Plugins
 
-`capability.AdminServices` is the management command catalog for trusted source plugins, exposed only through `pluginhost.Services.Admin()`. Source plugins can receive domain-governed management capabilities within the host process, such as user management, permission management, notification management, session revocation, and plugin governance commands.
+Source plugins access the full domain capability set through `capability.Services`, including both read and write operations (e.g., `Jobs().Run()`, `Sessions().Revoke()`, `Notifications().Send()`). These write operations are executed after governance validation covering state, target, tenant, and audit checks.
 
-The dynamic plugin `pluginbridge.Services` interface does not provide an `Admin()` entry, so dynamic plugins cannot directly use `sessioncap.AdminService`, `notifycap.AdminService`, or other domain `AdminService` interfaces. Dynamic plugins can only call specific methods that have been published as dynamic `hostServices`, declared in `plugin.yaml`, authorized by the host, and registered with the `WASM host-service` dispatcher.
-
-For example, the current `sessions` dynamic service only provides `sessions.search` and `sessions.batch_get`, not the `sessioncap.AdminService.RevokeSession` force-revoke command. If dynamic plugins need a management action in the future, the management interface will be considered for opening.
+The dynamic plugin `pluginbridge.Services` interface only exposes the capability subset published as `hostServices`. Dynamic plugins can only invoke specific methods that have been declared in `plugin.yaml`, authorized by the host, and registered with the `WASM host-service` dispatcher. Nearly all domain capabilities now expose both read and write interfaces to dynamic plugins — for example, the `sessions` dynamic service includes the `sessions.revoke` force-revoke command, the `jobs` dynamic service includes write operations like `jobs.run` and `jobs.status.set`, and services like `dict`, `files`, `hostconfig`, `org`, and `users` also provide full lifecycle management methods such as `Create`, `Update`, and `Delete`. Plugin authors should refer to the dynamic service catalog table below for the specific method list of each service.
 
 ## Domain Capability Overview
 
@@ -343,7 +341,7 @@ hostServices:
 
 | Resource Type | Declaration Field | Services |
 |---------------|-------------------|----------|
-| `none` | No `resources` declared | `runtime`, `apidoc`, `auth`, `authz`, `ai`, `users`, `bizctx`, `dict`, `files`, `jobs`, `notifications`, `plugins`, `route`, `sessions`, `org`, `tenant` |
+| `none` | No `resources` declared | `runtime`, `apidoc`, `auth`, `ai`, `users`, `bizctx`, `dict`, `files`, `jobs`, `notifications`, `plugins`, `route`, `sessions`, `org`, `tenant` |
 | `path` | `resources.paths` | `storage`, `manifest` |
 | `table` | `resources.tables` | `data` |
 | `key` | `resources.keys` | `hostconfig` |
@@ -355,32 +353,28 @@ Production validation requires `data` service tables to belong to the plugin's o
 
 | Service | Domain Documentation | Resource Type | Methods |
 |---------|---------------------|---------------|---------|
-| `runtime` | <span style={{whiteSpace: 'nowrap'}}>[Dynamic Runtime Capability](/docs/domain-capability-runtime)</span> | `none` | `log.write`, `state.get`, `state.set`, `state.delete`, `info.now`, `info.uuid`, `info.node` |
-| `storage` | [Files Capability](/docs/domain-capability-files) | `path` | `put`, `get`, `delete`, `delete_many`, `list`, `list_cursor`, `stat`, `batch_stat` |
-| `network` | [Network Capability](/docs/domain-capability-network) | `resource` | `request` |
-| `data` | [Record Store Capability](/docs/domain-capability-recordstore) | `table` | `list`, `get`, `create`, `update`, `delete`, `transaction` |
-| `cache` | [Cache Capability](/docs/domain-capability-cache) | `resource` | `get`, `set`, `delete`, `incr`, `expire` |
-| `lock` | [Lock Capability](/docs/domain-capability-lock) | `resource` | `acquire`, `renew`, `release` |
-| `hostconfig` | [Host Config Capability](/docs/domain-capability-hostconfig) | `key` | `get` |
-| `manifest` | [Manifest Resources Capability](/docs/domain-capability-manifest) | `path` | `get` |
+| `ai` | [AI Capability](/docs/domain-capability-ai) | `none` | `text.generate`, `text.method_status.get`, `ai.methods.status.batch_get`, `image.generate`, `image.edit`, `embedding.create`, `audio.transcribe`, `audio.synthesize`, `vision.analyze`, `document.analyze`, `document.cite`, `safety.moderate`, `video.generate`, `video.edit`, `video.extend`, `video.operation.get`, `video.operation.cancel` |
 | `apidoc` | [API Documentation Capability](/docs/domain-capability-apidoc) | `none` | `route_text.resolve`, `route_texts.resolve`, `route_title_operation_keys.find` |
-| `auth` | [Auth Capability](/docs/domain-capability-auth) | `none` | `tenant.select`, `tenant.switch`, `impersonation_token.issue`, `impersonation_token.revoke` |
-| `authz` | [Auth Capability](/docs/domain-capability-auth) | `none` | `permissions.batch_get`, `permissions.batch_has`, `permissions.has`, `users.platform_admin.check` |
-| `ai` | [AI Capability](/docs/domain-capability-ai) | `none` | `text.generate`, `image.generate`, `image.edit`, `embedding.create`, `audio.transcribe`, `audio.synthesize`, `vision.analyze`, `document.analyze`, `document.cite`, `safety.moderate`, `video.generate`, `video.edit`, `video.extend`, `video.operation.get`, `video.operation.cancel` |
-| `users` | [Users Capability](/docs/domain-capability-users) | `none` | `users.current`, `users.batch_get`, `users.batch_resolve`, `users.search`, `users.visible.ensure` |
+| `auth` | [Auth Capability](/docs/domain-capability-auth) | `none` | `token.tenant.select`, `token.tenant.switch`, `token.impersonation_token.issue`, `token.impersonation_token.revoke`, `authz.permissions.batch_get`, `authz.permissions.batch_has`, `authz.permissions.has`, `authz.users.platform_admin.check`, `authz.role_permissions.replace` |
 | `bizctx` | [Business Context Capability](/docs/domain-capability-bizctx) | `none` | `current.get` |
-| `dict` | [Dict Capability](/docs/domain-capability-dict) | `none` | `labels.resolve`, `labels.list`, `labels.visible.ensure` |
-| `files` | [Files Capability](/docs/domain-capability-files) | `none` | `files.batch_get`, `files.search`, `files.visible.ensure` |
-| `jobs` | [Jobs Capability](/docs/domain-capability-jobs) | `none` | `jobs.batch_get`, `jobs.search`, `jobs.visible.ensure`, `jobs.register` |
-| `notifications` | [Notifications Capability](/docs/domain-capability-notifications) | Read no resource; `messages.send` uses `resources[].ref` | `messages.batch_get`, `messages.batch_get_by_source`, `messages.visible.ensure`, `messages.send` |
-| `plugins` | [Plugin Governance Capability](/docs/domain-capability-plugins) | `none` | `plugins.batch_get`, `plugins.tenant.list`, `plugins.enabled.check`, `plugins.provider_enabled.check`, `plugins.enabled_authoritative.check`, `config.get`, `lifecycle.tenant_plugin_disable.ensure`, `lifecycle.tenant_plugin_disabled.notify`, `lifecycle.tenant_delete.ensure`, `lifecycle.tenant_deleted.notify` |
+| `cache` | [Cache Capability](/docs/domain-capability-cache) | `resource` | `get`, `get_many`, `set`, `set_many`, `delete`, `delete_many`, `incr`, `expire` |
+| `data` | [Record Store Capability](/docs/domain-capability-recordstore) | `table` | `list`, `get`, `batch_get`, `create`, `update`, `delete`, `transaction` |
+| `dict` | [Dict Capability](/docs/domain-capability-dict) | `none` | `dict.refresh`, `dict.type.get`, `dict.type.batch_get`, `dict.type.list`, `dict.type.visible.ensure`, `dict.type.keys.visible.ensure`, `dict.type.create`, `dict.type.update`, `dict.type.delete`, `dict.value.get`, `dict.value.batch_get`, `dict.value.labels.resolve`, `dict.value.list`, `dict.value.visible.ensure`, `dict.value.values.visible.ensure`, `dict.value.create`, `dict.value.update`, `dict.value.delete`, `dict.value.by_type.delete` |
+| `files` | [Files Capability](/docs/domain-capability-files) | `none` | `files.batch_get`, `files.list`, `files.visible.ensure`, `files.upload`, `files.create_from_storage`, `files.metadata.update`, `files.delete`, `files.delete_many` |
+| `hostconfig` | [Host Config Capability](/docs/domain-capability-hostconfig) | `key` | `get`, `sys_config.get`, `sys_config.value.set`, `sys_config.reset` |
+| `jobs` | [Jobs Capability](/docs/domain-capability-jobs) | `none` | `jobs.batch_get`, `jobs.list`, `jobs.visible.ensure`, `jobs.create`, `jobs.update`, `jobs.delete`, `jobs.run`, `jobs.status.set`, `jobs.register` |
+| `lock` | [Lock Capability](/docs/domain-capability-lock) | `resource` | `acquire`, `renew`, `release` |
+| `manifest` | [Manifest Resources Capability](/docs/domain-capability-manifest) | `path` | `get`, `get_many`, `list` |
+| `network` | [Network Capability](/docs/domain-capability-network) | `resource` | `request` |
+| `notifications` | [Notifications Capability](/docs/domain-capability-notifications) | Read no resource; `messages.send` uses `resources[].ref` | `messages.batch_get`, `messages.list`, `messages.by_source.batch_get`, `messages.visible.ensure`, `messages.send`, `messages.delete`, `messages.by_source.delete`, `messages.mark_read`, `messages.mark_unread` |
+| `org` | [Org Capability](/docs/domain-capability-org) | `none` | `capability.available`, `capability.status`, `org.assignment.user_profiles.batch_get`, `org.department.tree.list`, `org.department.batch_get`, `org.department.list`, `org.department.create`, `org.department.update`, `org.department.delete`, `org.post.batch_get`, `org.post.options.list`, `org.post.create`, `org.post.update`, `org.post.delete`, `org.department.visible.ensure_many`, `org.post.visible.ensure_many`, `org.assignment.by_user.replace`, `org.assignment.by_user.cleanup` |
+| `plugins` | [Plugin Governance Capability](/docs/domain-capability-plugins) | `none` | `plugins.current.get`, `plugins.batch_get`, `plugins.registry.list`, `plugins.tenant.list`, `config.get`, `plugins.state.enabled.check`, `plugins.state.provider_enabled.check`, `plugins.state.enabled_authoritative.check`, `plugins.lifecycle.tenant_plugin_disable.ensure`, `plugins.lifecycle.tenant_plugin_disabled.notify`, `plugins.lifecycle.tenant_delete.ensure`, `plugins.lifecycle.tenant_deleted.notify` |
 | `route` | [Dynamic Route Capability](/docs/domain-capability-route) | `none` | `metadata.get` |
-| `sessions` | [Sessions Capability](/docs/domain-capability-sessions) | `none` | `sessions.current`, `sessions.search`, `sessions.batch_get`, `sessions.batch_get_user_online_status`, `sessions.visible.ensure` |
-| `org` | [Org Capability](/docs/domain-capability-org) | `none` | `capability.available`, `capability.status`, `users.dept_assignments.list`, `users.org_profiles.batch_get`, `users.dept_info.get`, `users.dept_name.get`, `users.dept_ids.get`, `users.post_ids.get`, `departments.tree.list`, `departments.search`, `departments.visible.ensure`, `posts.options.list`, `posts.visible.ensure` |
-| `tenant` | [Tenant Capability](/docs/domain-capability-tenant) | `none` | `capability.available`, `capability.status`, `tenants.current`, `tenants.current_info`, `tenants.platform_bypass`, `tenants.visible.ensure`, `tenants.batch_get`, `tenants.search`, `tenants.visible.batch_ensure`, `users.tenant_membership.validate`, `users.tenants.list`, `users.tenants.batch_list`, `tenants.switch.validate` |
-| `secret` | Reserved | `resource` | `resolve` |
-| `event` | Reserved | `resource` | `publish` |
-| `queue` | Reserved | `resource` | `enqueue` |
+| `runtime` | <span style={{whiteSpace: 'nowrap'}}>[Dynamic Runtime Capability](/docs/domain-capability-runtime)</span> | `none` | `log.write`, `state.get`, `state.get_many`, `state.set`, `state.set_many`, `state.delete`, `state.delete_many`, `info.now`, `info.uuid`, `info.node` |
+| `sessions` | [Sessions Capability](/docs/domain-capability-sessions) | `none` | `sessions.current.get`, `sessions.list`, `sessions.batch_get`, `sessions.users.online.batch_get`, `sessions.visible.ensure`, `sessions.revoke`, `sessions.revoke_many` |
+| `storage` | [Files Capability](/docs/domain-capability-files) | `path` | `put`, `put.init`, `put.chunk`, `put.commit`, `put.abort`, `get`, `delete`, `delete.batch`, `list`, `list.cursor`, `stat`, `stat.batch` |
+| `tenant` | [Tenant Capability](/docs/domain-capability-tenant) | `none` | `capability.available`, `capability.status`, `tenant.context.current`, `tenant.context.info`, `tenant.context.platform_bypass`, `tenant.directory.batch_get`, `tenant.directory.list`, `tenant.membership.validate`, `tenant.membership.list_by_user`, `tenant.directory.visible.ensure_many`, `tenant.plugins.enabled.set`, `tenant.plugins.defaults.provision`, `tenant.filter.context` |
+| `users` | [Users Capability](/docs/domain-capability-users) | `none` | `users.current.get`, `users.batch_get`, `users.resolve.batch`, `users.list`, `users.visible.ensure`, `users.create`, `users.update`, `users.delete`, `users.status.set`, `users.password.reset`, `users.assignment.roles.replace` |
 
 ### Dynamic Plugin Exclusive Capabilities
 

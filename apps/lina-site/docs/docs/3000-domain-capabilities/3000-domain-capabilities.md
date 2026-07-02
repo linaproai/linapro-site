@@ -143,7 +143,7 @@ graph TB
 
 源码插件通过`capability.Services`访问完整的领域能力，包括读取和写入操作（例如`Jobs().Run()`、`Sessions().Revoke()`、`Notifications().Send()`等）。这些写操作经过状态、目标、租户、审计等治理校验后执行。
 
-动态插件的`pluginbridge.Services`接口只暴露已发布为`hostServices`的能力子集。动态插件只能调用已经写入`plugin.yaml`声明、经过宿主授权并注册到`WASM host-service`分发器中的具体方法。例如当前`sessions`动态服务只提供`sessions.batch_get`和`sessions.list`，不包含`Revoke`强退命令；`jobs`动态服务只提供`jobs.batch_get`、`jobs.list`和`jobs.register`，不包含`Run`或`SetStatus`。如果未来确实需要让动态插件使用某个写操作，再考虑开放对应方法。
+动态插件的`pluginbridge.Services`接口只暴露已发布为`hostServices`的能力子集。动态插件只能调用已经写入`plugin.yaml`声明、经过宿主授权并注册到`WASM host-service`分发器中的具体方法。几乎所有领域能力都已对动态插件开放了读写接口——例如`sessions`动态服务包含`sessions.revoke`强退命令，`jobs`动态服务包含`jobs.run`和`jobs.status.set`等写操作，`dict`、`files`、`hostconfig`、`org`、`users`等服务也同时提供了`Create`、`Update`、`Delete`等完整的生命周期管理方法。插件作者应参考下方动态服务目录表格确认各服务的具体方法列表。
 
 
 ## SPI架构设计
@@ -347,26 +347,26 @@ hostServices:
 |------|----------|----------|------|
 | `ai` | [AI能力](/docs/domain-capability-ai) | `none` | `text.generate`、`text.method_status.get`、`ai.methods.status.batch_get`、`image.generate`、`image.edit`、`embedding.create`、`audio.transcribe`、`audio.synthesize`、`vision.analyze`、`document.analyze`、`document.cite`、`safety.moderate`、`video.generate`、`video.edit`、`video.extend`、`video.operation.get`、`video.operation.cancel` |
 | `apidoc` | [接口文档](/docs/domain-capability-apidoc) | `none` | `route_text.resolve`、`route_texts.resolve`、`route_title_operation_keys.find` |
-| `auth` | [认证与授权](/docs/domain-capability-auth) | `none` | `token.tenant.select`、`token.tenant.switch`、`token.impersonation_token.issue`、`token.impersonation_token.revoke`、`authz.permissions.batch_get`、`authz.permissions.batch_has`、`authz.permissions.has`、`authz.users.platform_admin.check` |
+| `auth` | [认证与授权](/docs/domain-capability-auth) | `none` | `token.tenant.select`、`token.tenant.switch`、`token.impersonation_token.issue`、`token.impersonation_token.revoke`、`authz.permissions.batch_get`、`authz.permissions.batch_has`、`authz.permissions.has`、`authz.users.platform_admin.check`、`authz.role_permissions.replace` |
 | `bizctx` | [业务上下文](/docs/domain-capability-bizctx) | `none` | `current.get` |
 | `cache` | [缓存能力](/docs/domain-capability-cache) | `resource` | `get`、`get_many`、`set`、`set_many`、`delete`、`delete_many`、`incr`、`expire` |
 | `data` | [数据库操作](/docs/domain-capability-recordstore) | `table` | `list`、`get`、`batch_get`、`create`、`update`、`delete`、`transaction` |
-| `dict` | [字典能力](/docs/domain-capability-dict) | `none` | `dict.value.labels.resolve`、`dict.value.list`、`dict.value.values.visible.ensure` |
-| `files` | [文件能力](/docs/domain-capability-files) | `none` | `files.batch_get`、`files.list`、`files.visible.ensure`、`files.upload`、`files.create_from_storage` |
-| `hostconfig` | [配置管理](/docs/domain-capability-hostconfig) | `key` | `get` |
-| `jobs` | [定时任务](/docs/domain-capability-jobs) | `none` | `jobs.batch_get`、`jobs.list`、`jobs.visible.ensure`、`jobs.register` |
+| `dict` | [字典能力](/docs/domain-capability-dict) | `none` | `dict.refresh`、`dict.type.get`、`dict.type.batch_get`、`dict.type.list`、`dict.type.visible.ensure`、`dict.type.keys.visible.ensure`、`dict.type.create`、`dict.type.update`、`dict.type.delete`、`dict.value.get`、`dict.value.batch_get`、`dict.value.labels.resolve`、`dict.value.list`、`dict.value.visible.ensure`、`dict.value.values.visible.ensure`、`dict.value.create`、`dict.value.update`、`dict.value.delete`、`dict.value.by_type.delete` |
+| `files` | [文件能力](/docs/domain-capability-files) | `none` | `files.batch_get`、`files.list`、`files.visible.ensure`、`files.upload`、`files.create_from_storage`、`files.metadata.update`、`files.delete`、`files.delete_many` |
+| `hostconfig` | [配置管理](/docs/domain-capability-hostconfig) | `key` | `get`、`sys_config.get`、`sys_config.value.set`、`sys_config.reset` |
+| `jobs` | [定时任务](/docs/domain-capability-jobs) | `none` | `jobs.batch_get`、`jobs.list`、`jobs.visible.ensure`、`jobs.create`、`jobs.update`、`jobs.delete`、`jobs.run`、`jobs.status.set`、`jobs.register` |
 | `lock` | [分布式锁](/docs/domain-capability-lock) | `resource` | `acquire`、`renew`、`release` |
 | `manifest` | [清单资源](/docs/domain-capability-manifest) | `path` | `get`、`get_many`、`list` |
 | `network` | [网络访问](/docs/domain-capability-network) | `resource` | `request` |
 | `notifications` | [通知能力](/docs/domain-capability-notifications) | 读取无资源；`messages.send`使用`resources[].ref` | `messages.batch_get`、`messages.list`、`messages.by_source.batch_get`、`messages.visible.ensure`、`messages.send`、`messages.delete`、`messages.by_source.delete`、`messages.mark_read`、`messages.mark_unread` |
-| `org` | [组织管理](/docs/domain-capability-org) | `none` | `capability.available`、`capability.status`、`org.assignment.user_profiles.batch_get`、`org.department.tree.list`、`org.department.batch_get`、`org.department.list`、`org.post.batch_get`、`org.post.options.list`、`org.department.visible.ensure_many`、`org.post.visible.ensure_many` |
+| `org` | [组织管理](/docs/domain-capability-org) | `none` | `capability.available`、`capability.status`、`org.assignment.user_profiles.batch_get`、`org.department.tree.list`、`org.department.batch_get`、`org.department.list`、`org.department.create`、`org.department.update`、`org.department.delete`、`org.post.batch_get`、`org.post.options.list`、`org.post.create`、`org.post.update`、`org.post.delete`、`org.department.visible.ensure_many`、`org.post.visible.ensure_many`、`org.assignment.by_user.replace`、`org.assignment.by_user.cleanup` |
 | `plugins` | [插件治理](/docs/domain-capability-plugins) | `none` | `plugins.current.get`、`plugins.batch_get`、`plugins.registry.list`、`plugins.tenant.list`、`config.get`、`plugins.state.enabled.check`、`plugins.state.provider_enabled.check`、`plugins.state.enabled_authoritative.check`、`plugins.lifecycle.tenant_plugin_disable.ensure`、`plugins.lifecycle.tenant_plugin_disabled.notify`、`plugins.lifecycle.tenant_delete.ensure`、`plugins.lifecycle.tenant_deleted.notify` |
 | `route` | [动态路由](/docs/domain-capability-route) | `none` | `metadata.get` |
 | `runtime` | <span style={{whiteSpace: 'nowrap'}}>[运行时能力](/docs/domain-capability-runtime)</span> | `none` | `log.write`、`state.get`、`state.get_many`、`state.set`、`state.set_many`、`state.delete`、`state.delete_many`、`info.now`、`info.uuid`、`info.node` |
-| `sessions` | [会话管理](/docs/domain-capability-sessions) | `none` | `sessions.current.get`、`sessions.list`、`sessions.batch_get`、`sessions.users.online.batch_get`、`sessions.visible.ensure` |
+| `sessions` | [会话管理](/docs/domain-capability-sessions) | `none` | `sessions.current.get`、`sessions.list`、`sessions.batch_get`、`sessions.users.online.batch_get`、`sessions.visible.ensure`、`sessions.revoke`、`sessions.revoke_many` |
 | `storage` | [文件能力](/docs/domain-capability-files) | `path` | `put`、`put.init`、`put.chunk`、`put.commit`、`put.abort`、`get`、`delete`、`delete.batch`、`list`、`list.cursor`、`stat`、`stat.batch` |
 | `tenant` | [多租户能力](/docs/domain-capability-tenant) | `none` | `capability.available`、`capability.status`、`tenant.context.current`、`tenant.context.info`、`tenant.context.platform_bypass`、`tenant.directory.batch_get`、`tenant.directory.list`、`tenant.membership.validate`、`tenant.membership.list_by_user`、`tenant.directory.visible.ensure_many`、`tenant.plugins.enabled.set`、`tenant.plugins.defaults.provision`、`tenant.filter.context` |
-| `users` | [用户管理](/docs/domain-capability-users) | `none` | `users.current.get`、`users.batch_get`、`users.resolve.batch`、`users.list`、`users.visible.ensure` |
+| `users` | [用户管理](/docs/domain-capability-users) | `none` | `users.current.get`、`users.batch_get`、`users.resolve.batch`、`users.list`、`users.visible.ensure`、`users.create`、`users.update`、`users.delete`、`users.status.set`、`users.password.reset`、`users.assignment.roles.replace` |
 
 ### 动态插件专属能力
 
