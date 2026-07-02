@@ -73,7 +73,7 @@ scope_nature: tenant_aware
 1. **类型约束**：`type`必须为`source`（源码插件）
 2. **注册约束**：必须通过`pluginhost.RegisterSourcePlugin`注册到源码插件注册表
 
-动态插件（`type: dynamic`）不支持`builtin`分发模式。如果在动态插件的`plugin.yaml`中声明`distribution: builtin`，Manifest校验阶段将返回错误。
+动态插件（`type: dynamic`）不支持`builtin`分发模式。如果在动态插件的`plugin.yaml`中声明`distribution: builtin`，`Manifest`校验阶段将返回错误。
 
 ```mermaid
 flowchart TD
