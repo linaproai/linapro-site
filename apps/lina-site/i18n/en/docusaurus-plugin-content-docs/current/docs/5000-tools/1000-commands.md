@@ -2,7 +2,7 @@
 slug: '/docs/commands'
 title: 'Commands'
 hide_title: true
-description: 'including linactl, the Makefile compatibility entry, the Windows make.cmd wrapper, local environment checks and setup, development server management, full builds, WASM plugin builds, Docker image builds, plugin workspace management, agent resource symlink management, test validation, i18n checks, database initialization, and release governance. It helps developers use the same project toolchain consistently on macOS, Linux, and Windows.'
+description: 'Supported options and usage examples, covering linactl, the Makefile compatibility entry, the Windows make.cmd wrapper, local environment checks and setup, development server management, full builds, WASM plugin builds, Docker image builds, plugin workspace management, agent resource symlink management, test validation, static analysis, i18n checks, database initialization, and release governance. It helps developers use the same project toolchain consistently on macOS, Linux, and Windows.'
 keywords:
   - make commands
   - development commands
@@ -26,6 +26,8 @@ keywords:
   - make agents.prompts.link
   - make agents.md.link
   - make release.tag.check
+  - make lint
+  - make lint.go
   - linactl
   - development workflow
   - backend build
@@ -38,6 +40,9 @@ keywords:
   - Windows support
   - make.cmd
   - cross-platform
+  - static analysis
+  - golangci-lint
+  - code quality
 ---
 
 `LinaPro` provides a cross-platform development command set. Long-term task orchestration lives in `hack/tools/linactl`, implemented as a `Go` program; the root `Makefile` and `make.cmd` are compatibility entries that forward to the underlying `linactl`. This means the same commands work on `macOS`, `Linux`, and `Windows`, without relying on `GNU Make` or `POSIX Shell` as the only entry point.
@@ -100,6 +105,8 @@ Every `make <command>` example below can be replaced with `cd hack/tools/linactl
 | `make test.host` | Test | Run only the core framework-owned `E2E` tests |
 | `make test.plugins` | Test | Run the official plugins' own `E2E` tests |
 | `make test.scripts` | Test | Run unit and smoke tests for tooling scripts |
+| `make lint` | Static analysis | Run the repository static analysis gate (currently forwards to `lint.go`) |
+| `make lint.go` | Static analysis | Run `golangci-lint` static analysis on selected `Go` workspace modules |
 | `make i18n.check` | i18n | Scan runtime hardcoded text and validate language pack key coverage |
 | `make plugins.init` | Plugin workspace | Convert official plugin submodules into ordinary directories |
 | `make plugins.install` | Plugin workspace | Install configured source plugins into `apps/lina-plugins` |
@@ -403,6 +410,43 @@ Runs unit and smoke checks for cross-platform repository tooling, validating the
 make test.scripts
 ```
 
+## Static Analysis
+
+### make lint
+
+Runs the repository static analysis gate. Currently forwards to `lint.go`; other language analysis tools may be integrated in the future.
+
+```bash
+make lint
+```
+
+### make lint.go
+
+Runs `golangci-lint` static analysis on selected `Go` workspace modules. Analysis rules are centrally configured in the root `.golangci.yml`, spanning defect detection, resource management, error handling, security checks, performance optimization, and maintainability.
+
+```bash
+# Analyze the host workspace (apps/lina-core and hack/tools/linactl)
+make lint.go plugins=0
+
+# Analyze the host and official plugin workspaces
+make lint.go plugins=1
+
+# Auto-fix correctable issues
+make lint.go plugins=0 fix=true
+```
+
+The `plugins` argument controls the analysis scope:
+
+| `plugins` value | Description |
+|-----------------|-------------|
+| `auto` (default) | Auto-detect: enable official plugin mode when `apps/lina-plugins/` contains usable plugin `manifest` files |
+| `0` | Force core framework-only mode; analyze only the host workspace |
+| `1` | Force official source plugin mode; analyze host, tool, and official plugin `Go` modules |
+
+Static analysis tool versions are precisely pinned by repository files: `golangci-lint` version is recorded in `.golangci-lint-version`, `staticcheck` version in `.staticcheck-version`. `linactl lint.go` automatically installs missing or mismatched versions, ensuring team members and `CI` environments use identical analysis behavior.
+
+`fix=true` is an explicit developer action that allows `golangci-lint` to auto-fix import and formatting issues when supported. The `CI` pipeline does not enable this argument.
+
 ## Plugin Management
 
 The `apps/lina-plugins/` directory stores official plugins. It can be a `Git submodule`, or it can be managed as a source plugin workspace through the plugin workspace commands below.
@@ -517,7 +561,7 @@ If `PostgreSQL` cannot be reached, the command prompts you to start `PostgreSQL`
 
 ### make db.upgrade
 
-Replays host framework `SQL` files to upgrade the database schema to the latest state. The command reads all `.sql` files under `apps/lina-core/manifest/sql/`, executing them in filename order. All `SQL` statements use idempotent syntax such as `CREATE TABLE IF NOT EXISTS` and `CREATE INDEX IF NOT EXISTS`, so replaying them does not destroy existing data—it only adds any missing tables and indexes.
+Replays host framework `SQL` files to upgrade the database schema to the latest state. The command reads all `.sql` files under `apps/lina-core/manifest/sql/`, executing them in filename order. All `SQL` statements use idempotent syntax such as `CREATE TABLE IF NOT EXISTS` and `CREATE INDEX IF NOT EXISTS`, so replaying them does not destroy existing data — it only adds any missing tables and indexes.
 
 ```bash
 make db.upgrade confirm=upgrade

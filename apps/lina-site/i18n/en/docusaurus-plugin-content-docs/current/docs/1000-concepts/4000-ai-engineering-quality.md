@@ -2,7 +2,7 @@
 slug: '/docs/ai-engineering-quality'
 title: 'AI Engineering Quality'
 hide_title: true
-description: 'The engineering management challenges that arise when AI is introduced into software development, and how LinaPro builds a complete AI engineering quality assurance system through four dimensions: the SDD spec-driven workflow, two layers of project specifications, interface abstraction and anti-leakage API contracts, and high-density test coverage where test code accounts for 39% of the total codebase. Also explains how business development teams using the framework directly inherit these quality capabilities without building them from scratch.'
+description: 'The engineering management challenges that arise when AI is introduced into software development, and how LinaPro builds a complete AI engineering quality assurance system through five dimensions: the SDD spec-driven workflow, two layers of project specifications, interface abstraction and anti-leakage API contracts, high-density test coverage where test code accounts for 39% of the total codebase, and backend code quality static analysis. Also explains how business development teams using the framework directly inherit these quality capabilities without building them from scratch.'
 keywords:
   - AI engineering quality
   - quality assurance
@@ -30,6 +30,11 @@ keywords:
   - stable foundation
   - LinaPro
   - AI-native development
+  - static analysis
+  - golangci-lint
+  - staticcheck
+  - code quality detection
+  - dead code detection
 ---
 
 ## AI Makes Code Faster — But Who Ensures Quality
@@ -38,7 +43,7 @@ AI-assisted programming is profoundly changing the speed equation of software de
 
 In practice, teams face not just the simple problem of "AI wrote it wrong," but a series of deeper engineering challenges: from everyday style inconsistencies and fuzzy interface boundaries, to long-term architectural drift and specification gaps, to nearly imperceptible security data leakage risks. These problems exist in traditional development too, but under AI's high-speed iteration, both the speed and scale of their exposure are dramatically amplified.
 
-`LinaPro` established engineering quality assurance as a core pillar of its AI-native design from the very beginning of the project. This article starts from the industry's real challenges and systematically introduces how `LinaPro` builds a complete AI engineering quality assurance system through spec-driven workflows, interface abstraction, and high-density testing.
+`LinaPro` established engineering quality assurance as a core pillar of its AI-native design from the very beginning of the project. This article starts from the industry's real challenges and systematically introduces how `LinaPro` builds a complete AI engineering quality assurance system through spec-driven workflows, interface abstraction, high-density testing, and static analysis.
 
 ## Current AI Engineering Quality Challenges
 
@@ -72,7 +77,7 @@ In AI-generated code, a common and dangerous pattern is **directly exposing data
 
 ## LinaPro's Quality Assurance System
 
-`LinaPro`'s quality assurance system is built on four complementary dimensions: spec-first, interface constraints, code layering, and automated acceptance. Together they form a multi-layered defense net, ensuring every piece of `AI`-generated code operates under structured constraints.
+`LinaPro`'s quality assurance system is built on five complementary dimensions: spec-first, interface constraints, code layering, automated acceptance, and static analysis. Together they form a multi-layered defense net, ensuring every piece of `AI`-generated code operates under structured constraints.
 
 ```mermaid
 flowchart TD
@@ -80,11 +85,13 @@ flowchart TD
     A --> C["Interface abstraction\nAnti-leakage contracts"]
     A --> D["Project specifications\nFull Spec files"]
     A --> E["Automated acceptance\nUnit tests + E2E tests"]
+    A --> K["Static analysis\ngolangci-lint"]
     B --> F["Design before implementation\nSpecs anchor consistency"]
     C --> G["API contract guard\nEntities don't leak"]
     D --> H["Layered constraints\nDependency injection norms"]
     E --> I["39% test code\nRich E2E cases"]
-    F & G & H & I --> J["Sustainable high-quality delivery"]
+    K --> L["Defect interception\nCode quality gate"]
+    F & G & H & I & L --> J["Sustainable high-quality delivery"]
 ```
 
 ### Dimension 1: SDD Spec-Driven Workflow
@@ -120,7 +127,7 @@ The quality value of spec-driven development manifests in the following areas:
 The core constraint dimensions covered by `AGENTS.md` include:
 
 - **Architecture design constraints**: Defines the project positioning and `lina-core` main framework boundaries, preventing the core domain from being tightly bound to workspace display structures, and maintaining the stability of core domain contracts.
-- **Module design norms**: Business modules support on-demand disabling with frontend联动 hiding; data permissions must be explicitly injected at the query layer — in-memory filtering as a substitute is not allowed; source plugin directory structure is strictly fixed.
+- **Module design norms**: Business modules support on-demand disabling with corresponding frontend hiding; data permissions must be explicitly injected at the query layer — in-memory filtering as a substitute is not allowed; source plugin directory structure is strictly fixed.
 - **Interface design constraints**: Mandates `RESTful` semantics, prohibits action-oriented path naming, and maintains consistent resource path style across the entire repository.
 - **Code quality norms**: Runtime dependencies must be explicitly injected; errors must be wrapped through `bizerr`; logs must pass `ctx` along the call chain; caches must coordinate across instances in cluster mode.
 - **`API` response contracts**: Timestamp fields must return `Unix` millisecond integers; `DTO` fields must include English documentation tags; development tools must be cross-platform executable.
@@ -214,25 +221,55 @@ flowchart LR
 
 Unit tests and `E2E` tests provide quality assurance at different granularities. They complement rather than replace each other: unit tests ensure the precise correctness of service layer logic, while `E2E` tests ensure the entire system presents correct behavior to users.
 
+### Dimension 5: Backend Code Quality Static Analysis
+
+Beyond test coverage, `LinaPro` introduces **backend code quality static analysis** as the fifth quality assurance dimension. This analysis system is built on two industry-proven `Go` static analysis tools — `golangci-lint` and `staticcheck` — executed uniformly through `make lint` or `make lint.go`.
+
+#### Analysis Toolchain
+
+| Tool | Version Pinning | Primary Responsibility |
+|------|-----------------|----------------------|
+| `golangci-lint` | `.golangci-lint-version` (currently `v2.12.2`) | Comprehensive code quality checks, integrating dozens of linters |
+| `staticcheck` | `.staticcheck-version` (currently `v0.7.0`) | Focused dead code detection (`U1000` rules) |
+
+#### Scope and Rules
+
+Static analysis covers all modules in the `Go` workspace, including the core framework `apps/lina-core`, the development tool `hack/tools/linactl`, and enabled official plugins. Analysis rules are centrally configured in `.golangci.yml`, spanning the following quality dimensions:
+
+- **Defect detection**: `errcheck`, `govet`, `staticcheck` catch potential runtime errors
+- **Resource management**: `bodyclose`, `sqlclosecheck`, `rowserrcheck` ensure proper resource cleanup
+- **Error handling**: `errorlint`, `errname`, `errchkjson` standardize error wrapping and propagation
+- **Security checks**: `bidichk`, `forcetypeassert` guard against common security pitfalls
+- **Performance optimization**: `makezero`, `wastedassign`, `usestdlibvars` avoid inefficient code patterns
+- **Maintainability**: `cyclop` (cyclomatic complexity), `misspell`, `whitespace` keep code clean
+
+#### Integration with the AI Workflow
+
+Static analysis is similarly **embedded in `LinaPro`'s development workflow**. `make dev` runs static checks automatically before starting the development server, and the `CI` pipeline treats `make lint` as a blocking gate — any code violating the analysis rules cannot pass the build. Developers can also run `make lint.go fix=true` to let `golangci-lint` auto-fix certain correctable issues.
+
+The value of this mechanism lies in: **code quality standards are enforced by tooling, not by developer judgment**. Even under AI's high-speed code generation scenario, potential defects, resource leaks, and error handling omissions are automatically intercepted at the build stage and never flow into subsequent testing and release pipelines.
+
 ## The Overall Effect of Quality Assurance
 
-Combining the safeguards from all four dimensions, `LinaPro` forms a complete quality chain from specification design to automated acceptance:
+Combining the safeguards from all five dimensions, `LinaPro` forms a complete quality chain from specification design to automated acceptance and static analysis:
 
 ```mermaid
 flowchart LR
     A["Requirement intent"] -->|"SDD workflow"| B["Spec documents\n(proposal + design)"]
     B -->|"Spec constraints"| C["AI code implementation"]
+    C -->|"Static analysis"| I["Code quality\ndefect interception"]
     C -->|"Interface contract tests"| D["API boundary safety"]
     C -->|"Code consistency norms"| E["Unified code style"]
     C -->|"Unit tests"| F["Correct service behavior"]
     C -->|"E2E tests"| G["End-to-end functionality"]
-    D & E & F & G --> H["Spec archived\nquality crystallized"]
+    I & D & E & F & G --> H["Spec archived\nquality crystallized"]
 ```
 
-The core value this system delivers is: **quality assurance is systematic, not dependent on individual developer discipline**. Specifications are machine-readable, gates are automated, tests are mandatory — this means that even under AI's high-speed iteration and massive code output scenarios, quality standards won't be quietly lowered because "we're in a rush today" or "we'll skip it this time."
+The core value this system delivers is: **quality assurance is systematic, not dependent on individual developer discipline**. Specifications are machine-readable, gates are automated, tests are mandatory, and static analysis is blocking — this means that even under AI's high-speed iteration and massive code output scenarios, quality standards won't be quietly lowered because "we're in a rush today" or "we'll skip it this time."
 
 For teams using `LinaPro`, this system means:
 
+- Any code with potential defects or resource leaks is intercepted at the static analysis stage and never enters subsequent pipelines
 - Any code violating `API` contracts fails automatically in `CI` and never enters the main branch
 - Any change breaking functionality is caught by `E2E` tests and never enters the release pipeline
 - Any implementation deviating from specifications has clear documentation for comparison — reviews have evidence to rely on

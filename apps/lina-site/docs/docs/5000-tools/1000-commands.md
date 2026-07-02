@@ -26,6 +26,8 @@ keywords:
   - make agents.prompts.link
   - make agents.md.link
   - make release.tag.check
+  - make lint
+  - make lint.go
   - linactl
   - 开发工作流
   - 后端构建
@@ -38,6 +40,9 @@ keywords:
   - Windows支持
   - make.cmd
   - 跨平台
+  - 静态检查
+  - golangci-lint
+  - 代码质量
 ---
 
 `LinaPro`项目提供了一套跨平台开发指令集。长期维护的任务编排集中在`hack/tools/linactl`中，以`Go`程序实现；根目录`Makefile`和`make.cmd`只是兼容入口，都会转发到底层`linactl`。因此同一套命令可以在`macOS`、`Linux`和`Windows`上使用，不再依赖`GNU Make`或`POSIX Shell`作为唯一入口。
@@ -100,6 +105,8 @@ make help
 | `make test.host` | 测试 | 只运行主框架自有`E2E`测试 |
 | `make test.plugins` | 测试 | 运行官方插件自有`E2E`测试 |
 | `make test.scripts` | 测试 | 运行工具脚本的单元与`smoke`测试 |
+| `make lint` | 静态检查 | 运行仓库静态检查门禁（当前转发到`lint.go`） |
+| `make lint.go` | 静态检查 | 对选定`Go workspace`模块运行`golangci-lint`静态检查 |
 | `make i18n.check` | 国际化 | 扫描运行时硬编码文案并校验语言包`key`覆盖 |
 | `make plugins.init` | 插件工作区 | 将官方插件子模块转换为普通目录 |
 | `make plugins.install` | 插件工作区 | 安装配置中的源码插件到`apps/lina-plugins` |
@@ -136,7 +143,7 @@ make env.check
 
 ### make env.setup
 
-安装开发与`E2E`测试所需的前端依赖、`Playwright Chromium`浏览器和浏览器运行所需系统依赖。在首次克隆仓库或`CI`环境初始化时执行一次即可，后续通常不需要重复运行。
+安装开发与`E2E`测试所需的所有前置依赖，包括`Go`静态检查工具（`golangci-lint`和`staticcheck`）、前端依赖、`Playwright Chromium`浏览器和浏览器运行所需系统依赖。在首次克隆仓库或`CI`环境初始化时执行一次即可，后续通常不需要重复运行。
 
 ```bash
 make env.setup
@@ -402,6 +409,43 @@ make test.plugins
 ```bash
 make test.scripts
 ```
+
+## 静态检查
+
+### make lint
+
+运行仓库静态检查门禁。当前转发到`lint.go`，未来可扩展集成其他语言的静态检查工具。
+
+```bash
+make lint
+```
+
+### make lint.go
+
+对选定`Go workspace`模块运行`golangci-lint`静态检查。检查规则在仓库根目录`.golangci.yml`中集中配置，涵盖缺陷检测、资源管理、错误处理、安全检查、性能优化和可维护性等多个质量维度。
+
+```bash
+# 检查宿主工作区（apps/lina-core 和 hack/tools/linactl）
+make lint.go plugins=0
+
+# 检查宿主和官方插件工作区
+make lint.go plugins=1
+
+# 自动修复可纠正的问题
+make lint.go plugins=0 fix=true
+```
+
+`plugins`参数控制检查范围：
+
+| `plugins`值 | 说明 |
+|-------------|------|
+| `auto`（默认） | 自动探测：当`apps/lina-plugins/`存在可用插件`manifest`时启用官方插件模式 |
+| `0` | 强制主框架模式，只检查宿主工作区 |
+| `1` | 强制启用官方源码插件模式，检查宿主、工具和官方插件`Go`模块 |
+
+静态检查工具版本由仓库文件精确锁定：`golangci-lint`版本记录在`.golangci-lint-version`，`staticcheck`版本记录在`.staticcheck-version`。`linactl lint.go`会自动安装缺失或不匹配的版本，确保团队成员和`CI`环境使用完全一致的分析行为。
+
+`fix=true`是显式开发者操作，允许`golangci-lint`在支持时自动修复导入和格式问题。`CI`流水线不会启用该参数。
 
 ## 插件管理
 
