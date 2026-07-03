@@ -125,9 +125,9 @@ brew install node
 
 安装完成后运行`node --version`，确认输出版本不低于`v20.19.0`。
 
-### pnpm
+### Pnpm
 
-`pnpm`是`LinaPro`前端工程指定的包管理器，请勿使用`npm`或`yarn`替代。
+`Pnpm`是`LinaPro`前端工程指定的包管理器，请勿使用`npm`或`yarn`替代。
 
 ```bash
 npm install -g pnpm
@@ -196,7 +196,7 @@ docker run \
 npm install -g @fission-ai/openspec@latest
 ```
 
-### goframe-v2
+### GoFrame
 
 `goframe-v2`是专为`GoFrame`开发框架提供的`Agent Skill`，内置`GoFrame`编码规范、`ORM`使用模式和最佳实践示例。编写或修改后端`Go`代码时，该技能将自动激活。
 
@@ -204,7 +204,7 @@ npm install -g @fission-ai/openspec@latest
 npx skills add github.com/gogf/skills -g
 ```
 
-### find-skills
+### FindSkills
 
 `find-skills`是`Agent`技能市场搜索工具，帮助开发者快速查找和评估适合项目的`Agent Skills`，提升技能选型效率。
 
