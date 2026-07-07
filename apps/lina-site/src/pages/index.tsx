@@ -38,7 +38,7 @@ function HomepageHeader() {
                             <a href="https://vitejs.dev/" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/badge/Vite-6.x-646CFF.svg" alt="Vite" /></a>
                             <a href="https://tailwindcss.com/" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/badge/Tailwind_CSS-3.x-06B6D4.svg" alt="Tailwind CSS" /></a>
                             <a href="https://goframe.org/" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/badge/GoFrame-v2-00ADD8.svg" alt="GoFrame" /></a>
-                            <a href="https://github.com/ant-design/ant-design-pro" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/badge/Art_Design_Pro-UI-FF6B6B.svg" alt="Art Design Pro" /></a>
+                            <a href="https://github.com/vueComponent/ant-design-vue" target="_blank" rel="noopener noreferrer"><img src="https://img.shields.io/badge/Ant_Design_Vue-UI-4096FF.svg" alt="Ant Design Vue" /></a>
                         </div>
                     </div>
 
