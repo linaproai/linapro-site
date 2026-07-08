@@ -214,6 +214,9 @@ make build
 # 强制主框架模式，不构建官方源码插件
 make build plugins=0
 
+# 只构建指定官方插件
+make build dir=apps/lina-plugins/my-plugin
+
 # 指定目标平台（交叉编译）
 make build platforms=linux/amd64,linux/arm64
 
@@ -258,6 +261,8 @@ build:
 | `auto`（默认） | 当`apps/lina-plugins/`存在可用插件`manifest`时启用官方源码插件模式 |
 | `0` | 强制主框架模式，移除官方插件构建标签并跳过官方插件`WASM`构建 |
 | `1` | 强制启用官方源码插件模式；如果插件工作区不可用，命令会快速失败 |
+
+只需要构建单个官方插件时，使用`dir=apps/lina-plugins/<plugin-id>`指定插件目录。该目录必须是`apps/lina-plugins/`的直属子目录，并包含`plugin.yaml`。`linactl build`会执行插件根目录`hack/config.yaml`中声明的`build.commands`；如果插件的`plugin.yaml`声明`type: dynamic`，还会继续构建该插件的`WASM`产物并写入本次构建输出目录。`plugins`参数只控制官方插件模式，不用于选择具体插件。
 
 ### make wasm
 

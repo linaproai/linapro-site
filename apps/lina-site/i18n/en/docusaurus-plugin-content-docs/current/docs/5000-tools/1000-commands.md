@@ -214,6 +214,9 @@ make build
 # Force core framework-only mode without building official source plugins
 make build plugins=0
 
+# Build only one official plugin
+make build dir=apps/lina-plugins/my-plugin
+
 # Target specific platforms through cross-compilation
 make build platforms=linux/amd64,linux/arm64
 
@@ -258,6 +261,8 @@ Plugin build mode is controlled by the `plugins` argument:
 | `auto` (default) | Enable official source plugin mode when `apps/lina-plugins/` contains usable plugin `manifest` files |
 | `0` | Force core framework-only mode, remove official plugin build tags, and skip official plugin `WASM` builds |
 | `1` | Force official source plugin mode; fail fast if the plugin workspace is unavailable |
+
+To build only one official plugin, pass `dir=apps/lina-plugins/<plugin-id>`. The directory must be a direct child of `apps/lina-plugins/` and include `plugin.yaml`. `linactl build` runs the plugin's custom steps from `build.commands` in the plugin root `hack/config.yaml`; if the plugin's `plugin.yaml` declares `type: dynamic`, it also builds that plugin's `WASM` artifact into the selected build output directory. The `plugins` argument controls official plugin mode only; it does not select a plugin.
 
 ### make wasm
 
