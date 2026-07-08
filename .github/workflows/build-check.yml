@@ -33,4 +33,4 @@ jobs:
 
       - name: Build website
         run: |
-          make build
+          make site.build
