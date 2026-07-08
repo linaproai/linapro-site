@@ -163,6 +163,9 @@ make dev plugins=0
 
 # 强制启用官方源码插件模式
 make dev plugins=1
+
+# 执行指定目录的定向构建，不启动或重启开发服务
+make dev dir=tools/custom-builder
 ```
 
 `plugins=auto`是默认模式：当`apps/lina-plugins/`中存在可用插件`manifest`时自动启用官方插件模式，否则使用主框架模式。直接调用`linactl dev`时还可以传入`skip_wasm=true`只跳过`WASM`构建步骤。
@@ -172,6 +175,8 @@ cd hack/tools/linactl
 go run . dev skip_wasm=true
 ```
 
+传入`dir=<path>`时，`make dev`会复用`make build dir=<path>`的定向构建逻辑，读取目标目录下的`hack/config.yaml`或支持的构建入口，不执行默认的服务停止、编译启动和健康检查流程。
+
 后端默认监听`http://localhost:9120`，前端开发服务器默认监听`http://localhost:5666`，管理工作台默认开发入口为`http://localhost:5666/admin`。运行日志分别写入`temp/lina-core.log`和`temp/lina-vben.log`。
 
 ### make stop
@@ -180,7 +185,12 @@ go run . dev skip_wasm=true
 
 ```bash
 make stop
+
+# 执行指定目录的自定义停止逻辑
+make stop dir=tools/custom-builder
 ```
+
+传入`dir=<path>`时，`make stop`不执行默认宿主前后端停止流程，而是读取`<path>/hack/config.yaml`中的`stop.commands`并在目标目录执行。该模式适合自定义工具、插件或本地扩展目录维护自己的停止逻辑；目标目录缺少`hack/config.yaml`时命令会快速失败。
 
 ### make status
 
@@ -188,7 +198,12 @@ make stop
 
 ```bash
 make status
+
+# 执行指定目录的自定义状态查询逻辑
+make status dir=tools/custom-builder
 ```
+
+传入`dir=<path>`时，`make status`不打印默认宿主服务状态表，而是读取`<path>/hack/config.yaml`中的`status.commands`并在目标目录执行。该模式用于让独立工具或扩展目录提供自己的状态检查输出。
 
 输出示例：
 
@@ -216,6 +231,9 @@ make build plugins=0
 
 # 只构建指定官方插件
 make build dir=apps/lina-plugins/my-plugin
+
+# 执行任意目录下 hack/config.yaml 定义的定向构建
+make build dir=tools/custom-builder
 
 # 指定目标平台（交叉编译）
 make build platforms=linux/amd64,linux/arm64
@@ -262,7 +280,32 @@ build:
 | `0` | 强制主框架模式，移除官方插件构建标签并跳过官方插件`WASM`构建 |
 | `1` | 强制启用官方源码插件模式；如果插件工作区不可用，命令会快速失败 |
 
-只需要构建单个官方插件时，使用`dir=apps/lina-plugins/<plugin-id>`指定插件目录。该目录必须是`apps/lina-plugins/`的直属子目录，并包含`plugin.yaml`。`linactl build`会执行插件根目录`hack/config.yaml`中声明的`build.commands`；如果插件的`plugin.yaml`声明`type: dynamic`，还会继续构建该插件的`WASM`产物并写入本次构建输出目录。`plugins`参数只控制官方插件模式，不用于选择具体插件。
+`dir=<path>`用于定向执行单个目标目录。内置目标保留快捷路径：`apps/lina-vben`只构建默认前端并同步嵌入资源；`apps/lina-core`构建默认前端、准备嵌入资源并编译后端二进制；`apps/lina-plugins/<plugin-id>`使用官方插件构建环境。其他目录优先读取自身`hack/config.yaml`；没有该配置时，`make build dir=<path>`才回退到本地`package.json`的`build`脚本。
+
+#### 定向目录配置
+
+目标目录可以在自身`hack/config.yaml`中为不同命令维护自定义指令。`make build dir=<path>`和`make dev dir=<path>`读取`build.commands`；`make stop dir=<path>`读取`stop.commands`；`make status dir=<path>`读取`status.commands`。这些指令都在所选目录执行，并支持以下变量：
+
+| 变量 | 含义 |
+|------|------|
+| `$(TARGET_DIR)` | 当前`dir`解析后的绝对目录 |
+| `$(BUILD_DIR)` | 同`$(TARGET_DIR)`，用于构建命令命名 |
+| `$(PLUGIN_ROOT)` | 同`$(TARGET_DIR)`，作为插件旧配置的兼容别名 |
+| `$(REPO_ROOT)` | 当前仓库根目录 |
+
+```yaml
+build:
+  commands:
+    - pnpm --dir "$(BUILD_DIR)/frontend" run build
+stop:
+  commands:
+    - node scripts/stop.mjs --root "$(TARGET_DIR)"
+status:
+  commands:
+    - node scripts/status.mjs --root "$(TARGET_DIR)"
+```
+
+当`dir=apps/lina-plugins/<plugin-id>`指向官方插件时，`plugins`参数仍只控制官方插件模式，不用于选择具体插件。源码插件会使用官方插件构建环境；动态插件会在`build.commands`完成后继续生成自身`WASM`产物并写入本次构建输出目录。`make dev dir=<path>`只执行上述定向构建路径，不启动或重启开发服务；`make stop dir=<path>`和`make status dir=<path>`则用目录配置替代默认宿主服务停止和状态查询流程。
 
 ### make wasm
 

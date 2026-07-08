@@ -163,6 +163,9 @@ make dev plugins=0
 
 # Force official source plugin mode
 make dev plugins=1
+
+# Run a targeted directory build without starting or restarting development services
+make dev dir=tools/custom-builder
 ```
 
 `plugins=auto` is the default mode: if `apps/lina-plugins/` contains usable plugin `manifest` files, official plugin mode is enabled automatically; otherwise core framework-only mode is used. When invoking `linactl dev` directly, you can also pass `skip_wasm=true` to skip only the `WASM` build step.
@@ -172,6 +175,8 @@ cd hack/tools/linactl
 go run . dev skip_wasm=true
 ```
 
+When `dir=<path>` is passed, `make dev` reuses the same targeted build path as `make build dir=<path>`. It reads the target directory's `hack/config.yaml` or supported build entry and does not run the default stop, compile, start, and health-check workflow for development services.
+
 The backend listens on `http://localhost:9120` by default, the frontend dev server listens on `http://localhost:5666` by default, and the default admin workspace development entry is `http://localhost:5666/admin`. Logs are written to `temp/lina-core.log` and `temp/lina-vben.log`.
 
 ### make stop
@@ -180,7 +185,12 @@ Stops the backend and frontend development servers and cleans up stale `PID` fil
 
 ```bash
 make stop
+
+# Run custom stop logic from a target directory
+make stop dir=tools/custom-builder
 ```
+
+When `dir=<path>` is passed, `make stop` does not run the default host backend/frontend stop workflow. Instead, it reads `stop.commands` from `<path>/hack/config.yaml` and executes them from the target directory. This lets custom tools, plugins, or local extension directories own their stop logic; the command fails fast if the target directory has no `hack/config.yaml`.
 
 ### make status
 
@@ -188,7 +198,12 @@ Prints the current backend/frontend running status and log file paths, making it
 
 ```bash
 make status
+
+# Run custom status logic from a target directory
+make status dir=tools/custom-builder
 ```
+
+When `dir=<path>` is passed, `make status` does not print the default host service status table. Instead, it reads `status.commands` from `<path>/hack/config.yaml` and executes them from the target directory so standalone tools or extension directories can provide their own status output.
 
 Sample output:
 
@@ -216,6 +231,9 @@ make build plugins=0
 
 # Build only one official plugin
 make build dir=apps/lina-plugins/my-plugin
+
+# Run a targeted build defined by any directory's hack/config.yaml
+make build dir=tools/custom-builder
 
 # Target specific platforms through cross-compilation
 make build platforms=linux/amd64,linux/arm64
@@ -262,7 +280,32 @@ Plugin build mode is controlled by the `plugins` argument:
 | `0` | Force core framework-only mode, remove official plugin build tags, and skip official plugin `WASM` builds |
 | `1` | Force official source plugin mode; fail fast if the plugin workspace is unavailable |
 
-To build only one official plugin, pass `dir=apps/lina-plugins/<plugin-id>`. The directory must be a direct child of `apps/lina-plugins/` and include `plugin.yaml`. `linactl build` runs the plugin's custom steps from `build.commands` in the plugin root `hack/config.yaml`; if the plugin's `plugin.yaml` declares `type: dynamic`, it also builds that plugin's `WASM` artifact into the selected build output directory. The `plugins` argument controls official plugin mode only; it does not select a plugin.
+Use `dir=<path>` to target one directory. Built-in targets keep their shortcut behavior: `apps/lina-vben` builds the default frontend and synchronizes embedded assets; `apps/lina-core` builds the default frontend, prepares embedded assets, and compiles the backend binary; `apps/lina-plugins/<plugin-id>` uses the official plugin build environment. Other directories first read their own `hack/config.yaml`; only when that config is absent does `make build dir=<path>` fall back to a local `package.json` `build` script.
+
+#### Target Directory Config
+
+Target directories can keep custom commands in their own `hack/config.yaml`. `make build dir=<path>` and `make dev dir=<path>` read `build.commands`; `make stop dir=<path>` reads `stop.commands`; `make status dir=<path>` reads `status.commands`. The commands run from the selected directory and support these variables:
+
+| Variable | Meaning |
+|----------|---------|
+| `$(TARGET_DIR)` | Absolute path resolved from the current `dir` value |
+| `$(BUILD_DIR)` | Same as `$(TARGET_DIR)`, named for build command usage |
+| `$(PLUGIN_ROOT)` | Same as `$(TARGET_DIR)`, kept as a compatibility alias for older plugin config |
+| `$(REPO_ROOT)` | Current repository root |
+
+```yaml
+build:
+  commands:
+    - pnpm --dir "$(BUILD_DIR)/frontend" run build
+stop:
+  commands:
+    - node scripts/stop.mjs --root "$(TARGET_DIR)"
+status:
+  commands:
+    - node scripts/status.mjs --root "$(TARGET_DIR)"
+```
+
+When `dir=apps/lina-plugins/<plugin-id>` points to an official plugin, the `plugins` argument still only controls official plugin mode; it does not select a plugin. Source plugins receive the official plugin build environment, and dynamic plugins continue to produce their `WASM` artifact after `build.commands` finishes. `make dev dir=<path>` only runs this targeted build path and does not start or restart development services; `make stop dir=<path>` and `make status dir=<path>` replace the default host service stop/status workflow with the configured directory commands.
 
 ### make wasm
 
