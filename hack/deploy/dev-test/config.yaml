@@ -1,0 +1,92 @@
+# LinaPro memory-only demo runtime configuration.
+# This file is mounted read-only by docker-compose.yaml. Runtime data still
+# lives under /app/data, which is a tmpfs inside the container.
+
+# HTTP server configuration.
+server:
+  address: ":9120"
+  dumpRouterMap: false
+  gracefulShutdownTimeout: 30
+  extensions:
+    apiDocPath: "/api.json"
+
+# Console-focused logging for disposable demo containers.
+logger:
+  path: ""
+  file: "{Y-m-d}.log"
+  level: "all"
+  stdout: true
+  extensions:
+    structured: false
+    traceIDEnabled: false
+
+# PostgreSQL database provided by docker-compose.yaml.
+database:
+  default:
+    link: "pgsql:postgres:postgres@tcp(postgres:5432)/linapro?sslmode=disable"
+    debug: false
+
+# Demo-only JWT settings. Replace this secret outside disposable demos.
+jwt:
+  secret: "lina-jwt-secret-key-change-in-production"
+  expire: 24h
+
+# Short-lived session configuration for the demo container.
+session:
+  timeout: 24h
+  cleanupInterval: 5m
+
+# Service monitoring configuration.
+monitor:
+  interval: 1m
+
+# Scheduler configuration.
+scheduler:
+  defaultTimezone: "UTC"
+
+# Demo language metadata.
+i18n:
+  default: zh-CN
+  enabled: true
+  locales:
+    - locale: en-US
+      nativeName: English
+    - locale: zh-CN
+      nativeName: 简体中文
+
+# This demo runs one LinaPro container. Keep cluster mode disabled even though
+# PostgreSQL is used as the database.
+cluster:
+  enabled: false
+  election:
+    lease: 30s
+    renewInterval: 10s
+
+# Uploaded files are stored in /app/data tmpfs and disappear with the container.
+upload:
+  path: "/app/data/upload"
+  maxSize: 100
+
+# Enable the source-plugin demo surface and public-demo protection.
+plugin:
+  allowForceUninstall: true
+  dynamic:
+    storagePath: "/app/data/wasm"
+  autoEnable:
+    - id: "linapro-tenant-core"
+      withMockData: true
+    - id: "linapro-org-core"
+      withMockData: true
+    - id: "linapro-content-notice"
+      withMockData: true
+    - id: "linapro-monitor-loginlog"
+      withMockData: true
+    - id: "linapro-monitor-online"
+      withMockData: true
+    - id: "linapro-monitor-operlog"
+      withMockData: true
+    - id: "linapro-monitor-server"
+      withMockData: true
+    # linapro-ops-demo-guard protects risky actions in public demo environments.
+    - id: "linapro-ops-demo-guard"
+      withMockData: false

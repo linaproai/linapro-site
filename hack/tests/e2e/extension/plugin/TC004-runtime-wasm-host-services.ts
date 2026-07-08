@@ -1,0 +1,1231 @@
+import { execFileSync } from "node:child_process";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createServer, type Server } from "node:http";
+import type { AddressInfo } from "node:net";
+import path from "node:path";
+
+import type { APIRequestContext, APIResponse } from "@playwright/test";
+import { request as playwrightRequest } from "@playwright/test";
+
+import { test, expect } from "../../../fixtures/auth";
+import { config } from "../../../fixtures/config";
+import {
+  execPgSQLStatements,
+  pgEscapeLiteral,
+} from "../../../support/postgres";
+
+const apiBaseURL = config.apiBaseURL;
+
+const successPluginID = "plugin-dev-host-services-e2e";
+const deniedPluginID = "plugin-dev-host-services-denied-e2e";
+const rawSQLPluginID = "plugin-dev-host-services-raw-sql-e2e";
+const successDataTable = "plugin_plugin_dev_host_services_e2e_record";
+
+type PluginListItem = {
+  id: string;
+  enabled?: number;
+  installed?: number;
+};
+
+function repoRoot() {
+  return path.resolve(process.cwd(), "../..");
+}
+
+function tempRoot() {
+  return path.join(repoRoot(), "temp", "e2e-host-services");
+}
+
+function sourceRoot() {
+  return path.join(tempRoot(), "plugins");
+}
+
+function buildOutputDir() {
+  return path.join(tempRoot(), "artifacts");
+}
+
+function linactlDir() {
+  return path.join(repoRoot(), "hack", "tools", "linactl");
+}
+
+function runtimeStorageDir() {
+  return path.join(repoRoot(), "temp", "output");
+}
+
+function sourcePluginDir(pluginID: string) {
+  return path.join(sourceRoot(), pluginID);
+}
+
+function builtArtifactPath(pluginID: string) {
+  return path.join(buildOutputDir(), `${pluginID}.wasm`);
+}
+
+function uploadedArtifactPath(pluginID: string) {
+  return path.join(runtimeStorageDir(), `${pluginID}.wasm`);
+}
+
+function pluginApiPath(pluginID: string, pathName: string) {
+  const normalizedPath = pathName.startsWith("/") ? pathName : `/${pathName}`;
+  return `/x/${pluginID}/api/v1${normalizedPath}`;
+}
+
+function writeTestFile(filePath: string, content: string) {
+  mkdirSync(path.dirname(filePath), { recursive: true });
+  writeFileSync(filePath, content);
+}
+
+function pluginGoModContent(moduleName: string) {
+  const hostModulePath = path
+    .join(repoRoot(), "apps", "lina-core")
+    .replaceAll("\\", "/");
+  return `module ${moduleName}
+
+go 1.25.0
+
+require (
+	github.com/gogf/gf/v2 v2.10.1
+	lina-core v0.0.0
+)
+
+replace lina-core => ${hostModulePath}
+`;
+}
+
+function assertOk(response: APIResponse, message: string) {
+  expect(response.ok(), `${message}, status=${response.status()}`).toBeTruthy();
+}
+
+async function expectApiSuccess<T = any>(
+  response: APIResponse,
+  message: string,
+): Promise<T> {
+  assertOk(response, message);
+
+  const payload = (await response.json()) as {
+    code?: number;
+    data?: T;
+    message?: string;
+  };
+  expect(
+    payload?.code,
+    `${message}, business code=${payload?.code}, business message=${payload?.message ?? ""}`,
+  ).toBe(0);
+  return (payload?.data ?? null) as T;
+}
+
+async function expectApiFailure(
+  response: APIResponse,
+  message: string,
+  expectedText: string,
+) {
+  const text = await response.text();
+  if (response.ok()) {
+    const payload = JSON.parse(text) as {
+      code?: number;
+      message?: string;
+    };
+    expect(payload?.code, `${message}, body=${text}`).not.toBe(0);
+    expect(text, `${message}, body=${text}`).toContain(expectedText);
+    return;
+  }
+  expect(text, `${message}, status=${response.status()}`).toContain(expectedText);
+}
+
+async function createAdminApiContext(): Promise<APIRequestContext> {
+  const anonymousApi = await playwrightRequest.newContext({ baseURL: apiBaseURL });
+  const loginResponse = await anonymousApi.post("auth/login", {
+    data: {
+      username: config.adminUser,
+      password: config.adminPass,
+      clientType: "web",
+    },
+  });
+  const loginPayload = await expectApiSuccess<{ accessToken?: string }>(
+    loginResponse,
+    "管理员登录失败",
+  );
+  await anonymousApi.dispose();
+
+  expect(loginPayload?.accessToken, "管理员登录后应返回 accessToken").toBeTruthy();
+  return playwrightRequest.newContext({
+    baseURL: apiBaseURL,
+    extraHTTPHeaders: {
+      Authorization: `Bearer ${loginPayload.accessToken as string}`,
+    },
+  });
+}
+
+async function listPlugins(adminApi: APIRequestContext): Promise<PluginListItem[]> {
+  const response = await adminApi.get("plugins");
+  const payload = await expectApiSuccess<{ list?: PluginListItem[] }>(
+    response,
+    "查询插件列表失败",
+  );
+  return payload?.list ?? [];
+}
+
+async function findPlugin(adminApi: APIRequestContext, pluginID: string) {
+  const list = await listPlugins(adminApi);
+  return list.find((item) => item.id === pluginID) ?? null;
+}
+
+async function uploadDynamicPlugin(
+  adminApi: APIRequestContext,
+  artifactPath: string,
+  overwrite = false,
+) {
+  const response = await adminApi.post("plugins/dynamic/package", {
+    multipart: {
+      overwriteSupport: overwrite ? "1" : "0",
+      file: {
+        name: path.basename(artifactPath),
+        mimeType: "application/wasm",
+        buffer: readFileSync(artifactPath),
+      },
+    },
+  });
+  await expectApiSuccess(response, `上传动态插件失败: ${artifactPath}`);
+}
+
+async function installPlugin(adminApi: APIRequestContext, pluginID: string) {
+  const response = await adminApi.post(`plugins/${pluginID}/install`);
+  await expectApiSuccess(response, `安装动态插件失败: ${pluginID}`);
+}
+
+async function uninstallPlugin(adminApi: APIRequestContext, pluginID: string) {
+  const response = await adminApi.delete(`plugins/${pluginID}`);
+  await expectApiSuccess(response, `卸载动态插件失败: ${pluginID}`);
+}
+
+async function tryUninstallPlugin(adminApi: APIRequestContext, pluginID: string) {
+  const response = await adminApi.delete(`plugins/${pluginID}`);
+  const payload = (await response.json()) as {
+    code?: number;
+  };
+  return payload?.code === 0;
+}
+
+async function setPluginEnabled(
+  adminApi: APIRequestContext,
+  pluginID: string,
+  enabled: boolean,
+) {
+  const response = await adminApi.put(
+    enabled ? `plugins/${pluginID}/enable` : `plugins/${pluginID}/disable`,
+  );
+  await expectApiSuccess(
+    response,
+    `切换动态插件状态失败: ${pluginID} enabled=${enabled}`,
+  );
+}
+
+async function resetPlugin(adminApi: APIRequestContext, pluginID: string) {
+  const plugin = await findPlugin(adminApi, pluginID);
+  if (!plugin) {
+    return;
+  }
+  if (plugin.enabled === 1) {
+    await setPluginEnabled(adminApi, pluginID, false);
+  }
+  if (plugin.installed === 1) {
+    const uninstalled = await tryUninstallPlugin(adminApi, pluginID);
+    if (!uninstalled) {
+      cleanupPluginRows([pluginID]);
+      cleanupArtifacts([pluginID]);
+    }
+  }
+}
+
+function ensurePluginStateTable() {
+  execPgSQLStatements([
+    [
+      "CREATE TABLE IF NOT EXISTS sys_plugin_state (",
+      "  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,",
+      "  plugin_id VARCHAR(64) NOT NULL DEFAULT '',",
+      "  state_key VARCHAR(255) NOT NULL DEFAULT '',",
+      "  state_value TEXT,",
+      "  created_at TIMESTAMP,",
+      "  updated_at TIMESTAMP,",
+      "  CONSTRAINT uk_plugin_state UNIQUE (plugin_id, state_key)",
+      ");",
+    ].join(" "),
+  ]);
+}
+
+function ensureSuccessDataTable() {
+  execPgSQLStatements([
+    `DROP TABLE IF EXISTS ${successDataTable};`,
+    [
+      `CREATE TABLE ${successDataTable} (`,
+      "  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,",
+      "  plugin_id VARCHAR(64) NOT NULL DEFAULT '',",
+      "  release_id INTEGER NOT NULL DEFAULT 0,",
+      "  node_key VARCHAR(255) NOT NULL DEFAULT '',",
+      "  desired_state VARCHAR(64) NOT NULL DEFAULT '',",
+      "  current_state VARCHAR(64) NOT NULL DEFAULT '',",
+      "  generation INTEGER NOT NULL DEFAULT 0,",
+      "  error_message TEXT NOT NULL DEFAULT '',",
+      "  created_at TIMESTAMP,",
+      "  updated_at TIMESTAMP,",
+      "  deleted_at TIMESTAMP",
+      ");",
+    ].join(" "),
+  ]);
+}
+
+function cleanupPluginRows(pluginIDs: string[]) {
+  const statements: string[] = [];
+  for (const pluginID of pluginIDs) {
+    const escapedID = pgEscapeLiteral(pluginID);
+    statements.push(
+      `DELETE FROM sys_role_menu WHERE menu_id IN (SELECT id FROM sys_menu WHERE menu_key LIKE 'plugin:${escapedID}:%');`,
+      `DELETE FROM sys_menu WHERE menu_key LIKE 'plugin:${escapedID}:%';`,
+      `DELETE FROM sys_plugin_state WHERE plugin_id = '${escapedID}';`,
+      `DELETE FROM sys_plugin_node_state WHERE plugin_id = '${escapedID}';`,
+      `DELETE FROM sys_plugin_resource_ref WHERE plugin_id = '${escapedID}';`,
+      `DELETE FROM sys_plugin_migration WHERE plugin_id = '${escapedID}';`,
+      `DELETE FROM sys_plugin_release WHERE plugin_id = '${escapedID}';`,
+      `DELETE FROM sys_plugin WHERE plugin_id = '${escapedID}';`,
+    );
+  }
+  execPgSQLStatements(statements);
+}
+
+function cleanupSuccessDataTable() {
+  execPgSQLStatements([`DELETE FROM ${successDataTable};`]);
+}
+
+function dropSuccessDataTable() {
+  execPgSQLStatements([`DROP TABLE IF EXISTS ${successDataTable};`]);
+}
+
+function cleanupArtifacts(pluginIDs: string[]) {
+  for (const pluginID of pluginIDs) {
+    rmSync(uploadedArtifactPath(pluginID), { force: true });
+  }
+}
+
+function buildPluginRuntimeMain(moduleName: string) {
+  return `package main
+
+import (
+	bridgeplugin "lina-core/pkg/plugin/pluginbridge"
+	"lina-core/pkg/plugin/pluginbridge/protocol"
+	dynamicbackend "${moduleName}/backend"
+)
+
+var guestRuntime = bridgeplugin.NewGuestRuntime(dynamicbackend.HandleRequest)
+
+//go:wasmexport lina_dynamic_route_alloc
+func linaDynamicRouteAlloc(size uint32) uint32 {
+	return guestRuntime.Alloc(size)
+}
+
+//go:wasmexport lina_dynamic_route_execute
+func linaDynamicRouteExecute(size uint32) uint64 {
+	responsePointer, responseLength, err := guestRuntime.Execute(size)
+	if err != nil {
+		fallback, _ := protocol.EncodeResponseEnvelope(protocol.NewInternalErrorResponse(err.Error()))
+		responsePointer, responseLength, _ = guestRuntime.ExposeResponseBuffer(fallback)
+	}
+	return uint64(responsePointer)<<32 | uint64(responseLength)
+}
+
+//go:wasmexport lina_host_call_alloc
+func linaHostCallAlloc(size uint32) uint32 {
+	return guestRuntime.HostCallAlloc(size)
+}
+
+func main() {}
+`;
+}
+
+function buildPluginEmbedFile() {
+  return `package main
+
+import "embed"
+
+//go:embed plugin.yaml frontend manifest
+var EmbeddedFiles embed.FS
+`;
+}
+
+function buildBackendPluginFile(moduleName: string) {
+  return `//go:build !wasip1
+
+package backend
+
+import (
+	bridgeplugin "lina-core/pkg/plugin/pluginbridge"
+	"lina-core/pkg/plugin/pluginbridge/protocol"
+	"${moduleName}/backend/internal/controller/dynamic"
+)
+
+var guestRouteDispatcher = bridgeplugin.MustNewGuestControllerRouteDispatcher(dynamic.New())
+
+func HandleRequest(
+	request *protocol.BridgeRequestEnvelopeV1,
+) (*protocol.BridgeResponseEnvelopeV1, error) {
+	return guestRouteDispatcher.HandleRequest(request)
+}
+`;
+}
+
+function buildBackendWasmDispatcherFile(moduleName: string, pluginID: string) {
+  const cases =
+    pluginID === successPluginID
+      ? `\tcase "HostServicesReq":
+\t\treturn controller.HostServices(request)
+`
+      : `\tcase "DeniedMethodReq":
+\t\treturn controller.DeniedMethod(request)
+\tcase "DeniedResourceReq":
+\t\treturn controller.DeniedResource(request)
+\tcase "DeniedServiceReq":
+\t\treturn controller.DeniedService(request)
+`;
+
+  return `//go:build wasip1
+
+package backend
+
+import (
+\t"strings"
+
+\t"${moduleName}/backend/internal/controller/dynamic"
+\t"lina-core/pkg/plugin/pluginbridge/protocol"
+)
+
+func HandleRequest(
+\trequest *protocol.BridgeRequestEnvelopeV1,
+) (*protocol.BridgeResponseEnvelopeV1, error) {
+\tif request == nil || request.Route == nil {
+\t\treturn protocol.NewBadRequestResponse("Dynamic bridge request is missing route metadata"), nil
+\t}
+\tcontroller := dynamic.New()
+\tswitch strings.TrimSpace(request.Route.RequestType) {
+${cases}\tcase "":
+\t\treturn protocol.NewBadRequestResponse("Dynamic bridge request is missing route request type"), nil
+\tdefault:
+\t\treturn protocol.NewNotFoundResponse("Dynamic bridge route not found"), nil
+\t}
+}
+`;
+}
+
+function buildSuccessPluginSource(upstreamBaseURL: string) {
+  const pluginDir = sourcePluginDir(successPluginID);
+  const moduleName = "lina-plugin-dev-host-services-e2e";
+  rmSync(pluginDir, { force: true, recursive: true });
+
+  writeTestFile(
+    path.join(pluginDir, "go.mod"),
+    pluginGoModContent(moduleName),
+  );
+  writeTestFile(path.join(pluginDir, "main.go"), buildPluginRuntimeMain(moduleName));
+  writeTestFile(path.join(pluginDir, "plugin_embed.go"), buildPluginEmbedFile());
+  writeTestFile(path.join(pluginDir, "backend", "plugin.go"), buildBackendPluginFile(moduleName));
+  writeTestFile(
+    path.join(pluginDir, "backend", "plugin_wasip1.go"),
+    buildBackendWasmDispatcherFile(moduleName, successPluginID),
+  );
+  writeTestFile(
+    path.join(pluginDir, "plugin.yaml"),
+    `id: ${successPluginID}
+name: Host Services E2E
+version: v0.1.0
+type: dynamic
+scope_nature: tenant_aware
+supports_multi_tenant: false
+default_install_mode: global
+menus:
+  - key: plugin:${successPluginID}:host-services
+    parent_key: extension
+    name: Host Services E2E
+    path: host-services-e2e
+    component: system/plugin/dynamic-page
+    perms: ${successPluginID}:host-services:view
+    icon: lucide:plug
+    type: M
+    sort: -1
+hostServices:
+  - service: runtime
+    methods:
+      - log.write
+      - state.get
+      - state.set
+      - state.delete
+      - info.now
+      - info.uuid
+      - info.node
+  - service: storage
+    methods:
+      - put
+      - get
+      - delete
+      - list
+      - stat
+    resources:
+      paths:
+        - e2e/
+  - service: network
+    methods:
+      - request
+    resources:
+      - url: ${upstreamBaseURL}
+  - service: data
+    methods:
+      - list
+      - get
+      - create
+      - update
+      - delete
+      - transaction
+    resources:
+      tables:
+        - ${successDataTable}
+`,
+  );
+  writeTestFile(
+    path.join(pluginDir, "backend", "api", "dynamic", "v1", "host_services.go"),
+    `package v1
+
+import "github.com/gogf/gf/v2/frame/g"
+
+type HostServicesReq struct {
+	g.Meta \`path:"/api/v1/host-services" method:"get" tags:"动态插件 E2E" summary:"核心 host service 演示" dc:"验证 runtime、storage、network、data 四类核心宿主服务在动态插件路由内的成功调用" access:"login" permission:"${successPluginID}:host-services:view" operLog:"other"\`
+}
+`,
+  );
+  writeTestFile(
+    path.join(pluginDir, "backend", "internal", "controller", "dynamic", "dynamic.go"),
+    `package dynamic
+
+type Controller struct{}
+
+func New() *Controller {
+	return &Controller{}
+}
+`,
+  );
+  writeTestFile(
+    path.join(pluginDir, "backend", "internal", "controller", "dynamic", "host_services.go"),
+    `package dynamic
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+
+	"github.com/gogf/gf/v2/errors/gerror"
+
+	"lina-core/pkg/plugin/capability/storagecap"
+	bridgeplugin "lina-core/pkg/plugin/pluginbridge"
+	"lina-core/pkg/plugin/pluginbridge/recordstore"
+	"lina-core/pkg/plugin/pluginbridge/protocol"
+)
+
+const (
+	networkURL = "${upstreamBaseURL}"
+	dataTable  = "${successDataTable}"
+)
+
+func (c *Controller) HostServices(request *protocol.BridgeRequestEnvelopeV1) (*protocol.BridgeResponseEnvelopeV1, error) {
+	var (
+		ctx        = bridgeplugin.NewGuestControllerContext(request)
+		services   = bridgeplugin.Default()
+		runtimeSvc = services.Runtime()
+		storageSvc = services.Storage()
+		httpSvc    = services.Network()
+		dataSvc    = services.RecordStore()
+	)
+
+	nowValue, err := runtimeSvc.Now()
+	if err != nil {
+		return nil, err
+	}
+	uuidValue, err := runtimeSvc.UUID()
+	if err != nil {
+		return nil, err
+	}
+	nodeValue, err := runtimeSvc.Node()
+	if err != nil {
+		return nil, err
+	}
+
+	stateKey := "e2e-state-" + uuidValue
+	if err = runtimeSvc.StateSet(stateKey, request.PluginID); err != nil {
+		return nil, err
+	}
+	stateValue, stateFound, err := runtimeSvc.StateGet(stateKey)
+	if err != nil {
+		return nil, err
+	}
+	if !stateFound || stateValue != request.PluginID {
+		return nil, gerror.New("runtime state round trip failed")
+	}
+	if err = runtimeSvc.StateDelete(stateKey); err != nil {
+		return nil, err
+	}
+	_, stateFoundAfterDelete, err := runtimeSvc.StateGet(stateKey)
+	if err != nil {
+		return nil, err
+	}
+	if stateFoundAfterDelete {
+		return nil, gerror.New("runtime state delete failed")
+	}
+	if err = runtimeSvc.Log(int(protocol.LogLevelInfo), "host services e2e success", map[string]string{
+		"pluginId": request.PluginID,
+		"requestId": request.RequestID,
+		"demoKey": uuidValue,
+	}); err != nil {
+		return nil, err
+	}
+
+	objectPath := "e2e/" + uuidValue + ".json"
+	storageBody, err := json.Marshal(map[string]string{
+		"pluginId": request.PluginID,
+		"uuid": uuidValue,
+	})
+	if err != nil {
+		return nil, gerror.Wrap(err, "marshal storage body failed")
+	}
+	objectMeta, err := storageSvc.Put(ctx, storagecap.PutInput{
+		Path:        objectPath,
+		Body:        bytes.NewReader(storageBody),
+		Size:        int64(len(storageBody)),
+		ContentType: "application/json",
+		Overwrite:   true,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if objectMeta == nil || objectMeta.Object == nil {
+		return nil, gerror.New("storage put response missing object metadata")
+	}
+	readOutput, err := storageSvc.Get(ctx, storagecap.GetInput{Path: objectPath})
+	if err != nil {
+		return nil, err
+	}
+	var readBody []byte
+	if readOutput != nil && readOutput.Found && readOutput.Body != nil {
+		readBody, err = io.ReadAll(readOutput.Body)
+		closeErr := readOutput.Body.Close()
+		if err != nil {
+			return nil, err
+		}
+		if closeErr != nil {
+			return nil, closeErr
+		}
+	}
+	statOutput, err := storageSvc.Stat(ctx, storagecap.StatInput{Path: objectPath})
+	if err != nil {
+		return nil, err
+	}
+	if statOutput != nil && statOutput.Found && statOutput.Object == nil {
+		return nil, gerror.New("storage stat response missing object metadata")
+	}
+	listOutput, err := storageSvc.List(ctx, storagecap.ListInput{Prefix: "e2e", Limit: 10})
+	if err != nil {
+		return nil, err
+	}
+	if err = storageSvc.Delete(ctx, storagecap.DeleteInput{Path: objectPath}); err != nil {
+		return nil, err
+	}
+	deletedOutput, err := storageSvc.Stat(ctx, storagecap.StatInput{Path: objectPath})
+	if err != nil {
+		return nil, err
+	}
+	storageFound := readOutput != nil && readOutput.Found
+	statFound := statOutput != nil && statOutput.Found
+	deletedFound := deletedOutput != nil && deletedOutput.Found
+	listedCount := 0
+	if listOutput != nil {
+		listedCount = len(listOutput.Objects)
+	}
+	statPath := ""
+	if statOutput != nil && statOutput.Object != nil {
+		statPath = statOutput.Object.Path
+	}
+
+	networkResponse, err := httpSvc.Request(networkURL+"/ping?plugin="+request.PluginID, &protocol.HostServiceNetworkRequest{
+		Method: "GET",
+		Headers: map[string]string{
+			"x-request-id": request.RequestID,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	err = dataSvc.Transaction(func(tx *recordstore.Tx) error {
+		_, txErr := tx.Table(dataTable).Insert(map[string]any{
+			"pluginId": request.PluginID,
+			"releaseId": 0,
+			"nodeKey": "e2e-" + uuidValue,
+			"desiredState": "running",
+			"currentState": "pending",
+			"generation": 1,
+			"errorMessage": "",
+		})
+		return txErr
+	})
+	if err != nil {
+		return nil, err
+	}
+	listRecords, listTotal, err := dataSvc.Table(dataTable).
+		Fields("id", "nodeKey", "currentState").
+		WhereEq("pluginId", request.PluginID).
+		WhereLike("nodeKey", uuidValue).
+		WhereIn("currentState", []string{"pending", "running"}).
+		OrderDesc("id").
+		Page(1, 10).
+		All()
+	if err != nil {
+		return nil, err
+	}
+	if listTotal != 1 || len(listRecords) != 1 {
+		return nil, gerror.New("data capability list did not return one record")
+	}
+	recordKey := listRecords[0]["id"]
+	countTotal, err := dataSvc.Table(dataTable).
+		WhereEq("pluginId", request.PluginID).
+		WhereLike("nodeKey", uuidValue).
+		Count()
+	if err != nil {
+		return nil, err
+	}
+	updateResult, err := dataSvc.Table(dataTable).WhereKey(recordKey).Update(map[string]any{
+		"currentState": "running",
+		"errorMessage": "",
+	})
+	if err != nil {
+		return nil, err
+	}
+	record, dataFound, err := dataSvc.Table(dataTable).Fields("currentState").WhereKey(recordKey).One()
+	if err != nil {
+		return nil, err
+	}
+	deleteResult, err := dataSvc.Table(dataTable).WhereKey(recordKey).Delete()
+	if err != nil {
+		return nil, err
+	}
+
+	payload := map[string]any{
+		"pluginId": request.PluginID,
+		"runtime": map[string]any{
+			"now": nowValue,
+			"uuid": uuidValue,
+			"node": nodeValue,
+			"stateRoundTrip": stateFound && stateValue == request.PluginID,
+			"stateDeleted": !stateFoundAfterDelete,
+		},
+		"storage": map[string]any{
+			"objectPath": objectPath,
+			"stored": storageFound && string(readBody) == string(storageBody),
+			"listedCount": listedCount,
+			"statFound": statFound,
+			"deleted": !deletedFound,
+			"writtenPath": objectMeta.Object.Path,
+			"statPath": statPath,
+		},
+		"network": map[string]any{
+			"statusCode": networkResponse.StatusCode,
+			"contentType": networkResponse.ContentType,
+			"body": string(networkResponse.Body),
+			"requestId": networkResponse.Headers["X-Upstream-Request-Id"],
+		},
+		"data": map[string]any{
+			"recordKey": fmt.Sprint(recordKey),
+			"transactionAffectedRows": 1,
+			"listTotal": listTotal,
+			"countTotal": countTotal,
+			"updated": updateResult != nil && updateResult.AffectedRows >= 1,
+			"deleted": deleteResult != nil && deleteResult.AffectedRows >= 1,
+			"currentState": fmt.Sprint(record["currentState"]),
+			"found": dataFound,
+		},
+	}
+	content, err := json.Marshal(payload)
+	if err != nil {
+		return nil, gerror.Wrap(err, "marshal host services payload failed")
+	}
+	return protocol.NewJSONResponse(200, content), nil
+}
+`,
+  );
+  writeTestFile(
+    path.join(pluginDir, "frontend", "pages", "placeholder.html"),
+    "<!doctype html><html><body>host services e2e</body></html>\n",
+  );
+  writeTestFile(
+    path.join(pluginDir, "manifest", "README.md"),
+    "runtime host services e2e fixture\n",
+  );
+  return pluginDir;
+}
+
+function buildDeniedPluginSource() {
+  const pluginDir = sourcePluginDir(deniedPluginID);
+  const moduleName = "lina-plugin-dev-host-services-denied-e2e";
+  rmSync(pluginDir, { force: true, recursive: true });
+
+  writeTestFile(
+    path.join(pluginDir, "go.mod"),
+    pluginGoModContent(moduleName),
+  );
+  writeTestFile(path.join(pluginDir, "main.go"), buildPluginRuntimeMain(moduleName));
+  writeTestFile(path.join(pluginDir, "plugin_embed.go"), buildPluginEmbedFile());
+  writeTestFile(path.join(pluginDir, "backend", "plugin.go"), buildBackendPluginFile(moduleName));
+  writeTestFile(
+    path.join(pluginDir, "backend", "plugin_wasip1.go"),
+    buildBackendWasmDispatcherFile(moduleName, deniedPluginID),
+  );
+  writeTestFile(
+    path.join(pluginDir, "plugin.yaml"),
+    `id: ${deniedPluginID}
+name: Host Services Denied E2E
+version: v0.1.0
+type: dynamic
+scope_nature: tenant_aware
+supports_multi_tenant: false
+default_install_mode: global
+menus:
+  - key: plugin:${deniedPluginID}:denied-routes
+    parent_key: extension
+    name: Host Services Denied E2E
+    path: host-services-denied-e2e
+    component: system/plugin/dynamic-page
+    perms: ${deniedPluginID}:denied-method:view
+    icon: lucide:shield-alert
+    type: M
+    sort: -1
+hostServices:
+  - service: storage
+    methods:
+      - put
+    resources:
+      paths:
+        - authorized-files/
+`,
+  );
+  writeTestFile(
+    path.join(pluginDir, "backend", "api", "dynamic", "v1", "denied_routes.go"),
+    `package v1
+
+import "github.com/gogf/gf/v2/frame/g"
+
+type DeniedMethodReq struct {
+	g.Meta \`path:"/api/v1/denied-method" method:"get" tags:"动态插件 E2E" summary:"未授权 method 调用" dc:"验证插件调用未声明的 host service method 会被宿主拒绝" access:"login" permission:"${deniedPluginID}:denied-method:view" operLog:"other"\`
+}
+
+type DeniedResourceReq struct {
+	g.Meta \`path:"/api/v1/denied-resource" method:"get" tags:"动态插件 E2E" summary:"未授权资源标识调用" dc:"验证插件调用未授权资源标识时会被宿主拒绝" access:"login" permission:"${deniedPluginID}:denied-resource:view" operLog:"other"\`
+}
+
+type DeniedServiceReq struct {
+	g.Meta \`path:"/api/v1/denied-service" method:"get" tags:"动态插件 E2E" summary:"未授权 service 调用" dc:"验证插件调用未声明的 host service capability 会被宿主拒绝" access:"login" permission:"${deniedPluginID}:denied-service:view" operLog:"other"\`
+}
+`,
+  );
+  writeTestFile(
+    path.join(pluginDir, "backend", "internal", "controller", "dynamic", "dynamic.go"),
+    `package dynamic
+
+type Controller struct{}
+
+func New() *Controller {
+	return &Controller{}
+}
+`,
+  );
+  writeTestFile(
+    path.join(pluginDir, "backend", "internal", "controller", "dynamic", "denied_routes.go"),
+    `package dynamic
+
+import (
+	"bytes"
+
+	"lina-core/pkg/plugin/capability/storagecap"
+	bridgeplugin "lina-core/pkg/plugin/pluginbridge"
+	"lina-core/pkg/plugin/pluginbridge/protocol"
+)
+
+func (c *Controller) DeniedMethod(request *protocol.BridgeRequestEnvelopeV1) (*protocol.BridgeResponseEnvelopeV1, error) {
+	_, err := bridgeplugin.Default().Storage().Get(
+		bridgeplugin.NewGuestControllerContext(request),
+		storagecap.GetInput{Path: "authorized-files/blocked.txt"},
+	)
+	if err != nil {
+		return nil, err
+	}
+	return protocol.NewJSONResponse(200, []byte("{}")), nil
+}
+
+func (c *Controller) DeniedResource(request *protocol.BridgeRequestEnvelopeV1) (*protocol.BridgeResponseEnvelopeV1, error) {
+	_, err := bridgeplugin.Default().Storage().Put(
+		bridgeplugin.NewGuestControllerContext(request),
+		storagecap.PutInput{
+			Path:        "denied-files/blocked.txt",
+			Body:        bytes.NewReader([]byte("blocked")),
+			Size:        7,
+			ContentType: "text/plain",
+			Overwrite:   true,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	return protocol.NewJSONResponse(200, []byte("{}")), nil
+}
+
+func (c *Controller) DeniedService(request *protocol.BridgeRequestEnvelopeV1) (*protocol.BridgeResponseEnvelopeV1, error) {
+	_, _, err := bridgeplugin.Default().RecordStore().Table("sys_plugin_node_state").Page(1, 1).All()
+	if err != nil {
+		return nil, err
+	}
+	return protocol.NewJSONResponse(200, []byte("{}")), nil
+}
+`,
+  );
+  writeTestFile(
+    path.join(pluginDir, "frontend", "pages", "placeholder.html"),
+    "<!doctype html><html><body>denied host services e2e</body></html>\n",
+  );
+  writeTestFile(
+    path.join(pluginDir, "manifest", "README.md"),
+    "denied host services e2e fixture\n",
+  );
+  return pluginDir;
+}
+
+function buildDynamicPluginArtifact(pluginDir: string, pluginID: string) {
+  mkdirSync(buildOutputDir(), { recursive: true });
+  const goWorkPath = path.join(pluginDir, ".e2e-host-services.go.work");
+  writeFileSync(
+    goWorkPath,
+    [
+      "go 1.25.0",
+      "",
+      "use (",
+      `\t${path.join(repoRoot(), "apps", "lina-core")}`,
+      `\t${linactlDir()}`,
+      `\t${pluginDir}`,
+      ")",
+      "",
+    ].join("\n"),
+  );
+  try {
+    execFileSync("go", ["mod", "tidy"], {
+      cwd: pluginDir,
+      env: {
+        ...process.env,
+        GOWORK: goWorkPath,
+      },
+      stdio: "pipe",
+    });
+    execFileSync(
+      "go",
+      [
+        "run",
+        ".",
+        "wasm",
+        `plugin_dir=${pluginDir}`,
+        `out=${buildOutputDir()}`,
+      ],
+      {
+        cwd: linactlDir(),
+        env: {
+          ...process.env,
+          GOWORK: goWorkPath,
+        },
+        stdio: "pipe",
+      },
+    );
+  } finally {
+    rmSync(goWorkPath, { force: true });
+  }
+  return builtArtifactPath(pluginID);
+}
+
+function appendWasmULEB128(target: number[], value: number) {
+  let current = value >>> 0;
+  while (true) {
+    let byte = current & 0x7f;
+    current >>>= 7;
+    if (current !== 0) {
+      byte |= 0x80;
+    }
+    target.push(byte);
+    if (current === 0) {
+      return;
+    }
+  }
+}
+
+function appendCustomSection(target: number[], name: string, payload: Buffer) {
+  const section: number[] = [];
+  appendWasmULEB128(section, Buffer.byteLength(name));
+  section.push(...Buffer.from(name));
+  section.push(...payload);
+
+  target.push(0x00);
+  appendWasmULEB128(target, section.length);
+  target.push(...section);
+}
+
+function buildRawSQLInvalidArtifact() {
+  mkdirSync(buildOutputDir(), { recursive: true });
+  const bytes: number[] = [0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00];
+
+  appendCustomSection(
+    bytes,
+    "lina.plugin.manifest",
+    Buffer.from(
+      JSON.stringify({
+        id: rawSQLPluginID,
+        name: "Host Services Raw SQL E2E",
+        version: "v0.1.0",
+        type: "dynamic",
+        scopeNature: "tenant_aware",
+        supportsMultiTenant: false,
+        defaultInstallMode: "global",
+      }),
+    ),
+  );
+  appendCustomSection(
+    bytes,
+    "lina.plugin.dynamic",
+    Buffer.from(
+      JSON.stringify({
+        runtimeKind: "wasm",
+        abiVersion: "v1",
+      }),
+    ),
+  );
+  appendCustomSection(
+    bytes,
+    "lina.plugin.backend.host-services",
+    Buffer.from(
+      JSON.stringify([
+        {
+          service: "data",
+          methods: ["rawSql"],
+          resources: {
+            tables: ["sys_plugin_node_state"],
+          },
+        },
+      ]),
+    ),
+  );
+
+  const artifactPath = builtArtifactPath(rawSQLPluginID);
+  writeFileSync(artifactPath, Buffer.from(bytes));
+  return artifactPath;
+}
+
+async function startUpstreamServer() {
+  const server = createServer((request, response) => {
+    if (request.url?.startsWith("/ping")) {
+      response.statusCode = 200;
+      response.setHeader("Content-Type", "application/json");
+      response.setHeader(
+        "X-Upstream-Request-Id",
+        String(request.headers["x-request-id"] ?? ""),
+      );
+      response.end(
+        JSON.stringify({
+          ok: true,
+          path: request.url,
+          requestId: request.headers["x-request-id"] ?? "",
+        }),
+      );
+      return;
+    }
+    response.statusCode = 404;
+    response.end("not found");
+  });
+
+  await new Promise<void>((resolve) => {
+    server.listen(0, "127.0.0.1", () => resolve());
+  });
+
+  const address = server.address() as AddressInfo;
+  return {
+    server,
+    baseURL: `http://127.0.0.1:${address.port}`,
+  };
+}
+
+test.describe("TC-4 Runtime Wasm Host Services", () => {
+  let adminApi: APIRequestContext | null = null;
+  let upstreamServer: Server | null = null;
+  let successArtifact = "";
+  let deniedArtifact = "";
+  let rawSQLArtifact = "";
+
+  test.beforeAll(async () => {
+    rmSync(tempRoot(), { force: true, recursive: true });
+    mkdirSync(sourceRoot(), { recursive: true });
+    mkdirSync(buildOutputDir(), { recursive: true });
+    ensurePluginStateTable();
+    ensureSuccessDataTable();
+
+    const upstream = await startUpstreamServer();
+    upstreamServer = upstream.server;
+
+    successArtifact = buildDynamicPluginArtifact(
+      buildSuccessPluginSource(upstream.baseURL),
+      successPluginID,
+    );
+    deniedArtifact = buildDynamicPluginArtifact(
+      buildDeniedPluginSource(),
+      deniedPluginID,
+    );
+    rawSQLArtifact = buildRawSQLInvalidArtifact();
+    adminApi = await createAdminApiContext();
+  });
+
+  test.afterAll(async () => {
+    if (adminApi) {
+      await resetPlugin(adminApi, successPluginID);
+      await resetPlugin(adminApi, deniedPluginID);
+      await adminApi.dispose();
+    }
+    if (upstreamServer) {
+      await new Promise<void>((resolve, reject) => {
+        upstreamServer?.close((error) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+          resolve();
+        });
+      });
+    }
+    cleanupPluginRows([successPluginID, deniedPluginID, rawSQLPluginID]);
+    dropSuccessDataTable();
+    cleanupArtifacts([successPluginID, deniedPluginID, rawSQLPluginID]);
+    rmSync(tempRoot(), { force: true, recursive: true });
+  });
+
+  test.beforeEach(async () => {
+    await resetPlugin(adminApi!, successPluginID);
+    await resetPlugin(adminApi!, deniedPluginID);
+    cleanupPluginRows([successPluginID, deniedPluginID, rawSQLPluginID]);
+    cleanupSuccessDataTable();
+    cleanupArtifacts([successPluginID, deniedPluginID, rawSQLPluginID]);
+  });
+
+  test.afterEach(async () => {
+    await resetPlugin(adminApi!, successPluginID);
+    await resetPlugin(adminApi!, deniedPluginID);
+    cleanupPluginRows([successPluginID, deniedPluginID, rawSQLPluginID]);
+    cleanupSuccessDataTable();
+    cleanupArtifacts([successPluginID, deniedPluginID, rawSQLPluginID]);
+  });
+
+  test("TC-4a: 已授权的 runtime、storage、network 和 data 宿主服务调用成功", async () => {
+    await uploadDynamicPlugin(adminApi!, successArtifact);
+    await installPlugin(adminApi!, successPluginID);
+    await setPluginEnabled(adminApi!, successPluginID, true);
+
+    const response = await adminApi!.get(pluginApiPath(successPluginID, "/host-services"));
+    const responseText = await response.text();
+    expect(
+      response.status(),
+      `调用核心 host service 演示路由失败: ${responseText}`,
+    ).toBe(200);
+
+    const payload = JSON.parse(responseText) as {
+      pluginId: string;
+      runtime: Record<string, any>;
+      storage: Record<string, any>;
+      network: Record<string, any>;
+      data: Record<string, any>;
+    };
+
+    expect(payload.pluginId).toBe(successPluginID);
+    expect(payload.runtime.stateRoundTrip).toBeTruthy();
+    expect(payload.runtime.stateDeleted).toBeTruthy();
+    expect(payload.runtime.uuid).toBeTruthy();
+    expect(payload.runtime.node).toBeTruthy();
+
+    expect(payload.storage.stored).toBeTruthy();
+    expect(payload.storage.statFound).toBeTruthy();
+    expect(payload.storage.deleted).toBeTruthy();
+    expect(payload.storage.listedCount).toBeGreaterThanOrEqual(1);
+    expect(payload.storage.writtenPath).toBe(payload.storage.objectPath);
+    expect(payload.storage.statPath).toBe(payload.storage.objectPath);
+
+    expect(payload.network.statusCode).toBe(200);
+    expect(payload.network.contentType).toContain("application/json");
+    expect(payload.network.body).toContain(successPluginID);
+    expect(payload.network.requestId).toBeTruthy();
+
+    expect(payload.data.transactionAffectedRows).toBeGreaterThanOrEqual(1);
+    expect(payload.data.listTotal).toBe(1);
+    expect(payload.data.countTotal).toBe(1);
+    expect(payload.data.updated).toBeTruthy();
+    expect(payload.data.deleted).toBeTruthy();
+    expect(payload.data.currentState).toBe("running");
+    expect(payload.data.found).toBeTruthy();
+    expect(payload.data.recordKey).toBeTruthy();
+  });
+
+  test("TC-4b: 未声明的 service、method 或未授权资源标识调用会被宿主拒绝", async () => {
+    await uploadDynamicPlugin(adminApi!, deniedArtifact);
+    await installPlugin(adminApi!, deniedPluginID);
+    await setPluginEnabled(adminApi!, deniedPluginID, true);
+
+    const deniedMethodResponse = await adminApi!.get(
+      pluginApiPath(deniedPluginID, "/denied-method"),
+    );
+    expect(deniedMethodResponse.status()).toBe(500);
+    await expectApiFailure(
+      deniedMethodResponse,
+      "未声明 method 的调用应被拒绝",
+      "storage.get",
+    );
+
+    const deniedResourceResponse = await adminApi!.get(
+      pluginApiPath(deniedPluginID, "/denied-resource"),
+    );
+    expect(deniedResourceResponse.status()).toBe(500);
+    await expectApiFailure(
+      deniedResourceResponse,
+      "未授权资源标识的调用应被拒绝",
+      "resource=denied-files",
+    );
+
+    const deniedServiceResponse = await adminApi!.get(
+      pluginApiPath(deniedPluginID, "/denied-service"),
+    );
+    expect(deniedServiceResponse.status()).toBe(500);
+    await expectApiFailure(
+      deniedServiceResponse,
+      "未声明 service capability 的调用应被拒绝",
+      "host:data:read",
+    );
+  });
+
+  test("TC-4c: 插件尝试申请 raw SQL 旧能力时会在上传链路被拒绝", async () => {
+    const response = await adminApi!.post("plugins/dynamic/package", {
+      multipart: {
+        overwriteSupport: "0",
+        file: {
+          name: path.basename(rawSQLArtifact),
+          mimeType: "application/wasm",
+          buffer: readFileSync(rawSQLArtifact),
+        },
+      },
+    });
+
+    await expectApiFailure(
+      response,
+      "raw SQL 旧能力必须被宿主拒绝",
+      "host-service declarations",
+    );
+    expect(await findPlugin(adminApi!, rawSQLPluginID)).toBeNull();
+  });
+});

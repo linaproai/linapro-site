@@ -1,5 +1,19 @@
+# LinaPro Framework - Root Makefile
+# ===========================
 
-
+BACKEND_DIR   := apps/lina-core
+FRONTEND_DIR  := apps/lina-vben
+TEMP_DIR      := temp
+PID_DIR       := $(TEMP_DIR)/pids
+BACKEND_PID   := $(PID_DIR)/lina-core.pid
+FRONTEND_PID  := $(PID_DIR)/lina-vben.pid
+BACKEND_PORT  := 9120
+FRONTEND_PORT := 5666
+BACKEND_LOG   := $(TEMP_DIR)/lina-core.log
+FRONTEND_LOG  := $(TEMP_DIR)/lina-vben.log
+EMBED_DIR     := $(BACKEND_DIR)/internal/packed/public
+OUTPUT_DIR    := $(TEMP_DIR)/output
+LINACTL       := cd hack/tools/linactl && go run .
 
 SITE_DIR := apps/lina-site
 SITE_NAME := LinaPro official site
@@ -7,18 +21,33 @@ SITE_DEFAULT_HOST ?= 127.0.0.1
 SITE_DEFAULT_PORT ?= 3000
 SITE_DEFAULT_LOCALE ?= zh-Hans
 
-ifneq ($(filter version,$(MAKECMDGOALS)),)
-VERSION_ARG := $(word 2,$(MAKECMDGOALS))
-ifneq ($(VERSION_ARG),)
-.PHONY: $(VERSION_ARG)
-$(VERSION_ARG):
+ifneq ($(filter site.version,$(MAKECMDGOALS)),)
+SITE_VERSION_ARG := $(word 2,$(MAKECMDGOALS))
+ifneq ($(SITE_VERSION_ARG),)
+.PHONY: $(SITE_VERSION_ARG)
+$(SITE_VERSION_ARG):
 	@:
 endif
 endif
 
-## dev: 启动官网本地开发服务
-.PHONY: dev
-dev:
+# Include split makefile targets.
+# 引入拆分后的 Makefile 目标文件。
+include hack/makefiles/help.mk
+include hack/makefiles/env.mk
+include hack/makefiles/dev.mk
+include hack/makefiles/build.mk
+include hack/makefiles/plugins.mk
+include hack/makefiles/image.mk
+include hack/makefiles/release.mk
+include hack/makefiles/lint.mk
+include hack/makefiles/test.mk
+include hack/makefiles/i18n.mk
+include hack/makefiles/database.mk
+include hack/makefiles/agents.mk
+
+## site.dev: 启动官网本地开发服务
+.PHONY: site.dev
+site.dev:
 	@set -e; \
 	SITE_DIR="$(SITE_DIR)"; \
 	SITE_NAME="$(SITE_NAME)"; \
@@ -70,9 +99,9 @@ dev:
 	echo "Starting $$SITE_NAME at http://$$HOST:$$PORT$$SITE_PATH (locale=$$LOCALE, package-manager=$$PACKAGE_MANAGER)"; \
 	eval "$$START_CMD"
 
-## preview: 构建所有语言并启动预览服务（用于测试多语言切换）
-.PHONY: preview
-preview:
+## site.preview: 构建所有语言并启动官网预览服务
+.PHONY: site.preview
+site.preview:
 	@set -e; \
 	SITE_DIR="$(SITE_DIR)"; \
 	SITE_NAME="$(SITE_NAME)"; \
@@ -123,14 +152,18 @@ preview:
 	echo "  中文:    http://$$HOST:$$PORT/zh/"; \
 	eval "$$SERVE_CMD"
 
-## check: 检查中文文档在所有 i18n locale 中均有对应翻译文件
-.PHONY: check
-check:
+## site.check: 检查官网中文文档在所有 i18n locale 中均有对应翻译文件
+.PHONY: site.check
+site.check:
 	@bash .github/workflows/consistency-check.sh
 
-## build: 编译生成官网静态文件（输出到 apps/lina-site/build/）
-.PHONY: build
-build:
+## check: 兼容旧官网仓库的 i18n 完整性检查入口
+.PHONY: check
+check: site.check
+
+## site.build: 编译生成官网静态文件
+.PHONY: site.build
+site.build:
 	@set -e; \
 	SITE_DIR="$(SITE_DIR)"; \
 	SITE_NAME="$(SITE_NAME)"; \
@@ -170,15 +203,15 @@ build:
 	eval "$$BUILD_CMD"; \
 	echo "Build complete: $$SITE_DIR/build/"
 
-## version: 归档当前文档为指定版本，用法：make version 0.1.x
-.PHONY: version
-version:
+## site.version: 归档当前官网文档为指定版本，用法：make site.version 0.1.x
+.PHONY: site.version
+site.version:
 	@set -e; \
 	SITE_DIR="$(SITE_DIR)"; \
 	SITE_NAME="$(SITE_NAME)"; \
-	VERSION="$(VERSION_ARG)"; \
-	if [ -z "$$VERSION" ]; then \
-		echo "Usage: make version <version>"; \
+	DOC_VERSION="$(strip $(or $(version),$(VERSION),$(SITE_VERSION_ARG)))"; \
+	if [ -z "$$DOC_VERSION" ]; then \
+		echo "Usage: make site.version <version>"; \
 		exit 1; \
 	fi; \
 	[ -f "$$SITE_DIR/package.json" ] || { echo "Error: missing $$SITE_DIR/package.json"; exit 1; }; \
@@ -190,12 +223,12 @@ version:
 		echo "Installing $$SITE_NAME dependencies with yarn..."; \
 		yarn --cwd "$$SITE_DIR" install; \
 	fi; \
-	echo "Archiving $$SITE_NAME docs as version $$VERSION..."; \
-	yarn --cwd "$$SITE_DIR" run docusaurus docs:version "$$VERSION"; \
-	echo "Syncing versioned i18n docs for $$VERSION..."; \
-	node "$$SITE_DIR/scripts/sync-versioned-i18n-docs.js" "$$VERSION"; \
-	MAJOR=$$(echo "$$VERSION" | cut -d. -f1); \
-	MINOR=$$(echo "$$VERSION" | cut -d. -f2); \
+	echo "Archiving $$SITE_NAME docs as version $$DOC_VERSION..."; \
+	yarn --cwd "$$SITE_DIR" run docusaurus docs:version "$$DOC_VERSION"; \
+	echo "Syncing versioned i18n docs for $$DOC_VERSION..."; \
+	node "$$SITE_DIR/scripts/sync-versioned-i18n-docs.js" "$$DOC_VERSION"; \
+	MAJOR=$$(echo "$$DOC_VERSION" | cut -d. -f1); \
+	MINOR=$$(echo "$$DOC_VERSION" | cut -d. -f2); \
 	NEXT_MINOR=$$((MINOR + 1)); \
 	NEXT_VERSION="$${MAJOR}.$${NEXT_MINOR}.x"; \
 	NEXT_LABEL="$${NEXT_VERSION}(Latest)"; \
@@ -205,14 +238,17 @@ version:
 	if [ -f "$$I18N_JSON" ]; then \
 		sed -i.bak "s|\"message\": \"[^\"]*\",|\"message\": \"$$NEXT_LABEL\",|" "$$I18N_JSON" && rm -f "$$I18N_JSON.bak"; \
 	fi; \
-	echo "Version $$VERSION archived. Next development version: $$NEXT_LABEL"
+	echo "Version $$DOC_VERSION archived. Next development version: $$NEXT_LABEL"
 
-## image: 将 docs/blog/i18n 中被引用的本地内容图片转换为 WebP，并更新引用、删除安全的原图 [IMAGE_FLAGS=--dry-run|--include-static] [WEBP_INCLUDE_STATIC=1|0] [WEBP_LOSSLESS=1|0] [WEBP_QUALITY=1-100]
-# 默认使用无损 WebP，避免降低图片质量；只有 WEBP_LOSSLESS=0 时 WEBP_QUALITY 才用于有损压缩。
+## site.webp: 将官网内容图片转换为 WebP
 WEBP_LOSSLESS ?= 1
 WEBP_QUALITY ?= 100
 WEBP_INCLUDE_STATIC ?= 0
 
-.PHONY: webp
-webp:
+.PHONY: site.webp
+site.webp:
 	cd $(SITE_DIR) && WEBP_LOSSLESS=$(WEBP_LOSSLESS) WEBP_QUALITY=$(WEBP_QUALITY) WEBP_INCLUDE_STATIC=$(WEBP_INCLUDE_STATIC) node scripts/docs-images-to-webp.js $(IMAGE_FLAGS)
+
+## webp: 兼容旧官网仓库的图片转换入口
+.PHONY: webp
+webp: site.webp

@@ -1,0 +1,315 @@
+// This file verifies handler registry mutation and parameter validation behavior.
+
+package jobhandler
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"testing"
+
+	jobhandlerv1 "lina-core/api/jobhandler/v1"
+	pluginsvc "lina-core/internal/service/plugin"
+)
+
+// testLogCleaner satisfies RegisterHostHandlers for registry tests.
+type testLogCleaner struct{}
+
+// CleanupDueLogs is a no-op for host-handler registry tests.
+func (testLogCleaner) CleanupDueLogs(ctx context.Context) (int64, error) { return 0, nil }
+
+// TestRegisterRejectsDuplicateRefs verifies handler refs remain globally unique.
+func TestRegisterRejectsDuplicateRefs(t *testing.T) {
+	registry := New()
+	definition := HandlerDef{
+		Ref:          "host:test",
+		DisplayName:  "Test Handler",
+		ParamsSchema: `{"type":"object","properties":{}}`,
+		Source:       jobhandlerv1.SourceHost,
+		Invoke: func(ctx context.Context, params json.RawMessage) (result any, err error) {
+			return nil, nil
+		},
+	}
+
+	if err := registry.Register(definition); err != nil {
+		t.Fatalf("expected first register call to succeed, got error: %v", err)
+	}
+	if err := registry.Register(definition); err == nil {
+		t.Fatal("expected duplicate register call to fail")
+	}
+}
+
+// TestLookupAndUnregisterNotify verifies registry lookups and change callbacks stay in sync.
+func TestLookupAndUnregisterNotify(t *testing.T) {
+	registry := New()
+	var notifications []string
+	unsubscribe := registry.SubscribeChanges(func(ref string, exists bool) {
+		state := "removed"
+		if exists {
+			state = "registered"
+		}
+		notifications = append(notifications, ref+":"+state)
+	})
+	defer unsubscribe()
+
+	definition := HandlerDef{
+		Ref:          "host:test-lookup",
+		DisplayName:  "Lookup Handler",
+		ParamsSchema: `{"type":"object","properties":{}}`,
+		Source:       jobhandlerv1.SourceHost,
+		Invoke: func(ctx context.Context, params json.RawMessage) (result any, err error) {
+			return map[string]any{"ok": true}, nil
+		},
+	}
+	if err := registry.Register(definition); err != nil {
+		t.Fatalf("expected register to succeed, got error: %v", err)
+	}
+
+	lookup, ok := registry.Lookup(definition.Ref)
+	if !ok || lookup.Ref != definition.Ref {
+		t.Fatalf("expected handler lookup to succeed, got ok=%t def=%#v", ok, lookup)
+	}
+
+	registry.Unregister(definition.Ref)
+	if _, ok = registry.Lookup(definition.Ref); ok {
+		t.Fatal("expected handler lookup to miss after unregister")
+	}
+	if len(notifications) != 2 {
+		t.Fatalf("expected register and unregister notifications, got %#v", notifications)
+	}
+}
+
+// TestValidateParams verifies the supported JSON Schema subset enforces required fields and types.
+func TestValidateParams(t *testing.T) {
+	schema := `{
+		"type":"object",
+		"properties":{
+			"name":{"type":"string"},
+			"count":{"type":"integer"},
+			"enabled":{"type":"boolean"}
+		},
+		"required":["name","count"]
+	}`
+
+	if err := ValidateParams(schema, json.RawMessage(`{"name":"demo","count":2,"enabled":true}`)); err != nil {
+		t.Fatalf("expected valid params to pass, got error: %v", err)
+	}
+	if err := ValidateParams(schema, json.RawMessage(`{"name":"demo"}`)); err == nil {
+		t.Fatal("expected missing required field to fail validation")
+	}
+	if err := ValidateParams(schema, json.RawMessage(`{"name":"demo","count":"bad"}`)); err == nil {
+		t.Fatal("expected type mismatch to fail validation")
+	}
+}
+
+// TestRegisterHostHandlersProvidesWaitHandler verifies the built-in wait
+// handler is registered and respects execution-context cancellation.
+func TestRegisterHostHandlersProvidesWaitHandler(t *testing.T) {
+	registry := New()
+	if err := RegisterHostHandlers(registry, testLogCleaner{}); err != nil {
+		t.Fatalf("expected host handler registration to succeed, got error: %v", err)
+	}
+
+	definition, ok := registry.Lookup("host:wait")
+	if !ok {
+		t.Fatal("expected host:wait handler to be registered")
+	}
+	if err := ValidateParams(definition.ParamsSchema, json.RawMessage(`{"seconds":1}`)); err != nil {
+		t.Fatalf("expected host:wait schema validation to pass, got error: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := definition.Invoke(ctx, json.RawMessage(`{"seconds":1}`))
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected host:wait handler to honor context cancellation, got error: %v", err)
+	}
+}
+
+// testPluginLifecycleService exposes the plugin service methods used by
+// lifecycle attachment tests.
+type testPluginLifecycleService struct {
+	pluginsvc.Service
+	observer    pluginsvc.LifecycleObserver
+	enabled     map[string]bool
+	managedJobs map[string][]pluginsvc.ManagedJob
+}
+
+// RegisterLifecycleObserver stores the observer and returns an unsubscribe function.
+func (s *testPluginLifecycleService) RegisterLifecycleObserver(observer pluginsvc.LifecycleObserver) func() {
+	s.observer = observer
+	return func() {
+		s.observer = nil
+	}
+}
+
+// IsEnabled reports whether one plugin is flagged enabled in the test snapshot.
+func (s *testPluginLifecycleService) IsEnabled(ctx context.Context, pluginID string) bool {
+	return s.enabled[pluginID]
+}
+
+// ListEnabledPluginIDs returns the enabled plugin IDs for startup lifecycle tests.
+func (s *testPluginLifecycleService) ListEnabledPluginIDs(ctx context.Context) ([]string, error) {
+	items := make([]string, 0, len(s.enabled))
+	for pluginID, enabled := range s.enabled {
+		if !enabled {
+			continue
+		}
+		items = append(items, pluginID)
+	}
+	return items, nil
+}
+
+// ListManagedJobs returns synthetic scheduled jobs for registry tests when
+// the caller requests executable jobs for a plugin.
+func (s *testPluginLifecycleService) ListManagedJobs(
+	ctx context.Context,
+	query pluginsvc.ManagedJobQuery,
+) ([]pluginsvc.ManagedJob, error) {
+	if !query.ExecutableOnly {
+		return nil, nil
+	}
+	return s.managedJobs[query.PluginID], nil
+}
+
+// TestAttachPluginLifecycleSyncsEnabledPluginCronHandlers verifies startup
+// sync registers projected plugin job handlers for already-enabled plugins.
+func TestAttachPluginLifecycleSyncsEnabledPluginCronHandlers(t *testing.T) {
+	const pluginID = "jobhandler-lifecycle-enabled-sync"
+
+	registry := New()
+	pluginSvc := &testPluginLifecycleService{
+		enabled: map[string]bool{pluginID: true},
+		managedJobs: map[string][]pluginsvc.ManagedJob{
+			pluginID: {
+				{
+					PluginID:    pluginID,
+					Name:        "echo",
+					DisplayName: "Echo",
+					Description: "Projected builtin job handler for lifecycle sync tests.",
+					Handler: func(ctx context.Context) error {
+						return nil
+					},
+				},
+			},
+		},
+	}
+	unsubscribe, err := AttachPluginLifecycle(
+		context.Background(),
+		registry,
+		pluginSvc,
+	)
+	if err != nil {
+		t.Fatalf("expected plugin lifecycle attachment to succeed, got error: %v", err)
+	}
+	defer unsubscribe()
+
+	definition, ok := registry.Lookup("plugin:" + pluginID + "/jobs:echo")
+	if !ok {
+		t.Fatal("expected enabled plugin job handler to be registered during startup sync")
+	}
+	if definition.Source != jobhandlerv1.SourcePlugin {
+		t.Fatalf("expected plugin handler source, got %s", definition.Source)
+	}
+	if definition.PluginID != pluginID {
+		t.Fatalf("expected plugin id %s, got %s", pluginID, definition.PluginID)
+	}
+}
+
+// TestPluginLifecycleObserverRegistersAndUnregistersPluginCronHandlers
+// verifies plugin lifecycle callbacks keep projected job handlers in sync.
+func TestPluginLifecycleObserverRegistersAndUnregistersPluginCronHandlers(t *testing.T) {
+	const pluginID = "jobhandler-lifecycle-transition"
+
+	observer := &pluginLifecycleObserver{
+		registry: New(),
+		pluginSvc: &testPluginLifecycleService{
+			enabled: map[string]bool{pluginID: true},
+			managedJobs: map[string][]pluginsvc.ManagedJob{
+				pluginID: {
+					{
+						PluginID:    pluginID,
+						Name:        "echo",
+						DisplayName: "Echo",
+						Description: "Projected builtin job handler for lifecycle transition tests.",
+						Handler: func(ctx context.Context) error {
+							return nil
+						},
+					},
+				},
+			},
+		},
+	}
+	if err := observer.OnPluginEnabled(context.Background(), pluginID); err != nil {
+		t.Fatalf("expected plugin enable callback to succeed, got error: %v", err)
+	}
+	if _, ok := observer.registry.Lookup("plugin:" + pluginID + "/jobs:echo"); !ok {
+		t.Fatal("expected plugin job handler to be registered after enable callback")
+	}
+
+	if err := observer.OnPluginDisabled(context.Background(), pluginID); err != nil {
+		t.Fatalf("expected plugin disable callback to succeed, got error: %v", err)
+	}
+	if _, ok := observer.registry.Lookup("plugin:" + pluginID + "/jobs:echo"); ok {
+		t.Fatal("expected plugin job handler to be removed after disable callback")
+	}
+
+	if err := observer.OnPluginEnabled(context.Background(), pluginID); err != nil {
+		t.Fatalf("expected plugin re-enable callback to succeed, got error: %v", err)
+	}
+	if _, ok := observer.registry.Lookup("plugin:" + pluginID + "/jobs:echo"); !ok {
+		t.Fatal("expected plugin job handler to be re-registered after re-enable callback")
+	}
+
+	if err := observer.OnPluginUninstalled(context.Background(), pluginID); err != nil {
+		t.Fatalf("expected plugin uninstall callback to succeed, got error: %v", err)
+	}
+	if _, ok := observer.registry.Lookup("plugin:" + pluginID + "/jobs:echo"); ok {
+		t.Fatal("expected plugin job handler to be removed after uninstall callback")
+	}
+}
+
+// TestAttachPluginLifecycleSyncsEnabledDynamicPluginCronHandlers verifies
+// startup sync also restores synthetic handlers for enabled dynamic plugins.
+func TestAttachPluginLifecycleSyncsEnabledDynamicPluginCronHandlers(t *testing.T) {
+	const pluginID = "jobhandler-dynamic-enabled-sync"
+
+	registry := New()
+	pluginSvc := &testPluginLifecycleService{
+		enabled: map[string]bool{pluginID: true},
+		managedJobs: map[string][]pluginsvc.ManagedJob{
+			pluginID: {
+				{
+					PluginID:    pluginID,
+					Name:        "heartbeat",
+					DisplayName: "Heartbeat",
+					Description: "Dynamic job heartbeat handler.",
+					Handler: func(ctx context.Context) error {
+						return nil
+					},
+				},
+			},
+		},
+	}
+	unsubscribe, err := AttachPluginLifecycle(
+		context.Background(),
+		registry,
+		pluginSvc,
+	)
+	if err != nil {
+		t.Fatalf("expected plugin lifecycle attachment to succeed, got error: %v", err)
+	}
+	defer unsubscribe()
+
+	definition, ok := registry.Lookup("plugin:" + pluginID + "/jobs:heartbeat")
+	if !ok {
+		t.Fatal("expected enabled dynamic-plugin job handler to be registered during startup sync")
+	}
+	if definition.Source != jobhandlerv1.SourcePlugin {
+		t.Fatalf("expected plugin handler source, got %s", definition.Source)
+	}
+	if definition.PluginID != pluginID {
+		t.Fatalf("expected plugin id %s, got %s", pluginID, definition.PluginID)
+	}
+}

@@ -1,0 +1,202 @@
+<script setup lang="ts">
+import { computed, nextTick, ref } from 'vue';
+
+import { useVbenDrawer } from '@vben/common-ui';
+import { $t } from '@vben/locales';
+import { cloneDeep } from '@vben/utils';
+
+import { message } from 'ant-design-vue';
+
+import { useVbenForm } from '#/adapter/form';
+import { menuTreeSelect, roleMenuTreeSelect } from '#/api/system/menu';
+import { roleAdd, roleInfo, roleUpdate } from '#/api/system/role';
+import { MenuSelectTable } from '#/components/tree';
+import { resolveManagementCapabilityState } from '#/plugins/management-capabilities';
+import { useDictStore } from '#/store/dict';
+import { defaultFormValueGetter, useBeforeCloseDiff } from '#/utils/popup';
+
+import {
+  DATA_SCOPE_DICT_TYPE,
+  getDataScopeOptions,
+  getDefaultDataScope,
+  getDrawerSchema,
+  normalizeDataScopeValue,
+} from './data';
+
+const emit = defineEmits<{ reload: [] }>();
+const dictStore = useDictStore();
+
+const isUpdate = ref(false);
+const orgEnabled = ref(true);
+const tenantEnabled = ref(false);
+const title = computed(() => {
+  return isUpdate.value ? $t('pages.common.edit') : $t('pages.common.add');
+});
+
+const [BasicForm, formApi] = useVbenForm({
+  commonConfig: {
+    componentProps: {
+      class: 'w-full',
+    },
+    formItemClass: 'col-span-1',
+  },
+  layout: 'vertical',
+  schema: getDrawerSchema(true, false),
+  showDefaultActions: false,
+  wrapperClass: 'grid-cols-2 gap-x-4',
+});
+
+const menuTree = ref<any[]>([]);
+
+async function syncRoleCapabilities() {
+  const capabilities = await resolveManagementCapabilityState(true);
+  await dictStore.getDictOptionsAsync(DATA_SCOPE_DICT_TYPE);
+  orgEnabled.value = capabilities.organizationEnabled;
+  tenantEnabled.value = capabilities.tenantEnabled;
+  formApi.updateSchema([
+    {
+      fieldName: 'dataScope',
+      defaultValue: getDefaultDataScope(tenantEnabled.value),
+      componentProps: {
+        options: getDataScopeOptions(orgEnabled.value, tenantEnabled.value),
+      },
+    },
+  ]);
+}
+
+async function setupMenuTree(id?: number) {
+  if (id) {
+    const resp = await roleMenuTreeSelect(id);
+    menuTree.value = resp.menus;
+    await nextTick();
+    await formApi.setFieldValue('menuIds', resp.checkedKeys);
+  } else {
+    const resp = await menuTreeSelect();
+    menuTree.value = resp;
+    await nextTick();
+    await formApi.setFieldValue('menuIds', []);
+  }
+}
+
+async function customFormValueGetter() {
+  const formValues = await defaultFormValueGetter(formApi)();
+  const menuIds = menuSelectRef.value?.getCheckedKeys?.() ?? [];
+  return {
+    ...formValues,
+    menuIds,
+  };
+}
+
+const {
+  onBeforeClose: checkBeforeClose,
+  markInitialized,
+  resetInitialized,
+} = useBeforeCloseDiff({
+  initializedGetter: customFormValueGetter,
+  currentGetter: customFormValueGetter,
+});
+
+async function onBeforeClose() {
+  menuSelectRef.value?.closeGuide?.();
+  await nextTick();
+  return await checkBeforeClose();
+}
+
+const [BasicDrawer, drawerApi] = useVbenDrawer({
+  onBeforeClose,
+  onClosed: handleClosed,
+  onConfirm: handleConfirm,
+  destroyOnClose: true,
+  async onOpenChange(isOpen) {
+    if (!isOpen) {
+      return null;
+    }
+    drawerApi.setState({ loading: true });
+
+    const { id } = drawerApi.getData() as { id?: number };
+    isUpdate.value = !!id;
+    await syncRoleCapabilities();
+
+    if (isUpdate.value && id) {
+      const record = await roleInfo(id);
+      record.dataScope = normalizeDataScopeValue(
+        record.dataScope,
+        orgEnabled.value,
+        tenantEnabled.value,
+      );
+      await formApi.setValues(record);
+    } else {
+      // 新增模式：调用 resetForm 以应用 schema 中定义的 defaultValue
+      await formApi.resetForm();
+      await formApi.setFieldValue(
+        'dataScope',
+        getDefaultDataScope(tenantEnabled.value),
+      );
+    }
+    await setupMenuTree(id);
+    await markInitialized();
+
+    drawerApi.setState({ loading: false });
+  },
+});
+
+const menuSelectRef = ref<InstanceType<typeof MenuSelectTable>>();
+async function handleConfirm() {
+  try {
+    drawerApi.setState({ loading: true });
+
+    const { valid } = await formApi.validate();
+    if (!valid) {
+      return;
+    }
+    const menuIds = menuSelectRef.value?.getCheckedKeys?.() ?? [];
+    const data = cloneDeep(await formApi.getValues());
+    data.menuIds = menuIds;
+    await (isUpdate.value ? roleUpdate(data.id, data) : roleAdd(data));
+    message.success(
+      isUpdate.value
+        ? $t('pages.common.updateSuccess')
+        : $t('pages.common.createSuccess'),
+    );
+    emit('reload');
+    resetInitialized();
+    drawerApi.close();
+  } catch (error) {
+    console.error(error);
+  } finally {
+    drawerApi.setState({ loading: false });
+  }
+}
+
+async function handleClosed() {
+  await formApi.resetForm();
+  resetInitialized();
+}
+
+function handleMenuCheckStrictlyChange(value: boolean) {
+  formApi.setFieldValue('menuCheckStrictly', value);
+}
+
+function handleMenuIdsChange(value: (number | string)[]) {
+  formApi.setFieldValue('menuIds', value);
+}
+</script>
+
+<template>
+  <BasicDrawer :title="title" class="w-[800px]">
+    <BasicForm>
+      <template #menuIds="slotProps">
+        <div class="h-[600px] w-full">
+          <MenuSelectTable
+            ref="menuSelectRef"
+            :checked-keys="slotProps.value"
+            :association="formApi.form.values.menuCheckStrictly"
+            :menus="menuTree"
+            @update:checked-keys="handleMenuIdsChange"
+            @update:association="handleMenuCheckStrictlyChange"
+          />
+        </div>
+      </template>
+    </BasicForm>
+  </BasicDrawer>
+</template>

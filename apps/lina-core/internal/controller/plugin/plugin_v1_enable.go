@@ -1,0 +1,25 @@
+// This file implements plugin enablement and keeps the service integer status
+// update aligned with the public enabled flag contract.
+
+package plugin
+
+import (
+	"context"
+
+	v1 "lina-core/api/plugin/v1"
+	pluginsvc "lina-core/internal/service/plugin"
+	"lina-core/pkg/statusflag"
+)
+
+// Enable updates plugin status to enabled.
+func (c *ControllerV1) Enable(ctx context.Context, req *v1.EnableReq) (res *v1.EnableRes, err error) {
+	if err = c.pluginSvc.UpdateStatus(ctx, req.Id, pluginsvc.UpdateStatusOptions{
+		Status:        statusflag.EnabledValue.Int(),
+		Authorization: buildAuthorizationInput(req.Authorization),
+	}); err != nil {
+		return nil, err
+	}
+	c.roleSvc.NotifyAccessTopologyChanged(ctx)
+
+	return &v1.EnableRes{Id: req.Id, Enabled: statusflag.EnabledValue}, nil
+}

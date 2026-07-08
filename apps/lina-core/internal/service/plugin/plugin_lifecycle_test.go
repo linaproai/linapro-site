@@ -1,0 +1,2114 @@
+// This file covers root-facade lifecycle methods defined in plugin_lifecycle.go.
+
+package plugin
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	pluginv1 "lina-core/api/plugin/v1"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/gogf/gf/v2/errors/gerror"
+	"github.com/gogf/gf/v2/frame/g"
+	"github.com/gogf/gf/v2/os/gctx"
+
+	"lina-core/internal/dao"
+	"lina-core/internal/model"
+	"lina-core/internal/model/do"
+	i18nsvc "lina-core/internal/service/i18n"
+	"lina-core/internal/service/plugin/internal/catalog"
+	"lina-core/internal/service/plugin/internal/migration"
+	"lina-core/internal/service/plugin/internal/plugintypes"
+	"lina-core/internal/service/plugin/internal/store"
+	"lina-core/internal/service/plugin/internal/testutil"
+	"lina-core/pkg/bizerr"
+	"lina-core/pkg/plugin/pluginbridge/protocol"
+	"lina-core/pkg/plugin/pluginhost"
+	"lina-core/pkg/statusflag"
+)
+
+// TestWrapMockDataLoadErrorPassesThroughNonMockErrors verifies that arbitrary
+// install errors are returned unchanged so callers can distinguish mock
+// rollback from other install failures.
+func TestWrapMockDataLoadErrorPassesThroughNonMockErrors(t *testing.T) {
+	if got := wrapMockDataLoadError(nil); got != nil {
+		t.Fatalf("expected nil to pass through, got %v", got)
+	}
+	plain := errors.New("plain install failure")
+	if got := wrapMockDataLoadError(plain); got != plain {
+		t.Fatalf("expected non-mock error to pass through unchanged, got %v", got)
+	}
+	wrapped := gerror.Wrap(errors.New("inner"), "outer")
+	if got := wrapMockDataLoadError(wrapped); got != wrapped {
+		t.Fatalf("expected wrapped non-mock error to pass through unchanged, got %v", got)
+	}
+}
+
+// TestWrapMockDataLoadErrorWrapsTypedError verifies that a *MockDataLoadError
+// (or any error chain that contains one) is converted into the stable bizerr
+// carrying pluginId / failedFile / rolledBackFiles / cause for i18n rendering.
+func TestWrapMockDataLoadErrorWrapsTypedError(t *testing.T) {
+	cause := errors.New("Duplicate entry 'admin' for key sys_user.idx_username")
+	loadErr := &migration.MockDataLoadError{
+		PluginID:        "linapro-content-notice",
+		FailedFile:      "002-linapro-content-notice-mock-data.sql",
+		RolledBackFiles: []string{"001-linapro-content-notice-mock-data.sql", "002-linapro-content-notice-mock-data.sql"},
+		Cause:           cause,
+	}
+
+	got := wrapMockDataLoadError(loadErr)
+	if got == nil {
+		t.Fatalf("expected wrapped error, got nil")
+	}
+	if got.Error() == "" {
+		t.Fatalf("expected wrapped error message to be non-empty")
+	}
+
+	// Wrapping a context-wrapped chain should still recover the bizerr.
+	wrappedChain := gerror.Wrap(loadErr, "facade context")
+	if got := wrapMockDataLoadError(wrappedChain); got == nil {
+		t.Fatalf("expected wrapping to traverse error chain via errors.As")
+	}
+}
+
+// TestUpdateStatusEnablesBackendOnlyDynamicPluginWithoutFrontendAssets verifies
+// that route-only runtime plugins can be enabled without bundled frontend files.
+func TestUpdateStatusEnablesBackendOnlyDynamicPluginWithoutFrontendAssets(t *testing.T) {
+	var (
+		service  = newTestService()
+		ctx      = context.Background()
+		pluginID = "plugin-dev-dynamic-backend-only"
+	)
+
+	service.frontendSvc.InvalidateAllBundles(ctx, "test_reset")
+	t.Cleanup(func() {
+		service.frontendSvc.InvalidateAllBundles(context.Background(), "test_cleanup")
+	})
+
+	artifactPath := testutil.CreateTestRuntimeStorageArtifactWithFrontendAssets(
+		t,
+		pluginID,
+		"Backend Only Dynamic Plugin",
+		"v0.4.1",
+		nil,
+		nil,
+		nil,
+	)
+
+	testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+	t.Cleanup(func() {
+		testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+		if cleanupErr := os.Remove(artifactPath); cleanupErr != nil && !os.IsNotExist(cleanupErr) {
+			t.Fatalf("failed to remove artifact %s: %v", artifactPath, cleanupErr)
+		}
+	})
+
+	manifest, err := service.loadRuntimePluginManifestFromArtifact(artifactPath)
+	if err != nil {
+		t.Fatalf("expected backend-only artifact manifest to load, got error: %v", err)
+	}
+	if _, err = service.syncPluginManifest(ctx, manifest); err != nil {
+		t.Fatalf("expected backend-only artifact sync to succeed, got error: %v", err)
+	}
+	if err = service.setPluginInstalled(ctx, pluginID, statusflag.Installed.Int()); err != nil {
+		t.Fatalf("expected backend-only plugin install state to be set, got error: %v", err)
+	}
+
+	if err = service.UpdateStatus(ctx, pluginID, UpdateStatusOptions{Status: statusflag.EnabledValue.Int()}); err != nil {
+		t.Fatalf("expected backend-only dynamic plugin enable to succeed, got error: %v", err)
+	}
+	if !service.IsEnabled(ctx, pluginID) {
+		t.Fatalf("expected backend-only dynamic plugin to be enabled after status update")
+	}
+}
+
+// TestUpdateStatusPreservesDynamicPluginStorage verifies that enable-disable
+// status transitions do not replay uninstall SQL or remove plugin-owned data.
+func TestUpdateStatusPreservesDynamicPluginStorage(t *testing.T) {
+	var (
+		service   = newTestService()
+		ctx       = context.Background()
+		pluginID  = "plugin-dev-dynamic-status-toggle-storage"
+		tableName = "plugin_dev_dynamic_status_toggle_storage"
+	)
+
+	dropDynamicStatusToggleTable(t, ctx, tableName)
+	testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+	t.Cleanup(func() {
+		dropDynamicStatusToggleTable(t, ctx, tableName)
+		testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+	})
+
+	testutil.CreateTestRuntimeStorageArtifact(
+		t,
+		pluginID,
+		"Dynamic Status Toggle Storage Plugin",
+		"v0.4.9",
+		[]*catalog.ArtifactSQLAsset{
+			{
+				Key: "001-status-toggle-storage.sql",
+				Content: strings.Join([]string{
+					"CREATE TABLE IF NOT EXISTS " + tableName + " (id INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY, marker VARCHAR(32) NOT NULL);",
+					"INSERT INTO " + tableName + " (marker) VALUES ('installed');",
+				}, "\n"),
+			},
+		},
+		[]*catalog.ArtifactSQLAsset{
+			{
+				Key:     "001-status-toggle-storage-drop.sql",
+				Content: "DROP TABLE IF EXISTS " + tableName + ";",
+			},
+		},
+	)
+
+	if _, err := service.Install(ctx, pluginID, InstallOptions{}); err != nil {
+		t.Fatalf("expected dynamic plugin install to succeed, got error: %v", err)
+	}
+	if count := dynamicStatusToggleTableRowCount(t, ctx, tableName); count != 1 {
+		t.Fatalf("expected install SQL to create one marker row, got %d", count)
+	}
+
+	if err := service.UpdateStatus(ctx, pluginID, UpdateStatusOptions{Status: statusflag.EnabledValue.Int()}); err != nil {
+		t.Fatalf("expected dynamic plugin enable to succeed, got error: %v", err)
+	}
+	if err := service.UpdateStatus(ctx, pluginID, UpdateStatusOptions{Status: statusflag.Disabled.Int()}); err != nil {
+		t.Fatalf("expected dynamic plugin disable to succeed, got error: %v", err)
+	}
+	if err := service.UpdateStatus(ctx, pluginID, UpdateStatusOptions{Status: statusflag.EnabledValue.Int()}); err != nil {
+		t.Fatalf("expected dynamic plugin re-enable to succeed, got error: %v", err)
+	}
+	if count := dynamicStatusToggleTableRowCount(t, ctx, tableName); count != 1 {
+		t.Fatalf("expected status toggles to preserve plugin table row, got %d", count)
+	}
+}
+
+// dropDynamicStatusToggleTable removes the temporary table used by the dynamic
+// status toggle regression test so repeated runs start from a clean state.
+func dropDynamicStatusToggleTable(t *testing.T, ctx context.Context, tableName string) {
+	t.Helper()
+	if _, err := g.DB().Exec(ctx, "DROP TABLE IF EXISTS "+tableName+";"); err != nil {
+		t.Fatalf("expected dynamic status toggle table cleanup to succeed, got error: %v", err)
+	}
+}
+
+// dynamicStatusToggleTableRowCount returns the number of marker rows in the
+// dynamic status toggle test table and fails if the table has been dropped.
+func dynamicStatusToggleTableRowCount(t *testing.T, ctx context.Context, tableName string) int {
+	t.Helper()
+	value, err := g.DB().GetValue(ctx, "SELECT COUNT(1) FROM "+tableName+";")
+	if err != nil {
+		t.Fatalf("expected dynamic status toggle table row count query to succeed, got error: %v", err)
+	}
+	return value.Int()
+}
+
+// TestInstallPersistsExplicitDynamicInstallMode verifies dynamic install does
+// not let the runtime lifecycle's manifest reload reset the operator selection.
+func TestInstallPersistsExplicitDynamicInstallMode(t *testing.T) {
+	var (
+		service  = newTestService()
+		ctx      = context.Background()
+		pluginID = "plugin-dev-dynamic-explicit-install-mode"
+	)
+
+	artifactPath := testutil.CreateTestRuntimeStorageArtifactWithFrontendAssets(
+		t,
+		pluginID,
+		"Dynamic Explicit Install Mode",
+		"v0.4.2",
+		nil,
+		nil,
+		nil,
+	)
+	testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+	t.Cleanup(func() {
+		testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+		if cleanupErr := os.Remove(artifactPath); cleanupErr != nil && !os.IsNotExist(cleanupErr) {
+			t.Fatalf("failed to remove artifact %s: %v", artifactPath, cleanupErr)
+		}
+	})
+
+	if _, err := service.Install(ctx, pluginID, InstallOptions{
+		InstallMode: pluginv1.InstallModeGlobal.String(),
+	}); err != nil {
+		t.Fatalf("install dynamic plugin with explicit global mode: %v", err)
+	}
+	registry, err := service.getPluginRegistry(ctx, pluginID)
+	if err != nil {
+		t.Fatalf("load plugin registry after install: %v", err)
+	}
+	if registry == nil {
+		t.Fatal("expected plugin registry after install")
+	}
+	if registry.InstallMode != pluginv1.InstallModeGlobal.String() {
+		t.Fatalf("expected explicit global install_mode to persist, got %s", registry.InstallMode)
+	}
+}
+
+// TestDynamicLifecycleBeforeInstallFailsClosedBeforeInstall verifies dynamic
+// BeforeInstall blocks the install path before registry state changes.
+func TestDynamicLifecycleBeforeInstallFailsClosedBeforeInstall(t *testing.T) {
+	var (
+		service  = newTestService()
+		ctx      = context.Background()
+		pluginID = "plugin-dev-dynamic-before-install-fail-closed"
+	)
+
+	artifactPath := createDynamicLifecyclePreconditionArtifact(
+		t,
+		pluginID,
+		"Dynamic Before Install Fail Closed Plugin",
+		"v0.4.5",
+		protocol.LifecycleOperationBeforeInstall,
+	)
+	testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+	t.Cleanup(func() {
+		testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+		if cleanupErr := os.Remove(artifactPath); cleanupErr != nil && !os.IsNotExist(cleanupErr) {
+			t.Fatalf("failed to remove artifact %s: %v", artifactPath, cleanupErr)
+		}
+	})
+
+	_, err := service.Install(ctx, pluginID, InstallOptions{})
+	if !bizerr.Is(err, CodePluginLifecyclePreconditionVetoed) {
+		t.Fatalf("expected dynamic BeforeInstall precondition bizerr, got %v", err)
+	}
+
+	registry, err := service.getPluginRegistry(ctx, pluginID)
+	if err != nil {
+		t.Fatalf("expected registry lookup after vetoed install to succeed, got error: %v", err)
+	}
+	if registry == nil {
+		return
+	}
+	if registry.Installed != statusflag.Uninstalled.Int() || registry.Status != statusflag.Disabled.Int() {
+		t.Fatalf("expected vetoed dynamic install to keep plugin uninstalled, got installed=%d status=%d", registry.Installed, registry.Status)
+	}
+}
+
+// TestUninstallDynamicUsesArchivedReleaseWhenStagingArtifactMissing verifies
+// uninstall relies on the active release archive instead of the mutable staging
+// artifact after a dynamic plugin has been installed.
+func TestUninstallDynamicUsesArchivedReleaseWhenStagingArtifactMissing(t *testing.T) {
+	var (
+		service  = newTestService()
+		ctx      = context.Background()
+		pluginID = "plugin-dev-dynamic-uninstall-missing-staging"
+		menuKey  = "plugin:plugin-dev-dynamic-uninstall-missing-staging:entry"
+		version  = "v0.4.3"
+	)
+
+	testutil.CleanupPluginMenuRowsHard(t, ctx, pluginID)
+	testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+	releaseRoot := filepath.Join(testutil.TestDynamicStorageDir(), "releases", pluginID)
+	if err := os.RemoveAll(releaseRoot); err != nil {
+		t.Fatalf("failed to clear release archive root: %v", err)
+	}
+	t.Cleanup(func() {
+		testutil.CleanupPluginMenuRowsHard(t, ctx, pluginID)
+		testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+		if err := os.RemoveAll(releaseRoot); err != nil {
+			t.Fatalf("failed to cleanup release archive root: %v", err)
+		}
+	})
+
+	artifactPath := testutil.CreateTestRuntimeStorageArtifactWithMenus(
+		t,
+		pluginID,
+		"Dynamic Missing Staging Uninstall Plugin",
+		version,
+		[]*catalog.MenuSpec{
+			{
+				Key:   menuKey,
+				Name:  "Dynamic Missing Staging Uninstall Plugin",
+				Path:  "plugin-dev-dynamic-uninstall-missing-staging",
+				Perms: "plugin-dev-dynamic-uninstall-missing-staging:view",
+				Icon:  "ant-design:appstore-outlined",
+				Type:  catalog.MenuTypePage.String(),
+				Sort:  1,
+			},
+		},
+		nil,
+		nil,
+	)
+
+	if _, err := service.Install(ctx, pluginID, InstallOptions{}); err != nil {
+		t.Fatalf("expected dynamic plugin install to succeed, got error: %v", err)
+	}
+	release, err := service.getPluginRelease(ctx, pluginID, version)
+	if err != nil {
+		t.Fatalf("expected dynamic plugin release lookup to succeed, got error: %v", err)
+	}
+	if release == nil {
+		t.Fatalf("expected dynamic plugin release row after install")
+	}
+	archivePath := resolveTestDynamicPackagePath(t, release.PackagePath)
+	if _, err = os.Stat(archivePath); err != nil {
+		t.Fatalf("expected active release archive to exist before staging removal: %v", err)
+	}
+	if err = os.Remove(artifactPath); err != nil {
+		t.Fatalf("failed to remove staging artifact: %v", err)
+	}
+
+	if err = service.Uninstall(ctx, pluginID, UninstallOptions{PurgeStorageData: true}); err != nil {
+		t.Fatalf("expected dynamic plugin uninstall to use archived release, got error: %v", err)
+	}
+
+	registry, err := service.getPluginRegistry(ctx, pluginID)
+	if err != nil {
+		t.Fatalf("expected plugin registry lookup after uninstall to succeed, got error: %v", err)
+	}
+	if registry == nil {
+		t.Fatalf("expected plugin registry row after uninstall")
+	}
+	if registry.Installed != statusflag.Uninstalled.Int() || registry.Status != statusflag.Disabled.Int() || registry.ReleaseId != 0 {
+		t.Fatalf("expected dynamic plugin to be uninstalled+disabled with release cleared, got installed=%d enabled=%d releaseID=%d", registry.Installed, registry.Status, registry.ReleaseId)
+	}
+	menu, err := testutil.QueryMenuByKey(ctx, menuKey)
+	if err != nil {
+		t.Fatalf("expected plugin menu lookup after uninstall to succeed, got error: %v", err)
+	}
+	if menu != nil {
+		t.Fatalf("expected dynamic plugin menu to be removed after uninstall")
+	}
+}
+
+// TestDynamicLifecycleBeforeDisableFailsClosedBeforeStatusChange verifies
+// dynamic BeforeDisable runs from the active release and blocks status changes.
+func TestDynamicLifecycleBeforeDisableFailsClosedBeforeStatusChange(t *testing.T) {
+	var (
+		service  = newTestService()
+		ctx      = context.Background()
+		pluginID = "plugin-dev-dynamic-before-disable-fail-closed"
+	)
+
+	artifactPath := createDynamicLifecyclePreconditionArtifact(
+		t,
+		pluginID,
+		"Dynamic Before Disable Fail Closed Plugin",
+		"v0.4.6",
+		protocol.LifecycleOperationBeforeDisable,
+	)
+	testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+	t.Cleanup(func() {
+		testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+		if cleanupErr := os.Remove(artifactPath); cleanupErr != nil && !os.IsNotExist(cleanupErr) {
+			t.Fatalf("failed to remove artifact %s: %v", artifactPath, cleanupErr)
+		}
+	})
+
+	if _, err := service.Install(ctx, pluginID, InstallOptions{}); err != nil {
+		t.Fatalf("expected dynamic plugin install to succeed, got error: %v", err)
+	}
+	if err := service.UpdateStatus(ctx, pluginID, UpdateStatusOptions{Status: statusflag.EnabledValue.Int()}); err != nil {
+		t.Fatalf("expected dynamic plugin enable to succeed, got error: %v", err)
+	}
+
+	err := service.UpdateStatus(ctx, pluginID, UpdateStatusOptions{Status: statusflag.Disabled.Int()})
+	if !bizerr.Is(err, CodePluginLifecyclePreconditionVetoed) {
+		t.Fatalf("expected dynamic BeforeDisable precondition bizerr, got %v", err)
+	}
+	registry, err := service.getPluginRegistry(ctx, pluginID)
+	if err != nil {
+		t.Fatalf("expected registry lookup after vetoed disable to succeed, got error: %v", err)
+	}
+	if registry == nil || registry.Status != statusflag.EnabledValue.Int() {
+		t.Fatalf("expected vetoed dynamic disable to keep plugin enabled, got %#v", registry)
+	}
+}
+
+// TestDynamicLifecycleBeforeUninstallUsesActiveReleaseWhenStagingMissing
+// verifies archived dynamic lifecycle handlers still guard uninstall after the
+// mutable staging artifact has been removed.
+func TestDynamicLifecycleBeforeUninstallUsesActiveReleaseWhenStagingMissing(t *testing.T) {
+	var (
+		service  = newTestService()
+		ctx      = context.Background()
+		pluginID = "plugin-dev-dynamic-before-uninstall-active"
+		version  = "v0.4.7"
+	)
+
+	testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+	releaseRoot := filepath.Join(testutil.TestDynamicStorageDir(), "releases", pluginID)
+	if err := os.RemoveAll(releaseRoot); err != nil {
+		t.Fatalf("failed to clear release archive root: %v", err)
+	}
+	t.Cleanup(func() {
+		testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+		if err := os.RemoveAll(releaseRoot); err != nil {
+			t.Fatalf("failed to cleanup release archive root: %v", err)
+		}
+	})
+
+	artifactPath := createDynamicLifecyclePreconditionArtifact(
+		t,
+		pluginID,
+		"Dynamic Before Uninstall Active Release Plugin",
+		version,
+		protocol.LifecycleOperationBeforeUninstall,
+	)
+	if _, err := service.Install(ctx, pluginID, InstallOptions{}); err != nil {
+		t.Fatalf("expected dynamic plugin install to succeed, got error: %v", err)
+	}
+	if err := os.Remove(artifactPath); err != nil {
+		t.Fatalf("failed to remove staging artifact: %v", err)
+	}
+
+	err := service.Uninstall(ctx, pluginID, UninstallOptions{PurgeStorageData: true})
+	if !bizerr.Is(err, CodePluginLifecyclePreconditionVetoed) {
+		t.Fatalf("expected active-release BeforeUninstall precondition bizerr, got %v", err)
+	}
+	registry, err := service.getPluginRegistry(ctx, pluginID)
+	if err != nil {
+		t.Fatalf("expected registry lookup after vetoed uninstall to succeed, got error: %v", err)
+	}
+	if registry == nil || registry.Installed != statusflag.Installed.Int() {
+		t.Fatalf("expected vetoed dynamic uninstall to keep plugin installed, got %#v", registry)
+	}
+}
+
+// TestDynamicLifecycleUninstallRunsOnlyWhenPurgeRequested verifies dynamic
+// Uninstall cleanup callbacks are skipped for keep-data uninstall and fail
+// closed before state changes when data purge is requested.
+func TestDynamicLifecycleUninstallRunsOnlyWhenPurgeRequested(t *testing.T) {
+	var (
+		service    = newTestService()
+		ctx        = context.Background()
+		blockingID = "plugin-dev-dynamic-uninstall-cleanup-fail-closed"
+		skipID     = "plugin-dev-dynamic-uninstall-cleanup-skipped"
+		version    = "v0.4.8"
+	)
+
+	for _, pluginID := range []string{blockingID, skipID} {
+		testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+	}
+	t.Cleanup(func() {
+		for _, pluginID := range []string{blockingID, skipID} {
+			testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+		}
+	})
+
+	blockingArtifactPath := createDynamicLifecyclePreconditionArtifact(
+		t,
+		blockingID,
+		"Dynamic Uninstall Cleanup Fail Closed Plugin",
+		version,
+		protocol.LifecycleOperationUninstall,
+	)
+	if _, err := service.Install(ctx, blockingID, InstallOptions{}); err != nil {
+		t.Fatalf("expected blocking dynamic plugin install to succeed, got error: %v", err)
+	}
+	err := service.Uninstall(ctx, blockingID, UninstallOptions{PurgeStorageData: true})
+	if !bizerr.Is(err, CodePluginUninstallExecutionFailed) {
+		t.Fatalf("expected purge uninstall lifecycle callback to return uninstall execution bizerr, got %v", err)
+	}
+	blockingRegistry, err := service.getPluginRegistry(ctx, blockingID)
+	if err != nil {
+		t.Fatalf("expected blocking plugin registry lookup to succeed, got error: %v", err)
+	}
+	if blockingRegistry == nil || blockingRegistry.Installed != statusflag.Installed.Int() {
+		t.Fatalf("expected failed cleanup lifecycle to keep plugin installed, got %#v", blockingRegistry)
+	}
+	if cleanupErr := os.Remove(blockingArtifactPath); cleanupErr != nil && !os.IsNotExist(cleanupErr) {
+		t.Fatalf("failed to remove blocking artifact %s: %v", blockingArtifactPath, cleanupErr)
+	}
+
+	skipArtifactPath := createDynamicLifecyclePreconditionArtifact(
+		t,
+		skipID,
+		"Dynamic Uninstall Cleanup Skipped Plugin",
+		version,
+		protocol.LifecycleOperationUninstall,
+	)
+	if _, err = service.Install(ctx, skipID, InstallOptions{}); err != nil {
+		t.Fatalf("expected skip dynamic plugin install to succeed, got error: %v", err)
+	}
+	if err = service.Uninstall(ctx, skipID, UninstallOptions{PurgeStorageData: false}); err != nil {
+		t.Fatalf("expected keep-data uninstall to skip dynamic Uninstall lifecycle, got error: %v", err)
+	}
+	skipRegistry, err := service.getPluginRegistry(ctx, skipID)
+	if err != nil {
+		t.Fatalf("expected skip plugin registry lookup to succeed, got error: %v", err)
+	}
+	if skipRegistry == nil || skipRegistry.Installed != statusflag.Uninstalled.Int() {
+		t.Fatalf("expected keep-data uninstall to complete, got %#v", skipRegistry)
+	}
+	if cleanupErr := os.Remove(skipArtifactPath); cleanupErr != nil && !os.IsNotExist(cleanupErr) {
+		t.Fatalf("failed to remove skip artifact %s: %v", skipArtifactPath, cleanupErr)
+	}
+}
+
+// TestUninstallForceClearsDynamicOrphanWhenArtifactsMissing verifies force
+// uninstall can clear host governance when both staging and release artifacts
+// are unavailable.
+func TestUninstallForceClearsDynamicOrphanWhenArtifactsMissing(t *testing.T) {
+	var (
+		service  = newTestService()
+		ctx      = context.Background()
+		pluginID = "plugin-dev-dynamic-force-orphan-uninstall"
+		menuKey  = "plugin:plugin-dev-dynamic-force-orphan-uninstall:entry"
+		version  = "v0.4.4"
+	)
+
+	testutil.CleanupPluginMenuRowsHard(t, ctx, pluginID)
+	testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+	releaseRoot := filepath.Join(testutil.TestDynamicStorageDir(), "releases", pluginID)
+	if err := os.RemoveAll(releaseRoot); err != nil {
+		t.Fatalf("failed to clear release archive root: %v", err)
+	}
+	t.Cleanup(func() {
+		setTestPluginAllowForceUninstallOverride(nil)
+		testutil.CleanupPluginMenuRowsHard(t, ctx, pluginID)
+		testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+		if err := os.RemoveAll(releaseRoot); err != nil {
+			t.Fatalf("failed to cleanup release archive root: %v", err)
+		}
+	})
+
+	artifactPath := testutil.CreateTestRuntimeStorageArtifactWithMenus(
+		t,
+		pluginID,
+		"Dynamic Force Orphan Uninstall Plugin",
+		version,
+		[]*catalog.MenuSpec{
+			{
+				Key:   menuKey,
+				Name:  "Dynamic Force Orphan Uninstall Plugin",
+				Path:  "plugin-dev-dynamic-force-orphan-uninstall",
+				Perms: "plugin-dev-dynamic-force-orphan-uninstall:view",
+				Icon:  "ant-design:appstore-outlined",
+				Type:  catalog.MenuTypePage.String(),
+				Sort:  1,
+			},
+		},
+		nil,
+		nil,
+	)
+
+	if _, err := service.Install(ctx, pluginID, InstallOptions{}); err != nil {
+		t.Fatalf("expected dynamic plugin install to succeed, got error: %v", err)
+	}
+	release, err := service.getPluginRelease(ctx, pluginID, version)
+	if err != nil {
+		t.Fatalf("expected dynamic plugin release lookup to succeed, got error: %v", err)
+	}
+	if release == nil {
+		t.Fatalf("expected dynamic plugin release row after install")
+	}
+	archivePath := resolveTestDynamicPackagePath(t, release.PackagePath)
+	if err = os.Remove(artifactPath); err != nil {
+		t.Fatalf("failed to remove staging artifact: %v", err)
+	}
+	if err = os.Remove(archivePath); err != nil {
+		t.Fatalf("failed to remove active release artifact: %v", err)
+	}
+
+	resourceCount, err := dao.SysPluginResourceRef.Ctx(ctx).
+		Where(do.SysPluginResourceRef{PluginId: pluginID}).
+		Count()
+	if err != nil {
+		t.Fatalf("expected governance resource count query to succeed, got error: %v", err)
+	}
+	if resourceCount == 0 {
+		t.Fatalf("expected installed dynamic plugin to materialize governance resource refs")
+	}
+
+	err = service.Uninstall(ctx, pluginID, UninstallOptions{PurgeStorageData: true})
+	if !bizerr.Is(err, CodePluginDynamicArtifactMissingForUninstall) {
+		t.Fatalf("expected missing-artifact uninstall bizerr, got %v", err)
+	}
+
+	enabled := true
+	setTestPluginAllowForceUninstallOverride(&enabled)
+	if err = service.Uninstall(ctx, pluginID, UninstallOptions{
+		PurgeStorageData: true,
+		Force:            true,
+	}); err != nil {
+		t.Fatalf("expected force orphan uninstall to succeed, got error: %v", err)
+	}
+
+	registry, err := service.getPluginRegistry(ctx, pluginID)
+	if err != nil {
+		t.Fatalf("expected plugin registry lookup after force uninstall to succeed, got error: %v", err)
+	}
+	if registry == nil {
+		t.Fatalf("expected plugin registry row after force uninstall")
+	}
+	if registry.Installed != statusflag.Uninstalled.Int() || registry.Status != statusflag.Disabled.Int() || registry.ReleaseId != 0 {
+		t.Fatalf("expected force orphan uninstall to clear runtime state, got installed=%d enabled=%d releaseID=%d", registry.Installed, registry.Status, registry.ReleaseId)
+	}
+	if registry.DesiredState != plugintypes.HostStateUninstalled.String() || registry.CurrentState != plugintypes.HostStateUninstalled.String() {
+		t.Fatalf("expected force orphan uninstall to mark host states uninstalled, got desired=%s current=%s", registry.DesiredState, registry.CurrentState)
+	}
+
+	release, err = service.getPluginRelease(ctx, pluginID, version)
+	if err != nil {
+		t.Fatalf("expected dynamic plugin release lookup after force uninstall to succeed, got error: %v", err)
+	}
+	if release == nil {
+		t.Fatalf("expected dynamic plugin release row after force uninstall")
+	}
+	if release.Status != plugintypes.ReleaseStatusUninstalled.String() {
+		t.Fatalf("expected release to be marked uninstalled after force orphan uninstall, got %s", release.Status)
+	}
+
+	menu, err := testutil.QueryMenuByKey(ctx, menuKey)
+	if err != nil {
+		t.Fatalf("expected plugin menu lookup after force uninstall to succeed, got error: %v", err)
+	}
+	if menu != nil {
+		t.Fatalf("expected force orphan uninstall to remove plugin menu")
+	}
+	resourceCount, err = dao.SysPluginResourceRef.Ctx(ctx).
+		Where(do.SysPluginResourceRef{PluginId: pluginID}).
+		Count()
+	if err != nil {
+		t.Fatalf("expected governance resource count query after force uninstall to succeed, got error: %v", err)
+	}
+	if resourceCount != 0 {
+		t.Fatalf("expected force orphan uninstall to clear governance resource refs, got count=%d", resourceCount)
+	}
+}
+
+// resolveTestDynamicPackagePath resolves a release package path inside the
+// shared dynamic-plugin test storage directory.
+func resolveTestDynamicPackagePath(t *testing.T, packagePath string) string {
+	t.Helper()
+
+	if filepath.IsAbs(packagePath) {
+		return filepath.Clean(packagePath)
+	}
+	return filepath.Join(testutil.TestDynamicStorageDir(), filepath.FromSlash(packagePath))
+}
+
+// TestTenantDeleteRunsLifecyclePreconditions verifies tenant deletion fails
+// closed when any plugin-owned lifecycle precondition vetoes tenant deletion.
+func TestTenantDeleteRunsLifecyclePreconditions(t *testing.T) {
+	var (
+		service = newTestService()
+		ctx     = context.Background()
+	)
+	plugin := pluginhost.NewDeclarations("plugin-tenant-delete-precondition")
+	if err := plugin.Lifecycle().RegisterBeforeTenantDeleteHandler(func(
+		ctx context.Context,
+		input pluginhost.SourcePluginTenantLifecycleInput,
+	) (bool, string, error) {
+		if input.TenantID() != 8001 {
+			t.Fatalf("expected tenant id to be published, got %d", input.TenantID())
+		}
+		return false, "plugin.test.tenant_delete_blocked", nil
+	}); err != nil {
+		t.Fatalf("register tenant delete lifecycle handler failed: %v", err)
+	}
+	cleanup, err := pluginhost.RegisterSourcePluginForTest(plugin)
+	if err != nil {
+		t.Fatalf("register tenant delete lifecycle callback failed: %v", err)
+	}
+	t.Cleanup(cleanup)
+
+	err = service.EnsureTenantDeleteAllowed(ctx, 8001)
+	if !bizerr.Is(err, CodePluginLifecyclePreconditionVetoed) {
+		t.Fatalf("expected tenant delete lifecycle precondition bizerr, got %v", err)
+	}
+}
+
+// TestTenantDeleteLifecyclePreconditionAllowsWhenNoParticipant verifies tenant
+// deletion precondition checks are a no-op when no plugin participates.
+func TestTenantDeleteLifecyclePreconditionAllowsWhenNoParticipant(t *testing.T) {
+	service := newTestService()
+
+	if err := service.EnsureTenantDeleteAllowed(context.Background(), 8002); err != nil {
+		t.Fatalf("expected tenant delete precondition to allow without participants, got %v", err)
+	}
+}
+
+// TestTenantPluginDisableRunsSourceLifecyclePrecondition verifies tenant-scoped
+// plugin disable is routed to the target source plugin before state mutation.
+func TestTenantPluginDisableRunsSourceLifecyclePrecondition(t *testing.T) {
+	var (
+		service  = newTestService()
+		ctx      = context.Background()
+		pluginID = "plugin-dev-source-tenant-disable-precondition"
+	)
+	plugin := pluginhost.NewDeclarations(pluginID)
+	if err := plugin.Lifecycle().RegisterBeforeTenantDisableHandler(func(
+		ctx context.Context,
+		input pluginhost.SourcePluginTenantLifecycleInput,
+	) (bool, string, error) {
+		if input.TenantID() != 8101 {
+			t.Fatalf("expected tenant id to be published, got %d", input.TenantID())
+		}
+		return false, "plugin.test.tenant_disable_blocked", nil
+	}); err != nil {
+		t.Fatalf("register tenant disable lifecycle handler failed: %v", err)
+	}
+	cleanup, err := pluginhost.RegisterSourcePluginForTest(plugin)
+	if err != nil {
+		t.Fatalf("register tenant disable lifecycle callback failed: %v", err)
+	}
+	t.Cleanup(cleanup)
+
+	err = service.EnsureTenantPluginDisableAllowed(ctx, pluginID, 8101)
+	if !bizerr.Is(err, CodePluginLifecyclePreconditionVetoed) {
+		t.Fatalf("expected tenant plugin disable lifecycle precondition bizerr, got %v", err)
+	}
+}
+
+// TestDynamicLifecycleBeforeTenantDisableFailsClosed verifies tenant-scoped
+// plugin disable also runs dynamic plugin lifecycle preconditions.
+func TestDynamicLifecycleBeforeTenantDisableFailsClosed(t *testing.T) {
+	var (
+		service  = newTestService()
+		ctx      = context.Background()
+		pluginID = "plugin-dev-dynamic-before-tenant-disable"
+	)
+
+	artifactPath := createDynamicLifecyclePreconditionArtifact(
+		t,
+		pluginID,
+		"Dynamic Before Tenant Disable Plugin",
+		"v0.4.9",
+		protocol.LifecycleOperationBeforeTenantDisable,
+	)
+	testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+	t.Cleanup(func() {
+		testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+		if cleanupErr := os.Remove(artifactPath); cleanupErr != nil && !os.IsNotExist(cleanupErr) {
+			t.Fatalf("failed to remove artifact %s: %v", artifactPath, cleanupErr)
+		}
+	})
+
+	if _, err := service.Install(ctx, pluginID, InstallOptions{}); err != nil {
+		t.Fatalf("expected dynamic plugin install to succeed, got error: %v", err)
+	}
+	if err := service.UpdateStatus(ctx, pluginID, UpdateStatusOptions{Status: statusflag.EnabledValue.Int()}); err != nil {
+		t.Fatalf("expected dynamic plugin enable to succeed, got error: %v", err)
+	}
+	err := service.EnsureTenantPluginDisableAllowed(ctx, pluginID, 8102)
+	if !bizerr.Is(err, CodePluginLifecyclePreconditionVetoed) {
+		t.Fatalf("expected dynamic tenant disable lifecycle precondition bizerr, got %v", err)
+	}
+}
+
+// TestDynamicLifecycleBeforeTenantDeleteFailsClosed verifies tenant deletion
+// runs dynamic plugin lifecycle preconditions for installed enabled plugins.
+func TestDynamicLifecycleBeforeTenantDeleteFailsClosed(t *testing.T) {
+	var (
+		service  = newTestService()
+		ctx      = context.Background()
+		pluginID = "plugin-dev-dynamic-before-tenant-delete"
+	)
+
+	artifactPath := createDynamicLifecyclePreconditionArtifact(
+		t,
+		pluginID,
+		"Dynamic Before Tenant Delete Plugin",
+		"v0.4.10",
+		protocol.LifecycleOperationBeforeTenantDelete,
+	)
+	testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+	t.Cleanup(func() {
+		testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+		if cleanupErr := os.Remove(artifactPath); cleanupErr != nil && !os.IsNotExist(cleanupErr) {
+			t.Fatalf("failed to remove artifact %s: %v", artifactPath, cleanupErr)
+		}
+	})
+
+	if _, err := service.Install(ctx, pluginID, InstallOptions{}); err != nil {
+		t.Fatalf("expected dynamic plugin install to succeed, got error: %v", err)
+	}
+	if err := service.UpdateStatus(ctx, pluginID, UpdateStatusOptions{Status: statusflag.EnabledValue.Int()}); err != nil {
+		t.Fatalf("expected dynamic plugin enable to succeed, got error: %v", err)
+	}
+	err := service.EnsureTenantDeleteAllowed(ctx, 8103)
+	if !bizerr.Is(err, CodePluginLifecyclePreconditionVetoed) {
+		t.Fatalf("expected dynamic tenant delete lifecycle precondition bizerr, got %v", err)
+	}
+}
+
+// TestSourceLifecycleBeforeInstallBlocksInstall verifies source-plugin facade
+// BeforeInstall callbacks run before install SQL or registry state changes.
+func TestSourceLifecycleBeforeInstallBlocksInstall(t *testing.T) {
+	var (
+		service    = newTestService()
+		ctx        = context.Background()
+		pluginID   = "plugin-dev-source-before-install-veto"
+		operations []string
+	)
+
+	testutil.CreateTestPluginDir(t, pluginID)
+	registerSourceLifecycleCallbacksForTest(
+		t,
+		pluginID,
+		&operations,
+		sourceLifecycleCallbackOptions{vetoOperation: pluginhost.LifecycleHookBeforeInstall.String()},
+	)
+	testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+	t.Cleanup(func() {
+		testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+	})
+
+	if _, err := service.SyncAndList(ctx); err != nil {
+		t.Fatalf("expected source plugin discovery to succeed, got error: %v", err)
+	}
+	_, err := service.Install(ctx, pluginID, InstallOptions{})
+	if !bizerr.Is(err, CodePluginLifecyclePreconditionVetoed) {
+		t.Fatalf("expected BeforeInstall veto bizerr, got %v", err)
+	}
+	if len(operations) != 1 || operations[0] != pluginhost.LifecycleHookBeforeInstall.String()+":"+pluginID {
+		t.Fatalf("expected BeforeInstall operation to be published once, got %#v", operations)
+	}
+
+	registry, err := service.getPluginRegistry(ctx, pluginID)
+	if err != nil {
+		t.Fatalf("expected source plugin registry lookup to succeed, got error: %v", err)
+	}
+	if registry == nil {
+		t.Fatalf("expected source plugin registry row after discovery")
+	}
+	if registry.Installed != statusflag.Uninstalled.Int() {
+		t.Fatalf("expected vetoed install to keep plugin uninstalled, got installed=%d", registry.Installed)
+	}
+}
+
+// TestSourceLifecycleBeforeInstallRejectsManualWhenStartupAutoEnableRequired
+// verifies source plugins can use lifecycle input to reject management installs
+// while still allowing startup plugin.autoEnable bootstrap.
+func TestSourceLifecycleBeforeInstallRejectsManualWhenStartupAutoEnableRequired(t *testing.T) {
+	var (
+		service    = newTestService()
+		ctx        = context.Background()
+		pluginID   = "plugin-dev-source-startup-only-install"
+		operations []string
+	)
+
+	testutil.CreateTestPluginDir(t, pluginID)
+	testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+	t.Cleanup(func() {
+		setTestPluginAutoEnableOverride(nil)
+		testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+	})
+
+	if _, err := service.SyncAndList(ctx); err != nil {
+		t.Fatalf("expected source plugin discovery to succeed, got error: %v", err)
+	}
+	registerSourceLifecycleCallbacksForTest(
+		t,
+		pluginID,
+		&operations,
+		sourceLifecycleCallbackOptions{requireStartupAutoEnableForInstall: true},
+	)
+
+	_, err := service.Install(ctx, pluginID, InstallOptions{})
+	if !bizerr.Is(err, CodePluginLifecyclePreconditionVetoed) {
+		t.Fatalf("expected manual install to be vetoed, got %v", err)
+	}
+	if len(operations) != 1 || operations[0] != pluginhost.LifecycleHookBeforeInstall.String()+":"+pluginID {
+		t.Fatalf("expected one manual before-install operation, got %#v", operations)
+	}
+
+	setTestPluginAutoEnableOverride([]string{pluginID})
+	if err = service.BootstrapAutoEnable(ctx); err != nil {
+		t.Fatalf("expected startup auto-enable install to succeed, got error: %v", err)
+	}
+	expected := []string{
+		pluginhost.LifecycleHookBeforeInstall.String() + ":" + pluginID,
+		pluginhost.LifecycleHookBeforeInstall.String() + ":" + pluginID,
+		pluginhost.LifecycleHookAfterInstall.String() + ":" + pluginID,
+	}
+	if !sourceLifecycleTestStringSlicesEqual(operations, expected) {
+		t.Fatalf("expected lifecycle operations %#v, got %#v", expected, operations)
+	}
+	registry, lookupErr := service.getPluginRegistry(ctx, pluginID)
+	if lookupErr != nil {
+		t.Fatalf("expected source plugin registry lookup to succeed, got error: %v", lookupErr)
+	}
+	if registry == nil || registry.Installed != statusflag.Installed.Int() || registry.Status != statusflag.EnabledValue.Int() {
+		t.Fatalf("expected startup auto-enable to install and enable plugin, got %#v", registry)
+	}
+}
+
+// TestSourceLifecyclePreconditionLocalizesReasonParams verifies source-plugin
+// veto reasons are localized before being embedded in the user-facing lifecycle error.
+func TestSourceLifecyclePreconditionLocalizesReasonParams(t *testing.T) {
+	var (
+		service  = newTestService()
+		ctx      = context.Background()
+		pluginID = "plugin-dev-source-localized-before-install"
+	)
+
+	pluginDir := testutil.CreateTestPluginDir(t, pluginID)
+	testutil.WriteTestFile(
+		t,
+		filepath.Join(pluginDir, "plugin.yaml"),
+		"id: "+pluginID+"\nname: test\nversion: 0.1.0\ntype: source\nscope_nature: tenant_aware\nsupports_multi_tenant: true\ndefault_install_mode: tenant_scoped\ni18n:\n  enabled: true\n  default: "+i18nsvc.DefaultLocale+"\n  locales:\n    - locale: "+i18nsvc.DefaultLocale+"\n      nativeName: 简体中文\n    - locale: "+i18nsvc.EnglishLocale+"\n      nativeName: English\n",
+	)
+	testutil.WriteTestFile(
+		t,
+		filepath.Join(pluginDir, "manifest", "i18n", i18nsvc.DefaultLocale, "error.json"),
+		fmt.Sprintf(`{"plugin":{"%s":{"BeforeInstall":{"veto":"只能通过配置 plugin.autoEnable 并重启宿主来安装"}}}}`, pluginID),
+	)
+	testutil.WriteTestFile(
+		t,
+		filepath.Join(pluginDir, "manifest", "i18n", i18nsvc.EnglishLocale, "error.json"),
+		fmt.Sprintf(`{"plugin":{"%s":{"BeforeInstall":{"veto":"Install by configuring plugin.autoEnable and restarting the host"}}}}`, pluginID),
+	)
+	testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+	t.Cleanup(func() {
+		testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+	})
+
+	if _, err := service.SyncAndList(ctx); err != nil {
+		t.Fatalf("expected source plugin discovery to succeed, got error: %v", err)
+	}
+	service.i18nSvc.InvalidateRuntimeBundleCache(i18nsvc.InvalidateScope{
+		SourcePluginID: pluginID,
+		Sectors:        []i18nsvc.Sector{i18nsvc.SectorSourcePlugin},
+	})
+	t.Cleanup(func() {
+		service.i18nSvc.InvalidateRuntimeBundleCache(i18nsvc.InvalidateScope{
+			SourcePluginID: pluginID,
+			Sectors:        []i18nsvc.Sector{i18nsvc.SectorSourcePlugin},
+		})
+	})
+	registerSourceLifecycleCallbacksForTest(
+		t,
+		pluginID,
+		nil,
+		sourceLifecycleCallbackOptions{vetoOperation: pluginhost.LifecycleHookBeforeInstall.String()},
+	)
+
+	localizedCtx := context.WithValue(ctx, gctx.StrKey("BizCtx"), &model.Context{Locale: i18nsvc.DefaultLocale})
+	_, err := service.Install(localizedCtx, pluginID, InstallOptions{})
+	if !bizerr.Is(err, CodePluginLifecyclePreconditionVetoed) {
+		t.Fatalf("expected localized lifecycle precondition bizerr, got %v", err)
+	}
+	messageErr, ok := bizerr.As(err)
+	if !ok {
+		t.Fatalf("expected structured lifecycle error, got %v", err)
+	}
+	expectedReason := "只能通过配置 plugin.autoEnable 并重启宿主来安装"
+	if actual := messageErr.Params()["reasons"]; actual != expectedReason {
+		t.Fatalf("expected localized lifecycle reason %q, got %#v", expectedReason, actual)
+	}
+}
+
+// TestSourceLifecycleBeforeInstallReceivesStartupAutoEnableFlag verifies
+// plugin.autoEnable target installs publish startup context to BeforeInstall.
+func TestSourceLifecycleBeforeInstallReceivesStartupAutoEnableFlag(t *testing.T) {
+	var (
+		service    = newTestService()
+		ctx        = context.Background()
+		pluginID   = "plugin-dev-source-startup-flag"
+		operations []string
+	)
+
+	testutil.CreateTestPluginDir(t, pluginID)
+	setTestPluginAutoEnableOverride([]string{pluginID})
+	testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+	t.Cleanup(func() {
+		setTestPluginAutoEnableOverride(nil)
+		testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+	})
+
+	if _, err := service.SyncAndList(ctx); err != nil {
+		t.Fatalf("expected source plugin discovery to succeed, got error: %v", err)
+	}
+	registerSourceLifecycleCallbacksForTest(
+		t,
+		pluginID,
+		&operations,
+		sourceLifecycleCallbackOptions{expectBeforeInstallStartupAutoEnable: boolPtr(true)},
+	)
+
+	if err := service.BootstrapAutoEnable(ctx); err != nil {
+		t.Fatalf("expected startup auto-enable install to succeed, got error: %v", err)
+	}
+}
+
+// TestSourceLifecycleBeforeDisableBlocksDisable verifies source-plugin facade
+// BeforeDisable callbacks run before the source registry status changes.
+func TestSourceLifecycleBeforeDisableBlocksDisable(t *testing.T) {
+	var (
+		service    = newTestService()
+		ctx        = context.Background()
+		pluginID   = "plugin-dev-source-before-disable-veto"
+		operations []string
+	)
+
+	testutil.CreateTestPluginDir(t, pluginID)
+	testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+	t.Cleanup(func() {
+		testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+	})
+
+	if _, err := service.SyncAndList(ctx); err != nil {
+		t.Fatalf("expected source plugin discovery to succeed, got error: %v", err)
+	}
+	if _, err := service.Install(ctx, pluginID, InstallOptions{}); err != nil {
+		t.Fatalf("expected source plugin install to succeed, got error: %v", err)
+	}
+	if err := service.UpdateStatus(ctx, pluginID, UpdateStatusOptions{Status: statusflag.EnabledValue.Int()}); err != nil {
+		t.Fatalf("expected source plugin enable to succeed, got error: %v", err)
+	}
+	registerSourceLifecycleCallbacksForTest(
+		t,
+		pluginID,
+		&operations,
+		sourceLifecycleCallbackOptions{vetoOperation: pluginhost.LifecycleHookBeforeDisable.String()},
+	)
+
+	err := service.UpdateStatus(ctx, pluginID, UpdateStatusOptions{Status: statusflag.Disabled.Int()})
+	if !bizerr.Is(err, CodePluginLifecyclePreconditionVetoed) {
+		t.Fatalf("expected BeforeDisable veto bizerr, got %v", err)
+	}
+	if len(operations) != 1 || operations[0] != pluginhost.LifecycleHookBeforeDisable.String()+":"+pluginID {
+		t.Fatalf("expected BeforeDisable operation to be published once, got %#v", operations)
+	}
+
+	registry, err := service.getPluginRegistry(ctx, pluginID)
+	if err != nil {
+		t.Fatalf("expected source plugin registry lookup to succeed, got error: %v", err)
+	}
+	if registry == nil || registry.Status != statusflag.EnabledValue.Int() {
+		t.Fatalf("expected vetoed disable to keep plugin enabled, got %#v", registry)
+	}
+}
+
+// TestSourceLifecycleBeforeUninstallBlocksUninstall verifies source-plugin
+// facade BeforeUninstall callbacks run before uninstall cleanup side effects.
+func TestSourceLifecycleBeforeUninstallBlocksUninstall(t *testing.T) {
+	var (
+		service    = newTestService()
+		ctx        = context.Background()
+		pluginID   = "plugin-dev-source-before-uninstall-veto"
+		operations []string
+	)
+
+	testutil.CreateTestPluginDir(t, pluginID)
+	testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+	t.Cleanup(func() {
+		testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+	})
+
+	if _, err := service.SyncAndList(ctx); err != nil {
+		t.Fatalf("expected source plugin discovery to succeed, got error: %v", err)
+	}
+	if _, err := service.Install(ctx, pluginID, InstallOptions{}); err != nil {
+		t.Fatalf("expected source plugin install to succeed, got error: %v", err)
+	}
+	registerSourceLifecycleCallbacksForTest(
+		t,
+		pluginID,
+		&operations,
+		sourceLifecycleCallbackOptions{vetoOperation: pluginhost.LifecycleHookBeforeUninstall.String()},
+	)
+
+	err := service.Uninstall(ctx, pluginID, UninstallOptions{PurgeStorageData: true})
+	if !bizerr.Is(err, CodePluginLifecyclePreconditionVetoed) {
+		t.Fatalf("expected BeforeUninstall veto bizerr, got %v", err)
+	}
+	if len(operations) != 1 || operations[0] != pluginhost.LifecycleHookBeforeUninstall.String()+":"+pluginID {
+		t.Fatalf("expected BeforeUninstall operation to be published once, got %#v", operations)
+	}
+
+	registry, err := service.getPluginRegistry(ctx, pluginID)
+	if err != nil {
+		t.Fatalf("expected source plugin registry lookup to succeed, got error: %v", err)
+	}
+	if registry == nil || registry.Installed != statusflag.Installed.Int() {
+		t.Fatalf("expected vetoed uninstall to keep plugin installed, got %#v", registry)
+	}
+}
+
+// TestSourceLifecycleBeforeUninstallForceBypassesWhenConfigured verifies the
+// existing force-uninstall policy also applies to unified BeforeUninstall.
+func TestSourceLifecycleBeforeUninstallForceBypassesWhenConfigured(t *testing.T) {
+	var (
+		service    = newTestService()
+		ctx        = context.Background()
+		pluginID   = "plugin-dev-source-before-uninstall-force"
+		operations []string
+	)
+
+	testutil.CreateTestPluginDir(t, pluginID)
+	testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+	t.Cleanup(func() {
+		testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+		setTestPluginAllowForceUninstallOverride(nil)
+	})
+
+	if _, err := service.SyncAndList(ctx); err != nil {
+		t.Fatalf("expected source plugin discovery to succeed, got error: %v", err)
+	}
+	if _, err := service.Install(ctx, pluginID, InstallOptions{}); err != nil {
+		t.Fatalf("expected source plugin install to succeed, got error: %v", err)
+	}
+	registerSourceLifecycleCallbacksForTest(
+		t,
+		pluginID,
+		&operations,
+		sourceLifecycleCallbackOptions{vetoOperation: pluginhost.LifecycleHookBeforeUninstall.String()},
+	)
+	enabled := true
+	setTestPluginAllowForceUninstallOverride(&enabled)
+
+	if err := service.Uninstall(ctx, pluginID, UninstallOptions{PurgeStorageData: true, Force: true}); err != nil {
+		t.Fatalf("expected force uninstall to bypass BeforeUninstall veto, got error: %v", err)
+	}
+	expected := []string{
+		pluginhost.LifecycleHookBeforeUninstall.String() + ":" + pluginID,
+		pluginhost.LifecycleHookAfterUninstall.String() + ":" + pluginID,
+	}
+	if !sourceLifecycleTestStringSlicesEqual(operations, expected) {
+		t.Fatalf("expected force uninstall lifecycle operations %#v, got %#v", expected, operations)
+	}
+}
+
+// TestSourceLifecycleBeforeUninstallReceivesPurgePolicy verifies source-plugin
+// preconditions can distinguish data-preserving and data-purging uninstall.
+func TestSourceLifecycleBeforeUninstallReceivesPurgePolicy(t *testing.T) {
+	var (
+		service      = newTestService()
+		ctx          = context.Background()
+		skipID       = "plugin-dev-source-before-uninstall-keep-data"
+		purgeID      = "plugin-dev-source-before-uninstall-purge-data"
+		skipOps      []string
+		purgeOps     []string
+		purgeAllowed = true
+		expectFalse  = false
+		expectTrue   = true
+	)
+
+	testutil.CreateTestPluginDir(t, skipID)
+	testutil.CreateTestPluginDir(t, purgeID)
+	testutil.CleanupPluginGovernanceRowsHard(t, ctx, skipID)
+	testutil.CleanupPluginGovernanceRowsHard(t, ctx, purgeID)
+	t.Cleanup(func() {
+		testutil.CleanupPluginGovernanceRowsHard(t, ctx, skipID)
+		testutil.CleanupPluginGovernanceRowsHard(t, ctx, purgeID)
+	})
+
+	if _, err := service.SyncAndList(ctx); err != nil {
+		t.Fatalf("expected source plugin discovery to succeed, got error: %v", err)
+	}
+	if _, err := service.Install(ctx, skipID, InstallOptions{}); err != nil {
+		t.Fatalf("expected data-preserving source plugin install to succeed, got error: %v", err)
+	}
+	if _, err := service.Install(ctx, purgeID, InstallOptions{}); err != nil {
+		t.Fatalf("expected data-purging source plugin install to succeed, got error: %v", err)
+	}
+	registerSourceLifecycleCallbacksForTest(
+		t,
+		skipID,
+		&skipOps,
+		sourceLifecycleCallbackOptions{
+			expectBeforePurge:   &expectFalse,
+			allowedPurgeStorage: &purgeAllowed,
+		},
+	)
+	registerSourceLifecycleCallbacksForTest(
+		t,
+		purgeID,
+		&purgeOps,
+		sourceLifecycleCallbackOptions{
+			expectBeforePurge:   &expectTrue,
+			expectAfterPurge:    &expectTrue,
+			allowedPurgeStorage: &purgeAllowed,
+		},
+	)
+
+	err := service.Uninstall(ctx, skipID, UninstallOptions{PurgeStorageData: false})
+	if !bizerr.Is(err, CodePluginLifecyclePreconditionVetoed) {
+		t.Fatalf("expected data-preserving uninstall to be vetoed, got %v", err)
+	}
+	if len(skipOps) != 1 || skipOps[0] != pluginhost.LifecycleHookBeforeUninstall.String()+":"+skipID {
+		t.Fatalf("expected only before-uninstall for data-preserving veto, got %#v", skipOps)
+	}
+	if err = service.Uninstall(ctx, purgeID, UninstallOptions{PurgeStorageData: true}); err != nil {
+		t.Fatalf("expected data-purging uninstall to proceed, got error: %v", err)
+	}
+	expectedPurgeOps := []string{
+		pluginhost.LifecycleHookBeforeUninstall.String() + ":" + purgeID,
+		pluginhost.LifecycleHookAfterUninstall.String() + ":" + purgeID,
+	}
+	if !sourceLifecycleTestStringSlicesEqual(purgeOps, expectedPurgeOps) {
+		t.Fatalf("expected purge uninstall lifecycle operations %#v, got %#v", expectedPurgeOps, purgeOps)
+	}
+}
+
+// sourceLifecycleCallbackOptions configures a source-plugin lifecycle test facade.
+type sourceLifecycleCallbackOptions struct {
+	vetoOperation                        string
+	expectBeforePurge                    *bool
+	expectAfterPurge                     *bool
+	expectBeforeInstallStartupAutoEnable *bool
+	allowedPurgeStorage                  *bool
+	requireStartupAutoEnableForInstall   bool
+}
+
+// TestSourceLifecycleAfterInstallRunsAfterInstall verifies source-plugin
+// AfterInstall callbacks run only after the install transition succeeds.
+func TestSourceLifecycleAfterInstallRunsAfterInstall(t *testing.T) {
+	var (
+		service    = newTestService()
+		ctx        = context.Background()
+		pluginID   = "plugin-dev-source-after-install"
+		operations []string
+	)
+
+	testutil.CreateTestPluginDir(t, pluginID)
+	testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+	t.Cleanup(func() {
+		testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+	})
+
+	if _, err := service.SyncAndList(ctx); err != nil {
+		t.Fatalf("expected source plugin discovery to succeed, got error: %v", err)
+	}
+	registerSourceLifecycleCallbacksForTest(
+		t,
+		pluginID,
+		&operations,
+		sourceLifecycleCallbackOptions{},
+	)
+
+	if _, err := service.Install(ctx, pluginID, InstallOptions{}); err != nil {
+		t.Fatalf("expected source plugin install to succeed, got error: %v", err)
+	}
+	expected := []string{
+		pluginhost.LifecycleHookBeforeInstall.String() + ":" + pluginID,
+		pluginhost.LifecycleHookAfterInstall.String() + ":" + pluginID,
+	}
+	if !sourceLifecycleTestStringSlicesEqual(operations, expected) {
+		t.Fatalf("expected lifecycle operations %#v, got %#v", expected, operations)
+	}
+}
+
+// registerUninstallLifecycleVetoForTest registers a source-plugin before
+// uninstall callback that always vetoes.
+func registerUninstallLifecycleVetoForTest(t *testing.T, pluginID string) {
+	t.Helper()
+
+	plugin := pluginhost.NewDeclarations(pluginID)
+	if err := plugin.Lifecycle().RegisterBeforeUninstallHandler(func(
+		ctx context.Context,
+		input pluginhost.SourcePluginLifecycleInput,
+	) (bool, string, error) {
+		return false, "plugin.test.uninstall_blocked", nil
+	}); err != nil {
+		t.Fatalf("register uninstall lifecycle handler failed: %v", err)
+	}
+	cleanup, err := pluginhost.RegisterSourcePluginForTest(plugin)
+	if err != nil {
+		t.Fatalf("register lifecycle callback failed: %v", err)
+	}
+	t.Cleanup(cleanup)
+}
+
+// registerSourceLifecycleCallbacksForTest replaces the source-plugin fixture
+// lifecycle callbacks while preserving its embedded filesystem declaration.
+func registerSourceLifecycleCallbacksForTest(
+	t *testing.T,
+	pluginID string,
+	operations *[]string,
+	options sourceLifecycleCallbackOptions,
+) {
+	t.Helper()
+
+	previous, ok := pluginhost.GetSourcePlugin(pluginID)
+	if !ok || previous == nil {
+		t.Fatalf("expected source plugin fixture %s to be registered", pluginID)
+	}
+	plugin := pluginhost.NewDeclarations(pluginID)
+	plugin.Assets().UseEmbeddedFiles(previous.GetEmbeddedFiles())
+	handler := func(ctx context.Context, input pluginhost.SourcePluginLifecycleInput) (bool, string, error) {
+		if input == nil {
+			t.Fatalf("expected lifecycle input to be published")
+		}
+		operation := strings.TrimSpace(input.Operation())
+		if operations != nil {
+			*operations = append(*operations, operation+":"+input.PluginID())
+		}
+		if input.PluginID() != pluginID {
+			t.Fatalf("expected plugin id %s, got %s", pluginID, input.PluginID())
+		}
+		if operation == pluginhost.LifecycleHookBeforeUninstall.String() && options.expectBeforePurge != nil {
+			if input.PurgeStorageData() != *options.expectBeforePurge {
+				t.Fatalf("expected before-uninstall purgeStorageData=%v, got %v", *options.expectBeforePurge, input.PurgeStorageData())
+			}
+		}
+		if operation == pluginhost.LifecycleHookBeforeInstall.String() &&
+			options.expectBeforeInstallStartupAutoEnable != nil &&
+			input.StartupAutoEnable() != *options.expectBeforeInstallStartupAutoEnable {
+			t.Fatalf(
+				"expected before-install startupAutoEnable=%v, got %v",
+				*options.expectBeforeInstallStartupAutoEnable,
+				input.StartupAutoEnable(),
+			)
+		}
+		if operation == pluginhost.LifecycleHookBeforeInstall.String() &&
+			options.requireStartupAutoEnableForInstall &&
+			!input.StartupAutoEnable() {
+			return false, "plugin." + pluginID + ".startup_auto_enable_required", nil
+		}
+		if operation == pluginhost.LifecycleHookBeforeUninstall.String() &&
+			options.allowedPurgeStorage != nil &&
+			input.PurgeStorageData() != *options.allowedPurgeStorage {
+			return false, "plugin." + pluginID + ".purge_policy.veto", nil
+		}
+		if options.vetoOperation == operation {
+			return false, "plugin." + pluginID + "." + operation + ".veto", nil
+		}
+		return true, "", nil
+	}
+	if err := plugin.Lifecycle().RegisterBeforeInstallHandler(handler); err != nil {
+		t.Fatalf("failed to register before-install lifecycle handler: %v", err)
+	}
+	if err := plugin.Lifecycle().RegisterAfterInstallHandler(func(ctx context.Context, input pluginhost.SourcePluginLifecycleInput) error {
+		if input == nil {
+			t.Fatalf("expected lifecycle input to be published")
+		}
+		operation := strings.TrimSpace(input.Operation())
+		*operations = append(*operations, operation+":"+input.PluginID())
+		if input.PluginID() != pluginID {
+			t.Fatalf("expected plugin id %s, got %s", pluginID, input.PluginID())
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("failed to register after-install lifecycle handler: %v", err)
+	}
+	if err := plugin.Lifecycle().RegisterBeforeDisableHandler(handler); err != nil {
+		t.Fatalf("failed to register before-disable lifecycle handler: %v", err)
+	}
+	if err := plugin.Lifecycle().RegisterBeforeUninstallHandler(handler); err != nil {
+		t.Fatalf("failed to register before-uninstall lifecycle handler: %v", err)
+	}
+	if err := plugin.Lifecycle().RegisterAfterUninstallHandler(func(ctx context.Context, input pluginhost.SourcePluginLifecycleInput) error {
+		if input == nil {
+			t.Fatalf("expected lifecycle input to be published")
+		}
+		operation := strings.TrimSpace(input.Operation())
+		*operations = append(*operations, operation+":"+input.PluginID())
+		if input.PluginID() != pluginID {
+			t.Fatalf("expected plugin id %s, got %s", pluginID, input.PluginID())
+		}
+		if operation == pluginhost.LifecycleHookAfterUninstall.String() && options.expectAfterPurge != nil {
+			if input.PurgeStorageData() != *options.expectAfterPurge {
+				t.Fatalf("expected after-uninstall purgeStorageData=%v, got %v", *options.expectAfterPurge, input.PurgeStorageData())
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("failed to register after-uninstall lifecycle handler: %v", err)
+	}
+	cleanup, err := pluginhost.RegisterSourcePluginForTest(plugin)
+	if err != nil {
+		t.Fatalf("failed to replace source plugin fixture %s: %v", pluginID, err)
+	}
+	t.Cleanup(cleanup)
+}
+
+// boolPtr returns a pointer to value for concise lifecycle test expectations.
+func boolPtr(value bool) *bool {
+	return &value
+}
+
+// sourceLifecycleTestStringSlicesEqual reports whether two ordered string slices are equal.
+func sourceLifecycleTestStringSlicesEqual(left []string, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index] != right[index] {
+			return false
+		}
+	}
+	return true
+}
+
+// createDynamicLifecyclePreconditionArtifact writes a dynamic artifact with one
+// lifecycle contract and intentionally missing guest bridge exports so host
+// execution fails closed before lifecycle side effects.
+func createDynamicLifecyclePreconditionArtifact(
+	t *testing.T,
+	pluginID string,
+	pluginName string,
+	version string,
+	operation protocol.LifecycleOperation,
+) string {
+	t.Helper()
+
+	artifactPath := filepath.Join(testutil.TestDynamicStorageDir(), pluginID+".wasm")
+	testutil.WriteRuntimeWasmArtifact(
+		t,
+		artifactPath,
+		&catalog.ArtifactManifest{
+			ID:      pluginID,
+			Name:    pluginName,
+			Version: version,
+			Type:    pluginv1.PluginTypeDynamic.String(),
+		},
+		&catalog.ArtifactSpec{
+			RuntimeKind: protocol.RuntimeKindWasm,
+			ABIVersion:  protocol.SupportedABIVersion,
+			LifecycleContracts: []*protocol.LifecycleContract{
+				{
+					Operation:    operation,
+					RequestType:  "DynamicLifecycleReq",
+					InternalPath: "/__lifecycle/" + strings.ToLower(strings.TrimPrefix(operation.String(), "Before")),
+					TimeoutMs:    1000,
+				},
+			},
+		},
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		&protocol.BridgeSpec{
+			ABIVersion:     protocol.ABIVersionV1,
+			RuntimeKind:    protocol.RuntimeKindWasm,
+			RouteExecution: true,
+			RequestCodec:   protocol.CodecProtobuf,
+			ResponseCodec:  protocol.CodecProtobuf,
+		},
+	)
+	return artifactPath
+}
+
+// TestSyncAndListReportsPendingHostServiceAuthorization verifies that list
+// projections expose dynamic plugin authorization review requirements.
+func TestSyncAndListReportsPendingHostServiceAuthorization(t *testing.T) {
+	var (
+		service  = newTestService()
+		ctx      = context.Background()
+		pluginID = "plugin-dev-dynamic-host-auth-pending"
+	)
+
+	artifactPath := filepath.Join(
+		testutil.TestDynamicStorageDir(),
+		pluginID+".wasm",
+	)
+	testutil.WriteRuntimeWasmArtifact(
+		t,
+		artifactPath,
+		&catalog.ArtifactManifest{
+			ID:      pluginID,
+			Name:    "Pending Authorization Plugin",
+			Version: "v0.5.0",
+			Type:    pluginv1.PluginTypeDynamic.String(),
+		},
+		&catalog.ArtifactSpec{
+			RuntimeKind: protocol.RuntimeKindWasm,
+			ABIVersion:  protocol.SupportedABIVersion,
+			HostServices: []*protocol.HostServiceSpec{
+				{
+					Service: protocol.HostServiceRuntime,
+					Methods: []string{protocol.HostServiceMethodRuntimeInfoNow},
+				},
+				{
+					Service: protocol.HostServiceNetwork,
+					Methods: []string{protocol.HostServiceMethodNetworkRequest},
+					Resources: []*protocol.HostServiceResourceSpec{
+						{
+							Ref: "https://example.com/api",
+						},
+					},
+				},
+			},
+		},
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	)
+
+	testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+	t.Cleanup(func() {
+		testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+		if cleanupErr := os.Remove(artifactPath); cleanupErr != nil && !os.IsNotExist(cleanupErr) {
+			t.Fatalf("failed to remove artifact %s: %v", artifactPath, cleanupErr)
+		}
+	})
+
+	out, err := service.SyncAndList(ctx)
+	if err != nil {
+		t.Fatalf("expected sync-and-list to succeed, got error: %v", err)
+	}
+
+	var item *PluginItem
+	for _, current := range out.List {
+		if current != nil && current.Id == pluginID {
+			item = current
+			break
+		}
+	}
+	if item == nil {
+		t.Fatalf("expected pending authorization plugin in list")
+	}
+	if !item.AuthorizationRequired {
+		t.Fatalf("expected pending authorization plugin to require review")
+	}
+	if item.AuthorizationStatus != pluginv1.AuthorizationStatusPending {
+		t.Fatalf("expected authorization status pending, got %s", item.AuthorizationStatus)
+	}
+	if len(item.RequestedHostServices) != 2 {
+		t.Fatalf("expected requested host services to be exposed, got %#v", item.RequestedHostServices)
+	}
+	if len(item.AuthorizedHostServices) != 0 {
+		t.Fatalf("expected no authorized host services before confirmation, got %#v", item.AuthorizedHostServices)
+	}
+}
+
+// TestEnableWithAuthorizationAppliesConfirmedHostServiceSnapshot verifies that
+// install and enable persist the host-confirmed authorization snapshot.
+func TestEnableWithAuthorizationAppliesConfirmedHostServiceSnapshot(t *testing.T) {
+	var (
+		service  = newTestService()
+		ctx      = context.Background()
+		pluginID = "plugin-dev-dynamic-host-auth-enabled"
+	)
+
+	artifactPath := filepath.Join(
+		testutil.TestDynamicStorageDir(),
+		pluginID+".wasm",
+	)
+	testutil.WriteRuntimeWasmArtifact(
+		t,
+		artifactPath,
+		&catalog.ArtifactManifest{
+			ID:      pluginID,
+			Name:    "Confirmed Authorization Plugin",
+			Version: "v0.5.1",
+			Type:    pluginv1.PluginTypeDynamic.String(),
+		},
+		&catalog.ArtifactSpec{
+			RuntimeKind: protocol.RuntimeKindWasm,
+			ABIVersion:  protocol.SupportedABIVersion,
+			HostServices: []*protocol.HostServiceSpec{
+				{
+					Service: protocol.HostServiceRuntime,
+					Methods: []string{protocol.HostServiceMethodRuntimeInfoNow},
+				},
+				{
+					Service: protocol.HostServiceNetwork,
+					Methods: []string{protocol.HostServiceMethodNetworkRequest},
+					Resources: []*protocol.HostServiceResourceSpec{
+						{
+							Ref: "https://example.com/api",
+						},
+					},
+				},
+				{
+					Service: protocol.HostServiceStorage,
+					Methods: []string{protocol.HostServiceMethodStorageGet},
+					Paths:   []string{"private-files/"},
+				},
+			},
+		},
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	)
+
+	testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+	t.Cleanup(func() {
+		testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+		if cleanupErr := os.Remove(artifactPath); cleanupErr != nil && !os.IsNotExist(cleanupErr) {
+			t.Fatalf("failed to remove artifact %s: %v", artifactPath, cleanupErr)
+		}
+	})
+
+	authorization := &HostServiceAuthorizationInput{
+		Services: []*HostServiceAuthorizationDecision{
+			{
+				Service: protocol.HostServiceStorage,
+				Paths:   []string{"private-files/"},
+			},
+		},
+	}
+
+	if _, err := service.Install(ctx, pluginID, InstallOptions{Authorization: authorization}); err != nil {
+		t.Fatalf("expected install with authorization to succeed, got error: %v", err)
+	}
+	if err := service.UpdateStatus(ctx, pluginID, UpdateStatusOptions{Status: statusflag.EnabledValue.Int(), Authorization: authorization}); err != nil {
+		t.Fatalf("expected enable with authorization to succeed, got error: %v", err)
+	}
+
+	release, err := service.getPluginRelease(ctx, pluginID, "v0.5.1")
+	if err != nil {
+		t.Fatalf("expected release lookup to succeed, got error: %v", err)
+	}
+	if release == nil {
+		t.Fatalf("expected release row after enable")
+	}
+
+	snapshot, err := service.storeSvc.ParseManifestSnapshot(release.ManifestSnapshot)
+	if err != nil {
+		t.Fatalf("expected manifest snapshot parse to succeed, got error: %v", err)
+	}
+	if snapshot == nil || !snapshot.HostServiceAuthConfirmed {
+		t.Fatalf("expected confirmed host service authorization snapshot, got %#v", snapshot)
+	}
+
+	activeManifest, err := service.getActivePluginManifest(ctx, pluginID)
+	if err != nil {
+		t.Fatalf("expected active manifest lookup to succeed, got error: %v", err)
+	}
+	if activeManifest == nil {
+		t.Fatalf("expected active manifest after enable")
+	}
+	if len(activeManifest.HostServices) != 2 {
+		t.Fatalf("expected active manifest to use narrowed host services, got %#v", activeManifest.HostServices)
+	}
+	if activeManifest.HostServices[0].Service != protocol.HostServiceRuntime &&
+		activeManifest.HostServices[1].Service != protocol.HostServiceRuntime {
+		t.Fatalf("expected runtime host service to remain authorized, got %#v", activeManifest.HostServices)
+	}
+	for _, spec := range activeManifest.HostServices {
+		if spec == nil {
+			continue
+		}
+		if spec.Service == protocol.HostServiceNetwork {
+			t.Fatalf("expected network host service to be removed from authorized snapshot, got %#v", activeManifest.HostServices)
+		}
+	}
+	if _, ok := activeManifest.HostCapabilities[protocol.CapabilityHTTPRequest]; ok {
+		t.Fatalf("expected network capability to be removed with rejected authorization")
+	}
+}
+
+// TestPersistDynamicAuthorizationRefreshesStaleSameVersionHostServices verifies
+// same-version dynamic artifact rebuilds do not keep hostServices authorization
+// confirmed for an older requested declaration.
+func TestPersistDynamicAuthorizationRefreshesStaleSameVersionHostServices(t *testing.T) {
+	var (
+		service  = newTestService()
+		ctx      = context.Background()
+		pluginID = "plugin-dev-dynamic-host-auth-same-version-refresh"
+		version  = "v0.5.2"
+	)
+
+	artifactPath := filepath.Join(
+		testutil.TestDynamicStorageDir(),
+		pluginID+".wasm",
+	)
+	testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+	t.Cleanup(func() {
+		testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+		if cleanupErr := os.Remove(artifactPath); cleanupErr != nil && !os.IsNotExist(cleanupErr) {
+			t.Fatalf("failed to remove artifact %s: %v", artifactPath, cleanupErr)
+		}
+	})
+
+	writeDynamicAuthorizationRefreshArtifact(t, artifactPath, pluginID, version, []*protocol.HostServiceSpec{
+		{
+			Service: protocol.HostServiceRuntime,
+			Methods: []string{
+				protocol.HostServiceMethodRuntimeInfoNow,
+			},
+		},
+		{
+			Service: protocol.HostServiceStorage,
+			Methods: []string{
+				protocol.HostServiceMethodStorageGet,
+			},
+			Paths: []string{"private-files/"},
+		},
+	})
+	initialManifest, err := service.loadRuntimePluginManifestFromArtifact(artifactPath)
+	if err != nil {
+		t.Fatalf("expected initial artifact manifest to load, got error: %v", err)
+	}
+	if _, err = service.syncPluginManifest(ctx, initialManifest); err != nil {
+		t.Fatalf("expected initial manifest sync to succeed, got error: %v", err)
+	}
+	authorization := &HostServiceAuthorizationInput{
+		Services: []*store.HostServiceAuthorizationDecision{
+			{
+				Service: protocol.HostServiceStorage,
+				Paths:   []string{"private-files/"},
+			},
+		},
+	}
+	if _, err = service.storeSvc.PersistReleaseHostServiceAuthorization(ctx, initialManifest, authorization); err != nil {
+		t.Fatalf("expected initial authorization persistence to succeed, got error: %v", err)
+	}
+
+	writeDynamicAuthorizationRefreshArtifact(t, artifactPath, pluginID, version, []*protocol.HostServiceSpec{
+		{
+			Service: protocol.HostServiceManifest,
+			Methods: []string{
+				protocol.HostServiceMethodManifestGet,
+			},
+			Paths: []string{"config/config.yaml", "config/profile.yaml"},
+		},
+		{
+			Service: protocol.HostServiceRuntime,
+			Methods: []string{
+				protocol.HostServiceMethodRuntimeInfoNow,
+			},
+		},
+		{
+			Service: protocol.HostServiceStorage,
+			Methods: []string{
+				protocol.HostServiceMethodStorageGet,
+			},
+			Paths: []string{"private-files/"},
+		},
+	})
+	refreshedManifest, err := service.loadRuntimePluginManifestFromArtifact(artifactPath)
+	if err != nil {
+		t.Fatalf("expected refreshed artifact manifest to load, got error: %v", err)
+	}
+	if _, err = service.syncPluginManifest(ctx, refreshedManifest); err != nil {
+		t.Fatalf("expected refreshed manifest sync to succeed, got error: %v", err)
+	}
+
+	release, err := service.getPluginRelease(ctx, pluginID, version)
+	if err != nil {
+		t.Fatalf("expected refreshed release lookup to succeed, got error: %v", err)
+	}
+	syncedSnapshot, err := service.storeSvc.ParseManifestSnapshot(release.ManifestSnapshot)
+	if err != nil {
+		t.Fatalf("expected refreshed snapshot parse to succeed, got error: %v", err)
+	}
+	if syncedSnapshot.HostServiceAuthConfirmed {
+		t.Fatalf("expected changed hostServices to invalidate prior confirmation, got %#v", syncedSnapshot)
+	}
+	if containsHostService(syncedSnapshot.AuthorizedHostServices, protocol.HostServiceManifest) {
+		t.Fatalf("expected background sync to avoid silently authorizing new manifest service, got %#v", syncedSnapshot.AuthorizedHostServices)
+	}
+
+	if _, err = service.storeSvc.PersistReleaseHostServiceAuthorization(ctx, refreshedManifest, nil); err != nil {
+		t.Fatalf("expected nil install/enable authorization to refresh current declaration, got error: %v", err)
+	}
+	release, err = service.getPluginRelease(ctx, pluginID, version)
+	if err != nil {
+		t.Fatalf("expected authorized release lookup to succeed, got error: %v", err)
+	}
+	authorizedSnapshot, err := service.storeSvc.ParseManifestSnapshot(release.ManifestSnapshot)
+	if err != nil {
+		t.Fatalf("expected authorized snapshot parse to succeed, got error: %v", err)
+	}
+	if !authorizedSnapshot.HostServiceAuthConfirmed {
+		t.Fatalf("expected install/enable authorization to confirm current hostServices, got %#v", authorizedSnapshot)
+	}
+	if !containsHostService(authorizedSnapshot.AuthorizedHostServices, protocol.HostServiceManifest) {
+		t.Fatalf("expected authorized snapshot to include manifest service, got %#v", authorizedSnapshot.AuthorizedHostServices)
+	}
+	activeManifest, err := service.storeSvc.LoadReleaseManifest(ctx, release)
+	if err != nil {
+		t.Fatalf("expected release manifest to load, got error: %v", err)
+	}
+	if activeManifest == nil || activeManifest.HostCapabilities == nil {
+		t.Fatalf("expected release manifest with host capabilities, got %#v", activeManifest)
+	}
+	if _, ok := activeManifest.HostCapabilities[protocol.CapabilityManifest]; !ok {
+		t.Fatalf("expected active manifest to derive manifest capability, got %#v", activeManifest.HostCapabilities)
+	}
+}
+
+// writeDynamicAuthorizationRefreshArtifact writes a minimal dynamic artifact for
+// same-version hostServices authorization refresh regression coverage.
+func writeDynamicAuthorizationRefreshArtifact(
+	t *testing.T,
+	artifactPath string,
+	pluginID string,
+	version string,
+	hostServices []*protocol.HostServiceSpec,
+) {
+	t.Helper()
+	testutil.WriteRuntimeWasmArtifact(
+		t,
+		artifactPath,
+		&catalog.ArtifactManifest{
+			ID:      pluginID,
+			Name:    "Same Version Authorization Refresh Plugin",
+			Version: version,
+			Type:    pluginv1.PluginTypeDynamic.String(),
+		},
+		&catalog.ArtifactSpec{
+			RuntimeKind:  protocol.RuntimeKindWasm,
+			ABIVersion:   protocol.SupportedABIVersion,
+			HostServices: hostServices,
+		},
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	)
+}
+
+// containsHostService reports whether specs include one normalized service name.
+func containsHostService(specs []*protocol.HostServiceSpec, service string) bool {
+	for _, spec := range specs {
+		if spec != nil && spec.Service == service {
+			return true
+		}
+	}
+	return false
+}
+
+// TestSourcePluginInstallAndUninstallRequireExplicitLifecycle verifies that
+// source plugins stay discovered-only until the host explicitly installs them.
+func TestSourcePluginInstallAndUninstallRequireExplicitLifecycle(t *testing.T) {
+	var (
+		service = newTestService()
+		ctx     = context.Background()
+	)
+
+	const (
+		pluginID = "plugin-dev-source-explicit-lifecycle"
+		menuKey  = "plugin:plugin-dev-source-explicit-lifecycle:entry"
+	)
+
+	pluginDir := testutil.CreateTestPluginDir(t, pluginID)
+	manifestPath := filepath.Join(pluginDir, "plugin.yaml")
+	testutil.WriteTestFile(
+		t,
+		manifestPath,
+		"id: "+pluginID+"\n"+
+			"name: Source Explicit Lifecycle Plugin\n"+
+			"version: v0.1.0\n"+
+			"type: source\n"+
+			"scope_nature: tenant_aware\n"+
+			"supports_multi_tenant: false\n"+
+			"default_install_mode: global\n"+
+			"menus:\n"+
+			"  - key: "+menuKey+"\n"+
+			"    name: Source Explicit Lifecycle Plugin\n"+
+			"    path: plugin-dev-source-explicit-lifecycle\n"+
+			"    component: system/plugin/dynamic-page\n"+
+			"    perms: plugin-dev-source-explicit-lifecycle:view\n"+
+			"    icon: ant-design:appstore-outlined\n"+
+			"    type: M\n"+
+			"    sort: -1\n",
+	)
+
+	testutil.CleanupPluginMenuRowsHard(t, ctx, pluginID)
+	testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+	t.Cleanup(func() {
+		testutil.CleanupPluginMenuRowsHard(t, ctx, pluginID)
+		testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+	})
+
+	if _, err := service.SyncAndList(ctx); err != nil {
+		t.Fatalf("expected source plugin discovery to succeed, got error: %v", err)
+	}
+
+	registry, err := service.getPluginRegistry(ctx, pluginID)
+	if err != nil {
+		t.Fatalf("expected source plugin registry lookup to succeed, got error: %v", err)
+	}
+	if registry == nil {
+		t.Fatalf("expected source plugin registry row to exist after discovery")
+	}
+	if registry.Installed != statusflag.Uninstalled.Int() || registry.Status != statusflag.Disabled.Int() {
+		t.Fatalf("expected source plugin to stay uninstalled+disabled after discovery, got installed=%d enabled=%d", registry.Installed, registry.Status)
+	}
+
+	menu, err := testutil.QueryMenuByKey(ctx, menuKey)
+	if err != nil {
+		t.Fatalf("expected source plugin menu query to succeed, got error: %v", err)
+	}
+	if menu != nil {
+		t.Fatalf("expected source plugin menu to remain absent before install")
+	}
+
+	release, err := service.getPluginRelease(ctx, pluginID, "v0.1.0")
+	if err != nil {
+		t.Fatalf("expected source plugin release lookup after discovery to succeed, got error: %v", err)
+	}
+	if release == nil {
+		t.Fatalf("expected source plugin release row after discovery")
+	}
+	if release.Status != plugintypes.ReleaseStatusUninstalled.String() {
+		t.Fatalf("expected discovered source plugin release to stay uninstalled, got %s", release.Status)
+	}
+
+	if _, err = service.Install(ctx, pluginID, InstallOptions{}); err != nil {
+		t.Fatalf("expected source plugin install to succeed, got error: %v", err)
+	}
+
+	registry, err = service.getPluginRegistry(ctx, pluginID)
+	if err != nil {
+		t.Fatalf("expected source plugin registry lookup after install to succeed, got error: %v", err)
+	}
+	if registry == nil {
+		t.Fatalf("expected source plugin registry row after install")
+	}
+	if registry.Installed != statusflag.Installed.Int() || registry.Status != statusflag.Disabled.Int() {
+		t.Fatalf("expected source plugin install to yield installed+disabled, got installed=%d enabled=%d", registry.Installed, registry.Status)
+	}
+	if registry.InstalledAt == nil {
+		t.Fatalf("expected source plugin install to record installed_at")
+	}
+
+	menu, err = testutil.QueryMenuByKey(ctx, menuKey)
+	if err != nil {
+		t.Fatalf("expected source plugin menu query after install to succeed, got error: %v", err)
+	}
+	if menu == nil {
+		t.Fatalf("expected source plugin menu to be created on install")
+	}
+
+	release, err = service.getPluginRelease(ctx, pluginID, "v0.1.0")
+	if err != nil {
+		t.Fatalf("expected source plugin release lookup after install to succeed, got error: %v", err)
+	}
+	if release == nil {
+		t.Fatalf("expected source plugin release row after install")
+	}
+	if release.Status != plugintypes.ReleaseStatusInstalled.String() {
+		t.Fatalf("expected source plugin release to become installed, got %s", release.Status)
+	}
+
+	migrationCount, err := dao.SysPluginMigration.Ctx(ctx).
+		Where(do.SysPluginMigration{
+			PluginId: pluginID,
+			Phase:    plugintypes.MigrationDirectionInstall.String(),
+		}).
+		Count()
+	if err != nil {
+		t.Fatalf("expected source plugin install migration count query to succeed, got error: %v", err)
+	}
+	if migrationCount != 1 {
+		t.Fatalf("expected one source plugin install migration row, got count=%d", migrationCount)
+	}
+
+	resourceCount, err := dao.SysPluginResourceRef.Ctx(ctx).
+		Where(do.SysPluginResourceRef{PluginId: pluginID, ReleaseId: release.Id}).
+		Count()
+	if err != nil {
+		t.Fatalf("expected source plugin resource ref count query to succeed, got error: %v", err)
+	}
+	if resourceCount == 0 {
+		t.Fatalf("expected source plugin install to materialize governance resource refs")
+	}
+
+	if err = service.Uninstall(ctx, pluginID, UninstallOptions{PurgeStorageData: true}); err != nil {
+		t.Fatalf("expected source plugin uninstall to succeed, got error: %v", err)
+	}
+
+	registry, err = service.getPluginRegistry(ctx, pluginID)
+	if err != nil {
+		t.Fatalf("expected source plugin registry lookup after uninstall to succeed, got error: %v", err)
+	}
+	if registry == nil {
+		t.Fatalf("expected source plugin registry row after uninstall")
+	}
+	if registry.Installed != statusflag.Uninstalled.Int() || registry.Status != statusflag.Disabled.Int() {
+		t.Fatalf("expected source plugin uninstall to yield uninstalled+disabled, got installed=%d enabled=%d", registry.Installed, registry.Status)
+	}
+
+	menu, err = testutil.QueryMenuByKey(ctx, menuKey)
+	if err != nil {
+		t.Fatalf("expected source plugin menu query after uninstall to succeed, got error: %v", err)
+	}
+	if menu != nil {
+		t.Fatalf("expected source plugin menu to be removed on uninstall")
+	}
+
+	release, err = service.getPluginRelease(ctx, pluginID, "v0.1.0")
+	if err != nil {
+		t.Fatalf("expected source plugin release lookup after uninstall to succeed, got error: %v", err)
+	}
+	if release == nil {
+		t.Fatalf("expected source plugin release row after uninstall")
+	}
+	if release.Status != plugintypes.ReleaseStatusUninstalled.String() {
+		t.Fatalf("expected source plugin release to become uninstalled, got %s", release.Status)
+	}
+
+	resourceCount, err = dao.SysPluginResourceRef.Ctx(ctx).
+		Where(do.SysPluginResourceRef{PluginId: pluginID, ReleaseId: release.Id}).
+		Count()
+	if err != nil {
+		t.Fatalf("expected source plugin resource ref count query after uninstall to succeed, got error: %v", err)
+	}
+	if resourceCount != 0 {
+		t.Fatalf("expected source plugin uninstall to clear governance resource refs, got count=%d", resourceCount)
+	}
+
+	migrationCount, err = dao.SysPluginMigration.Ctx(ctx).
+		Where(do.SysPluginMigration{
+			PluginId: pluginID,
+			Phase:    plugintypes.MigrationDirectionUninstall.String(),
+		}).
+		Count()
+	if err != nil {
+		t.Fatalf("expected source plugin uninstall migration count query to succeed, got error: %v", err)
+	}
+	if migrationCount != 1 {
+		t.Fatalf("expected one source plugin uninstall migration row, got count=%d", migrationCount)
+	}
+}
+
+// TestBuiltinPluginManagementActionsAreDenied verifies public management write
+// paths cannot mutate project built-in source plugins.
+func TestBuiltinPluginManagementActionsAreDenied(t *testing.T) {
+	var (
+		service  = newTestService()
+		ctx      = context.Background()
+		pluginID = "plugin-dev-builtin-management-denied"
+	)
+
+	createTestSourceDependencyPlugin(
+		t,
+		pluginID,
+		"Builtin Management Denied",
+		"v0.1.0",
+		"distribution: builtin\n",
+	)
+	cleanupTestPluginIDs(t, ctx, pluginID)
+
+	if _, err := service.SyncSourcePluginsStrict(ctx); err != nil {
+		t.Fatalf("expected builtin manifest sync to succeed, got error: %v", err)
+	}
+
+	assertDenied := func(name string, err error) {
+		t.Helper()
+		if !bizerr.Is(err, CodePluginBuiltinManagementActionDenied) {
+			t.Fatalf("%s expected builtin management denial, got %v", name, err)
+		}
+	}
+
+	_, err := service.Install(ctx, pluginID, InstallOptions{})
+	assertDenied("install", err)
+	assertDenied("enable", service.UpdateStatus(ctx, pluginID, UpdateStatusOptions{Status: statusflag.EnabledValue.Int()}))
+	assertDenied("disable", service.UpdateStatus(ctx, pluginID, UpdateStatusOptions{Status: statusflag.Disabled.Int()}))
+	assertDenied("update status", service.UpdateStatus(ctx, pluginID, UpdateStatusOptions{Status: statusflag.EnabledValue.Int()}))
+	assertDenied("uninstall", service.Uninstall(ctx, pluginID, UninstallOptions{PurgeStorageData: true}))
+	assertDenied("tenant provisioning", service.UpdateTenantProvisioningPolicy(ctx, pluginID, true))
+	_, err = service.UpgradeSourcePlugin(ctx, pluginID)
+	assertDenied("source upgrade", err)
+	_, err = service.ExecuteRuntimeUpgrade(ctx, pluginID, RuntimeUpgradeOptions{Confirmed: true})
+	assertDenied("runtime upgrade", err)
+
+	registry, err := service.getPluginRegistry(ctx, pluginID)
+	if err != nil {
+		t.Fatalf("expected builtin registry lookup to succeed, got error: %v", err)
+	}
+	if registry == nil {
+		t.Fatalf("expected synced builtin registry row")
+	}
+	if registry.Installed != statusflag.Uninstalled.Int() || registry.Status != statusflag.Disabled.Int() {
+		t.Fatalf("expected denied actions to leave builtin uninstalled+disabled, got installed=%d status=%d", registry.Installed, registry.Status)
+	}
+	if registry.AutoEnableForNewTenants {
+		t.Fatalf("expected denied tenant provisioning update not to change policy")
+	}
+}

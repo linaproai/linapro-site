@@ -1,0 +1,125 @@
+{
+  "core": {
+    "api": {
+      "i18n": {
+        "v1": {
+          "RuntimeLocaleItem": {
+            "fields": {
+              "isDefault": {
+                "dc": "是否为宿主默认语言：true=是 false=否"
+              },
+              "direction": {
+                "dc": "语言文本方向，当前宿主约定固定为 ltr"
+              },
+              "locale": {
+                "dc": "语言编码，如 zh-CN、en-US"
+              },
+              "name": {
+                "dc": "按当前展示语言本地化后的语言名称"
+              },
+              "nativeName": {
+                "dc": "该语言自己的原生名称"
+              }
+            }
+          },
+          "RuntimeLocalesReq": {
+            "fields": {
+              "lang": {
+                "dc": "名称展示使用的语言编码；不传时按请求上下文自动解析，如 zh-CN、en-US"
+              }
+            },
+            "meta": {
+              "dc": "返回运行时多语言切换状态和宿主当前支持的语言列表，包含语言编码、默认标记、展示名称、原生名称和固定 LTR 文本方向，供登录页、工作台或交付工具构建语言切换器",
+              "summary": "获取运行时语言列表",
+              "tags": "国际化"
+            },
+            "responses": {
+              "200": {
+                "content": {
+                  "application_json": {
+                    "fields": {
+                      "data": {
+                        "fields": {
+                          "enabled": {
+                            "dc": "是否开启运行时多语言切换：true=可显示语言切换器，false=仅使用默认语言"
+                          },
+                          "items": {
+                            "dc": "宿主当前支持的运行时语言列表"
+                          },
+                          "locale": {
+                            "dc": "本次请求最终生效的展示语言编码"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "schema": {
+              "dc": "返回运行时多语言切换状态和宿主当前支持的语言列表，包含语言编码、默认标记、展示名称和原生名称，供登录页、工作台或交付工具构建语言切换器"
+            }
+          },
+          "RuntimeLocalesRes": {
+            "fields": {
+              "enabled": {
+                "dc": "是否开启运行时多语言切换：true=可显示语言切换器，false=仅使用默认语言"
+              },
+              "items": {
+                "dc": "宿主当前支持的运行时语言列表"
+              },
+              "locale": {
+                "dc": "本次请求最终生效的展示语言编码"
+              }
+            }
+          },
+          "RuntimeMessagesReq": {
+            "fields": {
+              "lang": {
+                "dc": "目标语言编码；不传时按请求上下文自动解析，如 zh-CN、en-US"
+              }
+            },
+            "meta": {
+              "dc": "返回宿主与已接入资源聚合后的运行时国际化消息包，供登录页、管理工作台和宿主嵌入式插件页面加载",
+              "summary": "获取运行时国际化消息包",
+              "tags": "国际化"
+            },
+            "responses": {
+              "200": {
+                "content": {
+                  "application_json": {
+                    "fields": {
+                      "data": {
+                        "fields": {
+                          "locale": {
+                            "dc": "本次请求最终生效的语言编码"
+                          },
+                          "messages": {
+                            "dc": "聚合后的运行时国际化消息集合"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "schema": {
+              "dc": "返回宿主与已接入资源聚合后的运行时国际化消息包，供登录页、管理工作台和宿主嵌入式插件页面加载"
+            }
+          },
+          "RuntimeMessagesRes": {
+            "fields": {
+              "locale": {
+                "dc": "本次请求最终生效的语言编码"
+              },
+              "messages": {
+                "dc": "聚合后的运行时国际化消息集合"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,10 +1,27 @@
 {
-  "name": "linapro-site-e2e",
+  "name": "e2e-tests",
   "private": true,
+  "type": "module",
   "scripts": {
-    "test": "playwright test -c playwright.config.ts"
+    "test": "node ./scripts/run-suite.mjs full",
+    "test:host": "node ./scripts/run-suite.mjs host",
+    "test:host:module": "node ./scripts/run-suite.mjs host-module",
+    "test:smoke": "node ./scripts/run-suite.mjs smoke",
+    "test:module": "node ./scripts/run-suite.mjs module",
+    "test:full": "node ./scripts/run-suite.mjs full",
+    "test:site": "playwright test -c playwright.site.config.ts",
+    "test:validate": "node ./scripts/validate-e2e.mjs",
+    "test:service-deps": "node ./scripts/validate-service-dependencies.mjs && node ./scripts/validate-service-dependencies-test.mjs",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "test:debug": "playwright test --debug",
+    "report": "playwright show-report"
   },
   "devDependencies": {
-    "@playwright/test": "^1.52.0"
-  }
+    "@playwright/test": "^1.58.2",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.3",
+    "xlsx": "^0.18.5"
+  },
+  "packageManager": "pnpm@11.0.9+sha512.34ce82e6780233cf9cad8685029a8f81d2e06196c5a9bad98879f7424940c6817c4e4524fb7d38b8553ceed48b9758b8ebaf1abd3600c232c4c8cf7366086f38"
 }

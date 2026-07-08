@@ -1,40 +1,213 @@
 # 仓库用途
 
-本仓库承载`LinaPro`官方网站（`apps/lina-site/`，基于`Docusaurus 3.10`）以及配套的 `OpenSpec` 治理文件。`LinaPro`本体——也就是官网所描述的 AI 驱动全栈框架 —— 位于单独的只读参考仓库`linapro`；编写站点文案时，应以该路径中的事实内容为依据。
+本仓库承载`LinaPro`主框架源码、官方网站和配套`OpenSpec`治理文件。`LinaPro`的项目定位是面向可持续交付的 AI 原生全栈框架；官网源码位于`apps/lina-site/`，框架核心宿主位于`apps/lina-core/`，管理工作台位于`apps/lina-vben/`，插件源码工作区位于`apps/lina-plugins/`。
 
-官网发布地址为`https://linapro.ai/`，源仓库地址为`https://github.com/linaproai/linapro`，对应的本地仓库地址为：`/Users/john/Workspace/github/linaproai/linapro`。
+官网发布地址为`https://linapro.ai/`，项目源仓库地址为`https://github.com/linaproai/linapro`。历史上的独立官网仓库内容已经合入当前工作区，后续编写官网文案时应优先依据同仓库内`apps/lina-core/`、`apps/lina-vben/`、`apps/lina-plugins/`和`openspec/`中的事实内容。
 
-`AGENTS.md`是指向本文件的符号链接 —— `Claude Code`、`Codex`以及其他`AI Coding Agent`会读取`AGENTS.md`的智能体应共享同一套说明。
+`AGENTS.md`是项目顶层规范入口；`Claude Code`、`Codex`以及其他`AI Coding Agent`读取本文件时应共享同一套说明。
 
-# 架构说明
+# 顶级规范要求
 
-## 站点结构（`apps/lina-site/`）
+## 项目定位统一要求
 
-- `docusaurus.config.ts`——站点配置入口。`docs.routeBasePath: '/'`表示**文档直接挂在站点根路径**，不存在单独的`/docs`前缀；根路由首页由`src/pages/index.tsx`覆盖。站点级`SEO`文案和`locale`元信息集中在`siteI18n.ts`，配置文件只消费该小型映射；导航、侧边栏、首页组件等普通界面文案遵循`Docusaurus`官方翻译机制，通过`write-translations`生成并维护在`i18n/<locale>/`的`JSON`资源中。
-- `docs/`——官网文档的中文主稿目录，也是 `Docusaurus` 内容发现的基准目录；当前标签为`v0.1.x(Latest)`。即便当前`defaultLocale`仍为`en`，也必须先在这里维护中文内容，再同步到英文和其他语言版本。旧版本位于`versioned_docs/`、`versioned_sidebars/`和`versions.json`，由`node version.js`生成。`editUrl`目前指向 GitHub 上的`linaproai/linapro`——后续站点源码预期会回到 `LinaPro` 主 `monorepo` 中。
-- `i18n/`——国际化资源目录。当前`defaultLocale: 'en'`，可用 `locale` 为`['en', 'zh-Hans']`。英文文档位于`i18n/en/docusaurus-plugin-content-docs/current/`，用于覆盖默认英文根路径；其他语言资源分别位于`i18n/<locale>/docusaurus-plugin-content-docs/`、`docusaurus-plugin-content-blog/`、`docusaurus-theme-classic/`以及`code.json`。`zh-Hans`站点文档默认复用`docs/`中文主稿，普通界面翻译保留在`code.json`、`docusaurus-theme-classic/*.json`和`docusaurus-plugin-content-docs/current.json`。
-- `sidebars.ts`——定义三个显式侧边栏：`quickSidebar`（快速体验）、`mainSidebar`（开发手册）和`communitySidebar`（开源社区）。导航栏中的`Get Started`使用`quickSidebar`，入口为`/quick/preface`，快速开始正文仍位于`docs/quick/quickstart.md`并发布到`/quickstart`。
-- `src/pages/index.tsx`——自定义首页；`src/components/HomepageFeatures/`和`src/theme/`中包含对经典主题的 `swizzle` 内容。仓库已启用 `Mermaid`（`themes: ['@docusaurus/theme-mermaid']`、`markdown.mermaid: true`），文档中的架构图和流程图应优先使用 `Mermaid`。
-- 当前启用的插件包括：`docusaurus-plugin-image-zoom`（缩放选择器为`.markdown :not(em) > img`）以及`@docusaurus/plugin-ideal-image`（开发环境下禁用）。
+1. 项目统一定位是`面向可持续交付的 AI 原生全栈框架`。所有功能设计都必须围绕这一定位展开。
+2. 默认管理工作台、系统管理模块、用户权限模块等能力属于`LinaPro`提供的默认入口和内建通用能力，不构成项目的唯一产品边界。
+3. `apps/lina-site`是`LinaPro`官方网站，不是独立产品；站点文案、架构介绍和示例必须与当前仓库中的框架事实保持一致。
 
-## OpenSpec 治理（`openspec/`）
+## 核心宿主边界要求
 
-本仓库使用 `OpenSpec` 管理需求提案、设计和落地过程，目录结构如下：
+1. `apps/lina-core`是全栈开发框架的核心宿主服务，负责提供通用模块接口能力、组件能力、系统治理能力与插件扩展能力。该服务的设计必须优先保证通用性、稳定性和可复用性，不得与具体管理工作台页面的展示结构、交互细节或前端框架实现强绑定。
+2. 若需求仅来源于表格列、筛选项、树选择器、路由装配、工作台聚合、下拉选项等工作台展示变化，应优先通过工作台适配接口或前端适配层解决，而不是直接修改`lina-core`的核心领域契约、通用`service`语义或存储模型。
+3. 在开发`apps/lina-plugins/<plugin-id>/`业务插件时，业务插件的相关前后端功能逻辑应当严格闭环在其内部实现，避免直接修改`lina-core`目录下的内容。确实需要修改时，必须评估是否会对其他插件或未来插件开发造成影响，并在实施前进行充分的设计和审查，并在用户授权的情况下进行修改。
+4. 主框架插件能力发生变更时，必须审查`apps/lina-core/pkg/plugin`目录下的README文档是否需要同步更新。
 
-- `openspec/changes/<change-id>/`——进行中的提案目录，包含`proposal.md`、`design.md`、`tasks.md`和`specs/`。
-- `openspec/changes/archive/`——已完成并归档的变更。
-- `openspec/specs/`——变更归档后沉淀的基线规范。
-- `openspec/config.yaml`——项目级语言与生成策略配置。
+## 官网站点结构要求
 
-涉及 `OpenSpec` 工作流时，优先使用`opsx:propose`、`opsx:explore`、`opsx:apply`、`opsx:archive`技能（或其`openspec-*`别名），不要手工拼装整套变更文件。
+1. `apps/lina-site/`基于`Docusaurus 3.10`，`docs.routeBasePath: '/'`表示文档直接挂在站点根路径，不存在单独的`/docs`前缀；根路由首页由`src/pages/index.tsx`覆盖。
+2. 站点级`SEO`文案和`locale`元信息集中在`siteI18n.ts`；导航、侧边栏、首页组件等普通界面文案通过`Docusaurus`官方翻译机制维护在`i18n/<locale>/`资源中。
+3. `apps/lina-site/docs/`是官网文档中文主稿目录，也是内容发现基准目录。即便当前`defaultLocale`仍为`en`，也必须先维护中文内容，再同步到英文和其他语言版本。
+4. 英文文档位于`apps/lina-site/i18n/en/docusaurus-plugin-content-docs/current/`，需要保持地道英文表达，不要逐字翻译中文主稿。
+5. `apps/lina-site/sidebars.ts`定义`quickSidebar`、`mainSidebar`和`communitySidebar`。导航入口和文档`slug`变更时必须同步审查侧边栏、链接和多语言结构。
+6. 站点已启用`Mermaid`，文档中的架构图和流程图应优先使用`Mermaid`。
 
-# 文档规范
+## 接口性能统一要求
 
-- 编写官网文档时，需要严格遵守该文件的规范`linapro-site/.agents/instructions/markdown-format.instructions.md`。
-- 编写官网文档时，优先在`apps/lina-site/docs/`维护中文主稿，确认中文内容后再同步到`apps/lina-site/i18n/en/docusaurus-plugin-content-docs/current/`中的英文版本。即便当前`defaultLocale`仍为`en`，也必须遵守“中文先行、英文同步”的流程。
-- 中文文档内容符合中文习惯的表达方式，同时保持内容的准确性和专业性，不能生硬表达含义。
-- 英文版本需要保持为地道的英文表达，不要逐字翻译中文内容。
+1. 功能设计和实现必须把接口性能作为基础约束，列表、详情批量、导出、聚合统计、树形数据、下拉候选、工作台聚合和插件资源扫描等高频或高数据量接口不得把性能优化留到后续补救。
+2. 后端实现必须主动降低数据库操作频次，优先采用批量查询、集合化查询、投影查询、缓存或快照等方式完成数据装配，避免产生随返回行数、树节点数、插件数、权限项数或关联对象数线性增长的`N+1`查询。
 
-# 测试规范
+# 外部规则文件
 
-使用`E2E`测试工具（如`playwright`）测试时，生成的临时中间内容，如截图、日志等，应该保存在`temp/e2e/`目录下。
+`AGENTS.md`是项目顶层规范入口；被本文件显式引用的`.agents/rules/*.md`是对应领域细则的唯一事实来源。`AGENTS.md`保留规范标题、强制触发场景和执行门禁，具体设计、实现、测试和审查细则必须到对应规则文件中读取。
+
+## 插件本地规范优先级
+
+- 修改`apps/lina-plugins/<plugin-id>/`下任意文件内容前，必须先检查该插件根目录是否存在`AGENTS.md`普通文件或符号链接。若插件根目录存在`AGENTS.md`文件，必须在修改该插件目录文件内容前优先读取并遵守该插件根目录`AGENTS.md`。
+- 插件根目录`AGENTS.md`仅作用于该插件目录内的文件变更。其规范与项目顶层`AGENTS.md`或`.agents/rules/*.md`存在冲突时，在该插件目录内以插件根目录`AGENTS.md`为准；未覆盖部分继续遵守项目规范和命中的规则文件。
+
+## 通用强制规则
+
+- 执行提案、设计、实现、反馈修复、审查或归档时，必须先根据变更内容判断命中的规则域，并在修改代码、修改文档、更新任务状态或输出审查结论前读取所有命中的规则文件。
+- 禁止仅凭记忆、历史上下文、摘要、此前读取记录或其他代理的转述替代本次读取。
+- 同一任务命中多个规则域时，必须读取所有对应规则文件，并同时满足所有门禁要求。
+- 规则文件缺失、无法读取或规则之间存在无法调和的冲突时，不得继续实现、反馈修复、审查或归档；必须先修复规则入口或向用户说明阻断原因。插件根目录`AGENTS.md`对本插件目录内文件的明确覆盖规则不视为无法调和冲突，按插件本地规范优先级处理。
+- 若确认某规则域无影响，必须在任务记录、反馈执行记录或审查结论中明确记录无影响判断。
+- 进行问题反馈修复时，必须优先排查并向用户报告问题原因，再进入代码修复；不得在未说明根因或合理假设的情况下直接改代码。
+- `lina-feedback`和`lina-review`必须以本文件的强制触发场景为入口。未读取命中规则文件的反馈闭环或审查结论无效，不得据此标记任务完成或执行归档。
+
+# 文档编写规范
+
+文档编写规范细则的唯一事实来源为`.agents/rules/documentation.md`，以下任一场景命中时，必须在实施、反馈修复、审查或归档前读取并严格遵守该规则：
+
+- 新增或修改仓库内技术文档、目录级说明文档、`README.md`或`README.zh-CN.md`
+- 新增目录说明文档、变更 Markdown 格式、链接、表格、代码块或图示
+- 修改 OpenSpec 文档语言、说明文档镜像关系或文档治理规则
+
+官网文档还必须遵守以下流程：
+
+- 优先在`apps/lina-site/docs/`维护中文主稿，确认中文内容后再同步到`apps/lina-site/i18n/en/docusaurus-plugin-content-docs/current/`中的英文版本。
+- 中文文档内容需要符合中文习惯的表达方式，同时保持准确性和专业性。
+- 英文版本需要保持地道英文表达，不要逐字翻译中文内容。
+- 编写官网文档时，需要同时遵守`.agents/instructions/markdown-format.instructions.md`。
+
+# 开发流程规范
+
+开发流程规范细则的唯一事实来源为`.agents/rules/openspec.md`，以下任一场景命中时，必须在实施、反馈修复、审查或归档前读取并严格遵守该规则：
+
+- 创建、修改、执行或归档 OpenSpec 变更
+- 编写或更新`proposal.md`、`design.md`、`tasks.md`或`specs/`增量规范
+- 处理用户反馈、缺陷、改进点或治理类问题
+- 执行`/opsx:explore`、`/opsx:propose`、`/opsx:apply`、`/opsx:archive`、`lina-feedback`或`lina-review`
+
+
+# 架构设计规范
+
+架构设计规范细则的唯一事实来源为`.agents/rules/architecture.md`。涉及数据权限时还必须读取`.agents/rules/data-permission.md`；涉及源码插件、动态插件或插件通用资源时还必须读取`.agents/rules/plugin.md`；涉及缓存时还必须读取`.agents/rules/cache-consistency.md`。
+
+## 模块设计规范
+
+以下任一场景命中时，必须读取并严格遵守`.agents/rules/architecture.md`：
+
+- 新增或修改业务模块、模块能力边界、模块启停或模块间依赖
+- 新增或修改模块间接口契约、跨模块调用路径、跨模块依赖注入或内部实现访问边界
+- 新增或修改列表、详情批量、导出、聚合统计、树形数据、下拉候选、工作台聚合等接口的数据装配路径或性能边界
+- 新增或修改具有枚举语义的业务值、字典类型、字典数据或模块运行配置
+- 调整默认工作台、系统管理、用户权限等内建能力与框架宿主边界
+- 设计前后端模块降级、隐藏、恢复或按需启用逻辑
+
+## 数据权限接入规范
+
+以下任一场景命中时，必须读取并严格遵守`.agents/rules/data-permission.md`：
+
+- 新增或修改列表、详情、导出、下载、聚合统计、批量信息或下拉候选接口
+- 新增或修改创建、更新、状态变更、删除、批量删除、授权关系变更或执行类动作
+- 新增或修改插件通过宿主发布服务访问数据的路径
+- 修改任何可能暴露业务数据存在性、可见性或租户/组织边界的逻辑
+
+## 插件目录结构规范
+
+开发业务插件，涉及`apps/lina-plugins/<plugin-id>/`目录下的任何资源创建、修改或删除时应当遵守`.agents/rules/plugin.md`。
+
+# 接口设计规范
+
+接口设计规范细则的唯一事实来源为`.agents/rules/api-contract.md`，以下任一场景命中时，必须在实施、反馈修复、审查或归档前读取并严格遵守该规则：
+
+- 新增或修改 HTTP API、路由、HTTP 方法、资源路径或权限标签
+- 修改请求 DTO、响应 DTO、OpenAPI/Swagger 元数据、`g.Meta`、`dc`或`eg`标签
+- 新增或修改接口响应中的时间字段、日期字段或前后端 API 调用契约
+- 新增或修改列表、详情批量、导出、聚合统计、树形数据、下拉候选、批量获取等高频或高数据量接口契约
+- 修改可能改变前端调用频次、后端数据装配成本或数据库访问频次的接口响应结构
+- 修改`api/`接口定义文件拆分、代码生成入口或接口文档语义
+
+# 代码开发规范
+
+## 开发工具与脚本规范
+
+开发工具与脚本规范细则的唯一事实来源为`.agents/rules/dev-tooling.md`，以下任一场景命中时，必须读取并严格遵守该规则：
+
+- 修改`Makefile`、`make.cmd`、`hack/tools/`、`hack/scripts/`、`hack/tests/scripts/`或`hack/makefiles/`
+- 修改 CI、构建、测试、代码生成、资源打包、服务启停或仓库治理工具
+- 新增或修改`.sh`、`.ps1`、`.cmd`、Node脚本或工具型 Go 代码
+- 修改`linactl`命令文件、子组件、跨平台执行入口或默认开发路径
+
+命中该规范时，必须记录跨平台影响和验证方式；未读取规则文件不得通过审查。
+
+## 后端代码规范
+
+后端代码规范细则的唯一事实来源为`.agents/rules/backend-go.md`，以下任一场景命中时，必须读取并严格遵守该规则：
+
+- 新增或修改 Go 后端生产代码或 Go 后端测试
+- 修改`Controller`、`Middleware`、`Service`、后端启动装配、路由绑定、依赖注入或运行时初始化逻辑
+- 修改源码插件后端、插件宿主服务适配器、动态插件 host service 或`WASM host service`
+- 修改错误处理、日志、公共组件、运行期依赖、缓存敏感服务、权限服务或生成代码边界
+- 新增或修改列表、详情批量、导出、聚合统计、树形数据、下拉候选、批量操作等接口实现、数据库查询路径或可能产生`N+1`查询的循环数据装配逻辑
+
+命中该规范时，必须按规则文件完成 Go 编译门禁、依赖治理和审查记录；未读取规则文件不得开始实现、标记任务完成、通过审查或归档。
+
+## Go代码生成流程
+
+Go代码生成流程细则由`.agents/rules/backend-go.md`、`.agents/rules/api-contract.md`和`.agents/rules/database.md`共同承载，以下任一场景命中时，必须读取对应规则文件：
+
+- API 变更、`api/{resource}/v1/*.go`变更或`make ctrl`相关变更
+- 数据库变更、`manifest/sql/`变更、`make db.init`或`make dao`相关变更
+- 生成或修改 Controller、DAO、DO、Entity 等脚手架维护代码
+
+## SQL文件管理规范
+
+SQL文件管理规范细则的唯一事实来源为`.agents/rules/database.md`，以下任一场景命中时，必须读取并严格遵守该规则：
+
+- 新增或修改 SQL 迁移文件、Seed DML、Mock 数据或插件安装/卸载 SQL
+- 修改数据库初始化、升级、重试执行、幂等逻辑或 DAO 生成输入
+- 修改软删除字段、数据库时间字段、删除语义或自增主键写入策略
+- 新增或修改支撑列表、筛选、排序、聚合、关联装配、树形查询或数据权限过滤的索引与查询性能设计
+
+命中该规范时，必须记录 SQL 幂等性、数据分类和验证结果；未读取规则文件不得通过审查。
+
+## 接口层实现要求
+
+接口层实现要求细则的唯一事实来源为`.agents/rules/api-contract.md`。修改`api/`目录、接口文件拆分、DTO 标签、权限标签或接口文档元数据前，必须读取并严格遵守该规则。
+
+## 服务层实现要求
+
+服务层实现要求细则的唯一事实来源为`.agents/rules/backend-go.md`。修改`internal/service/`、插件`backend/internal/service/`、服务接口、构造函数、文件命名、事务、数据库访问、接口性能、批量数据装配、定时任务或上下文传递前，必须读取并严格遵守该规则。
+
+## 控制器层实现要求
+
+控制器层实现要求细则的唯一事实来源为`.agents/rules/backend-go.md`。修改控制器构造、控制器依赖、`_new.go`结构、路由绑定或请求处理方法前，必须读取并严格遵守该规则。
+
+## 软删除与时间维护规范
+
+软删除与时间维护规范细则的唯一事实来源为`.agents/rules/database.md`。修改数据库时间字段、软删除字段、删除语义、查询过滤或 GoFrame 自动时间维护相关逻辑前，必须读取并严格遵守该规则。
+
+## 前端代码规范
+
+前端代码规范细则的唯一事实来源为`.agents/rules/frontend-ui.md`。以下任一场景命中时，必须读取并严格遵守该规则：
+
+- 新增或修改前端页面、路由、组件、表格、表单、弹窗、抽屉或操作列
+- 修改前端 API 调用、适配器层、权限控制、菜单显示逻辑或模块禁用联动
+- 修改用户可观察交互、布局、样式、图标、上传下载或页面工作流
+
+涉及用户可观察行为变化时，还必须读取`.agents/rules/testing.md`并补充或更新对应验证。
+
+## 单元测试规范
+
+单元测试规范细则的唯一事实来源为`.agents/rules/testing.md`。新增或修改单元测试、测试 helper、fixture、清理逻辑、全局状态或后端行为验证前，必须读取并严格遵守该规则。
+
+## E2E测试规范
+
+E2E测试规范细则的唯一事实来源为`.agents/rules/testing.md`。新增或修改 E2E、页面对象、helper、fixture、runner 配置、执行 manifest、测试数据或用户可观察行为验证前，必须读取并严格遵守该规则，并按需使用`lina-e2e`技能。
+
+官网 E2E 测试产生的截图、日志和中间文件应保存到`temp/e2e/`目录下。
+
+## I18N治理规范
+
+`i18n`治理细则的唯一事实来源为`.agents/rules/i18n.md`。所有功能变更都必须评估`i18n`影响。以下任一场景命中时，必须读取并严格遵守该规则：
+
+- 修改运行时用户可见文案、菜单、路由、按钮、表单、表格、提示信息或字典文案
+- 修改 API 文档源文本、OpenAPI 元数据、错误消息、插件清单、语言包、翻译资源或语言配置
+- 修改翻译缓存、`manifest/i18n`、`apidoc i18n JSON`或宿主/插件多语言边界
+
+若确认无`i18n`影响，必须在任务记录或审查结论中明确记录。
+
+## UI设计规范
+
+UI设计规范细则的唯一事实来源为`.agents/rules/frontend-ui.md`。实现任何前端页面、组件、交互、视觉样式、图标、表单、表格、弹窗或抽屉前，必须读取并严格遵守该规则。涉及用户可观察行为变化时，还必须读取`.agents/rules/testing.md`。

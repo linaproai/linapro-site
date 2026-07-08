@@ -1,0 +1,186 @@
+// This file coordinates cluster-wide wake-up revisions for the dynamic-plugin
+// reconciler so the background loop avoids scanning every registry row on each tick.
+
+package runtime
+
+import (
+	"context"
+	"time"
+
+	"lina-core/internal/service/cachecoord"
+	"lina-core/internal/service/cachecoord/revisionctrl"
+	"lina-core/pkg/logger"
+)
+
+// runtimeReconcilerSafetySweepInterval is the low-frequency fallback full-scan
+// cadence used when no shared revision changes are observed.
+const runtimeReconcilerSafetySweepInterval = 5 * time.Minute
+
+// runtimeChangeReason identifies why the dynamic-plugin runtime cache or
+// reconciler revision changed. Keep these values stable because external cache
+// coordinators and logs may persist them as plain strings even though runtime
+// code uses the named type.
+type runtimeChangeReason string
+
+const (
+	// runtimeChangeReasonPluginInstalled means a dynamic plugin release became installed.
+	runtimeChangeReasonPluginInstalled runtimeChangeReason = "plugin_installed"
+	// runtimeChangeReasonPluginUpgraded means an installed dynamic plugin switched release versions.
+	runtimeChangeReasonPluginUpgraded runtimeChangeReason = "plugin_upgraded"
+	// runtimeChangeReasonPluginDisabled means an installed dynamic plugin became disabled.
+	runtimeChangeReasonPluginDisabled runtimeChangeReason = "plugin_disabled"
+	// runtimeChangeReasonPluginEnabled means an installed dynamic plugin became enabled.
+	runtimeChangeReasonPluginEnabled runtimeChangeReason = "plugin_enabled"
+	// runtimeChangeReasonPluginStatusChanged means a dynamic plugin status toggle completed.
+	runtimeChangeReasonPluginStatusChanged runtimeChangeReason = "plugin_status_changed"
+	// runtimeChangeReasonPluginRefreshed means an installed dynamic plugin release was refreshed.
+	runtimeChangeReasonPluginRefreshed runtimeChangeReason = "plugin_refreshed"
+	// runtimeChangeReasonPluginUninstalled means a dynamic plugin was uninstalled using its manifest.
+	runtimeChangeReasonPluginUninstalled runtimeChangeReason = "plugin_uninstalled"
+	// runtimeChangeReasonPluginOrphanUninstalled means host governance was force-cleared for a missing artifact.
+	runtimeChangeReasonPluginOrphanUninstalled runtimeChangeReason = "plugin_orphan_uninstalled"
+	// runtimeChangeReasonRuntimePackageUploaded means a dynamic runtime package was uploaded.
+	runtimeChangeReasonRuntimePackageUploaded runtimeChangeReason = "runtime_package_uploaded"
+	// runtimeChangeReasonDynamicPackageUploaded means a dynamic package upload changed desired reconciliation input.
+	runtimeChangeReasonDynamicPackageUploaded runtimeChangeReason = "dynamic_package_uploaded"
+	// runtimeChangeReasonRuntimeArtifactMissing means an active runtime artifact disappeared and registry state changed.
+	runtimeChangeReasonRuntimeArtifactMissing runtimeChangeReason = "runtime_artifact_missing"
+	// runtimeChangeReasonStaleReconcilingRestored means an abandoned transient
+	// reconcile state was restored to a stable state.
+	runtimeChangeReasonStaleReconcilingRestored runtimeChangeReason = "stale_reconciling_restored"
+	// runtimeChangeReasonDesiredStateChanged means a management request changed one plugin target state.
+	runtimeChangeReasonDesiredStateChanged runtimeChangeReason = "desired_state_changed"
+	// runtimeChangeReasonSingleNode means single-node mode should run reconciliation every tick.
+	runtimeChangeReasonSingleNode runtimeChangeReason = "single_node"
+	// runtimeChangeReasonRevisionChanged means the shared reconciler revision advanced.
+	runtimeChangeReasonRevisionChanged runtimeChangeReason = "revision_changed"
+	// runtimeChangeReasonSafetySweep means the low-frequency safety scan interval elapsed.
+	runtimeChangeReasonSafetySweep runtimeChangeReason = "safety_sweep"
+)
+
+// backgroundReconcileDecision captures whether one reconciler tick should run a
+// full registry convergence pass and which shared revision it will consume.
+type backgroundReconcileDecision struct {
+	// revision is the current shared reconciler wake-up revision.
+	revision int64
+	// shouldRun reports whether the tick should execute a full convergence pass.
+	shouldRun bool
+	// reason identifies why the tick needs to run.
+	reason runtimeChangeReason
+}
+
+// configureReconcilerRevisionController wires the cluster-aware controller
+// after topology has been injected.
+func (s *serviceImpl) configureReconcilerRevisionController() {
+	if s.reconcilerRevisionObserved == nil {
+		s.reconcilerRevisionObserved = revisionctrl.NewObservedRevision()
+	}
+	s.reconcilerRevisionCtrl = revisionctrl.NewControllerForScopeWithCoordinator(
+		cachecoord.ScopeReconciler,
+		revisionctrl.ReconcilerCacheChangeReason,
+		s.isClusterModeEnabled(),
+		cachecoord.Default(s.topology),
+		s.reconcilerRevisionObserved,
+		nil,
+	)
+}
+
+// ensureReconcilerRevisionController returns the configured controller, creating
+// a topology-aware no-op controller when tests or direct constructors skipped
+// setter injection.
+func (s *serviceImpl) ensureReconcilerRevisionController() *revisionctrl.Controller {
+	if s.reconcilerRevisionCtrl == nil {
+		s.configureReconcilerRevisionController()
+	}
+	return s.reconcilerRevisionCtrl
+}
+
+// notifyReconcilerChanged publishes one desired-state or runtime-state mutation
+// that may require another node to run a dynamic-plugin convergence pass.
+func (s *serviceImpl) notifyReconcilerChanged(ctx context.Context, reason runtimeChangeReason) error {
+	return s.publishReconcilerChanged(ctx, reason, true)
+}
+
+// publishReconcilerChanged publishes one reconciler wake-up revision and
+// controls whether the local runtime marks that revision as already consumed.
+func (s *serviceImpl) publishReconcilerChanged(ctx context.Context, reason runtimeChangeReason, storeObserved bool) error {
+	controller := s.ensureReconcilerRevisionController()
+	if controller == nil {
+		return nil
+	}
+	var (
+		revision int64
+		err      error
+	)
+	if storeObserved {
+		revision, err = controller.MarkChanged(ctx)
+	} else {
+		revision, err = controller.PublishChanged(ctx)
+	}
+	if err != nil {
+		return err
+	}
+	if revision > 0 {
+		logger.Debugf(ctx, "dynamic plugin reconciler revision bumped reason=%s revision=%d", string(reason), revision)
+	}
+	return nil
+}
+
+// nextBackgroundReconcileDecision checks the shared revision and safety sweep
+// timer to decide whether the current tick should perform a full scan.
+func (s *serviceImpl) nextBackgroundReconcileDecision(ctx context.Context) (backgroundReconcileDecision, error) {
+	if !s.isClusterModeEnabled() {
+		return backgroundReconcileDecision{
+			shouldRun: true,
+			reason:    runtimeChangeReasonSingleNode,
+		}, nil
+	}
+
+	controller := s.ensureReconcilerRevisionController()
+	revision, err := controller.CurrentRevision(ctx)
+	if err != nil {
+		return backgroundReconcileDecision{}, err
+	}
+	if !controller.IsObserved(revision) {
+		return backgroundReconcileDecision{
+			revision:  revision,
+			shouldRun: true,
+			reason:    runtimeChangeReasonRevisionChanged,
+		}, nil
+	}
+	if s.shouldRunReconcilerSafetySweep(time.Now()) {
+		return backgroundReconcileDecision{
+			revision:  revision,
+			shouldRun: true,
+			reason:    runtimeChangeReasonSafetySweep,
+		}, nil
+	}
+	return backgroundReconcileDecision{
+		revision: revision,
+		reason:   "revision_unchanged",
+	}, nil
+}
+
+// shouldRunReconcilerSafetySweep reports whether the fallback full-scan interval
+// has elapsed since the last successful background convergence pass.
+func (s *serviceImpl) shouldRunReconcilerSafetySweep(now time.Time) bool {
+	s.reconcilerSafetyMu.Lock()
+	defer s.reconcilerSafetyMu.Unlock()
+	if s.lastReconcilerSweepAt.IsZero() {
+		return true
+	}
+	return now.Sub(s.lastReconcilerSweepAt) >= runtimeReconcilerSafetySweepInterval
+}
+
+// markBackgroundReconcileObserved records that a successful full-scan pass has
+// consumed the shared reconciler revision.
+func (s *serviceImpl) markBackgroundReconcileObserved(revision int64, now time.Time) {
+	controller := s.ensureReconcilerRevisionController()
+	if controller != nil {
+		controller.StoreObserved(revision)
+	}
+
+	s.reconcilerSafetyMu.Lock()
+	defer s.reconcilerSafetyMu.Unlock()
+	s.lastReconcilerSweepAt = now
+}

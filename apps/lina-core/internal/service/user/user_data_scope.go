@@ -1,0 +1,94 @@
+// This file applies role data-scope rules to host user-management queries and
+// target-record checks.
+
+package user
+
+import (
+	"context"
+
+	"github.com/gogf/gf/v2/database/gdb"
+
+	"lina-core/internal/dao"
+	"lina-core/internal/service/datascope"
+	"lina-core/pkg/bizerr"
+	"lina-core/pkg/plugin/capability/tenantcap"
+	tenantcapsvc "lina-core/pkg/plugin/capability/tenantcap"
+)
+
+// applyUserDataScope injects the current user's data-scope filter into a
+// sys_user model. The empty flag lets callers return an empty result when a
+// scope resolves to no visible rows.
+func (s *serviceImpl) applyUserDataScope(ctx context.Context, m *gdb.Model) (*gdb.Model, bool, error) {
+	return s.currentScopeSvc().ApplyUserScope(ctx, m, qualifiedSysUserIDColumn())
+}
+
+// ensureUserVisible rejects detail and mutation operations for rows outside
+// the current request user's effective data-scope.
+func (s *serviceImpl) ensureUserVisible(ctx context.Context, userID int) error {
+	return s.ensureUsersVisible(ctx, []int{userID})
+}
+
+// ensureUsersVisible rejects a multi-target operation unless every target user
+// is visible under the current request user's effective data-scope.
+func (s *serviceImpl) ensureUsersVisible(ctx context.Context, userIDs []int) error {
+	if err := s.ensureUsersVisibleByTenantMembership(ctx, userIDs); err != nil {
+		return err
+	}
+	return s.currentScopeSvc().EnsureUsersVisible(ctx, userIDs)
+}
+
+// ensureUsersVisibleByTenantMembership rejects tenant-scoped detail and write
+// operations unless every target has active membership in the current tenant.
+func (s *serviceImpl) ensureUsersVisibleByTenantMembership(ctx context.Context, userIDs []int) error {
+	if len(userIDs) == 0 || currentTenantID(ctx) == datascope.PlatformTenantID || s == nil || s.tenantSvc == nil {
+		return nil
+	}
+	return mapTenantMembershipVisibilityError(
+		s.tenantSvc.EnsureUsersInTenant(
+			ctx,
+			uniqueTenantMembershipUserIDs(userIDs),
+			tenantcapsvc.TenantID(currentTenantID(ctx)),
+		),
+	)
+}
+
+// uniqueTenantMembershipUserIDs returns stable unique user IDs for membership
+// visibility checks.
+func uniqueTenantMembershipUserIDs(userIDs []int) []int {
+	seen := make(map[int]struct{}, len(userIDs))
+	result := make([]int, 0, len(userIDs))
+	for _, userID := range userIDs {
+		if _, ok := seen[userID]; ok {
+			continue
+		}
+		seen[userID] = struct{}{}
+		result = append(result, userID)
+	}
+	return result
+}
+
+// qualifiedSysUserIDColumn returns the fully qualified sys_user ID column used
+// by correlated orgcap constraints.
+func qualifiedSysUserIDColumn() string {
+	return dao.SysUser.Table() + "." + dao.SysUser.Columns().Id
+}
+
+// currentScopeSvc returns the injected shared data-scope service.
+func (s *serviceImpl) currentScopeSvc() datascope.Service {
+	if s != nil && s.scopeSvc != nil {
+		return s.scopeSvc
+	}
+	return nil
+}
+
+// mapTenantMembershipVisibilityError preserves user-management authorization
+// semantics while delegating membership details to tenantcap providers.
+func mapTenantMembershipVisibilityError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if bizerr.Is(err, tenantcap.CodeTenantForbidden) {
+		return bizerr.NewCode(datascope.CodeDataScopeDenied)
+	}
+	return err
+}

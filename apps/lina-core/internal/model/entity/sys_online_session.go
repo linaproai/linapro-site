@@ -1,0 +1,24 @@
+// =================================================================================
+// Code generated and maintained by GoFrame CLI tool. DO NOT EDIT.
+// =================================================================================
+
+package entity
+
+import (
+	"time"
+)
+
+// SysOnlineSession is the golang structure for table sys_online_session.
+type SysOnlineSession struct {
+	TenantId       int        `json:"tenantId"       orm:"tenant_id"        description:"Owning tenant ID, 0 means PLATFORM"`
+	TokenId        string     `json:"tokenId"        orm:"token_id"         description:"Session token ID (UUID)"`
+	UserId         int        `json:"userId"         orm:"user_id"          description:"User ID"`
+	Username       string     `json:"username"       orm:"username"         description:"Login account"`
+	ClientType     string     `json:"clientType"     orm:"client_type"      description:"User session client type: web, mobile, desktop, cli"`
+	DeptName       string     `json:"deptName"       orm:"dept_name"        description:"Department name"`
+	Ip             string     `json:"ip"             orm:"ip"               description:"Login IP"`
+	Browser        string     `json:"browser"        orm:"browser"          description:"Browser"`
+	Os             string     `json:"os"             orm:"os"               description:"Operating system"`
+	LoginTime      *time.Time `json:"loginTime"      orm:"login_time"       description:"Login time"`
+	LastActiveTime *time.Time `json:"lastActiveTime" orm:"last_active_time" description:"Last active time"`
+}

@@ -1,0 +1,186 @@
+// This file verifies generic plugin resource permission checks and request
+// data-scope propagation used by plugin-owned resource queries.
+
+package plugin
+
+import (
+	"context"
+	"testing"
+
+	"github.com/gogf/gf/v2/net/ghttp"
+
+	"lina-core/internal/model"
+	"lina-core/internal/service/datascope"
+	i18nsvc "lina-core/internal/service/i18n"
+	pluginsvc "lina-core/internal/service/plugin"
+	"lina-core/internal/service/role"
+	"lina-core/pkg/plugin/capability/bizctxcap"
+)
+
+// fakePluginI18nService provides deterministic translation values for
+// resource permission controller tests.
+type fakePluginI18nService struct {
+	i18nsvc.Service
+}
+
+// Translate returns the supplied fallback.
+func (fakePluginI18nService) Translate(_ context.Context, _ string, fallback string) string {
+	return fallback
+}
+
+// LocalizeError returns the error string for fake localizer tests.
+func (fakePluginI18nService) LocalizeError(_ context.Context, err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
+}
+
+// pluginResourceFakeBizCtx stores one mutable business context for controller tests.
+type pluginResourceFakeBizCtx struct {
+	ctx *model.Context
+}
+
+// Init assigns the supplied context to the fake service.
+func (f *pluginResourceFakeBizCtx) Init(_ *ghttp.Request, ctx *model.Context) {
+	f.ctx = ctx
+}
+
+// Get returns the fake request business context.
+func (f *pluginResourceFakeBizCtx) Get(_ context.Context) *model.Context {
+	return f.ctx
+}
+
+// Current returns the plugin-visible business context projection.
+func (f *pluginResourceFakeBizCtx) Current(context.Context) bizctxcap.CurrentContext {
+	if f.ctx == nil {
+		return bizctxcap.CurrentContext{}
+	}
+	return bizctxcap.CurrentContext{
+		UserID:          f.ctx.UserId,
+		Username:        f.ctx.Username,
+		TenantID:        f.ctx.TenantId,
+		ActingUserID:    f.ctx.ActingUserId,
+		ActingAsTenant:  f.ctx.ActingAsTenant,
+		IsImpersonation: f.ctx.IsImpersonation,
+		PlatformBypass:  f.ctx.TenantId == 0,
+	}
+}
+
+// SetLocale records the current request locale.
+func (f *pluginResourceFakeBizCtx) SetLocale(_ context.Context, locale string) {
+	if f.ctx != nil {
+		f.ctx.Locale = locale
+	}
+}
+
+// SetUser records the current authenticated user snapshot.
+func (f *pluginResourceFakeBizCtx) SetUser(_ context.Context, tokenId string, userId int, username string, status int, clientType string) {
+	if f.ctx != nil {
+		f.ctx.TokenId = tokenId
+		f.ctx.UserId = userId
+		f.ctx.Username = username
+		f.ctx.Status = status
+		f.ctx.ClientType = clientType
+	}
+}
+
+// SetTenant records the current tenant snapshot.
+func (f *pluginResourceFakeBizCtx) SetTenant(_ context.Context, tenantId int) {
+	if f.ctx != nil {
+		f.ctx.TenantId = tenantId
+	}
+}
+
+// SetImpersonation records the current impersonation snapshot.
+func (f *pluginResourceFakeBizCtx) SetImpersonation(_ context.Context, actingUserId int, tenantId int, actingAsTenant bool, isImpersonation bool) {
+	if f.ctx != nil {
+		f.ctx.ActingUserId = actingUserId
+		f.ctx.TenantId = tenantId
+		f.ctx.ActingAsTenant = actingAsTenant
+		f.ctx.IsImpersonation = isImpersonation
+	}
+}
+
+// SetUserAccess records the role-derived data-scope snapshot.
+func (f *pluginResourceFakeBizCtx) SetUserAccess(_ context.Context, dataScope int, dataScopeUnsupported bool, unsupportedDataScope int) {
+	if f.ctx != nil {
+		f.ctx.DataScope = dataScope
+		f.ctx.DataScopeUnsupported = dataScopeUnsupported
+		f.ctx.UnsupportedDataScope = unsupportedDataScope
+	}
+}
+
+// pluginResourceFakeRoleService returns one fixed access context.
+type pluginResourceFakeRoleService struct {
+	role.Service
+
+	accessContext *role.UserAccessContext
+}
+
+// GetUserAccessContext returns the configured role access snapshot.
+func (f pluginResourceFakeRoleService) GetUserAccessContext(_ context.Context, _ int) (*role.UserAccessContext, error) {
+	return f.accessContext, nil
+}
+
+// pluginResourceFakeService resolves one fixed resource permission.
+type pluginResourceFakeService struct {
+	pluginsvc.Service
+
+	permission string
+}
+
+// ResolveResourcePermission returns the configured resource permission string.
+func (f pluginResourceFakeService) ResolveResourcePermission(_ context.Context, _ string, _ string) (string, error) {
+	return f.permission, nil
+}
+
+// TestEnsurePluginResourcePermissionPropagatesDataScope verifies the generic
+// plugin resource route carries the role data-scope snapshot into downstream
+// plugin resource queries after controller-level permission checks.
+func TestEnsurePluginResourcePermissionPropagatesDataScope(t *testing.T) {
+	const requiredPermission = "plugin-dev-dynamic-governance:records:list"
+
+	bizCtx := &pluginResourceFakeBizCtx{
+		ctx: &model.Context{
+			UserId:   1001,
+			Username: "runtime_governance_user",
+		},
+	}
+	controller := &ControllerV1{
+		pluginSvc: pluginResourceFakeService{
+			permission: requiredPermission,
+		},
+		bizCtxSvc: bizCtx,
+		i18nSvc:   fakePluginI18nService{},
+		roleSvc: pluginResourceFakeRoleService{
+			accessContext: &role.UserAccessContext{
+				Permissions:          []string{requiredPermission},
+				DataScope:            datascope.ScopeSelf,
+				DataScopeUnsupported: true,
+				UnsupportedDataScope: 99,
+			},
+		},
+	}
+
+	allowed, err := controller.ensurePluginResourcePermission(
+		context.Background(),
+		"plugin-dev-dynamic-governance",
+		"records",
+	)
+	if err != nil {
+		t.Fatalf("expected permission check to succeed, got error: %v", err)
+	}
+	if !allowed {
+		t.Fatal("expected plugin resource permission to be allowed")
+	}
+	if bizCtx.ctx.DataScope != int(datascope.ScopeSelf) {
+		t.Fatalf("expected data-scope self to be propagated, got %d", bizCtx.ctx.DataScope)
+	}
+	if !bizCtx.ctx.DataScopeUnsupported {
+		t.Fatal("expected unsupported data-scope flag to be propagated")
+	}
+	if bizCtx.ctx.UnsupportedDataScope != 99 {
+		t.Fatalf("expected unsupported data-scope value 99, got %d", bizCtx.ctx.UnsupportedDataScope)
+	}
+}

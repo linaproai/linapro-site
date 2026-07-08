@@ -1,0 +1,248 @@
+// This file covers backend contract sections embedded into runtime wasm artifacts.
+
+package runtime_test
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"testing"
+	"time"
+
+	"lina-core/internal/service/plugin/internal/runtime"
+	"lina-core/internal/service/plugin/internal/testutil"
+	"lina-core/pkg/plugin/pluginbridge/protocol"
+	"lina-core/pkg/plugin/pluginhost"
+)
+
+// TestBuildRuntimeWasmArtifactEmbedsBackendContracts verifies that hook and
+// resource declarations are embedded into the generated runtime artifact.
+func TestBuildRuntimeWasmArtifactEmbedsBackendContracts(t *testing.T) {
+	services := testutil.NewServices()
+	pluginDir := t.TempDir()
+
+	testutil.WriteTestFile(
+		t,
+		filepath.Join(pluginDir, "plugin.yaml"),
+		"id: plugin-dev-dynamic-contract\nname: Dynamic Contract\nversion: v0.2.0\ntype: dynamic\nscope_nature: tenant_aware\nsupports_multi_tenant: false\ndefault_install_mode: global\n",
+	)
+	testutil.WriteTestFile(
+		t,
+		filepath.Join(pluginDir, "hack", "config.yaml"),
+		`wasm:
+  hooks:
+    - event: auth.login.succeeded
+      action: sleep
+      timeout: 50ms
+      sleep: 10ms
+  resources:
+    - key: records
+      type: table-list
+      table: plugin_runtime_records
+      fields:
+        - name: id
+          column: id
+        - name: status
+          column: status
+      filters:
+        - param: status
+          column: status
+          operator: eq
+      orderBy:
+        column: id
+        direction: asc
+      operations:
+        - query
+        - get
+        - update
+      keyField: id
+      writableFields:
+        - status
+      access: both
+      dataScope:
+        userColumn: owner_user_id
+`,
+	)
+
+	buildOut := testutil.BuildRuntimeArtifactWithHackTool(t, pluginDir)
+
+	artifact, err := services.Runtime.ParseRuntimeWasmArtifactContent(buildOut.ArtifactPath, buildOut.Content)
+	if err != nil {
+		t.Fatalf("expected dynamic artifact parse to succeed, got error: %v", err)
+	}
+	if len(artifact.HookSpecs) != 1 {
+		t.Fatalf("expected 1 embedded hook spec, got %d", len(artifact.HookSpecs))
+	}
+	if artifact.HookSpecs[0].Action != pluginhost.HookActionSleep {
+		t.Fatalf("expected embedded hook action sleep, got %s", artifact.HookSpecs[0].Action)
+	}
+	if len(artifact.ResourceSpecs) != 1 {
+		t.Fatalf("expected 1 embedded resource spec, got %d", len(artifact.ResourceSpecs))
+	}
+	if artifact.ResourceSpecs[0].DataScope == nil || artifact.ResourceSpecs[0].DataScope.UserColumn != "owner_user_id" {
+		t.Fatalf("expected embedded resource data scope userColumn owner_user_id, got %#v", artifact.ResourceSpecs[0].DataScope)
+	}
+	if artifact.ResourceSpecs[0].KeyField != "id" || artifact.ResourceSpecs[0].Access != "both" {
+		t.Fatalf("expected embedded resource governance fields, got %#v", artifact.ResourceSpecs[0])
+	}
+	if len(artifact.ResourceSpecs[0].WritableFields) != 1 || artifact.ResourceSpecs[0].WritableFields[0] != "status" {
+		t.Fatalf("expected embedded writableFields to contain status, got %#v", artifact.ResourceSpecs[0].WritableFields)
+	}
+}
+
+// TestRunBundledDynamicSampleBeforeInstallLifecycleAllowsRuntimeLog verifies
+// the bundled dynamic sample can run its BeforeInstall callback, including the
+// runtime.log.write host service used by the callback implementation.
+func TestRunBundledDynamicSampleBeforeInstallLifecycleAllowsRuntimeLog(t *testing.T) {
+	testutil.EnsureBundledRuntimeSampleArtifactForTests(t)
+
+	services := testutil.NewServices()
+	artifactPath := filepath.Join(testutil.TestDynamicStorageDir(), testutil.RuntimeArtifactFileName("linapro-demo-dynamic"))
+	manifest, err := services.Catalog.LoadManifestFromArtifactPath(artifactPath)
+	if err != nil {
+		t.Fatalf("expected bundled dynamic manifest to load, got error: %v", err)
+	}
+	for _, contract := range manifest.LifecycleHandlers {
+		if contract != nil && contract.Operation.String() == pluginhost.LifecycleHookBeforeInstall.String() {
+			// CI runs this package with -race, so the real bundled sample gets a
+			// wider test-only cold-start budget without changing production defaults.
+			contract.TimeoutMs = int((2 * time.Minute) / time.Millisecond)
+			break
+		}
+	}
+
+	decision, err := services.Runtime.RunDynamicLifecyclePrecondition(context.Background(), manifest, runtime.DynamicLifecycleInput{
+		PluginID:  manifest.ID,
+		Operation: pluginhost.LifecycleHookBeforeInstall,
+	})
+	if err != nil {
+		t.Fatalf("expected bundled BeforeInstall lifecycle to succeed, got error: %v decision=%#v", err, decision)
+	}
+	if decision == nil || !decision.OK {
+		t.Fatalf("expected bundled BeforeInstall lifecycle to allow install, got %#v", decision)
+	}
+}
+
+// TestLoadRuntimePluginManifestFromArtifactHydratesBackendContracts verifies
+// that runtime manifest loading restores embedded backend contracts.
+func TestLoadRuntimePluginManifestFromArtifactHydratesBackendContracts(t *testing.T) {
+	services := testutil.NewServices()
+	pluginDir := t.TempDir()
+
+	testutil.WriteTestFile(
+		t,
+		filepath.Join(pluginDir, "plugin.yaml"),
+		"id: plugin-dev-dynamic-active-contract\nname: Active Contract\nversion: v0.2.0\ntype: dynamic\nscope_nature: tenant_aware\nsupports_multi_tenant: false\ndefault_install_mode: global\n",
+	)
+	testutil.WriteTestFile(
+		t,
+		filepath.Join(pluginDir, "hack", "config.yaml"),
+		`wasm:
+  hooks:
+    - event: auth.login.succeeded
+      action: sleep
+      timeout: 50ms
+      sleep: 10ms
+  resources:
+    - key: records
+      type: table-list
+      table: plugin_runtime_records
+      fields:
+        - name: id
+          column: id
+        - name: status
+          column: status
+      orderBy:
+        column: id
+        direction: asc
+      operations:
+        - query
+        - get
+      keyField: id
+      access: request
+`,
+	)
+
+	buildOut := testutil.BuildRuntimeArtifactWithHackTool(t, pluginDir)
+	if err := os.MkdirAll(filepath.Dir(buildOut.ArtifactPath), 0o755); err != nil {
+		t.Fatalf("expected runtime artifact directory to be created, got error: %v", err)
+	}
+	if err := os.WriteFile(buildOut.ArtifactPath, buildOut.Content, 0o644); err != nil {
+		t.Fatalf("expected runtime artifact to be written, got error: %v", err)
+	}
+
+	manifest, err := services.Catalog.LoadManifestFromArtifactPath(buildOut.ArtifactPath)
+	if err != nil {
+		t.Fatalf("expected runtime manifest load to succeed, got error: %v", err)
+	}
+	if len(manifest.Hooks) != 1 {
+		t.Fatalf("expected runtime manifest to expose 1 hook, got %d", len(manifest.Hooks))
+	}
+	if len(manifest.BackendResources) != 1 {
+		t.Fatalf("expected runtime manifest to expose 1 backend resource, got %d", len(manifest.BackendResources))
+	}
+	if _, ok := manifest.BackendResources["records"]; !ok {
+		t.Fatalf("expected runtime manifest to expose resource key records, got %#v", manifest.BackendResources)
+	}
+	if manifest.BackendResources["records"].KeyField != "id" || len(manifest.BackendResources["records"].Operations) != 2 {
+		t.Fatalf("expected runtime manifest to expose resource governance fields, got %#v", manifest.BackendResources["records"])
+	}
+}
+
+// TestBundledDynamicSampleDeclaresBeforeAndAfterLifecycleCallbacks verifies
+// the official dynamic sample registers the full canonical lifecycle callback
+// set in its runtime artifact.
+func TestBundledDynamicSampleDeclaresBeforeAndAfterLifecycleCallbacks(t *testing.T) {
+	services := testutil.NewServices()
+	repoRoot, err := testutil.FindRepoRoot(".")
+	if err != nil {
+		t.Fatalf("expected repo root to resolve, got error: %v", err)
+	}
+	pluginDir := filepath.Join(repoRoot, "apps", "lina-plugins", "linapro-demo-dynamic")
+	if _, statErr := os.Stat(filepath.Join(pluginDir, "plugin.yaml")); statErr != nil {
+		if os.IsNotExist(statErr) {
+			t.Skip("official plugin workspace is not initialized")
+		}
+		t.Fatalf("expected linapro-demo-dynamic plugin.yaml to stat, got error: %v", statErr)
+	}
+
+	buildOut := testutil.BuildRuntimeArtifactWithHackTool(t, pluginDir)
+	artifact, err := services.Runtime.ParseRuntimeWasmArtifactContent(buildOut.ArtifactPath, buildOut.Content)
+	if err != nil {
+		t.Fatalf("expected bundled dynamic sample artifact to parse, got error: %v", err)
+	}
+
+	expected := map[protocol.LifecycleOperation]struct{}{
+		protocol.LifecycleOperationBeforeInstall:           {},
+		protocol.LifecycleOperationAfterInstall:            {},
+		protocol.LifecycleOperationBeforeUpgrade:           {},
+		protocol.LifecycleOperationUpgrade:                 {},
+		protocol.LifecycleOperationAfterUpgrade:            {},
+		protocol.LifecycleOperationBeforeDisable:           {},
+		protocol.LifecycleOperationAfterDisable:            {},
+		protocol.LifecycleOperationBeforeUninstall:         {},
+		protocol.LifecycleOperationUninstall:               {},
+		protocol.LifecycleOperationAfterUninstall:          {},
+		protocol.LifecycleOperationBeforeTenantDisable:     {},
+		protocol.LifecycleOperationAfterTenantDisable:      {},
+		protocol.LifecycleOperationBeforeTenantDelete:      {},
+		protocol.LifecycleOperationAfterTenantDelete:       {},
+		protocol.LifecycleOperationBeforeInstallModeChange: {},
+		protocol.LifecycleOperationAfterInstallModeChange:  {},
+	}
+	if len(artifact.LifecycleContracts) != len(expected) {
+		t.Fatalf("expected %d lifecycle contracts, got %d", len(expected), len(artifact.LifecycleContracts))
+	}
+	for _, contract := range artifact.LifecycleContracts {
+		if contract == nil {
+			t.Fatalf("expected lifecycle contract not to be nil")
+		}
+		if _, ok := expected[contract.Operation]; !ok {
+			t.Fatalf("unexpected lifecycle operation %s", contract.Operation)
+		}
+		delete(expected, contract.Operation)
+	}
+	if len(expected) != 0 {
+		t.Fatalf("expected all lifecycle operations to be declared, missing=%#v", expected)
+	}
+}

@@ -1,0 +1,129 @@
+// Package dialect provides the stable database-dialect boundary used by host
+// bootstrap commands, plugin SQL lifecycle code, and future tooling.
+package dialect
+
+import (
+	"context"
+	"strings"
+
+	"github.com/gogf/gf/v2/database/gdb"
+	"github.com/gogf/gf/v2/errors/gcode"
+
+	"lina-core/pkg/bizerr"
+)
+
+// Supported database link prefixes.
+const (
+	pgsqlPrefix = "pgsql:"
+)
+
+var (
+	// CodeDialectLinkRequired reports that database.default.link is empty.
+	CodeDialectLinkRequired = bizerr.MustDefine(
+		"DIALECT_LINK_REQUIRED",
+		"Database link is required",
+		gcode.CodeInvalidParameter,
+	)
+	// CodeDialectUnsupported reports that a database link prefix is not supported.
+	CodeDialectUnsupported = bizerr.MustDefine(
+		"DIALECT_UNSUPPORTED",
+		"Database dialect {prefix} is unsupported; supported prefix is pgsql:",
+		gcode.CodeInvalidParameter,
+	)
+	// CodeDialectMySQLUnsupported reports that MySQL support has been removed.
+	CodeDialectMySQLUnsupported = bizerr.MustDefine(
+		"DIALECT_MYSQL_UNSUPPORTED",
+		"mysql dialect is no longer supported; supported prefix is pgsql:",
+		gcode.CodeInvalidParameter,
+	)
+	// CodeDialectSQLiteUnsupported reports that SQLite support has been removed.
+	CodeDialectSQLiteUnsupported = bizerr.MustDefine(
+		"DIALECT_SQLITE_UNSUPPORTED",
+		"sqlite dialect is no longer supported; supported prefix is pgsql:",
+		gcode.CodeInvalidParameter,
+	)
+)
+
+// Dialect abstracts database-engine behavior that cannot be delegated to
+// GoFrame's query builder.
+type Dialect interface {
+	// Name returns the stable dialect name used in logs, diagnostics, cache keys,
+	// and startup decisions. The value must not depend on the active connection.
+	Name() string
+	// TranslateDDL converts one PostgreSQL-source SQL asset into SQL executable by
+	// this dialect. sourceName is a file path or embedded asset identifier used
+	// only for error diagnostics; ddl is not modified in-place. Implementations
+	// return an error when the asset uses SQL outside the supported migration
+	// subset, and callers must treat the output as database-specific init SQL.
+	TranslateDDL(ctx context.Context, sourceName string, ddl string) (string, error)
+	// PrepareDatabase prepares the configured database before init SQL assets run.
+	// link is the raw database.default.link value and rebuild controls destructive
+	// local reset behavior for initialization flows. Implementations return errors
+	// for unreachable servers, invalid filesystem paths, or unsupported rebuild
+	// requests; they do not alter routes, permissions, i18n resources, or caches.
+	PrepareDatabase(ctx context.Context, link string, rebuild bool) error
+	// SupportsCluster reports whether this database can back multi-node
+	// coordination state. Callers use this to decide whether cluster-mode cache
+	// coordination can be enabled for the active database.
+	SupportsCluster() bool
+	// DatabaseVersion returns a display-ready database engine and version label
+	// for the provided GoFrame database handle. It returns an error when the
+	// version query cannot be executed.
+	DatabaseVersion(ctx context.Context, db gdb.DB) (string, error)
+	// QueryTableMetadata returns metadata for the named tables that exist in
+	// the requested schema. Missing table names are skipped and database errors
+	// are returned to the caller without fallback data.
+	QueryTableMetadata(ctx context.Context, db gdb.DB, schema string, tableNames []string) ([]TableMeta, error)
+	// ClassifyReadSQL classifies database driver and ORM read-only SQL that may
+	// not include an application table literal. Callers use the result to keep
+	// governance code independent from concrete database catalog syntax.
+	ClassifyReadSQL(sql string) ReadSQLClassification
+}
+
+// TableMeta describes portable table metadata exposed through the dialect
+// boundary.
+type TableMeta struct {
+	TableName    string // TableName is the database table identifier.
+	TableComment string // TableComment is the optional table comment.
+}
+
+// ReadSQLClassification describes read-only SQL emitted by database drivers or
+// ORM internals that should be treated differently from application data reads.
+type ReadSQLClassification struct {
+	MetadataLookup bool // MetadataLookup reports catalog SQL that binds the table name as an argument.
+	SchemaProbe    bool // SchemaProbe reports database/session probes that do not target one application table.
+}
+
+// From resolves one database dialect from the database.default.link prefix.
+func From(link string) (Dialect, error) {
+	return fromLink(link)
+}
+
+// FromDatabase resolves one database dialect from the active GoFrame database
+// configuration.
+func FromDatabase(db gdb.DB) (Dialect, error) {
+	link := ""
+	if db != nil && db.GetConfig() != nil {
+		configNode := db.GetConfig()
+		link = strings.TrimSpace(configNode.Link)
+		if link == "" && strings.TrimSpace(configNode.Type) != "" {
+			link = strings.TrimSpace(configNode.Type) + ":"
+		}
+	}
+	return From(link)
+}
+
+// FromDriverType resolves one database dialect from a GoFrame driver type.
+func FromDriverType(driverType string) (Dialect, error) {
+	normalized := strings.TrimSpace(driverType)
+	if normalized == "" {
+		return From("")
+	}
+	return From(normalized + ":")
+}
+
+// DatabaseVersion returns a display-ready database engine and version label for
+// the active GoFrame database.
+func DatabaseVersion(ctx context.Context, db gdb.DB) (string, error) {
+	return databaseVersion(ctx, db)
+}

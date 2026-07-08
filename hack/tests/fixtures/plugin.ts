@@ -1,0 +1,299 @@
+import type { APIRequestContext, Page } from '@playwright/test';
+
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+
+import { request as playwrightRequest } from '@playwright/test';
+
+import { config, workspacePath } from './config';
+import { execPgSQLFile } from '../support/postgres';
+import { waitForRouteReady } from '../support/ui';
+
+const apiBaseURL = config.apiBaseURL;
+const repoRoot = path.resolve(process.cwd(), '../..');
+
+type PluginListItem = {
+  enabled?: number;
+  id: string;
+  installMode?: string;
+  installed?: number;
+  runtimeState?: string;
+  scopeNature?: string;
+  type?: string;
+  upgradeAvailable?: boolean;
+  version?: string;
+};
+
+async function ensurePluginEnabledState(
+  adminApi: APIRequestContext,
+  pluginId: string,
+  installMode?: string,
+) {
+  let plugin = await findPlugin(adminApi, pluginId);
+  if (!plugin) {
+    throw new Error(`未找到插件: ${pluginId}`);
+  }
+  if (plugin.installed !== 1) {
+    await installPlugin(adminApi, pluginId, installMode);
+    plugin = await findPlugin(adminApi, pluginId);
+  }
+  if (plugin && plugin.installed === 1 && pluginNeedsRuntimeUpgrade(plugin)) {
+    await upgradePlugin(adminApi, pluginId);
+    plugin = await findPlugin(adminApi, pluginId);
+  }
+  if (plugin?.enabled !== 1) {
+    await updatePluginStatus(adminApi, pluginId, true);
+  }
+  loadSourcePluginMockData(pluginId);
+}
+
+function pluginNeedsRuntimeUpgrade(plugin: PluginListItem) {
+  return (
+    plugin.upgradeAvailable === true ||
+    plugin.runtimeState === 'pending_upgrade' ||
+    plugin.runtimeState === 'upgrade_failed'
+  );
+}
+
+function unwrapApiData(payload: any) {
+  if (payload && typeof payload === 'object' && 'data' in payload) {
+    return payload.data;
+  }
+  return payload;
+}
+
+function assertOk(response: Awaited<ReturnType<APIRequestContext['get']>>, message: string) {
+  if (!response.ok()) {
+    throw new Error(`${message}, status=${response.status()}`);
+  }
+}
+
+function loadSourcePluginMockData(pluginId: string) {
+  const mockSQLPath = path.join(
+    repoRoot,
+    'apps',
+    'lina-plugins',
+    pluginId,
+    'manifest',
+    'sql',
+    'mock-data',
+    `001-${pluginId}-mock-data.sql`,
+  );
+  if (!existsSync(mockSQLPath)) {
+    return;
+  }
+
+  execPgSQLFile(mockSQLPath);
+}
+
+export async function createAdminApiContext(): Promise<APIRequestContext> {
+  const loginApi = await playwrightRequest.newContext({ baseURL: apiBaseURL });
+  const loginResponse = await loginApi.post('auth/login', {
+    data: {
+      password: config.adminPass,
+      username: config.adminUser,
+      clientType: 'web',
+    },
+  });
+  assertOk(loginResponse, '管理员登录 API 失败');
+
+  const loginResult = unwrapApiData(await loginResponse.json());
+  const accessToken = loginResult?.accessToken;
+  if (!accessToken) {
+    throw new Error('未获取到 accessToken');
+  }
+  await loginApi.dispose();
+
+  return await playwrightRequest.newContext({
+    baseURL: apiBaseURL,
+    extraHTTPHeaders: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+}
+
+export async function prepareSourcePluginsBaseline(pluginIds: readonly string[]) {
+  const uniquePluginIds = [...new Set(pluginIds)].sort();
+  const adminApi = await createAdminApiContext();
+  try {
+    await syncPlugins(adminApi);
+    for (const pluginId of uniquePluginIds) {
+      await ensurePluginEnabledState(adminApi, pluginId, 'global');
+    }
+  } finally {
+    await adminApi.dispose();
+  }
+}
+
+export async function syncPlugins(adminApi: APIRequestContext) {
+  const response = await adminApi.post('plugins/sync');
+  assertOk(response, '同步源码插件失败');
+}
+
+export async function listPlugins(
+  adminApi: APIRequestContext,
+): Promise<PluginListItem[]> {
+  const response = await adminApi.get('plugins');
+  assertOk(response, '查询插件列表失败');
+  const payload = unwrapApiData(await response.json());
+  return payload?.list ?? [];
+}
+
+export async function findPlugin(
+  adminApi: APIRequestContext,
+  pluginId: string,
+) {
+  const items = await listPlugins(adminApi);
+  return items.find((item) => item.id === pluginId) ?? null;
+}
+
+export async function installPlugin(
+  adminApi: APIRequestContext,
+  pluginId: string,
+  installMode?: string,
+) {
+  const response = await adminApi.post(`plugins/${pluginId}/install`, {
+    data: installMode
+      ? {
+          installMode,
+        }
+      : undefined,
+  });
+  assertOk(response, `安装插件失败: ${pluginId}`);
+}
+
+export async function upgradePlugin(adminApi: APIRequestContext, pluginId: string) {
+  const response = await adminApi.post(`plugins/${pluginId}/upgrade`, {
+    data: {
+      confirmed: true,
+    },
+  });
+  assertOk(response, `升级插件失败: ${pluginId}`);
+}
+
+export async function uninstallPlugin(
+  adminApi: APIRequestContext,
+  pluginId: string,
+  purgeStorageData = false,
+) {
+  const response = await adminApi.delete(`plugins/${pluginId}`, {
+    data: {
+      purgeStorageData: purgeStorageData ? 1 : 0,
+    },
+  });
+  assertOk(response, `卸载插件失败: ${pluginId}`);
+}
+
+export async function updatePluginStatus(
+  adminApi: APIRequestContext,
+  pluginId: string,
+  enabled: boolean,
+) {
+  const response = await adminApi.put(
+    enabled ? `plugins/${pluginId}/enable` : `plugins/${pluginId}/disable`,
+  );
+  assertOk(response, `更新插件状态失败: ${pluginId}`);
+}
+
+export async function refreshPluginProjection(page: Page) {
+  // Always land on a stable host route before reloading so plugin lifecycle
+  // changes do not leave the current page stranded on a stale dynamic route.
+  await page.goto(workspacePath('/dashboard/analytics'), {
+    waitUntil: 'domcontentloaded',
+  });
+  await waitForRouteReady(page, 15000);
+  await page.evaluate(() => {
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith('linapro:i18n:runtime:')) {
+        localStorage.removeItem(key);
+      }
+    }
+  });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await waitForRouteReady(page, 15000);
+}
+
+export async function ensureSourcePluginInstalled(page: Page, pluginId: string) {
+  const adminApi = await createAdminApiContext();
+  try {
+    await syncPlugins(adminApi);
+    const plugin = await findPlugin(adminApi, pluginId);
+    if (!plugin) {
+      throw new Error(`未找到插件: ${pluginId}`);
+    }
+    if (plugin.installed !== 1) {
+      await installPlugin(adminApi, pluginId, 'global');
+    }
+  } finally {
+    await adminApi.dispose();
+  }
+
+  await refreshPluginProjection(page);
+}
+
+export async function ensureSourcePluginEnabled(page: Page, pluginId: string) {
+  const adminApi = await createAdminApiContext();
+  try {
+    await syncPlugins(adminApi);
+    await ensurePluginEnabledState(adminApi, pluginId, 'global');
+  } finally {
+    await adminApi.dispose();
+  }
+
+  await refreshPluginProjection(page);
+}
+
+export async function ensureSourcePluginsEnabled(
+  page: Page,
+  pluginIds: readonly string[],
+) {
+  const adminApi = await createAdminApiContext();
+  try {
+    await syncPlugins(adminApi);
+    for (const pluginId of pluginIds) {
+      await ensurePluginEnabledState(adminApi, pluginId, 'global');
+    }
+  } finally {
+    await adminApi.dispose();
+  }
+
+  await refreshPluginProjection(page);
+}
+
+export async function ensureSourcePluginEnabledViaAPI(
+  adminApi: APIRequestContext,
+  pluginId: string,
+) {
+  await syncPlugins(adminApi);
+  await ensurePluginEnabledState(adminApi, pluginId, 'global');
+}
+
+export async function ensureSourcePluginDisabled(page: Page, pluginId: string) {
+  const adminApi = await createAdminApiContext();
+  try {
+    await syncPlugins(adminApi);
+    const plugin = await findPlugin(adminApi, pluginId);
+    if (plugin?.installed === 1 && plugin.enabled === 1) {
+      await updatePluginStatus(adminApi, pluginId, false);
+    }
+  } finally {
+    await adminApi.dispose();
+  }
+
+  await refreshPluginProjection(page);
+}
+
+export async function ensureSourcePluginUninstalled(page: Page, pluginId: string) {
+  const adminApi = await createAdminApiContext();
+  try {
+    await syncPlugins(adminApi);
+    const plugin = await findPlugin(adminApi, pluginId);
+    if (plugin?.installed === 1) {
+      await uninstallPlugin(adminApi, pluginId);
+    }
+  } finally {
+    await adminApi.dispose();
+  }
+
+  await refreshPluginProjection(page);
+}
