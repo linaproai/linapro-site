@@ -248,7 +248,3 @@ WEBP_INCLUDE_STATIC ?= 0
 .PHONY: site.webp
 site.webp:
 	cd $(SITE_DIR) && WEBP_LOSSLESS=$(WEBP_LOSSLESS) WEBP_QUALITY=$(WEBP_QUALITY) WEBP_INCLUDE_STATIC=$(WEBP_INCLUDE_STATIC) node scripts/docs-images-to-webp.js $(IMAGE_FLAGS)
-
-## webp: 兼容旧官网仓库的图片转换入口
-.PHONY: webp
-webp: site.webp
