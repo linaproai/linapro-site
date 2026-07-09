@@ -37,7 +37,9 @@ keywords:
 
 ## 工具集成
 
+:::info 提示
 本示例我们使用了`Claude Code`，因为它（目前）被认为是行业内最强大的`AI Coding`工具，其他的工具如`Codex CLI`、`Cursor`等也表现不错，大家开发中可以选择任意自己熟悉的`AI Coding`工具。
+:::
 
 执行以下指令，通过终端交互的方式，可以将框架提供的`Skills`、项目规范和提示词集成到自己熟悉的`AI Coding`工具中：
 
@@ -94,6 +96,10 @@ claude
 ```text
 /opsx:propose content-article
 ```
+或者
+```text
+继续OpenSpec变更。
+```
 
 **AI 会做什么：**
 
@@ -126,6 +132,10 @@ claude
 
 ```text
 /opsx:apply
+```
+或者
+```text
+执行OpenSpec变更。
 ```
 
 **AI 会做什么：**
@@ -204,7 +214,7 @@ make dev
 验收过程中如果发现`Bug`、功能不完整或体验问题，可以直接在`Claude Code`中描述，`AI`会针对性修复并完成测试：
 
 ```text
-/lina-feedback 文章列表的分页不正确，第2页显示的数据与第1页重复
+文章列表的分页不正确，第2页显示的数据与第1页重复
 ```
 
 `AI`会：
@@ -227,6 +237,10 @@ make dev
 
 ```text
 /opsx:archive
+```
+或者
+```text
+归档OpenSpec变更。
 ```
 
 **AI 会做什么：**
@@ -256,4 +270,4 @@ flowchart LR
 - **每次迭代都有完整记录**，架构不会随时间漂移
 - **插件采用松耦合设计**，可以随时单独禁用或卸载，不影响其他模块
 
-接下来，你可以阅读[组件设计](/docs/components)建立整体组件地图，再深入查看[源码插件](/docs/source-plugins)、[WASM动态插件](/docs/wasm-plugins)和[主框架服务](/docs/core-host)等页面，理解框架的扩展方式和架构边界。
+接下来，建议先阅读[设计理念](/docs/concepts)了解框架背后的核心设计原则，再阅读[组件设计](/docs/components)建立整体组件地图，然后深入查看[领域设计](/docs/domain-capabilities)理解插件可用的领域能力边界。

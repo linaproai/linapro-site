@@ -49,4 +49,6 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 ## 捐赠记录
 
-TODO
+| 名称 | 渠道 | 金额 | 时间 | 备注 |
+| --- | --- | --- | --- | --- |
+| 善善有福 | `wechat` | `￥500.00` | `2026-07-03 21:32:00` |  |

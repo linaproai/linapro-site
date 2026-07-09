@@ -1,8 +1,8 @@
 ---
 slug: '/community/support'
-title: 'Support'
+title: 'Support Us'
 hide_title: true
-description: 'Practical ways to support the long-term maintenance of LinaPro, including filing reproducible issues, improving documentation, sharing production experience, joining community discussions, and donating through WeChat Pay or Alipay. Please include your GitHub or Gitee account name in the donation note so we can keep an accurate donation record.'
+description: 'Practical ways to support long-term maintenance, including reporting reproducible issues, contributing documentation, improving examples, sharing production experience, joining community discussions, and donating via WeChat Pay or Alipay. Please include your GitHub or Gitee account name when donating so we can maintain an accurate donation record.'
 keywords:
   - LinaPro
   - support LinaPro
@@ -26,7 +26,7 @@ import useBaseUrl from '@docusaurus/useBaseUrl';
 
 ## Donation Methods
 
-We currently accept donations through WeChat Pay and Alipay. Please include your GitHub or Gitee account name in the donation note so we can keep an accurate donation record and acknowledge your support.
+We currently accept donations via WeChat Pay and Alipay. Please include your GitHub or Gitee account name in the donation note so we can maintain an accurate donation record and acknowledge your contribution.
 
 <table>
   <thead>
@@ -49,4 +49,6 @@ We currently accept donations through WeChat Pay and Alipay. Please include your
 
 ## Donation Records
 
-TODO
+| Name | Channel | Amount | Date | Note |
+| --- | --- | --- | --- | --- |
+| 善善有福 | `wechat` | `￥500.00` | `2026-07-03 21:32:00` |  |

@@ -148,16 +148,16 @@ make dev
 
 | 服务 | 地址 |
 |------|------|
-| 前端开发服务 | `http://localhost:5666` |
-| 后端`API`服务 | `http://localhost:9120` |
-| 默认管理工作台 | `http://localhost:5666/admin` |
+| **前端开发服务** | `http://localhost:5666` |
+| **后端`API`服务** | `http://localhost:9120` |
+| **默认管理工作台** | `http://localhost:5666/admin` |
 
 使用默认账号登录管理工作台：
 
 | 字段 | 值 |
 |------|-----|
-| 账号 | `admin` |
-| 密码 | `admin123` |
+| **账号** | `admin` |
+| **密码** | `admin123` |
 
 ## 工具集成
 

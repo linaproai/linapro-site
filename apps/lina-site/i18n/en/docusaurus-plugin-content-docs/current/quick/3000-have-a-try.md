@@ -37,7 +37,9 @@ The entire development process is driven by `Claude Code` through the spec-drive
 
 ## Tool Integration
 
+:::info Tip
 This example uses `Claude Code` because it is currently regarded as one of the strongest `AI Coding` tools in the industry. Other tools such as `Codex CLI` and `Cursor` also work well, so you can choose the `AI Coding` tool you are most comfortable with.
+:::
 
 Run the following interactive terminal command to integrate the framework's `Skills`, project conventions, and prompts into your preferred `AI Coding` tool:
 
@@ -94,6 +96,10 @@ Enter in `Claude Code`:
 ```text
 /opsx:propose content-article
 ```
+Or
+```text
+Continue the OpenSpec change.
+```
 
 **What AI does:**
 
@@ -126,6 +132,10 @@ Enter in `Claude Code`:
 
 ```text
 /opsx:apply
+```
+Or
+```text
+Execute the OpenSpec change.
 ```
 
 **What AI does:**
@@ -204,7 +214,7 @@ To adjust permissions, go to "Permission Management -> Role Management" and assi
 If you find a `Bug`, incomplete feature, or experience issue during acceptance, describe it directly in `Claude Code`. `AI` will apply a targeted fix and complete testing:
 
 ```text
-/lina-feedback The article list pagination is incorrect. Page 2 shows the same data as page 1.
+The article list pagination is incorrect. Page 2 shows the same data as page 1.
 ```
 
 `AI` will:
@@ -227,6 +237,10 @@ Enter in `Claude Code`:
 
 ```text
 /opsx:archive
+```
+Or
+```text
+Archive the OpenSpec change.
 ```
 
 **What AI does:**
@@ -256,4 +270,4 @@ flowchart LR
 - **Every iteration has a complete record**, so the architecture does not drift over time
 - **Plugins use a loosely coupled design**, so they can be disabled or uninstalled independently without affecting other modules
 
-Next, read [Components](/docs/components) to build a map of the overall component architecture, then continue with [Source Plugins](/docs/source-plugins), [WASM Dynamic Plugins](/docs/wasm-plugins), and [Core Framework Service](/docs/core-host) to understand the framework's extension model and architecture boundaries.
+Next, start by reading [Design Philosophy](/docs/concepts) to understand the core design principles behind the framework, then read [Components](/docs/components) to build a map of the overall component architecture, and finally dive into [Domain Capabilities](/docs/domain-capabilities) to understand the domain capability boundaries available to plugins.
