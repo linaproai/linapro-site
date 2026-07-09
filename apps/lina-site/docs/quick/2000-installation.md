@@ -144,6 +144,10 @@ $env:PLAYWRIGHT_DOWNLOAD_HOST="https://cdn.npmmirror.com/binaries/playwright" ma
 make dev
 ```
 
+:::tip 提示
+如果在启动过程中遇到报错问题，可以让`AI`工具帮助你解决问题，比如本地运行`claude`, `codex`等`AI`工具都能快速帮助你解决环境或者启动问题。
+:::
+
 服务启动成功后，访问以下地址：
 
 | 服务 | 地址 |

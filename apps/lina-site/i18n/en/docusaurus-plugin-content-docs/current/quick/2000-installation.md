@@ -144,6 +144,10 @@ Run the following command to start the frontend and backend services:
 make dev
 ```
 
+:::tip Tip
+If you encounter errors during startup, AI tools can help you resolve them quickly. Running tools like Claude or Codex locally can help you troubleshoot environment or startup issues in no time.
+:::
+
 After the services start successfully, visit the following addresses:
 
 | Service | Address |
