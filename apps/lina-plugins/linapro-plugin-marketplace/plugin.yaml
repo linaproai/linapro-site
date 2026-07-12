@@ -1,0 +1,71 @@
+id: linapro-plugin-marketplace
+name: LinaPro Plugin Marketplace
+version: v0.1.3
+type: source
+distribution: builtin
+scope_nature: platform_only
+supports_multi_tenant: false
+default_install_mode: global
+description: Built-in marketplace source plugin for publishing, reviewing, discovering, documenting, and downloading LinaPro plugins.
+author: LinaPro
+license: Apache-2.0
+i18n:
+  enabled: true
+  default: en-US
+  locales:
+    - locale: en-US
+      nativeName: English
+    - locale: zh-CN
+      nativeName: 简体中文
+menus:
+  # Top-level directory. Host extension center uses sort=9; marketplace sits above it.
+  - key: plugin:linapro-plugin-marketplace:directory
+    name: plugin.linapro-plugin-marketplace.menu.directory
+    path: plugin-marketplace
+    component: ""
+    icon: ant-design:shop-outlined
+    type: D
+    sort: 8
+  - key: plugin:linapro-plugin-marketplace:marketplace-mine
+    parent_key: plugin:linapro-plugin-marketplace:directory
+    name: plugin.linapro-plugin-marketplace.menu.mine
+    path: plugin-marketplace-mine
+    component: system/plugin/dynamic-page
+    perms: market:plugin:publish
+    icon: ant-design:appstore-outlined
+    type: M
+    sort: 1
+  - key: plugin:linapro-plugin-marketplace:marketplace-admin-list
+    parent_key: plugin:linapro-plugin-marketplace:directory
+    name: plugin.linapro-plugin-marketplace.menu.adminList
+    path: plugin-marketplace-admin-list
+    component: system/plugin/dynamic-page
+    perms: market:plugin:review
+    icon: ant-design:unordered-list-outlined
+    type: M
+    sort: 2
+  - key: plugin:linapro-plugin-marketplace:marketplace-review
+    parent_key: plugin:linapro-plugin-marketplace:directory
+    name: plugin.linapro-plugin-marketplace.menu.review
+    path: plugin-marketplace-review
+    component: system/plugin/dynamic-page
+    perms: market:plugin:review
+    icon: ant-design:audit-outlined
+    type: M
+    sort: 3
+  - key: plugin:linapro-plugin-marketplace:marketplace-detail
+    parent_key: plugin:linapro-plugin-marketplace:directory
+    name: plugin.linapro-plugin-marketplace.menu.detail
+    path: plugin-marketplace-detail
+    component: system/plugin/dynamic-page
+    perms: market:plugin:view
+    icon: ant-design:profile-outlined
+    type: M
+    sort: 4
+    visible: 0
+  - key: plugin:linapro-plugin-marketplace:marketplace-download
+    parent_key: plugin:linapro-plugin-marketplace:marketplace-detail
+    name: plugin.linapro-plugin-marketplace.menu.download
+    perms: market:plugin:download
+    type: B
+    sort: 1

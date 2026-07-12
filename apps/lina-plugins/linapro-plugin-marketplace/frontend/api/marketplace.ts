@@ -1,0 +1,305 @@
+// This file provides the plugin-owned marketplace frontend API adapter. It
+// builds URLs through the host plugin API helper and keeps response projection
+// thin so pages can use Vben grid conventions without duplicating DTO mapping.
+
+import type { RequestClientConfig } from "@vben/request";
+
+import type {
+  MarketplaceDocumentItem,
+  MarketplaceDocumentParams,
+  MarketplaceDownloadSessionCreateParams,
+  MarketplaceDownloadSessionItem,
+  MarketplaceGridResult,
+  MarketplacePageResult,
+  MarketplacePluginCreatePayload,
+  MarketplacePluginDetailItem,
+  MarketplaceManagedPluginListParams,
+  MarketplacePluginListItem,
+  MarketplacePluginListParams,
+  MarketplacePluginStatusUpdatePayload,
+  MarketplacePublisherCreatePayload,
+  MarketplacePublisherItem,
+  MarketplacePublisherListParams,
+  MarketplaceMyPluginListParams,
+  MarketplaceReleaseItem,
+  MarketplaceReleaseListParams,
+  MarketplaceReleaseReviewPayload,
+  MarketplaceReleaseSubmitPayload,
+  MarketplaceReleaseUploadParams,
+  MarketplaceReviewQueueItem,
+  MarketplaceReviewQueueListParams,
+  MarketplaceRiskItem,
+  MarketplaceRiskListParams,
+} from "../types/marketplace";
+
+import { pluginApiPath, requestClient } from "#/api/request";
+
+export const marketplacePluginId = "linapro-plugin-marketplace";
+
+export type MarketplaceReadScope = "managed" | "mine" | "public";
+
+const marketplaceUploadTimeout = 120_000;
+const marketplaceDownloadTimeout = 120_000;
+
+function marketplacePath(pathName: string) {
+  return pluginApiPath(marketplacePluginId, pathName);
+}
+
+function encodePathSegment(value: string) {
+  return encodeURIComponent(value.trim());
+}
+
+function releasePath(pluginId: string, version: string, suffix = "") {
+  const base = `market/plugins/${encodePathSegment(pluginId)}/releases/${encodePathSegment(version)}`;
+  return suffix ? `${base}/${suffix.replace(/^\/+/, "")}` : base;
+}
+
+function readPluginBase(scope: MarketplaceReadScope) {
+  if (scope === "mine") {
+    return "market/my-plugins";
+  }
+  if (scope === "managed") {
+    return "market/managed-plugins";
+  }
+  return "market/plugins";
+}
+
+function readPluginPath(pluginId: string, scope: MarketplaceReadScope) {
+  return `${readPluginBase(scope)}/${encodePathSegment(pluginId)}`;
+}
+
+function readReleasePath(
+  pluginId: string,
+  version: string,
+  suffix: string,
+  scope: MarketplaceReadScope,
+) {
+  const base = `${readPluginPath(pluginId, scope)}/releases/${encodePathSegment(version)}`;
+  return suffix ? `${base}/${suffix.replace(/^\/+/, "")}` : base;
+}
+
+function appendString(formData: FormData, key: string, value?: string) {
+  if (value) {
+    formData.append(key, value);
+  }
+}
+
+function appendBoolean(formData: FormData, key: string, value?: boolean) {
+  if (typeof value === "boolean") {
+    formData.append(key, value ? "1" : "0");
+  }
+}
+
+function gridResult<T>(
+  result: MarketplacePageResult<T>,
+): MarketplaceGridResult<T> {
+  return {
+    items: result.list ?? [],
+    total: result.total ?? 0,
+  };
+}
+
+export async function marketplacePublisherList(
+  params?: MarketplacePublisherListParams,
+) {
+  const res = await requestClient.get<
+    MarketplacePageResult<MarketplacePublisherItem>
+  >(marketplacePath("market/publishers"), { params });
+  return gridResult(res);
+}
+
+export function marketplacePublisherCreate(
+  data: MarketplacePublisherCreatePayload,
+) {
+  return requestClient.post<{ publisher: MarketplacePublisherItem }>(
+    marketplacePath("market/publishers"),
+    data,
+  );
+}
+
+export async function marketplacePluginList(
+  params?: MarketplacePluginListParams,
+) {
+  const res = await requestClient.get<
+    MarketplacePageResult<MarketplacePluginListItem>
+  >(marketplacePath("market/plugins"), { params });
+  return gridResult(res);
+}
+
+export async function marketplaceMyPluginList(
+  params?: MarketplaceMyPluginListParams,
+) {
+  const res = await requestClient.get<
+    MarketplacePageResult<MarketplacePluginListItem>
+  >(marketplacePath("market/my-plugins"), { params });
+  return gridResult(res);
+}
+
+export async function marketplaceManagedPluginList(
+  params?: MarketplaceManagedPluginListParams,
+) {
+  const res = await requestClient.get<
+    MarketplacePageResult<MarketplacePluginListItem>
+  >(marketplacePath("market/managed-plugins"), { params });
+  return gridResult(res);
+}
+
+export async function marketplaceReviewQueueList(
+  params?: MarketplaceReviewQueueListParams,
+) {
+  const res = await requestClient.get<
+    MarketplacePageResult<MarketplaceReviewQueueItem>
+  >(marketplacePath("market/review-queue"), { params });
+  return gridResult(res);
+}
+
+export async function marketplacePluginDetail(
+  pluginId: string,
+  scope: MarketplaceReadScope = "public",
+) {
+  const res = await requestClient.get<{
+    plugin: MarketplacePluginDetailItem;
+  }>(marketplacePath(readPluginPath(pluginId, scope)));
+  return res.plugin;
+}
+
+export function marketplacePluginCreate(data: MarketplacePluginCreatePayload) {
+  return requestClient.post<{ plugin: MarketplacePluginDetailItem }>(
+    marketplacePath("market/plugins"),
+    data,
+  );
+}
+
+export async function marketplaceReleaseList(
+  pluginId: string,
+  params?: MarketplaceReleaseListParams,
+  scope: MarketplaceReadScope = "public",
+) {
+  const res = await requestClient.get<
+    MarketplacePageResult<MarketplaceReleaseItem>
+  >(marketplacePath(`${readPluginPath(pluginId, scope)}/releases`), {
+    params,
+  });
+  return gridResult(res);
+}
+
+export function marketplaceReleaseUpload(
+  params: MarketplaceReleaseUploadParams,
+) {
+  const formData = new FormData();
+  formData.append("file", params.file, params.file.name);
+  formData.append("pluginId", params.pluginId);
+  formData.append("version", params.version);
+  formData.append("pluginType", params.pluginType);
+  appendString(formData, "visibility", params.visibility);
+  appendString(formData, "minHostVersion", params.minHostVersion);
+  appendString(formData, "maxHostVersion", params.maxHostVersion);
+  appendBoolean(formData, "replaceDraft", params.replaceDraft);
+
+  return requestClient.post<{ release: MarketplaceReleaseItem }>(
+    marketplacePath(
+      `market/plugins/${encodePathSegment(params.pluginId)}/releases`,
+    ),
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      timeout: marketplaceUploadTimeout,
+    },
+  );
+}
+
+export function marketplaceReleaseSubmitReview(
+  pluginId: string,
+  version: string,
+  data?: MarketplaceReleaseSubmitPayload,
+) {
+  return requestClient.post<{ release: MarketplaceReleaseItem }>(
+    marketplacePath(releasePath(pluginId, version, "submit-review")),
+    data ?? {},
+  );
+}
+
+export function marketplaceReleaseReview(
+  pluginId: string,
+  version: string,
+  data: MarketplaceReleaseReviewPayload,
+) {
+  return requestClient.put<{ release: MarketplaceReleaseItem }>(
+    marketplacePath(releasePath(pluginId, version, "review")),
+    data,
+  );
+}
+
+export function marketplacePluginStatusUpdate(
+  pluginId: string,
+  data: MarketplacePluginStatusUpdatePayload,
+) {
+  return requestClient.put<{ plugin: MarketplacePluginDetailItem }>(
+    marketplacePath(`market/plugins/${encodePathSegment(pluginId)}/status`),
+    data,
+  );
+}
+
+export async function marketplaceReleaseDocument(
+  pluginId: string,
+  version: string,
+  params?: MarketplaceDocumentParams,
+  scope: MarketplaceReadScope = "public",
+) {
+  const res = await requestClient.get<{ document: MarketplaceDocumentItem }>(
+    marketplacePath(readReleasePath(pluginId, version, "docs", scope)),
+    { params },
+  );
+  return res.document;
+}
+
+export async function marketplaceReleaseRisks(
+  pluginId: string,
+  version: string,
+  params?: MarketplaceRiskListParams,
+  scope: MarketplaceReadScope = "public",
+) {
+  const res = await requestClient.get<
+    MarketplacePageResult<MarketplaceRiskItem>
+  >(marketplacePath(readReleasePath(pluginId, version, "risks", scope)), {
+    params,
+  });
+  return gridResult(res);
+}
+
+export function marketplaceDownloadSessionCreate(
+  params: MarketplaceDownloadSessionCreateParams,
+  options?: Pick<RequestClientConfig, "silentErrorMessage">,
+) {
+  return requestClient.post<{ session: MarketplaceDownloadSessionItem }>(
+    marketplacePath(
+      `market/plugins/${encodePathSegment(params.pluginId)}/releases/${encodePathSegment(params.version)}/downloads`,
+    ),
+    {
+      artifactType: params.artifactType,
+      pluginId: params.pluginId,
+      version: params.version,
+    },
+    options,
+  );
+}
+
+export async function marketplaceDownloadSessionGet(sessionId: string) {
+  const res = await requestClient.get<{
+    session: MarketplaceDownloadSessionItem;
+  }>(
+    marketplacePath(`market/download-sessions/${encodePathSegment(sessionId)}`),
+  );
+  return res.session;
+}
+
+export function marketplaceDownloadSessionBlob(
+  session: MarketplaceDownloadSessionItem,
+  options?: Pick<RequestClientConfig, "timeout">,
+) {
+  return requestClient.download<Blob>(session.downloadUrl, {
+    timeout: options?.timeout ?? marketplaceDownloadTimeout,
+  });
+}

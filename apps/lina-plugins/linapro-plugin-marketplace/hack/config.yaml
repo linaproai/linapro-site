@@ -1,0 +1,33 @@
+shared:
+  localDatabaseLink: &localDatabaseLink "pgsql:postgres:postgres@tcp(127.0.0.1:5432)/linapro?sslmode=disable&timezone=Asia/Shanghai"
+
+gfcli:
+  gen:
+    dao:
+      - link: *localDatabaseLink
+        tables: >-
+          plugin_marketplace_artifact,
+          plugin_marketplace_doc,
+          plugin_marketplace_download_event,
+          plugin_marketplace_download_session,
+          plugin_marketplace_plugin,
+          plugin_marketplace_plugin_read_model,
+          plugin_marketplace_plugin_tag,
+          plugin_marketplace_publisher,
+          plugin_marketplace_release,
+          plugin_marketplace_risk,
+          plugin_marketplace_tag,
+          plugin_marketplace_visibility_grant
+        descriptionTag: true
+        noModelComment: true
+        stdTime: true
+        typeMapping:
+          timestamptz:
+            type: "*time.Time"
+            import: time
+          "timestamp with time zone":
+            type: "*time.Time"
+            import: time
+
+build:
+  commands: []
