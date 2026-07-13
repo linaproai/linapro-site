@@ -100,6 +100,7 @@ type SaveReleaseDraftInput struct {
 	RiskSummary        string                         // RiskSummary is JSON produced by package scanning.
 	ReviewMessage      string                         // ReviewMessage stores a scanner or publisher note.
 	ReplaceDraft       bool                           // ReplaceDraft allows replacing an existing mutable draft.
+	SourceRef          string                         // SourceRef is the Git tag/ref for git-sourced drafts.
 }
 
 // UploadSourcePackageInput carries one uploaded source plugin marketplace package.
@@ -370,6 +371,13 @@ type PluginRecord struct {
 	Repository      string
 	License         string
 	DownloadCount   int64
+	SourceKind      marketv1.MarketplaceSourceKind
+	RepoURL         string
+	RepoProvider    marketv1.MarketplaceRepoProvider
+	CredentialRef   string // never expose token; presence implies requiresAuth
+	LastSyncAt      *time.Time
+	LastSyncStatus  string
+	LastSyncMessage string
 	PublishedAt     *time.Time
 	UpdatedAt       *time.Time
 }
@@ -381,6 +389,7 @@ type ReleaseRecord struct {
 	PublisherID    int
 	PluginID       string
 	Version        string
+	SourceRef      string
 	PluginType     marketv1.MarketplacePluginType
 	ReleaseStatus  marketv1.MarketplaceStatus
 	ReviewStatus   marketv1.MarketplaceReviewStatus

@@ -1118,7 +1118,9 @@ func (s *serviceImpl) selectPackageArtifactForRelease(
 	}
 	for _, artifactType := range []string{
 		marketv1.MarketplaceArtifactTypeSourceZip.String(),
+		marketv1.MarketplaceArtifactTypeSourceTarGz.String(),
 		marketv1.MarketplaceArtifactTypeDynamicZip.String(),
+		marketv1.MarketplaceArtifactTypeDynamicTarGz.String(),
 	} {
 		row, err := s.getArtifactByReleaseType(ctx, releaseID, artifactType)
 		if err != nil {
@@ -1274,7 +1276,7 @@ func artifactPriority(row *entity.PluginMarketplaceArtifact, pluginType marketv1
 	artifactType := marketv1.MarketplaceArtifactType(row.ArtifactType)
 	if pluginType == marketv1.MarketplacePluginTypeDynamic {
 		switch artifactType {
-		case marketv1.MarketplaceArtifactTypeDynamicZip:
+		case marketv1.MarketplaceArtifactTypeDynamicZip, marketv1.MarketplaceArtifactTypeDynamicTarGz:
 			return 1
 		case marketv1.MarketplaceArtifactTypePluginWasm:
 			return 2
@@ -1282,7 +1284,8 @@ func artifactPriority(row *entity.PluginMarketplaceArtifact, pluginType marketv1
 			return 10
 		}
 	}
-	if artifactType == marketv1.MarketplaceArtifactTypeSourceZip {
+	if artifactType == marketv1.MarketplaceArtifactTypeSourceZip ||
+		artifactType == marketv1.MarketplaceArtifactTypeSourceTarGz {
 		return 1
 	}
 	return 10

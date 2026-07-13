@@ -164,22 +164,34 @@ func pluginDetailFromRecord(record *marketplacesvc.PluginRecord) *marketv1.Marke
 		return nil
 	}
 	return &marketv1.MarketplacePluginDetailItem{
-		PluginId:      record.PluginID,
-		Name:          record.Name,
-		Summary:       record.Summary,
-		Description:   record.Description,
-		PluginType:    record.PluginType,
-		MarketStatus:  record.MarketStatus,
-		Visibility:    record.Visibility,
-		LatestVersion: record.LatestVersion,
-		Icon:          record.Icon,
-		Homepage:      record.Homepage,
-		Repository:    record.Repository,
-		License:       record.License,
-		DownloadCount: record.DownloadCount,
-		PublishedAt:   unixMillisPtr(record.PublishedAt),
-		UpdatedAt:     unixMillisPtr(record.UpdatedAt),
+		PluginId:        record.PluginID,
+		Name:            record.Name,
+		Summary:         record.Summary,
+		Description:     record.Description,
+		PluginType:      record.PluginType,
+		MarketStatus:    record.MarketStatus,
+		Visibility:      record.Visibility,
+		LatestVersion:   record.LatestVersion,
+		Icon:            record.Icon,
+		Homepage:        record.Homepage,
+		Repository:      record.Repository,
+		License:         record.License,
+		DownloadCount:   record.DownloadCount,
+		SourceKind:      record.SourceKind,
+		RepoUrl:         record.RepoURL,
+		RepoProvider:    record.RepoProvider,
+		RequiresAuth:    normalizeKey(record.CredentialRef) != "",
+		LastSyncStatus:  record.LastSyncStatus,
+		LastSyncMessage: record.LastSyncMessage,
+		LastSyncAt:      unixMillisPtr(record.LastSyncAt),
+		PublishedAt:     unixMillisPtr(record.PublishedAt),
+		UpdatedAt:       unixMillisPtr(record.UpdatedAt),
 	}
+}
+
+// normalizeKey trims stable identity keys in controller projections.
+func normalizeKey(value string) string {
+	return strings.TrimSpace(value)
 }
 
 // releaseItemFromRecords maps a draft release and primary artifact to the public DTO.
@@ -212,6 +224,7 @@ func releaseItemFromRecords(
 		MinHostVersion: release.MinHostVersion,
 		MaxHostVersion: release.MaxHostVersion,
 		ReviewMessage:  release.ReviewMessage,
+		SourceRef:      release.SourceRef,
 		Artifact:       artifactItem,
 		SubmittedAt:    unixMillisPtr(release.SubmittedAt),
 		ReviewedAt:     unixMillisPtr(release.ReviewedAt),

@@ -123,8 +123,30 @@ export interface MarketplaceReleaseItem {
   visibility: MarketplaceVisibility;
 }
 
+export type MarketplaceSourceKind = "git" | "upload";
+export type MarketplaceDistributionMode = "git" | "https";
+export type MarketplaceRepoProvider = "github" | "gitee";
+
+export interface MarketplaceDistributionItem {
+  artifactType?: MarketplaceArtifactType;
+  downloadSessionRequired?: boolean;
+  mode: MarketplaceDistributionMode;
+  pluginId: string;
+  pluginType: MarketplacePluginType;
+  provider?: MarketplaceRepoProvider;
+  ref?: string;
+  repoUrl?: string;
+  requiresAuth?: boolean;
+  sha256?: string;
+  sizeBytes?: number;
+  version: string;
+}
+
 export interface MarketplacePluginListItem {
   downloadCount: number;
+  lastSyncAt?: null | number;
+  lastSyncMessage?: string;
+  lastSyncStatus?: string;
   latestReviewStatus?: MarketplaceReviewStatus;
   latestVersion: string;
   marketStatus: MarketplaceStatus;
@@ -135,7 +157,10 @@ export interface MarketplacePluginListItem {
   primaryTag?: string;
   publishedAt?: null | number;
   publisher?: MarketplacePublisherItem;
+  repoProvider?: MarketplaceRepoProvider;
+  repoUrl?: string;
   riskCounts: MarketplaceRiskCounts;
+  sourceKind?: MarketplaceSourceKind;
   summary: string;
   tagCodes: string[];
   updatedAt?: null | number;
@@ -179,9 +204,13 @@ export interface MarketplaceReviewQueueListParams extends MarketplacePageParams 
 
 export interface MarketplacePluginDetailItem {
   description?: string;
+  distribution?: MarketplaceDistributionItem;
   downloadCount: number;
   homepage?: string;
   icon?: string;
+  lastSyncAt?: null | number;
+  lastSyncMessage?: string;
+  lastSyncStatus?: string;
   latestRelease?: MarketplaceReleaseItem;
   latestVersion: string;
   license?: string;
@@ -191,9 +220,13 @@ export interface MarketplacePluginDetailItem {
   pluginType: MarketplacePluginType;
   publishedAt?: null | number;
   publisher?: MarketplacePublisherItem;
+  repoProvider?: MarketplaceRepoProvider;
+  repoUrl?: string;
   repository?: string;
+  requiresAuth?: boolean;
   riskCounts: MarketplaceRiskCounts;
   sourceDelivery: MarketplaceSourceDelivery;
+  sourceKind?: MarketplaceSourceKind;
   summary: string;
   tags: MarketplaceTagItem[];
   updatedAt?: null | number;

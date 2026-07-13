@@ -556,3 +556,81 @@ func (c *ControllerV1) PluginStatusUpdate(
 	}
 	return &marketv1.PluginStatusUpdateRes{Plugin: pluginDetailFromRecord(record)}, nil
 }
+
+// GitSourceRegister registers one Git-backed marketplace plugin and discovers tags.
+func (c *ControllerV1) GitSourceRegister(
+	ctx context.Context,
+	req *marketv1.GitSourceRegisterReq,
+) (*marketv1.GitSourceRegisterRes, error) {
+	userID, err := c.requireUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	record, err := c.marketSvc.RegisterGitSource(ctx, marketplacesvc.RegisterGitSourceInput{
+		PublisherKey: req.PublisherKey,
+		OwnerUserID:  userID,
+		RepoURL:      req.RepoUrl,
+		AccessToken:  req.AccessToken,
+		Visibility:   req.Visibility,
+		Homepage:     req.Homepage,
+		License:      req.License,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &marketv1.GitSourceRegisterRes{Plugin: pluginDetailFromRecord(record)}, nil
+}
+
+// GitSourceSync refreshes metadata for one owned Git marketplace plugin.
+func (c *ControllerV1) GitSourceSync(
+	ctx context.Context,
+	req *marketv1.GitSourceSyncReq,
+) (*marketv1.GitSourceSyncRes, error) {
+	userID, err := c.requireUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result, err := c.marketSvc.DiscoverGitMetadata(ctx, marketplacesvc.DiscoverGitMetadataInput{
+		PluginID:    req.PluginId,
+		OwnerUserID: userID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &marketv1.GitSourceSyncRes{
+		Plugin: pluginDetailFromRecord(result.Plugin),
+		Synced: result.Synced,
+	}, nil
+}
+
+// ReleaseDistribution returns CLI install metadata for one visible release.
+func (c *ControllerV1) ReleaseDistribution(
+	ctx context.Context,
+	req *marketv1.ReleaseDistributionReq,
+) (*marketv1.ReleaseDistributionRes, error) {
+	item, err := c.marketSvc.GetDistribution(ctx, marketplacesvc.GetDistributionInput{
+		PluginID:   req.PluginId,
+		Version:    req.Version,
+		Visibility: c.currentVisibilitySubject(ctx),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &marketv1.ReleaseDistributionRes{Distribution: item}, nil
+}
+
+// MyReleaseDistribution returns CLI install metadata for one owned release.
+func (c *ControllerV1) MyReleaseDistribution(
+	ctx context.Context,
+	req *marketv1.MyReleaseDistributionReq,
+) (*marketv1.MyReleaseDistributionRes, error) {
+	item, err := c.marketSvc.GetDistribution(ctx, marketplacesvc.GetDistributionInput{
+		PluginID:   req.PluginId,
+		Version:    req.Version,
+		Visibility: c.currentPublisherVisibilitySubject(ctx),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &marketv1.MyReleaseDistributionRes{Distribution: item}, nil
+}

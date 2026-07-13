@@ -29,6 +29,13 @@ type PluginMarketplacePlugin struct {
 	Repository      any        // Plugin source repository URL
 	License         any        // Plugin license identifier
 	DownloadCount   any        // Aggregated download count snapshot
+	SourceKind      any        // Publish source kind: git/upload
+	RepoUrl         any        // Git repository URL when source_kind is git
+	RepoProvider    any        // Git provider: github/gitee, empty for upload
+	CredentialRef   any        // Opaque credential reference for private Git access, empty when public
+	LastSyncAt      *time.Time // Last Git metadata discovery time
+	LastSyncStatus  any        // Last Git sync status
+	LastSyncMessage any        // Last Git sync diagnostic message without secrets
 	PublishedAt     *time.Time // First published time
 	CreatedAt       *time.Time // Creation time
 	UpdatedAt       *time.Time // Update time

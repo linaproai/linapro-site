@@ -487,7 +487,9 @@ func normalizeDownloadEventType(eventType DownloadEventType) DownloadEventType {
 func validDownloadArtifactType(artifactType marketv1.MarketplaceArtifactType) bool {
 	switch artifactType {
 	case marketv1.MarketplaceArtifactTypeSourceZip,
+		marketv1.MarketplaceArtifactTypeSourceTarGz,
 		marketv1.MarketplaceArtifactTypeDynamicZip,
+		marketv1.MarketplaceArtifactTypeDynamicTarGz,
 		marketv1.MarketplaceArtifactTypePluginWasm:
 		return true
 	default:

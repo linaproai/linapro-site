@@ -50,6 +50,11 @@ func (s *serviceImpl) UploadDynamicPackage(
 	if err != nil {
 		return nil, err
 	}
+	if plugin, getErr := s.getPluginByID(ctx, scan.manifest.ID); getErr == nil && plugin != nil {
+		if normalizeSourceKind(plugin.SourceKind) == gitSourceKind {
+			return nil, bizerr.NewCode(CodeMarketplaceSourceKindConflict)
+		}
+	}
 	publisherKey, err := s.resolvePublisherKeyForPlugin(
 		ctx,
 		in.PublisherKey,
@@ -96,7 +101,7 @@ func (s *serviceImpl) UploadDynamicPackage(
 		}
 
 		packageArtifact, err = s.saveMarketplaceArtifact(ctx, release, &marketplaceArtifactWrite{
-			artifactType:   marketv1.MarketplaceArtifactTypeDynamicZip,
+			artifactType:   dynamicArtifactTypeForName(scan.fileName),
 			storageKey:     scan.storageKey,
 			fileName:       scan.fileName,
 			contentType:    scan.contentType,
@@ -263,8 +268,8 @@ func scanDynamicPackage(in UploadDynamicPackageInput) (scan *dynamicPackageScan,
 	if packagePath == "" {
 		return nil, packageDiagnosticError(CodeMarketplacePackageInvalid, "package path is required")
 	}
-	if normalizeKey(in.FileName) != "" && strings.ToLower(filepath.Ext(in.FileName)) != ".zip" {
-		return nil, packageDiagnosticError(CodeMarketplacePackageInvalid, "dynamic package file name must end with .zip")
+	if err = ensurePackageArchiveSupported(in.FileName); err != nil {
+		return nil, err
 	}
 
 	packageSha, sizeBytes, err := fileSHA256AndSize(packagePath)
@@ -272,9 +277,15 @@ func scanDynamicPackage(in UploadDynamicPackageInput) (scan *dynamicPackageScan,
 		return nil, packageDiagnosticError(CodeMarketplacePackageInvalid, "package file cannot be read")
 	}
 
-	zipReader, err := zip.OpenReader(packagePath)
+	scanPath, cleanup, err := materializeZipPackagePath(packagePath, in.FileName)
 	if err != nil {
-		return nil, packageDiagnosticError(CodeMarketplacePackageInvalid, "package must be a valid ZIP container")
+		return nil, err
+	}
+	defer cleanup()
+
+	zipReader, err := zip.OpenReader(scanPath)
+	if err != nil {
+		return nil, packageDiagnosticError(CodeMarketplacePackageInvalid, "package must be a valid ZIP or tar.gz container")
 	}
 	defer func() {
 		if closeErr := zipReader.Close(); err == nil && closeErr != nil {
@@ -381,14 +392,14 @@ func scanDynamicPackage(in UploadDynamicPackageInput) (scan *dynamicPackageScan,
 	if fileName == "" {
 		fileName = filepath.Base(packagePath)
 	}
-	contentType := normalizeKey(in.ContentType)
+	contentType := packageContentTypeForName(fileName, normalizeKey(in.ContentType))
 	if contentType == "" {
 		contentType = dynamicPackageDefaultContentType
 	}
 	wasmSha := sha256Hex(wasmBytes)
 	storageKey := normalizeKey(in.StorageKey)
 	if storageKey == "" {
-		storageKey = path.Join(dynamicPackageStoragePrefix, rootManifest.ID, rootManifest.Version, packageSha+".zip")
+		storageKey = path.Join(dynamicPackageStoragePrefix, rootManifest.ID, rootManifest.Version, packageSha+storageKeyExtension(fileName))
 	}
 	wasmStorageKey := normalizeKey(in.WasmStorageKey)
 	if wasmStorageKey == "" {

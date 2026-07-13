@@ -126,6 +126,7 @@ func pluginRecordFromEntity(row *entity.PluginMarketplacePlugin) *PluginRecord {
 	if row == nil {
 		return nil
 	}
+	sourceKind := marketv1.MarketplaceSourceKind(normalizeSourceKind(row.SourceKind))
 	return &PluginRecord{
 		ID:              row.Id,
 		PublisherID:     row.PublisherId,
@@ -143,6 +144,13 @@ func pluginRecordFromEntity(row *entity.PluginMarketplacePlugin) *PluginRecord {
 		Repository:      row.Repository,
 		License:         row.License,
 		DownloadCount:   row.DownloadCount,
+		SourceKind:      sourceKind,
+		RepoURL:         row.RepoUrl,
+		RepoProvider:    marketv1.MarketplaceRepoProvider(row.RepoProvider),
+		CredentialRef:   row.CredentialRef,
+		LastSyncAt:      cloneTime(row.LastSyncAt),
+		LastSyncStatus:  row.LastSyncStatus,
+		LastSyncMessage: row.LastSyncMessage,
 		PublishedAt:     cloneTime(row.PublishedAt),
 		UpdatedAt:       cloneTime(row.UpdatedAt),
 	}
@@ -159,6 +167,7 @@ func releaseRecordFromEntity(row *entity.PluginMarketplaceRelease) *ReleaseRecor
 		PublisherID:    row.PublisherId,
 		PluginID:       row.PluginId,
 		Version:        row.ReleaseVersion,
+		SourceRef:      row.SourceRef,
 		PluginType:     marketv1.MarketplacePluginType(row.PluginType),
 		ReleaseStatus:  marketv1.MarketplaceStatus(row.ReleaseStatus),
 		ReviewStatus:   marketv1.MarketplaceReviewStatus(row.ReviewStatus),

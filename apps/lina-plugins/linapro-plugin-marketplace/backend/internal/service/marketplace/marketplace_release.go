@@ -250,6 +250,7 @@ func (s *serviceImpl) releaseDraftData(
 		PublisherId:        plugin.PublisherId,
 		PluginId:           plugin.PluginId,
 		ReleaseVersion:     normalizeKey(in.Version),
+		SourceRef:          normalizeKey(in.SourceRef),
 		PluginType:         pluginType.String(),
 		ReleaseStatus:      marketv1.MarketplaceStatusDraft.String(),
 		ReviewStatus:       marketv1.MarketplaceReviewStatusDraft.String(),

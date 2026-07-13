@@ -26,6 +26,7 @@ type PluginMarketplaceReleaseColumns struct {
 	PublisherId        string // Owning publisher ID
 	PluginId           string // Stable plugin ID
 	ReleaseVersion     string // Plugin release version
+	SourceRef          string // Git tag or ref for git-sourced releases, empty for upload packages
 	PluginType         string // Plugin type: source/dynamic
 	ReleaseStatus      string // Release status: draft/published/delisted/deprecated
 	ReviewStatus       string // Review status: draft/submitted/reviewing/approved/rejected
@@ -56,6 +57,7 @@ var pluginMarketplaceReleaseColumns = PluginMarketplaceReleaseColumns{
 	PublisherId:        "publisher_id",
 	PluginId:           "plugin_id",
 	ReleaseVersion:     "release_version",
+	SourceRef:          "source_ref",
 	PluginType:         "plugin_type",
 	ReleaseStatus:      "release_status",
 	ReviewStatus:       "review_status",

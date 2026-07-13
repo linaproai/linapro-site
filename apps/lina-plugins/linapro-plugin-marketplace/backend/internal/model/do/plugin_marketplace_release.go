@@ -18,6 +18,7 @@ type PluginMarketplaceRelease struct {
 	PublisherId        any        // Owning publisher ID
 	PluginId           any        // Stable plugin ID
 	ReleaseVersion     any        // Plugin release version
+	SourceRef          any        // Git tag or ref for git-sourced releases, empty for upload packages
 	PluginType         any        // Plugin type: source/dynamic
 	ReleaseStatus      any        // Release status: draft/published/delisted/deprecated
 	ReviewStatus       any        // Review status: draft/submitted/reviewing/approved/rejected

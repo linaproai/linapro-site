@@ -47,6 +47,8 @@ import { $t } from "#/locales";
 import { formatTimestamp } from "#/utils/time";
 
 import {
+  marketplaceGitSourceRegister,
+  marketplaceGitSourceSync,
   marketplaceMyPluginList,
   marketplacePluginCreate,
   marketplacePublisherCreate,
@@ -82,16 +84,22 @@ const showEmbeddedDetail = computed(
   () =>
     route.query.view === "detail" && typeof route.query.pluginId === "string",
 );
-const publishMode = ref<"plugin" | "version">("plugin");
+const publishMode = ref<"plugin" | "version" | "git">("plugin");
 const publishers = ref<MarketplacePublisherItem[]>([]);
 const pluginDraftReady = ref(false);
 const uploadFileList = ref<UploadFile[]>([]);
 const latestDraftRelease = ref<MarketplaceReleaseItem | null>(null);
-const drawerTitle = computed(() =>
-  publishMode.value === "version"
-    ? t("plugin.linapro-plugin-marketplace.mine.actions.newVersion")
-    : t("plugin.linapro-plugin-marketplace.mine.actions.publish"),
-);
+const gitRepoUrl = ref("");
+const gitAccessToken = ref("");
+const drawerTitle = computed(() => {
+  if (publishMode.value === "version") {
+    return t("plugin.linapro-plugin-marketplace.mine.actions.newVersion");
+  }
+  if (publishMode.value === "git") {
+    return t("plugin.linapro-plugin-marketplace.mine.actions.registerGit");
+  }
+  return t("plugin.linapro-plugin-marketplace.mine.actions.publish");
+});
 const hasPublishers = computed(() => publishers.value.length > 0);
 const canSubmitLatestDraft = computed(
   () => latestDraftRelease.value?.reviewStatus === "draft",
@@ -173,6 +181,7 @@ const [PublishDrawer, publishDrawerApi] = useVbenDrawer({
 
     publishDrawerApi.setState({ loading: true });
     try {
+      const requestedMode = publishMode.value;
       await resetPublishWorkflow();
       const { row } = publishDrawerApi.getData() as {
         row?: MarketplacePluginListItem;
@@ -189,6 +198,7 @@ const [PublishDrawer, publishDrawerApi] = useVbenDrawer({
         return;
       }
 
+      publishMode.value = requestedMode === "git" ? "git" : "plugin";
       const result = await marketplacePublisherList({
         pageNum: 1,
         pageSize: 100,
@@ -353,6 +363,15 @@ function buildColumns(): MineGridOptions["columns"] {
             width: 105,
           },
         ]),
+    {
+      field: "sourceKind",
+      formatter: ({ cellValue }: { cellValue?: null | string }) =>
+        cellValue === "git"
+          ? t("plugin.linapro-plugin-marketplace.mine.sourceKind.git")
+          : t("plugin.linapro-plugin-marketplace.mine.sourceKind.upload"),
+      title: t("plugin.linapro-plugin-marketplace.mine.columns.sourceKind"),
+      width: compact ? 80 : 90,
+    },
     {
       field: "visibility",
       slots: { default: "visibility" },
@@ -674,6 +693,9 @@ function handleOpenDetail(row: MarketplacePluginListItem) {
 }
 
 function openPublishDrawer(row?: MarketplacePluginListItem) {
+  if (!row && publishMode.value !== "git") {
+    publishMode.value = "plugin";
+  }
   publishDrawerApi.setData(row ? { row } : {});
   publishDrawerApi.open();
 }
@@ -839,6 +861,62 @@ async function handleSubmitLatestDraft() {
     publishDrawerApi.lock(false);
   }
 }
+
+async function handleRegisterGitSource() {
+  publishDrawerApi.lock(true);
+  try {
+    const { valid } = await publisherFormApi.validate();
+    if (!valid) {
+      return;
+    }
+    if (!gitRepoUrl.value.trim()) {
+      message.warning(
+        t("plugin.linapro-plugin-marketplace.console.messages.fieldRequired"),
+      );
+      return;
+    }
+    const publisherValues = await publisherFormApi.getValues();
+    await marketplaceGitSourceRegister({
+      accessToken: gitAccessToken.value.trim() || undefined,
+      publisherKey: requiredString(publisherValues.publisherKey),
+      repoUrl: gitRepoUrl.value.trim(),
+      visibility: "public",
+    });
+    message.success({
+      content: t(
+        "plugin.linapro-plugin-marketplace.mine.messages.gitRegistered",
+      ),
+      key: workflowMessageKey,
+    });
+    gitRepoUrl.value = "";
+    gitAccessToken.value = "";
+    await gridApi.reload();
+    publishDrawerApi.close();
+  } catch {
+    // Validation or API errors are shown by form/message handlers.
+  } finally {
+    publishDrawerApi.lock(false);
+  }
+}
+
+async function handleSyncGitSource(row: MarketplacePluginListItem) {
+  try {
+    const result = await marketplaceGitSourceSync(row.pluginId);
+    message.success(
+      t("plugin.linapro-plugin-marketplace.mine.messages.gitSynced", {
+        count: result.synced,
+      }),
+    );
+    await gridApi.reload();
+  } catch {
+    // API errors are shown by request client handlers.
+  }
+}
+
+function openGitPublishDrawer() {
+  publishMode.value = "git";
+  openPublishDrawer();
+}
 </script>
 
 <template>
@@ -849,9 +927,14 @@ async function handleSubmitLatestDraft() {
       :table-title="$t('plugin.linapro-plugin-marketplace.mine.tableTitle')"
     >
       <template #toolbar-tools>
-        <a-button type="primary" @click="openPublishDrawer()">
-          {{ $t("plugin.linapro-plugin-marketplace.mine.actions.publish") }}
-        </a-button>
+        <Space>
+          <a-button @click="openGitPublishDrawer()">
+            {{ $t("plugin.linapro-plugin-marketplace.mine.actions.registerGit") }}
+          </a-button>
+          <a-button type="primary" @click="openPublishDrawer()">
+            {{ $t("plugin.linapro-plugin-marketplace.mine.actions.publish") }}
+          </a-button>
+        </Space>
       </template>
 
       <template #plugin="{ row }">
@@ -914,6 +997,17 @@ async function handleSubmitLatestDraft() {
                   {{
                     $t(
                       "plugin.linapro-plugin-marketplace.mine.actions.newVersion",
+                    )
+                  }}
+                </MenuItem>
+                <MenuItem
+                  v-if="row.sourceKind === 'git'"
+                  key="sync-git"
+                  @click="handleSyncGitSource(row)"
+                >
+                  {{
+                    $t(
+                      "plugin.linapro-plugin-marketplace.mine.actions.syncGit",
                     )
                   }}
                 </MenuItem>
@@ -1014,7 +1108,7 @@ async function handleSubmitLatestDraft() {
           <UploadForm />
           <UploadDragger
             v-model:file-list="uploadFileList"
-            accept=".zip"
+            accept=".zip,.tar.gz,.tgz"
             :before-upload="() => false"
             :max-count="1"
             class="mine-upload"
@@ -1041,12 +1135,100 @@ async function handleSubmitLatestDraft() {
             </Tag>
           </div>
         </section>
+
+        <section
+          v-show="publishMode === 'git'"
+          class="mine-section-divider"
+        >
+          <div class="mine-section-header">
+            <h3>
+              {{
+                $t(
+                  "plugin.linapro-plugin-marketplace.console.sections.publisher",
+                )
+              }}
+            </h3>
+            <a-button
+              v-if="!hasPublishers"
+              type="primary"
+              @click="handleCreatePublisher"
+            >
+              {{
+                $t(
+                  "plugin.linapro-plugin-marketplace.console.actions.savePublisher",
+                )
+              }}
+            </a-button>
+          </div>
+          <PublisherForm />
+          <div v-if="hasPublishers" class="mine-section-header">
+            <h3>
+              {{
+                $t("plugin.linapro-plugin-marketplace.mine.sections.gitSource")
+              }}
+            </h3>
+            <a-button type="primary" @click="handleRegisterGitSource">
+              {{
+                $t(
+                  "plugin.linapro-plugin-marketplace.mine.actions.saveGitSource",
+                )
+              }}
+            </a-button>
+          </div>
+          <div v-if="hasPublishers" class="mine-git-fields">
+            <label>
+              {{ $t("plugin.linapro-plugin-marketplace.mine.fields.repoUrl") }}
+              <input
+                v-model="gitRepoUrl"
+                class="mine-git-input"
+                type="url"
+                :placeholder="
+                  $t(
+                    'plugin.linapro-plugin-marketplace.mine.placeholders.repoUrl',
+                  )
+                "
+              />
+            </label>
+            <label>
+              {{
+                $t("plugin.linapro-plugin-marketplace.mine.fields.accessToken")
+              }}
+              <input
+                v-model="gitAccessToken"
+                class="mine-git-input"
+                type="password"
+                autocomplete="off"
+                :placeholder="
+                  $t(
+                    'plugin.linapro-plugin-marketplace.mine.placeholders.accessToken',
+                  )
+                "
+              />
+            </label>
+          </div>
+        </section>
       </div>
     </PublishDrawer>
   </Page>
 </template>
 
 <style scoped>
+.mine-git-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mine-git-input {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 6px 10px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  background: transparent;
+}
+
 .mine-plugin-cell {
   display: flex;
   flex-direction: column;

@@ -143,4 +143,34 @@ var (
 		"Marketplace storage operation failed",
 		gcode.CodeInternalError,
 	)
+	// CodeMarketplaceSourceKindConflict reports mixed git/upload publish sources.
+	CodeMarketplaceSourceKindConflict = bizerr.MustDefine(
+		"PLUGIN_MARKETPLACE_SOURCE_KIND_CONFLICT",
+		"Marketplace plugin publish source kind does not allow this operation",
+		gcode.CodeInvalidParameter,
+	)
+	// CodeMarketplaceGitDiscoveryFailed reports remote Git metadata discovery failure.
+	CodeMarketplaceGitDiscoveryFailed = bizerr.MustDefine(
+		"PLUGIN_MARKETPLACE_GIT_DISCOVERY_FAILED",
+		"Marketplace Git metadata discovery failed: {diagnostic}",
+		gcode.CodeInternalError,
+	)
+	// CodeMarketplaceGitAuthFailed reports private repository authentication failure.
+	CodeMarketplaceGitAuthFailed = bizerr.MustDefine(
+		"PLUGIN_MARKETPLACE_GIT_AUTH_FAILED",
+		"Marketplace Git authentication failed: {diagnostic}",
+		gcode.CodeNotAuthorized,
+	)
+	// CodeMarketplaceGitVersionMismatch reports tag and plugin.yaml version mismatch.
+	CodeMarketplaceGitVersionMismatch = bizerr.MustDefine(
+		"PLUGIN_MARKETPLACE_GIT_VERSION_MISMATCH",
+		"Marketplace Git tag does not match plugin.yaml version: {diagnostic}",
+		gcode.CodeInvalidParameter,
+	)
+	// CodeMarketplaceGitDynamicUnsupported reports dynamic plugins on Git sources.
+	CodeMarketplaceGitDynamicUnsupported = bizerr.MustDefine(
+		"PLUGIN_MARKETPLACE_GIT_DYNAMIC_UNSUPPORTED",
+		"Marketplace Git sources support source plugins only: {diagnostic}",
+		gcode.CodeInvalidParameter,
+	)
 )

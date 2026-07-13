@@ -4,7 +4,11 @@
 // marketplace visibility filtering, and controlled download sessions.
 package marketplace
 
-import "context"
+import (
+	"context"
+
+	marketv1 "linapro-plugin-marketplace/backend/api/market/v1"
+)
 
 // Service is the marketplace domain boundary used by controllers and later
 // package scanning services.
@@ -142,6 +146,21 @@ type Service interface {
 	// deprecate, or relist actions and mirrors the status to the latest release
 	// when one exists. The returned record is the updated plugin projection.
 	UpdatePluginStatus(ctx context.Context, in UpdatePluginStatusInput) (*PluginRecord, error)
+
+	// RegisterGitSource registers one GitHub/Gitee repository as a marketplace
+	// plugin, stores optional encrypted credentials, and immediately discovers
+	// version tags as metadata without cloning full source trees.
+	RegisterGitSource(ctx context.Context, in RegisterGitSourceInput) (*PluginRecord, error)
+
+	// DiscoverGitMetadata refreshes remote tags and draft releases for one
+	// Git-backed marketplace plugin.
+	DiscoverGitMetadata(ctx context.Context, in DiscoverGitMetadataInput) (*DiscoverGitMetadataResult, error)
+
+	// DiscoverAllGitSources scans every Git-backed marketplace plugin for new tags.
+	DiscoverAllGitSources(ctx context.Context) (int, error)
+
+	// GetDistribution returns CLI install metadata for one visible release.
+	GetDistribution(ctx context.Context, in GetDistributionInput) (*marketv1.MarketplaceDistributionItem, error)
 }
 
 var _ Service = (*serviceImpl)(nil)
@@ -149,6 +168,7 @@ var _ Service = (*serviceImpl)(nil)
 // serviceImpl is the default marketplace domain service implementation.
 type serviceImpl struct {
 	artifacts ArtifactStore
+	gitRemote gitRemoteClient
 }
 
 // New creates a marketplace domain service. artifacts is required for package

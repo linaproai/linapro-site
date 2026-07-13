@@ -51,10 +51,64 @@ type MarketplaceArtifactType string
 
 // Marketplace release artifact types.
 const (
-	MarketplaceArtifactTypeSourceZip  MarketplaceArtifactType = "source_zip"
-	MarketplaceArtifactTypeDynamicZip MarketplaceArtifactType = "dynamic_zip"
-	MarketplaceArtifactTypePluginWasm MarketplaceArtifactType = "plugin_wasm"
+	MarketplaceArtifactTypeSourceZip     MarketplaceArtifactType = "source_zip"
+	MarketplaceArtifactTypeSourceTarGz   MarketplaceArtifactType = "source_tar_gz"
+	MarketplaceArtifactTypeDynamicZip    MarketplaceArtifactType = "dynamic_zip"
+	MarketplaceArtifactTypeDynamicTarGz  MarketplaceArtifactType = "dynamic_tar_gz"
+	MarketplaceArtifactTypePluginWasm    MarketplaceArtifactType = "plugin_wasm"
 )
+
+// MarketplaceSourceKind identifies how a marketplace plugin is published.
+type MarketplaceSourceKind string
+
+// Marketplace publish source kinds.
+const (
+	MarketplaceSourceKindGit    MarketplaceSourceKind = "git"
+	MarketplaceSourceKindUpload MarketplaceSourceKind = "upload"
+)
+
+// String returns the serialized marketplace source kind value.
+func (value MarketplaceSourceKind) String() string { return string(value) }
+
+// MarketplaceDistributionMode identifies how consumers obtain one release.
+type MarketplaceDistributionMode string
+
+// Marketplace distribution modes returned to CLI installers.
+const (
+	MarketplaceDistributionModeGit   MarketplaceDistributionMode = "git"
+	MarketplaceDistributionModeHTTPS MarketplaceDistributionMode = "https"
+)
+
+// String returns the serialized marketplace distribution mode value.
+func (value MarketplaceDistributionMode) String() string { return string(value) }
+
+// MarketplaceRepoProvider identifies a supported Git hosting provider.
+type MarketplaceRepoProvider string
+
+// Supported Git hosting providers for marketplace Git sources.
+const (
+	MarketplaceRepoProviderGitHub MarketplaceRepoProvider = "github"
+	MarketplaceRepoProviderGitee  MarketplaceRepoProvider = "gitee"
+)
+
+// String returns the serialized repository provider value.
+func (value MarketplaceRepoProvider) String() string { return string(value) }
+
+// MarketplaceDistributionItem is the CLI-facing install projection for one release.
+type MarketplaceDistributionItem struct {
+	Mode                    MarketplaceDistributionMode `json:"mode" dc:"Distribution mode: git=clone by ref https=download package through controlled session" eg:"git"`
+	PluginId                string                      `json:"pluginId" dc:"Stable plugin ID bound to the distribution projection" eg:"linapro-demo-source"`
+	Version                 string                      `json:"version" dc:"Release version bound to the distribution projection" eg:"v1.0.0"`
+	PluginType              MarketplacePluginType       `json:"pluginType" dc:"Plugin type: source or dynamic" eg:"source"`
+	RepoUrl                 string                      `json:"repoUrl,omitempty" dc:"Git repository URL when mode is git; empty for https packages" eg:"https://github.com/org/plugin.git"`
+	Ref                     string                      `json:"ref,omitempty" dc:"Git tag or ref when mode is git" eg:"v1.0.0"`
+	Provider                MarketplaceRepoProvider     `json:"provider,omitempty" dc:"Git provider when mode is git: github or gitee" eg:"github"`
+	RequiresAuth            bool                        `json:"requiresAuth,omitempty" dc:"Whether private Git access requires caller credentials; platform tokens are never returned" eg:"true"`
+	ArtifactType            MarketplaceArtifactType     `json:"artifactType,omitempty" dc:"Primary package artifact type when mode is https" eg:"source_zip"`
+	Sha256                  string                      `json:"sha256,omitempty" dc:"Primary package SHA-256 when mode is https" eg:"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"`
+	SizeBytes               int64                       `json:"sizeBytes,omitempty" dc:"Primary package size in bytes when mode is https" eg:"102400"`
+	DownloadSessionRequired bool                        `json:"downloadSessionRequired,omitempty" dc:"Whether clients must create a download session before streaming package bytes" eg:"true"`
+}
 
 // String returns the serialized marketplace artifact type value.
 func (value MarketplaceArtifactType) String() string { return string(value) }
@@ -164,10 +218,12 @@ type MarketplaceReleaseItem struct {
 	Visibility     MarketplaceVisibility    `json:"visibility" dc:"Release visibility policy: public, private, or reserved" eg:"public"`
 	MinHostVersion string                   `json:"minHostVersion" dc:"Minimum compatible LinaPro host version declared or inferred for this release" eg:"v0.1.0"`
 	MaxHostVersion string                   `json:"maxHostVersion" dc:"Maximum compatible LinaPro host version, empty when no upper bound is declared" eg:"v1.0.0"`
-	ReviewMessage  string                   `json:"reviewMessage" dc:"Latest reviewer message or scanner diagnostic summary, empty when no message exists" eg:"Approved for marketplace listing"`
-	Artifact       *MarketplaceArtifactItem `json:"artifact,omitempty" dc:"Primary artifact checksum and size summary for this release" eg:"{}"`
-	SubmittedAt    *int64                   `json:"submittedAt,omitempty" dc:"Review submission time as Unix timestamp in milliseconds" eg:"1767240000000"`
-	ReviewedAt     *int64                   `json:"reviewedAt,omitempty" dc:"Review completion time as Unix timestamp in milliseconds" eg:"1767243600000"`
-	PublishedAt    *int64                   `json:"publishedAt,omitempty" dc:"Publish time as Unix timestamp in milliseconds" eg:"1767247200000"`
-	UpdatedAt      *int64                   `json:"updatedAt,omitempty" dc:"Release last updated time as Unix timestamp in milliseconds" eg:"1767247200000"`
+	ReviewMessage  string                       `json:"reviewMessage" dc:"Latest reviewer message or scanner diagnostic summary, empty when no message exists" eg:"Approved for marketplace listing"`
+	SourceRef      string                       `json:"sourceRef,omitempty" dc:"Git tag or ref for git-sourced releases" eg:"v0.1.0"`
+	Distribution   *MarketplaceDistributionItem `json:"distribution,omitempty" dc:"CLI install distribution projection when available for this release" eg:"{}"`
+	Artifact       *MarketplaceArtifactItem     `json:"artifact,omitempty" dc:"Primary artifact checksum and size summary for this release" eg:"{}"`
+	SubmittedAt    *int64                       `json:"submittedAt,omitempty" dc:"Review submission time as Unix timestamp in milliseconds" eg:"1767240000000"`
+	ReviewedAt     *int64                       `json:"reviewedAt,omitempty" dc:"Review completion time as Unix timestamp in milliseconds" eg:"1767243600000"`
+	PublishedAt    *int64                       `json:"publishedAt,omitempty" dc:"Publish time as Unix timestamp in milliseconds" eg:"1767247200000"`
+	UpdatedAt      *int64                       `json:"updatedAt,omitempty" dc:"Release last updated time as Unix timestamp in milliseconds" eg:"1767247200000"`
 }

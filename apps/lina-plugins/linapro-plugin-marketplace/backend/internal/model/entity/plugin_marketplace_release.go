@@ -15,6 +15,7 @@ type PluginMarketplaceRelease struct {
 	PublisherId        int        `json:"publisherId"        orm:"publisher_id"         description:"Owning publisher ID"`
 	PluginId           string     `json:"pluginId"           orm:"plugin_id"            description:"Stable plugin ID"`
 	ReleaseVersion     string     `json:"releaseVersion"     orm:"release_version"      description:"Plugin release version"`
+	SourceRef          string     `json:"sourceRef"        orm:"source_ref"         description:"Git tag or ref for git-sourced releases, empty for upload packages"`
 	PluginType         string     `json:"pluginType"         orm:"plugin_type"          description:"Plugin type: source/dynamic"`
 	ReleaseStatus      string     `json:"releaseStatus"      orm:"release_status"       description:"Release status: draft/published/delisted/deprecated"`
 	ReviewStatus       string     `json:"reviewStatus"       orm:"review_status"        description:"Review status: draft/submitted/reviewing/approved/rejected"`

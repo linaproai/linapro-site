@@ -187,6 +187,12 @@ type MarketplacePluginListItem struct {
 	TagCodes           []string                  `json:"tagCodes" dc:"Category and tag code snapshot for display and client-side badges" eg:"[\"observability\",\"audit\"]"`
 	RiskCounts         MarketplaceRiskCounts     `json:"riskCounts" dc:"Risk finding count snapshot grouped by severity for the latest visible release" eg:"{}"`
 	DownloadCount      int64                     `json:"downloadCount" dc:"Aggregated marketplace download count snapshot" eg:"1200"`
+	SourceKind         MarketplaceSourceKind     `json:"sourceKind,omitempty" dc:"Publish source kind: git or upload" eg:"upload"`
+	RepoUrl            string                    `json:"repoUrl,omitempty" dc:"Git repository URL when sourceKind is git" eg:"https://github.com/org/plugin.git"`
+	RepoProvider       MarketplaceRepoProvider   `json:"repoProvider,omitempty" dc:"Git provider when sourceKind is git" eg:"github"`
+	LastSyncStatus     string                    `json:"lastSyncStatus,omitempty" dc:"Last Git metadata sync status for git sources" eg:"success"`
+	LastSyncMessage    string                    `json:"lastSyncMessage,omitempty" dc:"Last Git metadata sync diagnostic without secrets" eg:"discovered 2 draft releases"`
+	LastSyncAt         *int64                    `json:"lastSyncAt,omitempty" dc:"Last Git metadata sync time as Unix timestamp in milliseconds" eg:"1767247200000"`
 	PublishedAt        *int64                    `json:"publishedAt,omitempty" dc:"Latest publish time as Unix timestamp in milliseconds" eg:"1767247200000"`
 	UpdatedAt          *int64                    `json:"updatedAt,omitempty" dc:"Read model last updated time as Unix timestamp in milliseconds" eg:"1767247200000"`
 }
@@ -211,6 +217,14 @@ type MarketplacePluginDetailItem struct {
 	RiskCounts     MarketplaceRiskCounts     `json:"riskCounts" dc:"Risk finding count snapshot grouped by severity for the latest visible release" eg:"{}"`
 	DownloadCount  int64                     `json:"downloadCount" dc:"Aggregated marketplace download count snapshot" eg:"1200"`
 	SourceDelivery string                    `json:"sourceDelivery" dc:"Source plugin delivery guidance; source plugins require placement under apps/lina-plugins and host rebuild, while dynamic plugins continue through local dynamic upload governance" eg:"source_rebuild_required"`
+	SourceKind     MarketplaceSourceKind     `json:"sourceKind,omitempty" dc:"Publish source kind: git or upload" eg:"git"`
+	RepoUrl        string                    `json:"repoUrl,omitempty" dc:"Git repository URL when sourceKind is git" eg:"https://github.com/org/plugin.git"`
+	RepoProvider   MarketplaceRepoProvider   `json:"repoProvider,omitempty" dc:"Git provider when sourceKind is git" eg:"github"`
+	RequiresAuth   bool                      `json:"requiresAuth,omitempty" dc:"Whether the Git source is private; platform tokens are never returned" eg:"true"`
+	LastSyncStatus string                    `json:"lastSyncStatus,omitempty" dc:"Last Git metadata sync status for git sources" eg:"success"`
+	LastSyncMessage string                   `json:"lastSyncMessage,omitempty" dc:"Last Git metadata sync diagnostic without secrets" eg:"discovered 2 draft releases"`
+	LastSyncAt     *int64                    `json:"lastSyncAt,omitempty" dc:"Last Git metadata sync time as Unix timestamp in milliseconds" eg:"1767247200000"`
+	Distribution   *MarketplaceDistributionItem `json:"distribution,omitempty" dc:"Latest release distribution projection when available" eg:"{}"`
 	PublishedAt    *int64                    `json:"publishedAt,omitempty" dc:"First marketplace publish time as Unix timestamp in milliseconds" eg:"1767247200000"`
 	UpdatedAt      *int64                    `json:"updatedAt,omitempty" dc:"Marketplace plugin last updated time as Unix timestamp in milliseconds" eg:"1767247200000"`
 }

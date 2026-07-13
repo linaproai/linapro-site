@@ -33,15 +33,22 @@ func init() {
 
 // Register attaches marketplace backend contributions to the source-plugin
 // declaration, including HTTP routes for marketplace catalog, publish, review,
-// document, risk, and download endpoints.
+// document, risk, and download endpoints, plus Git metadata discovery jobs.
 func Register(declarations pluginhost.Declarations) error {
 	if declarations == nil {
 		return gerror.New("marketplace source plugin declarations cannot be nil")
 	}
-	return declarations.HTTP().RegisterRoutes(
+	if err := declarations.HTTP().RegisterRoutes(
 		pluginhost.ExtensionPointHTTPRouteRegister,
 		pluginhost.CallbackExecutionModeBlocking,
 		registerMarketplaceRoutes,
+	); err != nil {
+		return err
+	}
+	return declarations.Jobs().RegisterJobs(
+		pluginhost.ExtensionPointJobsRegister,
+		pluginhost.CallbackExecutionModeBlocking,
+		registerMarketplaceJobs,
 	)
 }
 
@@ -82,4 +89,27 @@ func resolveBizCtx(services capability.Services) bizctxcap.Service {
 		return nil
 	}
 	return services.BizCtx()
+}
+
+// registerMarketplaceJobs registers the Git metadata polling scheduled job.
+func registerMarketplaceJobs(ctx context.Context, registrar pluginhost.JobsRegistrar) error {
+	if registrar == nil {
+		return gerror.New("marketplace jobs registrar cannot be nil")
+	}
+	marketSvc, err := marketplacesvc.New(nil)
+	if err != nil {
+		return gerror.Wrap(err, "create marketplace service for jobs")
+	}
+	// Every 20 minutes: immediate discovery still happens on Git source registration.
+	return registrar.AddWithMetadata(
+		ctx,
+		"0 */20 * * * *",
+		"linapro-plugin-marketplace-git-metadata-sync",
+		"Marketplace Git metadata sync",
+		"Discover marketplace Git source tags and plugin.yaml metadata without cloning full repositories",
+		func(jobCtx context.Context) error {
+			_, syncErr := marketSvc.DiscoverAllGitSources(jobCtx)
+			return syncErr
+		},
+	)
 }

@@ -26,6 +26,13 @@ type PluginMarketplacePlugin struct {
 	Repository      string     `json:"repository"      orm:"repository"        description:"Plugin source repository URL"`
 	License         string     `json:"license"         orm:"license"           description:"Plugin license identifier"`
 	DownloadCount   int64      `json:"downloadCount"   orm:"download_count"    description:"Aggregated download count snapshot"`
+	SourceKind      string     `json:"sourceKind"      orm:"source_kind"        description:"Publish source kind: git/upload"`
+	RepoUrl         string     `json:"repoUrl"         orm:"repo_url"           description:"Git repository URL when source_kind is git"`
+	RepoProvider    string     `json:"repoProvider"    orm:"repo_provider"      description:"Git provider: github/gitee, empty for upload"`
+	CredentialRef   string     `json:"credentialRef"   orm:"credential_ref"     description:"Opaque credential reference for private Git access, empty when public"`
+	LastSyncAt      *time.Time `json:"lastSyncAt"      orm:"last_sync_at"       description:"Last Git metadata discovery time"`
+	LastSyncStatus  string     `json:"lastSyncStatus"  orm:"last_sync_status"   description:"Last Git sync status"`
+	LastSyncMessage string     `json:"lastSyncMessage" orm:"last_sync_message"  description:"Last Git sync diagnostic message without secrets"`
 	PublishedAt     *time.Time `json:"publishedAt"     orm:"published_at"      description:"First published time"`
 	CreatedAt       *time.Time `json:"createdAt"       orm:"created_at"        description:"Creation time"`
 	UpdatedAt       *time.Time `json:"updatedAt"       orm:"updated_at"        description:"Update time"`

@@ -51,6 +51,7 @@ func (s *serviceImpl) SavePluginDraft(ctx context.Context, in SavePluginDraftInp
 		Repository:      normalizeKey(in.Repository),
 		License:         normalizeKey(in.License),
 		DownloadCount:   0,
+		SourceKind:      uploadSourceKind,
 	}).InsertAndGetId()
 	if err != nil {
 		return nil, bizerr.WrapCode(err, CodeMarketplaceStorageFailed)

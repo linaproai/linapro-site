@@ -170,6 +170,46 @@ export function marketplacePluginCreate(data: MarketplacePluginCreatePayload) {
   );
 }
 
+export type MarketplaceGitSourceRegisterPayload = {
+  accessToken?: string;
+  homepage?: string;
+  license?: string;
+  publisherKey: string;
+  repoUrl: string;
+  visibility?: string;
+};
+
+export function marketplaceGitSourceRegister(
+  data: MarketplaceGitSourceRegisterPayload,
+) {
+  return requestClient.post<{ plugin: MarketplacePluginDetailItem }>(
+    marketplacePath("market/plugins/git-sources"),
+    data,
+  );
+}
+
+export function marketplaceGitSourceSync(pluginId: string) {
+  return requestClient.post<{
+    plugin: MarketplacePluginDetailItem;
+    synced: number;
+  }>(marketplacePath(`market/plugins/${encodePathSegment(pluginId)}/git-sync`));
+}
+
+export async function marketplaceReleaseDistribution(
+  pluginId: string,
+  version: string,
+  scope: MarketplaceReadScope = "public",
+) {
+  const path =
+    scope === "mine"
+      ? `market/my-plugins/${encodePathSegment(pluginId)}/releases/${encodePathSegment(version)}/distribution`
+      : `market/plugins/${encodePathSegment(pluginId)}/releases/${encodePathSegment(version)}/distribution`;
+  const res = await requestClient.get<{
+    distribution: import("../types/marketplace").MarketplaceDistributionItem;
+  }>(marketplacePath(path));
+  return res.distribution;
+}
+
 export async function marketplaceReleaseList(
   pluginId: string,
   params?: MarketplaceReleaseListParams,

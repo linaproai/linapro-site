@@ -58,6 +58,11 @@ func (s *serviceImpl) UploadSourcePackage(
 	if err != nil {
 		return nil, err
 	}
+	if plugin, getErr := s.getPluginByID(ctx, scan.manifest.ID); getErr == nil && plugin != nil {
+		if normalizeSourceKind(plugin.SourceKind) == gitSourceKind {
+			return nil, bizerr.NewCode(CodeMarketplaceSourceKindConflict)
+		}
+	}
 	publisherKey, err := s.resolvePublisherKeyForPlugin(
 		ctx,
 		in.PublisherKey,
@@ -224,8 +229,8 @@ func scanSourcePackage(in UploadSourcePackageInput) (scan *sourcePackageScan, er
 	if packagePath == "" {
 		return nil, packageDiagnosticError(CodeMarketplacePackageInvalid, "package path is required")
 	}
-	if normalizeKey(in.FileName) != "" && strings.ToLower(filepath.Ext(in.FileName)) != ".zip" {
-		return nil, packageDiagnosticError(CodeMarketplacePackageInvalid, "source package file name must end with .zip")
+	if err = ensurePackageArchiveSupported(in.FileName); err != nil {
+		return nil, err
 	}
 
 	packageSha, sizeBytes, err := fileSHA256AndSize(packagePath)
@@ -233,9 +238,15 @@ func scanSourcePackage(in UploadSourcePackageInput) (scan *sourcePackageScan, er
 		return nil, packageDiagnosticError(CodeMarketplacePackageInvalid, "package file cannot be read")
 	}
 
-	zipReader, err := zip.OpenReader(packagePath)
+	scanPath, cleanup, err := materializeZipPackagePath(packagePath, in.FileName)
 	if err != nil {
-		return nil, packageDiagnosticError(CodeMarketplacePackageInvalid, "package must be a valid ZIP container")
+		return nil, err
+	}
+	defer cleanup()
+
+	zipReader, err := zip.OpenReader(scanPath)
+	if err != nil {
+		return nil, packageDiagnosticError(CodeMarketplacePackageInvalid, "package must be a valid ZIP or tar.gz container")
 	}
 	defer func() {
 		if closeErr := zipReader.Close(); err == nil && closeErr != nil {
@@ -320,13 +331,13 @@ func scanSourcePackage(in UploadSourcePackageInput) (scan *sourcePackageScan, er
 	if fileName == "" {
 		fileName = filepath.Base(packagePath)
 	}
-	contentType := normalizeKey(in.ContentType)
+	contentType := packageContentTypeForName(fileName, normalizeKey(in.ContentType))
 	if contentType == "" {
 		contentType = sourcePackageDefaultContentType
 	}
 	storageKey := normalizeKey(in.StorageKey)
 	if storageKey == "" {
-		storageKey = path.Join(sourcePackageStoragePrefix, manifest.ID, manifest.Version, packageSha+".zip")
+		storageKey = path.Join(sourcePackageStoragePrefix, manifest.ID, manifest.Version, packageSha+storageKeyExtension(fileName))
 	}
 
 	return &sourcePackageScan{
@@ -359,7 +370,7 @@ func (s *serviceImpl) saveSourcePackageArtifact(
 	if release == nil || scan == nil {
 		return nil, bizerr.NewCode(CodeMarketplaceInvalidInput)
 	}
-	artifactType := marketv1.MarketplaceArtifactTypeSourceZip.String()
+	artifactType := sourceArtifactTypeForName(scan.fileName).String()
 	data := do.PluginMarketplaceArtifact{
 		ReleaseId:      release.ID,
 		PluginId:       release.PluginID,

@@ -37,6 +37,13 @@ type PluginMarketplacePluginColumns struct {
 	Repository      string // Plugin source repository URL
 	License         string // Plugin license identifier
 	DownloadCount   string // Aggregated download count snapshot
+	SourceKind      string // Publish source kind: git/upload
+	RepoUrl         string // Git repository URL when source_kind is git
+	RepoProvider    string // Git provider: github/gitee, empty for upload
+	CredentialRef   string // Opaque credential reference for private Git access, empty when public
+	LastSyncAt      string // Last Git metadata discovery time
+	LastSyncStatus  string // Last Git sync status
+	LastSyncMessage string // Last Git sync diagnostic message without secrets
 	PublishedAt     string // First published time
 	CreatedAt       string // Creation time
 	UpdatedAt       string // Update time
@@ -61,6 +68,13 @@ var pluginMarketplacePluginColumns = PluginMarketplacePluginColumns{
 	Repository:      "repository",
 	License:         "license",
 	DownloadCount:   "download_count",
+	SourceKind:      "source_kind",
+	RepoUrl:         "repo_url",
+	RepoProvider:    "repo_provider",
+	CredentialRef:   "credential_ref",
+	LastSyncAt:      "last_sync_at",
+	LastSyncStatus:  "last_sync_status",
+	LastSyncMessage: "last_sync_message",
 	PublishedAt:     "published_at",
 	CreatedAt:       "created_at",
 	UpdatedAt:       "updated_at",
