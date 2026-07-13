@@ -55,7 +55,7 @@ type Service interface {
 	// Delete soft-deletes visible file metadata rows and best-effort removes the
 	// physical objects from storage. Visibility failures abort before mutation;
 	// storage cleanup failures are logged and do not roll back soft deletion.
-	Delete(ctx context.Context, idsStr string) error
+	Delete(ctx context.Context, ids []int64) error
 	// OpenByID opens a stored file stream by metadata ID for download after
 	// data-scope validation. Missing metadata or storage objects return file
 	// business errors.
@@ -89,6 +89,7 @@ type serviceImpl struct {
 }
 
 // New creates and returns a new file service from explicit runtime-owned dependencies.
+// storage is the host-wide Storage Service used for file-center content Put/Get/Delete.
 func New(configSvc config.Service, storage storagesvc.Service, bizCtxSvc bizctx.Service, dictSvc dictsvc.Service, scopeSvc datascope.Service) Service {
 	return &serviceImpl{
 		configSvc: configSvc,

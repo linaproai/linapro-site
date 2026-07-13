@@ -7,6 +7,7 @@ package hostservice
 import (
 	"bytes"
 	"encoding/json"
+	"lina-core/pkg/plugin/pluginbridge/protocol/hostservices"
 
 	"github.com/gogf/gf/v2/errors/gerror"
 	"gopkg.in/yaml.v3"
@@ -14,7 +15,9 @@ import (
 
 // hostServiceSpecWire is the JSON decoding shape for host service declarations.
 type hostServiceSpecWire struct {
+	Owner     string          `json:"owner,omitempty" yaml:"owner,omitempty"`
 	Service   string          `json:"service" yaml:"service"`
+	Version   string          `json:"version,omitempty" yaml:"version,omitempty"`
 	Methods   []string        `json:"methods" yaml:"methods"`
 	Resources json.RawMessage `json:"resources,omitempty" yaml:"-"`
 }
@@ -50,13 +53,19 @@ func (spec HostServiceSpec) MarshalJSON() ([]byte, error) {
 		"service": spec.Service,
 		"methods": spec.Methods,
 	}
+	if spec.Owner != "" {
+		payload["owner"] = spec.Owner
+	}
+	if spec.Version != "" {
+		payload["version"] = spec.Version
+	}
 	if len(spec.Paths) > 0 {
 		payload["resources"] = &hostServiceStorageResourcesWire{Paths: spec.Paths}
 	} else if len(spec.Tables) > 0 {
 		payload["resources"] = &hostServiceDataResourcesWire{Tables: spec.Tables}
 	} else if len(spec.Keys) > 0 {
 		payload["resources"] = &hostServiceKeyResourcesWire{Keys: spec.Keys}
-	} else if spec.Service == HostServiceNetwork && len(spec.Resources) > 0 {
+	} else if spec.Service == hostservices.HostServiceNetwork && len(spec.Resources) > 0 {
 		payload["resources"] = marshalNetworkResources(spec.Resources)
 	} else if len(spec.Resources) > 0 {
 		payload["resources"] = spec.Resources
@@ -72,6 +81,8 @@ func (spec *HostServiceSpec) UnmarshalJSON(data []byte) error {
 	}
 
 	spec.Service = wire.Service
+	spec.Owner = wire.Owner
+	spec.Version = wire.Version
 	spec.Methods = append([]string(nil), wire.Methods...)
 	spec.Paths = nil
 	spec.Tables = nil
@@ -92,14 +103,14 @@ func (spec *HostServiceSpec) UnmarshalJSON(data []byte) error {
 		spec.Resources = resources
 	case '{':
 		switch normalizeHostServiceName(spec.Service) {
-		case HostServiceStorage, HostServiceManifest:
+		case hostservices.HostServiceStorage, hostservices.HostServiceManifest:
 			var storageResources hostServiceStorageResourcesWire
 			if err := json.Unmarshal(trimmed, &storageResources); err != nil {
 				return err
 			}
 			spec.Paths = append([]string(nil), storageResources.Paths...)
 			return nil
-		case HostServiceHostConfig:
+		case hostservices.HostServiceHostConfig:
 			var keyResources hostServiceKeyResourcesWire
 			if err := json.Unmarshal(trimmed, &keyResources); err != nil {
 				return err
@@ -125,13 +136,19 @@ func (spec HostServiceSpec) MarshalYAML() (interface{}, error) {
 		"service": spec.Service,
 		"methods": spec.Methods,
 	}
+	if spec.Owner != "" {
+		payload["owner"] = spec.Owner
+	}
+	if spec.Version != "" {
+		payload["version"] = spec.Version
+	}
 	if len(spec.Paths) > 0 {
 		payload["resources"] = &hostServiceStorageResourcesWire{Paths: spec.Paths}
 	} else if len(spec.Tables) > 0 {
 		payload["resources"] = &hostServiceDataResourcesWire{Tables: spec.Tables}
 	} else if len(spec.Keys) > 0 {
 		payload["resources"] = &hostServiceKeyResourcesWire{Keys: spec.Keys}
-	} else if spec.Service == HostServiceNetwork && len(spec.Resources) > 0 {
+	} else if spec.Service == hostservices.HostServiceNetwork && len(spec.Resources) > 0 {
 		payload["resources"] = marshalNetworkResources(spec.Resources)
 	} else if len(spec.Resources) > 0 {
 		payload["resources"] = spec.Resources
@@ -143,7 +160,9 @@ func (spec HostServiceSpec) MarshalYAML() (interface{}, error) {
 // the unified `resources` envelope.
 func (spec *HostServiceSpec) UnmarshalYAML(node *yaml.Node) error {
 	type hostServiceSpecYAMLWire struct {
+		Owner     string    `yaml:"owner,omitempty"`
 		Service   string    `yaml:"service"`
+		Version   string    `yaml:"version,omitempty"`
 		Methods   []string  `yaml:"methods"`
 		Resources yaml.Node `yaml:"resources,omitempty"`
 	}
@@ -154,6 +173,8 @@ func (spec *HostServiceSpec) UnmarshalYAML(node *yaml.Node) error {
 	}
 
 	spec.Service = wire.Service
+	spec.Owner = wire.Owner
+	spec.Version = wire.Version
 	spec.Methods = append([]string(nil), wire.Methods...)
 	spec.Paths = nil
 	spec.Tables = nil
@@ -173,14 +194,14 @@ func (spec *HostServiceSpec) UnmarshalYAML(node *yaml.Node) error {
 		spec.Resources = resources
 	case yaml.MappingNode:
 		switch normalizeHostServiceName(spec.Service) {
-		case HostServiceStorage, HostServiceManifest:
+		case hostservices.HostServiceStorage, hostservices.HostServiceManifest:
 			var storageResources hostServiceStorageResourcesWire
 			if err := wire.Resources.Decode(&storageResources); err != nil {
 				return err
 			}
 			spec.Paths = append([]string(nil), storageResources.Paths...)
 			return nil
-		case HostServiceHostConfig:
+		case hostservices.HostServiceHostConfig:
 			var keyResources hostServiceKeyResourcesWire
 			if err := wire.Resources.Decode(&keyResources); err != nil {
 				return err
@@ -220,7 +241,7 @@ func marshalNetworkResources(resources []*HostServiceResourceSpec) []*hostServic
 // unmarshalJSONResourcesByService decodes service-specific JSON `resources`
 // payloads into normalized host resource declarations.
 func unmarshalJSONResourcesByService(service string, payload []byte) ([]*HostServiceResourceSpec, error) {
-	if normalizeHostServiceName(service) == HostServiceNetwork {
+	if normalizeHostServiceName(service) == hostservices.HostServiceNetwork {
 		var resources []*hostServiceNetworkResourceWire
 		if err := json.Unmarshal(payload, &resources); err != nil {
 			return nil, err
@@ -238,7 +259,7 @@ func unmarshalJSONResourcesByService(service string, payload []byte) ([]*HostSer
 // unmarshalYAMLResourcesByService decodes service-specific YAML `resources`
 // payloads into normalized host resource declarations.
 func unmarshalYAMLResourcesByService(service string, node *yaml.Node) ([]*HostServiceResourceSpec, error) {
-	if normalizeHostServiceName(service) == HostServiceNetwork {
+	if normalizeHostServiceName(service) == hostservices.HostServiceNetwork {
 		var resources []*hostServiceNetworkResourceWire
 		if err := node.Decode(&resources); err != nil {
 			return nil, err

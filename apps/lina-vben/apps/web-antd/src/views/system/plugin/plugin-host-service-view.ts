@@ -21,9 +21,13 @@ export interface HostServiceScopeView {
 }
 
 export interface HostServiceCardView {
+  identityKey: string;
+  identityTestIdValue: string;
+  owner: string | undefined;
   scopes: HostServiceScopeView[];
   service: string;
   title: string;
+  version: string | undefined;
 }
 
 export interface HostServiceTargetView {
@@ -53,6 +57,11 @@ interface HostServiceCardBuildOptions {
   targetSummaryBadgeColor?: string;
 }
 
+/**
+ * Stable display order for known host service families.
+ * Values align with common authorization-review scanning order: data plane
+ * first, then infra, identity, and remaining catalog services.
+ */
 const hostServiceOrder: Record<string, number> = {
   data: 0,
   storage: 1,
@@ -61,47 +70,73 @@ const hostServiceOrder: Record<string, number> = {
   jobs: 4,
   plugins: 5,
   notifications: 6,
+  cache: 7,
+  lock: 8,
+  files: 9,
+  users: 10,
+  sessions: 11,
+  auth: 12,
+  tenant: 13,
+  org: 14,
+  dict: 15,
+  route: 16,
+  apidoc: 17,
+  bizctx: 18,
+  hostconfig: 19,
+  manifest: 20,
+  ai: 21,
 };
 
+/**
+ * Known host service wire names that have dedicated display labels.
+ * Keep in sync with pages.system.plugin.hostServices.service.* i18n keys
+ * (excluding the shared "unknown" fallback key).
+ */
+export const knownHostServiceLabels = [
+  'ai',
+  'apidoc',
+  'auth',
+  'bizctx',
+  'cache',
+  'data',
+  'dict',
+  'files',
+  'hostconfig',
+  'jobs',
+  'lock',
+  'manifest',
+  'network',
+  'notifications',
+  'org',
+  'plugins',
+  'route',
+  'runtime',
+  'sessions',
+  'storage',
+  'tenant',
+  'users',
+] as const;
+
+const hostServiceLabelKeyPrefix = 'pages.system.plugin.hostServices.service';
+
 export function sortHostServices(items?: HostServicePermissionItem[]) {
-  return [...(items ?? [])].sort((left, right) => {
-    const leftOrder = hostServiceOrder[left.service] ?? Number.MAX_SAFE_INTEGER;
-    const rightOrder =
-      hostServiceOrder[right.service] ?? Number.MAX_SAFE_INTEGER;
-    if (leftOrder !== rightOrder) {
-      return leftOrder - rightOrder;
-    }
-    return left.service.localeCompare(right.service);
-  });
+  return [...(items ?? [])].sort(compareHostServiceIdentity);
 }
 
+/**
+ * Resolve a localized display title for a host service wire name.
+ * Known services use dedicated i18n keys; unknown services use a consistent
+ * fallback that still surfaces the raw wire identifier for operators.
+ */
 export function formatServiceLabel(service: string) {
-  switch (service) {
-    case 'data': {
-      return $t('pages.system.plugin.hostServices.service.data');
-    }
-    case 'network': {
-      return $t('pages.system.plugin.hostServices.service.network');
-    }
-    case 'runtime': {
-      return $t('pages.system.plugin.hostServices.service.runtime');
-    }
-    case 'storage': {
-      return $t('pages.system.plugin.hostServices.service.storage');
-    }
-    case 'jobs': {
-      return $t('pages.system.plugin.hostServices.service.jobs');
-    }
-    case 'plugins': {
-      return $t('pages.system.plugin.hostServices.service.plugins');
-    }
-    case 'notifications': {
-      return $t('pages.system.plugin.hostServices.service.notifications');
-    }
-    default: {
-      return service;
-    }
+  const normalized = (service ?? '').trim();
+  if (!normalized) {
+    return '';
   }
+  if ((knownHostServiceLabels as readonly string[]).includes(normalized)) {
+    return $t(`${hostServiceLabelKeyPrefix}.${normalized}`);
+  }
+  return $t(`${hostServiceLabelKeyPrefix}.unknown`, { service: normalized });
 }
 
 export function buildPluginDetailHostServiceCards(
@@ -120,6 +155,7 @@ export function buildPluginDetailHostServiceCards(
       if (!displayService) {
         return null;
       }
+      const identity = buildHostServiceIdentity(displayService);
 
       const sameAsAuthorized =
         requestedService &&
@@ -134,7 +170,7 @@ export function buildPluginDetailHostServiceCards(
             badgeColor: 'green',
             label: $t('pages.system.plugin.hostServices.scope.effective'),
             kind: 'authorized',
-            scopeKey: `${serviceKey}-effective`,
+            scopeKey: `${identity.testIdValue}-effective`,
             service: authorizedService,
           }),
         );
@@ -145,7 +181,7 @@ export function buildPluginDetailHostServiceCards(
               badgeColor: 'blue',
               kind: 'requested',
               label: $t('pages.system.plugin.hostServices.scope.requested'),
-              scopeKey: `${serviceKey}-requested`,
+              scopeKey: `${identity.testIdValue}-requested`,
               service: requestedService,
             }),
           );
@@ -156,7 +192,7 @@ export function buildPluginDetailHostServiceCards(
               badgeColor: 'green',
               kind: 'authorized',
               label: $t('pages.system.plugin.hostServices.scope.authorized'),
-              scopeKey: `${serviceKey}-authorized`,
+              scopeKey: `${identity.testIdValue}-authorized`,
               service: authorizedService,
             }),
           );
@@ -164,9 +200,13 @@ export function buildPluginDetailHostServiceCards(
       }
 
       return {
+        identityKey: identity.key,
+        identityTestIdValue: identity.testIdValue,
+        owner: identity.owner || undefined,
         scopes,
-        service: serviceKey,
-        title: formatServiceLabel(serviceKey),
+        service: identity.service,
+        title: formatServiceLabel(identity.service),
+        version: identity.version || undefined,
       } satisfies HostServiceCardView;
     })
     .filter((item): item is HostServiceCardView => item !== null);
@@ -176,30 +216,37 @@ export function buildPluginAuthorizationHostServiceCards(
   requested?: HostServicePermissionItem[],
   options: HostServiceCardBuildOptions = {},
 ) {
-  return sortHostServices(requested).map((service) => ({
-    scopes: [
-      buildScopeView({
-        badgeColor: 'green',
-        buildScopeContainerTestId: options.buildScopeContainerTestId,
-        buildScopeItemTestIdPrefix: options.buildScopeItemTestIdPrefix,
-        kind: options.authorizationRequired ? 'requested' : 'authorized',
-        label: options.authorizationRequired
-          ? $t('pages.system.plugin.hostServices.scope.requested')
-          : $t('pages.system.plugin.hostServices.scope.effective'),
-        scopeKey: `${service.service}-review`,
-        service,
-        targetSummaryBadgeColor: options.targetSummaryBadgeColor,
-      }),
-    ],
-    service: service.service,
-    title: formatServiceLabel(service.service),
-  }));
+  return sortHostServices(requested).map((service) => {
+    const identity = buildHostServiceIdentity(service);
+    return {
+      identityKey: identity.key,
+      identityTestIdValue: identity.testIdValue,
+      owner: identity.owner || undefined,
+      scopes: [
+        buildScopeView({
+          badgeColor: 'green',
+          buildScopeContainerTestId: options.buildScopeContainerTestId,
+          buildScopeItemTestIdPrefix: options.buildScopeItemTestIdPrefix,
+          kind: options.authorizationRequired ? 'requested' : 'authorized',
+          label: options.authorizationRequired
+            ? $t('pages.system.plugin.hostServices.scope.requested')
+            : $t('pages.system.plugin.hostServices.scope.effective'),
+          scopeKey: `${identity.testIdValue}-review`,
+          service,
+          targetSummaryBadgeColor: options.targetSummaryBadgeColor,
+        }),
+      ],
+      service: identity.service,
+      title: formatServiceLabel(identity.service),
+      version: identity.version || undefined,
+    } satisfies HostServiceCardView;
+  });
 }
 
 function buildServiceMap(items?: HostServicePermissionItem[]) {
   const map = new Map<string, HostServicePermissionItem>();
   for (const item of sortHostServices(items)) {
-    map.set(item.service, item);
+    map.set(buildHostServiceIdentity(item).key, item);
   }
   return map;
 }
@@ -210,12 +257,12 @@ function sortServiceKeys(
 ) {
   return [...new Set([...requested.keys(), ...authorized.keys()])].sort(
     (left, right) => {
-      const leftOrder = hostServiceOrder[left] ?? Number.MAX_SAFE_INTEGER;
-      const rightOrder = hostServiceOrder[right] ?? Number.MAX_SAFE_INTEGER;
-      if (leftOrder !== rightOrder) {
-        return leftOrder - rightOrder;
+      const leftService = requested.get(left) ?? authorized.get(left);
+      const rightService = requested.get(right) ?? authorized.get(right);
+      if (!leftService || !rightService) {
+        return left.localeCompare(right);
       }
-      return left.localeCompare(right);
+      return compareHostServiceIdentity(leftService, rightService);
     },
   );
 }
@@ -262,6 +309,9 @@ function buildScopeView(input: {
 
 function buildServiceCompareKey(service: HostServicePermissionItem) {
   return JSON.stringify({
+    owner: normalizeIdentitySegment(service.owner),
+    service: normalizeIdentitySegment(service.service),
+    version: normalizeIdentitySegment(service.version),
     methods: normalizeStringList(service.methods),
     paths: normalizeStringList(service.paths),
     resources: normalizeStringList(
@@ -269,6 +319,50 @@ function buildServiceCompareKey(service: HostServicePermissionItem) {
     ),
     tables: normalizeStringList(resolveDataTableNames(service)),
   });
+}
+
+function buildHostServiceIdentity(service: HostServicePermissionItem) {
+  const owner = normalizeIdentitySegment(service.owner);
+  const serviceName = normalizeIdentitySegment(service.service);
+  const version = normalizeIdentitySegment(service.version);
+  const key = owner ? `${owner}/${serviceName}/${version}` : serviceName;
+  return {
+    key,
+    owner,
+    service: serviceName,
+    testIdValue: key.replaceAll(/[^A-Za-z0-9_-]+/gu, '-'),
+    version,
+  };
+}
+
+function compareHostServiceIdentity(
+  left: HostServicePermissionItem,
+  right: HostServicePermissionItem,
+) {
+  const leftIdentity = buildHostServiceIdentity(left);
+  const rightIdentity = buildHostServiceIdentity(right);
+  const leftOrder =
+    hostServiceOrder[leftIdentity.service] ?? Number.MAX_SAFE_INTEGER;
+  const rightOrder =
+    hostServiceOrder[rightIdentity.service] ?? Number.MAX_SAFE_INTEGER;
+  if (leftOrder !== rightOrder) {
+    return leftOrder - rightOrder;
+  }
+  const serviceCompare = leftIdentity.service.localeCompare(
+    rightIdentity.service,
+  );
+  if (serviceCompare !== 0) {
+    return serviceCompare;
+  }
+  const ownerCompare = leftIdentity.owner.localeCompare(rightIdentity.owner);
+  if (ownerCompare !== 0) {
+    return ownerCompare;
+  }
+  return leftIdentity.version.localeCompare(rightIdentity.version);
+}
+
+function normalizeIdentitySegment(value?: string) {
+  return (value ?? '').trim();
 }
 
 function resolveServiceTargets(service: HostServicePermissionItem) {

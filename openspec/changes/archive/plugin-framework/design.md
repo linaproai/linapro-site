@@ -104,13 +104,28 @@ source/dynamic 两套升级骨架分散在 `sourceupgrade`、`runtimeupgrade`、
 
 ## 10. Builtin 插件分发治理
 
-**决策**：在插件 manifest 中新增`distribution`字段，缺省为`marketplace`，支持`builtin`声明项目内建源码插件。`builtin`必须同时满足源码插件和编译期注册，动态插件不能声明`builtin`。
+**决策**：在插件 manifest 中新增`distribution`字段，缺省归一化为`managed`，支持`builtin`声明项目内建源码插件。合法值仅`managed|builtin`；旧值`marketplace`在有效契约中拒绝。`builtin`必须同时满足源码插件和编译期注册，动态插件不能声明`builtin`。
 
 **关键设计**：
-- `sys_plugin`基线表结构新增`distribution varchar(32) not null default 'marketplace'`
+- `sys_plugin`基线表结构使用`distribution varchar(32) not null default 'managed'`
 - 普通插件管理列表默认隐藏`builtin`插件，写操作由服务端 guard 统一拒绝
 - 启动期独立执行`BootstrapBuiltinPlugins(ctx)`，在插件路由、cron、前端包预热前自动安装、启用和安全升级 builtin 源码插件
 - 生命周期变化继续复用现有依赖解析、SQL 迁移、资源同步、缓存失效、enabled snapshot 和集群主节点边界
+
+## 10.1 插件管理列表「管理」入口
+
+运维人员进入某个插件的业务管理页（如 LDAP 设置、登录日志、通知管理）时，不应只能从左侧菜单自行定位。列表操作列需要提供直达入口，并在无管理页或未安装时明确置灰。
+
+**决策**：
+
+1. **判定来源：前端 page-registry**。以`getPluginPages()`中归属该`pluginId`的可导航页面为准；排除`frontend/pages/components/**`以及文件名含`modal`/`drawer`的辅助组件。构建期已有稳定注册表，无需后端扩展列表字段，符合列表首屏性能约束。
+2. **多管理页目标选择**。以当前会话`accessMenus`深度优先遍历顺序选择该插件第一个匹配菜单路径；若 access 菜单尚无匹配则回退`router.getRoutes()`注册顺序中的第一个匹配路径。**禁止**按`routePath`字母序排序，否则会出现如`/ai/invocations`排在`/ai/providers`前、误进非首位菜单的问题。侧边栏菜单顺序即用户感知的“第一个菜单”，与`plugin.yaml`的`sort`一致。
+3. **跳转路径解析**。路径匹配支持完整相等或后缀匹配，以兼容相对菜单路径挂到父目录后的完整 URL。当前会话找不到任何匹配路由时，保持在列表页并给出用户可见提示。按钮启用只表达“插件声明了管理页且已安装”；真正可访问性仍受启用状态与权限约束。
+4. **按钮状态**。已安装且存在可导航管理页 → 可点击；未安装 → 禁用并提示先安装；已安装但无管理页 → 禁用并提示无管理页面。
+
+**非目标**：不为每个插件强制新增管理页；不改变菜单同步、权限过滤或动态插件资产托管语义；不在列表接口返回`managementPath`等新字段。
+
+**取舍**：仅 iframe/资产页、未进入 page-registry 的动态插件可能被判定为无管理页（当前托管工作台主要源码插件管理页走 page-registry）；多管理页只进一个，优先菜单顺序首位，后续若需要可改为下拉。
 
 ## 11. 插件领域能力扩展
 
@@ -151,3 +166,27 @@ source/dynamic 两套升级骨架分散在 `sourceupgrade`、`runtimeupgrade`、
 - 接口按 owner 分为三类：生产者完整契约、稳定产品/运行期契约、消费方窄依赖
 - 消费方优先复用目标组件已有`Service`或稳定契约；仅当完整契约不能清晰表达消费边界时才在消费方包内定义窄依赖接口
 - 收敛`i18n.Service`，删除无业务入口的 i18n 管理诊断 API 和源码插件消息搜索方法
+
+## Plugin-Owned Domain Capabilities
+
+Non-core domain capabilities are owned by domain owner plugins. Public contracts live under `apps/lina-plugins/<plugin-id>/backend/cap/<domain>cap`. Core keeps only the plugin kernel, dependency governance, generic capability descriptors, dynamic routing, authorization, audit, and lifecycle controls.
+
+Owner-aware dynamic `hostServices` use structured `owner` and `version` fields rather than encoding ownership into the service string. Core merges static core-owned catalog entries with owner descriptors, stores authorization snapshots keyed by `owner/service/version`, and dispatches through a generic invoker path instead of domain-specific switches. Consuming plugins must declare a hard `dependencies.plugins` entry for the owner; reverse disable/uninstall/upgrade checks protect downstream consumers and must not N+1 on first-screen lists.
+
+AI is the first owner pilot. `linapro-ai-core` owns text and multimodal contracts, provider SPI, and the dynamic guest bridge SDK. Core no longer ships production `aicap` contracts, `ProvideAIText`, or AI-specific codecs/dispatchers. Capability IDs use `plugin.linapro-ai-core.ai.<family>.v1`. Dynamic descriptors only publish runnable methods; remaining multimodal methods stay in the owner contract until invokers exist.
+
+Import boundary scanning via `linactl plugins.check` allows cross-plugin production imports only into owner `backend/cap/...`. Runtime caches for registries, authorization snapshots, and owner availability follow critical runtime data rules: authoritative sources, post-commit invalidation, cluster coordination, and rebuild-or-deny on failure.
+
+## Host Layer Simplification
+
+New core-owned host service methods must use JSON envelopes. Existing dedicated codecs are frozen as a method-level allowlist. Wire constants for services and methods live only under `protocol/hostservices` and are referenced by the catalog; no `go generate`. Historical `HostServiceCapabilityJSON*` aliases are removed in favor of `HostServiceJSON*`. Upgrade preview/execute is owned by the lifecycle facade; the root plugin package no longer constructs or holds a parallel `upgrade.Service`, while public type aliases remain stable for management API callers.
+
+## 同权同信与动态外部登录
+
+**决策**：经宿主安装或升级治理并处于启用状态的动态插件，与源码插件适用同一信任级与能力准入模型；不得仅因 `type=dynamic` 永久拒绝发布某一 core-owned 领域能力。
+
+**关键设计**：
+- 动态插件可经 hostServices 授权调用 `external_login.login_by_verified_identity` 与 `users.create_from_external`，guest 走真实 host call 而非永久 stub。
+- 源码 provider ownership 继续 `ProvideExternalIdentity(providerID)`；动态 ownership 由 `auth` 服务下 `resources[].ref` 声明 provider ID，WASM dispatcher 校验后盖章 pluginID 铸会话。
+- 调用链：dynamic guest → domainhostcall → wasm dispatcher（授权 + ownership）→ capability 或等价 auth/users 实现。
+- 安全仍依赖安装治理、方法级授权、provider ownership 与启用检查；被攻破的已授权动态插件与源码插件同信模型，后续可叠加宿主验签加固。

@@ -41,7 +41,7 @@ func init() {
 }
 
 func TestParseCommandInputSupportsMakeStyleParams(t *testing.T) {
-	input, err := parseCommandInput([]string{"confirm=init", "rebuild=true", "--platforms=linux/amd64,linux/arm64", "UPPER=ClaudeCode", "-h", "extra"})
+	input, err := parseCommandInput([]string{"confirm=init", "rebuild=true", "--platforms=linux/amd64,linux/arm64", "--dash-key=literal", "UPPER=ClaudeCode", "-h", "extra"})
 	if err != nil {
 		t.Fatalf("parseCommandInput returned error: %v", err)
 	}
@@ -55,9 +55,11 @@ func TestParseCommandInputSupportsMakeStyleParams(t *testing.T) {
 	if input.Get("platforms") != "linux/amd64,linux/arm64" {
 		t.Fatalf("platforms mismatch: %q", input.Get("platforms"))
 	}
-	input.Params["base_image"] = "alpine"
-	if input.Get("base-image") != "alpine" {
-		t.Fatalf("hyphenated key did not resolve normalized parameter")
+	if input.Get("dash-key") != "literal" {
+		t.Fatalf("hyphenated literal key mismatch: %q", input.Get("dash-key"))
+	}
+	if input.Get("dash_key") != "" {
+		t.Fatalf("hyphenated key should not resolve as snake_case parameter")
 	}
 	if input.Get("upper") != "" {
 		t.Fatalf("upper-case key should not resolve as lower-case parameter")
@@ -128,7 +130,8 @@ func TestCommandRegistryUsesDottedPackAssetsCommand(t *testing.T) {
 }
 
 // TestCommandRegistryUsesDottedDatabaseCommands guards the public database
-// command names.
+// command names. Top-level upgrade is reserved for framework source upgrades
+// (see command_upgrade.go), not the legacy database alias of db.upgrade.
 func TestCommandRegistryUsesDottedDatabaseCommands(t *testing.T) {
 	registry := commandRegistry()
 	for _, name := range []string{"db.init", "db.upgrade", "db.mock"} {
@@ -136,10 +139,13 @@ func TestCommandRegistryUsesDottedDatabaseCommands(t *testing.T) {
 			t.Fatalf("expected command %q to be registered", name)
 		}
 	}
-	for _, name := range []string{"init", "upgrade", "mock"} {
+	for _, name := range []string{"init", "mock"} {
 		if _, ok := registry[name]; ok {
-			t.Fatalf("legacy command %q should not be registered", name)
+			t.Fatalf("legacy database command %q should not be registered", name)
 		}
+	}
+	if _, ok := registry["upgrade"]; !ok {
+		t.Fatalf("expected framework upgrade command %q to be registered", "upgrade")
 	}
 }
 
@@ -497,18 +503,18 @@ func TestRunReleaseTagCheckAcceptsMatchingMetadataVersion(t *testing.T) {
 	}
 }
 
-// TestRunReleaseTagCheckUsesGitHubRefNameFallback verifies tag workflow input.
-func TestRunReleaseTagCheckUsesGitHubRefNameFallback(t *testing.T) {
+// TestRunReleaseTagCheckRequiresExplicitTag verifies environment variables are
+// not accepted as implicit release inputs.
+func TestRunReleaseTagCheckRequiresExplicitTag(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "apps", "lina-core", "manifest", "config", "metadata.yaml"), "framework:\n  version: v1.2.3-rc.1\n")
 
 	application := newApp(ioDiscard{}, ioDiscard{}, strings.NewReader(""))
 	application.root = root
-	application.env = toolutil.SetEnvValue(os.Environ(), "GITHUB_REF_NAME", "v1.2.3-rc.1")
 
 	err := runReleaseTagCheck(context.Background(), application, commandInput{})
-	if err != nil {
-		t.Fatalf("runReleaseTagCheck should use GITHUB_REF_NAME fallback: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "release tag is empty; pass tag=<version>") {
+		t.Fatalf("expected explicit tag error, got %v", err)
 	}
 }
 
@@ -521,7 +527,7 @@ func TestRunReleaseTagCheckPrintsValidatedFrameworkVersion(t *testing.T) {
 	application := newApp(&stdout, ioDiscard{}, strings.NewReader(""))
 	application.root = root
 
-	err := runReleaseTagCheck(context.Background(), application, commandInput{Params: map[string]string{"print_version": "1"}})
+	err := runReleaseTagCheck(context.Background(), application, commandInput{Params: map[string]string{"print-version": "1"}})
 	if err != nil {
 		t.Fatalf("runReleaseTagCheck returned error: %v", err)
 	}
@@ -949,7 +955,7 @@ func TestDynamicPluginsScansYAMLManifests(t *testing.T) {
 	writeFile(t, filepath.Join(pluginRoot, "dynamic-b", "plugin.yaml"), "type: dynamic\n")
 	writeFile(t, filepath.Join(pluginRoot, "dynamic-a", "plugin.yaml"), "type: dynamic\n")
 
-	plugins, err := dynamicPlugins(root, "")
+	plugins, err := dynamicPlugins(root)
 	if err != nil {
 		t.Fatalf("dynamicPlugins returned error: %v", err)
 	}
@@ -1079,6 +1085,52 @@ func TestRunBuildDirBuildsSelectedPluginOnly(t *testing.T) {
 	}
 }
 
+func TestRunBuildDirRunsArbitraryHackConfigCommands(t *testing.T) {
+	root := t.TempDir()
+	writeBuildFixture(t, root)
+	targetDir := filepath.Join(root, "tools", "custom-builder")
+	writeFile(t, filepath.Join(targetDir, "hack", "config.yaml"), "build:\n  commands:\n    - node build.mjs --target \"$(BUILD_DIR)\" --repo \"$(REPO_ROOT)\"\n")
+
+	calls := runBuildWithCapturedCommands(t, root, nil, commandInput{Params: map[string]string{
+		"dir": "tools/custom-builder",
+	}})
+
+	if len(calls) != 1 {
+		t.Fatalf("expected one configured build command, got %#v", calls)
+	}
+	call := calls[0]
+	if call.name != "node" || len(call.args) != 5 || call.args[0] != "build.mjs" || call.args[1] != "--target" || call.args[2] != targetDir || call.args[3] != "--repo" || call.args[4] != root {
+		t.Fatalf("unexpected configured build command: %#v", call)
+	}
+	if call.cmd.Dir != targetDir {
+		t.Fatalf("configured build dir mismatch: got %q want %q", call.cmd.Dir, targetDir)
+	}
+	if got := toolutil.EnvValue(call.cmd.Env, plugins.SourcePluginsEnvKey); got != "0" {
+		t.Fatalf("expected arbitrary configured build to use host-only plugin env, got %q", got)
+	}
+}
+
+func TestRunBuildDirRejectsPackageBuildWithoutHackConfig(t *testing.T) {
+	root := t.TempDir()
+	writeBuildFixture(t, root)
+	writeFile(t, filepath.Join(root, "tools", "package-builder", "package.json"), `{"scripts":{"build":"vite build"}}`)
+
+	application := newApp(ioDiscard{}, ioDiscard{}, strings.NewReader(""))
+	application.root = root
+	application.lookPath = func(name string) (string, error) {
+		return name, nil
+	}
+	application.execCommand = func(_ context.Context, name string, args ...string) *exec.Cmd {
+		t.Fatalf("build without hack/config.yaml must not execute %s %#v", name, args)
+		return exec.Command(os.Args[0], "-test.run=TestHelperCommandSuccess", "--")
+	}
+
+	err := runBuild(context.Background(), application, commandInput{Params: map[string]string{"dir": "tools/package-builder"}})
+	if err == nil || !strings.Contains(err.Error(), "build dir has no hack/config.yaml") {
+		t.Fatalf("expected missing hack/config.yaml error, got %v", err)
+	}
+}
+
 func TestRunBuildWithoutDirBuildsAllPlugins(t *testing.T) {
 	root := t.TempDir()
 	writeBuildFixture(t, root)
@@ -1148,14 +1200,168 @@ func TestRunBuildDirBuildsHostBackendWithPreparedAssets(t *testing.T) {
 	}
 }
 
-func TestResolvePluginConfigBuildStepsSkipsPluginsWithoutCommands(t *testing.T) {
+func TestRunDevDirUsesBuildDirLogic(t *testing.T) {
+	root := t.TempDir()
+	writeBuildFixture(t, root)
+	targetDir := filepath.Join(root, "tools", "dev-target")
+	writeFile(t, filepath.Join(targetDir, "hack", "config.yaml"), "build:\n  commands:\n    - node dev-build.mjs --target \"$(BUILD_DIR)\"\n")
+
+	var calls []capturedCommand
+	application := newApp(ioDiscard{}, ioDiscard{}, strings.NewReader(""))
+	application.root = root
+	application.lookPath = func(name string) (string, error) {
+		return name, nil
+	}
+	application.execCommand = func(_ context.Context, name string, args ...string) *exec.Cmd {
+		cmd := exec.Command(os.Args[0], "-test.run=TestHelperCommandSuccess", "--")
+		calls = append(calls, capturedCommand{
+			name: name,
+			args: append([]string(nil), args...),
+			cmd:  cmd,
+		})
+		return cmd
+	}
+	application.portInUse = func(int) bool {
+		t.Fatalf("runDev dir should not enter service port checks")
+		return false
+	}
+
+	if err := runDev(context.Background(), application, commandInput{Params: map[string]string{
+		"dir": "tools/dev-target",
+	}}); err != nil {
+		t.Fatalf("runDev returned error: %v", err)
+	}
+	if len(calls) != 1 {
+		t.Fatalf("expected one configured build command, got %#v", calls)
+	}
+	call := calls[0]
+	if call.name != "node" || len(call.args) != 3 || call.args[0] != "dev-build.mjs" || call.args[1] != "--target" || call.args[2] != targetDir {
+		t.Fatalf("unexpected dev dir build command: %#v", call)
+	}
+	if call.cmd.Dir != targetDir {
+		t.Fatalf("dev dir build command dir mismatch: got %q want %q", call.cmd.Dir, targetDir)
+	}
+}
+
+func TestRunStopDirRunsConfiguredCommands(t *testing.T) {
+	root := t.TempDir()
+	writeBuildFixture(t, root)
+	targetDir := filepath.Join(root, "tools", "service-target")
+	writeFile(t, filepath.Join(targetDir, "hack", "config.yaml"), "stop:\n  commands:\n    - node stop.mjs --target \"$(TARGET_DIR)\" --repo \"$(REPO_ROOT)\"\n")
+
+	var calls []capturedCommand
+	var stdout bytes.Buffer
+	application := newApp(&stdout, ioDiscard{}, strings.NewReader(""))
+	application.root = root
+	application.lookPath = func(name string) (string, error) {
+		return name, nil
+	}
+	application.execCommand = func(_ context.Context, name string, args ...string) *exec.Cmd {
+		cmd := exec.Command(os.Args[0], "-test.run=TestHelperCommandSuccess", "--")
+		calls = append(calls, capturedCommand{
+			name: name,
+			args: append([]string(nil), args...),
+			cmd:  cmd,
+		})
+		return cmd
+	}
+
+	if err := runStop(context.Background(), application, commandInput{Params: map[string]string{
+		"dir": "tools/service-target",
+	}}); err != nil {
+		t.Fatalf("runStop returned error: %v", err)
+	}
+	if len(calls) != 1 {
+		t.Fatalf("expected one configured stop command, got %#v", calls)
+	}
+	call := calls[0]
+	if call.name != "node" || len(call.args) != 5 || call.args[0] != "stop.mjs" || call.args[1] != "--target" || call.args[2] != targetDir || call.args[3] != "--repo" || call.args[4] != root {
+		t.Fatalf("unexpected stop command: %#v", call)
+	}
+	if call.cmd.Dir != targetDir {
+		t.Fatalf("stop command dir mismatch: got %q want %q", call.cmd.Dir, targetDir)
+	}
+	if call.cmd.Stdout != &stdout {
+		t.Fatalf("configured stop command output should be forwarded")
+	}
+}
+
+func TestRunStatusDirRunsConfiguredCommands(t *testing.T) {
+	root := t.TempDir()
+	writeBuildFixture(t, root)
+	targetDir := filepath.Join(root, "tools", "service-target")
+	writeFile(t, filepath.Join(targetDir, "hack", "config.yaml"), "status:\n  commands:\n    - node status.mjs --target \"$(BUILD_DIR)\"\n")
+
+	var calls []capturedCommand
+	var stdout bytes.Buffer
+	application := newApp(&stdout, ioDiscard{}, strings.NewReader(""))
+	application.root = root
+	application.lookPath = func(name string) (string, error) {
+		return name, nil
+	}
+	application.execCommand = func(_ context.Context, name string, args ...string) *exec.Cmd {
+		cmd := exec.Command(os.Args[0], "-test.run=TestHelperCommandSuccess", "--")
+		calls = append(calls, capturedCommand{
+			name: name,
+			args: append([]string(nil), args...),
+			cmd:  cmd,
+		})
+		return cmd
+	}
+	application.portInUse = func(int) bool {
+		t.Fatalf("runStatus dir should not enter default service status checks")
+		return false
+	}
+
+	if err := runStatus(context.Background(), application, commandInput{Params: map[string]string{
+		"dir": "tools/service-target",
+	}}); err != nil {
+		t.Fatalf("runStatus returned error: %v", err)
+	}
+	if len(calls) != 1 {
+		t.Fatalf("expected one configured status command, got %#v", calls)
+	}
+	call := calls[0]
+	if call.name != "node" || len(call.args) != 3 || call.args[0] != "status.mjs" || call.args[1] != "--target" || call.args[2] != targetDir {
+		t.Fatalf("unexpected status command: %#v", call)
+	}
+	if call.cmd.Dir != targetDir {
+		t.Fatalf("status command dir mismatch: got %q want %q", call.cmd.Dir, targetDir)
+	}
+	if call.cmd.Stdout != &stdout {
+		t.Fatalf("configured status command output should be forwarded")
+	}
+}
+
+func TestRunStopDirRequiresHackConfig(t *testing.T) {
+	root := t.TempDir()
+	writeBuildFixture(t, root)
+	targetDir := filepath.Join(root, "tools", "missing-config")
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
+		t.Fatalf("mkdir target dir: %v", err)
+	}
+
+	application := newApp(ioDiscard{}, ioDiscard{}, strings.NewReader(""))
+	application.root = root
+	err := runStop(context.Background(), application, commandInput{Params: map[string]string{
+		"dir": "tools/missing-config",
+	}})
+	if err == nil {
+		t.Fatalf("expected runStop to reject dir without hack/config.yaml")
+	}
+	if !strings.Contains(err.Error(), "stop dir has no hack/config.yaml") {
+		t.Fatalf("unexpected missing config error: %v", err)
+	}
+}
+
+func TestResolveBuildConfigStepsSkipsTargetsWithoutCommands(t *testing.T) {
 	var (
 		root         = t.TempDir()
 		withBuild    = filepath.Join(root, "apps", "lina-plugins", "with-build")
 		withoutBuild = filepath.Join(root, "apps", "lina-plugins", "without-build")
 	)
 	writeFile(t, filepath.Join(withBuild, "plugin.yaml"), "id: with-build\n")
-	writeFile(t, filepath.Join(withBuild, "hack", "config.yaml"), "build:\n  commands:\n    - node build.mjs\n    - pnpm --dir \"$(PLUGIN_ROOT)/frontend\" run build\n")
+	writeFile(t, filepath.Join(withBuild, "hack", "config.yaml"), "build:\n  commands:\n    - node build.mjs\n    - pnpm --dir \"$(BUILD_DIR)/frontend\" run build\n")
 	writeFile(t, filepath.Join(withoutBuild, "plugin.yaml"), "id: without-build\n")
 	writeFile(t, filepath.Join(withoutBuild, "hack", "config.yaml"), "gfcli:\n  gen:\n    dao: []\n")
 
@@ -1167,22 +1373,72 @@ func TestResolvePluginConfigBuildStepsSkipsPluginsWithoutCommands(t *testing.T) 
 		t.Fatalf("unexpected plugin roots: %#v", plugins)
 	}
 
-	steps, err := resolvePluginConfigBuildSteps(root, withBuild)
+	steps, exists, err := resolveBuildConfigSteps(root, withBuild)
 	if err != nil {
-		t.Fatalf("resolvePluginConfigBuildSteps returned error: %v", err)
+		t.Fatalf("resolveBuildConfigSteps returned error: %v", err)
+	}
+	if !exists {
+		t.Fatalf("expected build config to exist")
 	}
 	if len(steps) != 2 {
 		t.Fatalf("unexpected plugin build steps: %#v", steps)
 	}
 	if steps[1].Command != "pnpm" || steps[1].Args[1] != filepath.Join(withBuild, "frontend") {
-		t.Fatalf("expected plugin root expansion in command, got %#v", steps[1])
+		t.Fatalf("expected build dir expansion in command, got %#v", steps[1])
 	}
-	emptySteps, err := resolvePluginConfigBuildSteps(root, withoutBuild)
+	emptySteps, exists, err := resolveBuildConfigSteps(root, withoutBuild)
 	if err != nil {
-		t.Fatalf("resolvePluginConfigBuildSteps without commands returned error: %v", err)
+		t.Fatalf("resolveBuildConfigSteps without commands returned error: %v", err)
+	}
+	if !exists {
+		t.Fatalf("expected empty build config to exist")
 	}
 	if len(emptySteps) != 0 {
 		t.Fatalf("expected no build steps, got %#v", emptySteps)
+	}
+	missingSteps, exists, err := resolveBuildConfigSteps(root, filepath.Join(root, "missing-config"))
+	if err != nil {
+		t.Fatalf("resolveBuildConfigSteps missing config returned error: %v", err)
+	}
+	if exists {
+		t.Fatalf("missing build config should not be reported as existing")
+	}
+	if len(missingSteps) != 0 {
+		t.Fatalf("expected no steps for missing config, got %#v", missingSteps)
+	}
+
+	serviceTarget := filepath.Join(root, "tools", "service-target")
+	writeFile(t, filepath.Join(serviceTarget, "hack", "config.yaml"), "stop:\n  commands:\n    - node stop.mjs\nstatus:\n  commands:\n    - node status.mjs\n")
+	stopSteps, exists, err := resolveCommandConfigSteps(root, serviceTarget, "stop")
+	if err != nil {
+		t.Fatalf("resolveCommandConfigSteps stop returned error: %v", err)
+	}
+	if !exists || len(stopSteps) != 1 || stopSteps[0].Command != "node" || stopSteps[0].Args[0] != "stop.mjs" {
+		t.Fatalf("unexpected stop steps: exists=%t steps=%#v", exists, stopSteps)
+	}
+	statusSteps, exists, err := resolveCommandConfigSteps(root, serviceTarget, "status")
+	if err != nil {
+		t.Fatalf("resolveCommandConfigSteps status returned error: %v", err)
+	}
+	if !exists || len(statusSteps) != 1 || statusSteps[0].Command != "node" || statusSteps[0].Args[0] != "status.mjs" {
+		t.Fatalf("unexpected status steps: exists=%t steps=%#v", exists, statusSteps)
+	}
+}
+
+func TestResolveBuildConfigStepsLeavesUnknownVariablesLiteral(t *testing.T) {
+	root := t.TempDir()
+	targetDir := filepath.Join(root, "apps", "lina-plugins", "with-build")
+	writeFile(t, filepath.Join(targetDir, "hack", "config.yaml"), "build:\n  commands:\n    - pnpm --dir \"$(UNKNOWN_ROOT)/frontend\" run build\n")
+
+	steps, exists, err := resolveBuildConfigSteps(root, targetDir)
+	if err != nil {
+		t.Fatalf("resolveBuildConfigSteps returned error: %v", err)
+	}
+	if !exists {
+		t.Fatalf("expected config existence to be reported")
+	}
+	if len(steps) != 1 || steps[0].Args[1] != "$(UNKNOWN_ROOT)/frontend" {
+		t.Fatalf("expected unknown variable to stay literal, got %#v", steps)
 	}
 }
 
@@ -1215,7 +1471,7 @@ func TestRunWasmResolvesExplicitRelativeOutputFromRepositoryRoot(t *testing.T) {
 	if err = runWasm(context.Background(), application, commandInput{
 		Params: map[string]string{
 			"out": "temp/output",
-			"p":   "linapro-demo-dynamic",
+			"dir": filepath.Join("apps", "lina-plugins", "linapro-demo-dynamic"),
 		},
 	}); err != nil {
 		t.Fatalf("runWasm returned error: %v", err)
@@ -1243,7 +1499,7 @@ func TestRunWasmUsesRepositoryTempOutputByDefault(t *testing.T) {
 	application.root = root
 
 	if err := runWasm(context.Background(), application, commandInput{
-		Params: map[string]string{"p": "linapro-demo-dynamic"},
+		Params: map[string]string{"dir": filepath.Join("apps", "lina-plugins", "linapro-demo-dynamic")},
 	}); err != nil {
 		t.Fatalf("runWasm returned error: %v", err)
 	}
@@ -1252,6 +1508,37 @@ func TestRunWasmUsesRepositoryTempOutputByDefault(t *testing.T) {
 	artifactPath := filepath.Join(expected, "linapro-demo-dynamic.wasm")
 	if !fileutil.FileExists(artifactPath) {
 		t.Fatalf("expected wasm artifact at %s", artifactPath)
+	}
+}
+
+func TestRunWasmDoesNotUsePluginIDParameterForSelection(t *testing.T) {
+	root := t.TempDir()
+	pluginRoot := filepath.Join(root, "apps", "lina-plugins")
+	writeFile(t, filepath.Join(root, "go.work"), "go 1.25.0\n")
+	writeDynamicPluginManifest(t, filepath.Join(pluginRoot, "dynamic-a"), "dynamic-a")
+	writeDynamicPluginManifest(t, filepath.Join(pluginRoot, "dynamic-b"), "dynamic-b")
+
+	var stdout bytes.Buffer
+	application := newApp(&stdout, ioDiscard{}, strings.NewReader(""))
+	application.root = root
+
+	if err := runWasm(context.Background(), application, commandInput{
+		Params: map[string]string{
+			"p":       "dynamic-a",
+			"dry-run": "true",
+		},
+	}); err != nil {
+		t.Fatalf("runWasm returned error: %v", err)
+	}
+
+	output := stdout.String()
+	for _, expected := range []string{
+		"Building dynamic wasm plugin: dynamic-a",
+		"Building dynamic wasm plugin: dynamic-b",
+	} {
+		if !strings.Contains(output, expected) {
+			t.Fatalf("expected dry-run output to contain %q, got:\n%s", expected, output)
+		}
 	}
 }
 
@@ -1739,14 +2026,28 @@ func TestRunDevStartsServicesAsAsyncProcessesAndPrintsFinalStatus(t *testing.T) 
 		if name == "go" && len(args) >= 1 && args[0] == "build" {
 			return exec.Command("true")
 		}
-		if strings.Contains(name, "vite") {
+		// Regression for https://github.com/linaproai/linapro/issues/85:
+		// runDev must start Vite through node instead of Windows batch shims.
+		isFrontend := name == "node" && len(args) > 0 && args[0] == toolutil.ViteCommand(root)
+		if isFrontend {
+			if strings.Contains(strings.Join(append([]string{name}, args...), " "), ".cmd") {
+				t.Fatalf("frontend process must not use a Windows batch shim: %s %#v", name, args)
+			}
 			serviceEnv, _ := runCtx.Value(devservice.RunnerContextServiceEnvKey).([]string)
 			if got := toolutil.EnvValue(serviceEnv, "LINAPRO_FRONTEND_DEV_SERVER_URL"); got != "" {
-				t.Fatalf("frontend process must not receive backend proxy env, got %q", got)
+				t.Fatalf("frontend process must not receive backend-only env, got %q", got)
 			}
-		} else if serviceEnv, _ := runCtx.Value(devservice.RunnerContextServiceEnvKey).([]string); toolutil.EnvValue(serviceEnv, "LINAPRO_FRONTEND_DEV_SERVER_URL") != "http://127.0.0.1:5666" {
-			got := toolutil.EnvValue(serviceEnv, "LINAPRO_FRONTEND_DEV_SERVER_URL")
-			t.Fatalf("backend process must receive frontend dev server URL, got %q", got)
+			if got := toolutil.EnvValue(serviceEnv, "LINAPRO_BACKEND_PROXY_TARGET"); got != "http://127.0.0.1:9120" {
+				t.Fatalf("frontend process must receive backend proxy target, got %q", got)
+			}
+		} else {
+			serviceEnv, _ := runCtx.Value(devservice.RunnerContextServiceEnvKey).([]string)
+			if got := toolutil.EnvValue(serviceEnv, "LINAPRO_FRONTEND_DEV_SERVER_URL"); got != "http://127.0.0.1:5666" {
+				t.Fatalf("backend process must receive frontend dev server URL, got %q", got)
+			}
+			if got := toolutil.EnvValue(serviceEnv, "LINAPRO_SERVER_ADDRESS"); got != ":9120" {
+				t.Fatalf("backend process must receive LINAPRO_SERVER_ADDRESS, got %q", got)
+			}
 		}
 		return exec.Command(os.Args[0], "-test.run=TestHelperLongRunningProcess", "--")
 	}
@@ -1942,11 +2243,8 @@ func TestResolveOfficialPluginBuildModeAutoDetectsWorkspace(t *testing.T) {
 	}
 
 	auto, _, err := plugins.ResolveBuildMode(root, commandInput{Params: map[string]string{"plugins": "auto"}})
-	if err != nil {
-		t.Fatalf("explicit plugins=auto returned error: %v", err)
-	}
-	if !auto {
-		t.Fatalf("expected plugins=auto to use workspace detection")
+	if err == nil || !strings.Contains(err.Error(), "invalid boolean value") {
+		t.Fatalf("expected non-boolean plugin mode value to be rejected, got auto=%v err=%v", auto, err)
 	}
 }
 
@@ -2801,6 +3099,145 @@ func TestGoLintStaticcheckMatrixInput(t *testing.T) {
 	}
 }
 
+// TestGoLintResolveModuleDirMapsPluginRootAndSubdir verifies dir resolution for
+// host modules, plugin roots, and nested package directories.
+func TestGoLintResolveModuleDirMapsPluginRootAndSubdir(t *testing.T) {
+	root := t.TempDir()
+	coreDir := filepath.Join(root, "apps", "lina-core")
+	coreSubDir := filepath.Join(coreDir, "internal", "service", "auth")
+	pluginRoot := filepath.Join(root, "apps", "lina-plugins", "demo-plugin")
+	pluginBackend := filepath.Join(pluginRoot, "backend")
+	writeFile(t, filepath.Join(coreDir, "go.mod"), "module lina-core\n")
+	writeFile(t, filepath.Join(coreSubDir, "auth.go"), "package auth\n")
+	writeFile(t, filepath.Join(pluginRoot, "plugin.yaml"), "id: demo-plugin\n")
+	writeFile(t, filepath.Join(pluginBackend, "go.mod"), "module demo-plugin\n")
+
+	gotCore, err := goLintResolveModuleDir(root, "apps/lina-core")
+	if err != nil {
+		t.Fatalf("resolve apps/lina-core: %v", err)
+	}
+	if !samePath(t, gotCore, coreDir) {
+		t.Fatalf("apps/lina-core resolved to %s, want %s", gotCore, coreDir)
+	}
+
+	gotSub, err := goLintResolveModuleDir(root, filepath.Join("apps", "lina-core", "internal", "service", "auth"))
+	if err != nil {
+		t.Fatalf("resolve core subdir: %v", err)
+	}
+	if !samePath(t, gotSub, coreDir) {
+		t.Fatalf("core subdir resolved to %s, want %s", gotSub, coreDir)
+	}
+
+	gotPlugin, err := goLintResolveModuleDir(root, "apps/lina-plugins/demo-plugin")
+	if err != nil {
+		t.Fatalf("resolve plugin root: %v", err)
+	}
+	if !samePath(t, gotPlugin, pluginBackend) {
+		t.Fatalf("plugin root resolved to %s, want %s", gotPlugin, pluginBackend)
+	}
+
+	if _, err := goLintResolveModuleDir(root, "apps/missing"); err == nil {
+		t.Fatalf("expected missing dir to fail")
+	}
+	if _, err := goLintResolveModuleDir(root, "apps"); err == nil {
+		t.Fatalf("expected non-module dir to fail")
+	}
+	if _, err := goLintResolveModuleDir(root, ""); err == nil {
+		t.Fatalf("expected empty dir to fail")
+	}
+}
+
+// TestGoLintFilterModulesByDirKeepsMatchingModule verifies workspace filtering
+// for dir-scoped lint and rejects modules outside the current workspace.
+func TestGoLintFilterModulesByDirKeepsMatchingModule(t *testing.T) {
+	root := t.TempDir()
+	coreDir := filepath.Join(root, "apps", "lina-core")
+	toolDir := filepath.Join(root, "hack", "tools", "linactl")
+	pluginDir := filepath.Join(root, "apps", "lina-plugins", "demo", "backend")
+	writeFile(t, filepath.Join(coreDir, "go.mod"), "module lina-core\n")
+	writeFile(t, filepath.Join(toolDir, "go.mod"), "module linactl\n")
+	writeFile(t, filepath.Join(pluginDir, "go.mod"), "module demo\n")
+
+	filtered, err := goLintFilterModulesByDir([]string{coreDir, toolDir}, coreDir)
+	if err != nil {
+		t.Fatalf("filter modules: %v", err)
+	}
+	if len(filtered) != 1 || !samePath(t, filtered[0], coreDir) {
+		t.Fatalf("unexpected filtered modules: %#v", filtered)
+	}
+
+	if _, err := goLintFilterModulesByDir([]string{coreDir, toolDir}, pluginDir); err == nil {
+		t.Fatalf("expected out-of-workspace module to fail")
+	}
+}
+
+// TestRunLintGoDirScopesToSingleModule verifies dir= only dispatches lint for
+// the resolved module instead of the full workspace list.
+func TestRunLintGoDirScopesToSingleModule(t *testing.T) {
+	var (
+		root    = t.TempDir()
+		coreDir = filepath.Join(root, "apps", "lina-core")
+		toolDir = filepath.Join(root, "hack", "tools", "linactl")
+	)
+	writeFile(t, filepath.Join(root, ".golangci-lint-version"), "v2.12.2\n")
+	writeFile(t, filepath.Join(root, ".staticcheck-version"), "v0.7.0\n")
+	writeFile(t, filepath.Join(coreDir, "go.mod"), "module lina-core\n")
+	writeFile(t, filepath.Join(toolDir, "go.mod"), "module linactl\n")
+
+	var calls []capturedCommand
+	application := newApp(ioDiscard{}, ioDiscard{}, strings.NewReader(""))
+	application.root = root
+	application.lookPath = func(name string) (string, error) {
+		return name, nil
+	}
+	application.execCommand = func(_ context.Context, name string, args ...string) *exec.Cmd {
+		cmd := exec.Command(os.Args[0], "-test.run=TestHelperCommandSuccess", "--")
+		switch {
+		case name == "go" && strings.Join(args, " ") == "list -m -f {{.Dir}}":
+			cmd = exec.Command(os.Args[0], "-test.run=TestHelperPrintWorkspaceModules", "--", coreDir, toolDir)
+		case name == "go" && strings.Join(args, " ") == "list -f {{.Dir}} ./...":
+			cmd = exec.Command(os.Args[0], "-test.run=TestHelperPrintLines", "--", coreDir)
+		case name == "golangci-lint" && strings.Join(args, " ") == "--version":
+			cmd = exec.Command(os.Args[0], "-test.run=TestHelperPrintLines", "--", "golangci-lint has version 2.12.2")
+		case name == "staticcheck" && strings.Join(args, " ") == "-version":
+			cmd = exec.Command(os.Args[0], "-test.run=TestHelperPrintLines", "--", "staticcheck v0.7.0")
+		}
+		calls = append(calls, capturedCommand{
+			name: name,
+			args: append([]string(nil), args...),
+			cmd:  cmd,
+		})
+		return cmd
+	}
+
+	if err := runLintGo(context.Background(), application, commandInput{Params: map[string]string{
+		"plugins": "0",
+		"dir":     "apps/lina-core",
+	}}); err != nil {
+		t.Fatalf("runLintGo returned error: %v", err)
+	}
+
+	expectedConfig := filepath.Join(root, ".golangci.yml")
+	expected := []string{
+		"go list -m -f {{.Dir}}",
+		"go list -f {{.Dir}} ./...",
+		"golangci-lint --version",
+		"staticcheck -version",
+		"golangci-lint run --config " + expectedConfig + " ./...",
+		"staticcheck -checks=U1000 -tests=false .",
+	}
+	if got := commandLines(calls); strings.Join(got, "\n") != strings.Join(expected, "\n") {
+		t.Fatalf("unexpected lint command sequence:\ngot:\n%s\nexpected:\n%s", strings.Join(got, "\n"), strings.Join(expected, "\n"))
+	}
+	for _, call := range calls {
+		if call.name == "golangci-lint" && strings.Join(call.args, " ") != "--version" {
+			if !samePath(t, call.cmd.Dir, coreDir) {
+				t.Fatalf("expected golangci-lint to run in %s, got %s", coreDir, call.cmd.Dir)
+			}
+		}
+	}
+}
+
 // TestGoLintFileHasWasip1BuildParsesBuildExpressions verifies build-tag
 // detection handles equivalent `go:build` expressions instead of relying on a
 // single string shape.
@@ -3198,6 +3635,7 @@ use (
 func TestValidateRepositoryToolingAllowsEmptyLegacyScriptDirectory(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "make.cmd"), "@echo off\r\npushd \"%~dp0hack\\tools\\linactl\" || exit /b 1\r\ngo run . %*\r\n")
+	writeWindowsWrapperAttributes(t, root)
 	if err := os.MkdirAll(filepath.Join(root, "hack", "scripts"), 0o755); err != nil {
 		t.Fatalf("mkdir hack/scripts: %v", err)
 	}
@@ -3210,6 +3648,7 @@ func TestValidateRepositoryToolingAllowsEmptyLegacyScriptDirectory(t *testing.T)
 func TestValidateRepositoryToolingRejectsLegacyScripts(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "make.cmd"), "@echo off\r\ngo run . %*\r\n")
+	writeWindowsWrapperAttributes(t, root)
 	writeFile(t, filepath.Join(root, "hack", "scripts", "legacy.sh"), "#!/usr/bin/env bash\n")
 
 	err := repository.ValidateTooling(root, commandNames())
@@ -3221,10 +3660,33 @@ func TestValidateRepositoryToolingRejectsLegacyScripts(t *testing.T) {
 func TestValidateRepositoryToolingRejectsStaleMakeCmdWorkspaceOverride(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, filepath.Join(root, "make.cmd"), "@echo off\r\nset GOWORK=off\r\ngo run . %*\r\n")
+	writeWindowsWrapperAttributes(t, root)
 
 	err := repository.ValidateTooling(root, commandNames())
 	if err == nil || !strings.Contains(err.Error(), "must not force GOWORK=off") {
 		t.Fatalf("expected stale GOWORK validation error, got %v", err)
+	}
+}
+
+func TestValidateRepositoryToolingRejectsNonASCIIMakeCmd(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "make.cmd"), "@echo off\r\nREM 用途：Windows wrapper\r\ngo run . %*\r\n")
+	writeWindowsWrapperAttributes(t, root)
+
+	err := repository.ValidateTooling(root, commandNames())
+	if err == nil || !strings.Contains(err.Error(), "ASCII-only") {
+		t.Fatalf("expected ASCII-only validation error, got %v", err)
+	}
+}
+
+func TestValidateRepositoryToolingRejectsMissingWindowsWrapperAttributes(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "make.cmd"), "@echo off\r\ngo run . %*\r\n")
+	writeFile(t, filepath.Join(root, ".gitattributes"), "*.cmd text eol=crlf\n")
+
+	err := repository.ValidateTooling(root, commandNames())
+	if err == nil || !strings.Contains(err.Error(), ".gitattributes must set *.bat text eol=crlf") {
+		t.Fatalf("expected missing .bat eol validation error, got %v", err)
 	}
 }
 
@@ -3236,6 +3698,11 @@ func TestValidateLinactlCommandFilesAcceptsRepositoryCommands(t *testing.T) {
 	if err = repository.ValidateLinactlCommandFiles(root, commandNames()); err != nil {
 		t.Fatalf("repository.ValidateLinactlCommandFiles returned error: %v", err)
 	}
+}
+
+func writeWindowsWrapperAttributes(t *testing.T, root string) {
+	t.Helper()
+	writeFile(t, filepath.Join(root, ".gitattributes"), "*.cmd text eol=crlf\n*.bat text eol=crlf\n")
 }
 
 // TestPluginCommandSmokeFixtureIncludesLinactlLocalReplaceDeps verifies the
@@ -4116,7 +4583,7 @@ func TestHelperEmbeddedGoFrameCtrl(t *testing.T) {
 	application.root = os.Args[len(os.Args)-1]
 	if err := runEmbeddedGoFrame(context.Background(), application, commandInput{
 		Args:   []string{"gen", "ctrl"},
-		Params: map[string]string{"config_dir": filepath.Join(application.root, "apps", "lina-core", "hack")},
+		Params: map[string]string{"config-dir": filepath.Join(application.root, "apps", "lina-core", "hack")},
 	}); err != nil {
 		t.Fatalf("run embedded GoFrame ctrl: %v", err)
 	}
@@ -4301,7 +4768,7 @@ func writeBuildFixture(t *testing.T, root string) {
 	writeFile(t, filepath.Join(root, "apps", "lina-core", "manifest", "sql", "001.sql"), "-- sql\n")
 	writeFile(t, filepath.Join(root, "apps", "lina-core", "manifest", "i18n", "en", "messages.json"), "{}\n")
 	writeFile(t, filepath.Join(root, "apps", "lina-plugins", "john-ai-agentbox", "plugin.yaml"), "id: john-ai-agentbox\ntype: source\n")
-	writeFile(t, filepath.Join(root, "apps", "lina-plugins", "john-ai-agentbox", "hack", "config.yaml"), "build:\n  commands:\n    - pnpm --dir \"$(PLUGIN_ROOT)/frontend\" run build\n")
+	writeFile(t, filepath.Join(root, "apps", "lina-plugins", "john-ai-agentbox", "hack", "config.yaml"), "build:\n  commands:\n    - pnpm --dir \"$(BUILD_DIR)/frontend\" run build\n")
 	writeFile(t, filepath.Join(root, "apps", "lina-core", "go.mod"), "module lina-core\n")
 }
 
@@ -4455,7 +4922,7 @@ func (rows *envCheckSQLRows) Next(dest []driver.Value) error {
 	return nil
 }
 
-// writeFrontendDependencySentinel creates the Vite binary expected by
+// writeFrontendDependencySentinel creates the Vite CLI expected by
 // ensureFrontendDeps so runDev unit tests do not require pnpm on PATH.
 func writeFrontendDependencySentinel(t *testing.T, root string) {
 	t.Helper()

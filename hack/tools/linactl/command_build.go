@@ -4,7 +4,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -32,16 +31,20 @@ type buildOptions struct {
 	Verbose    bool
 }
 
-// pluginBuildStep is one command line declared by a plugin hack/config.yaml.
-type pluginBuildStep struct {
+// buildStep is one configured command line declared by a target hack/config.yaml.
+type buildStep struct {
 	Command string
 	Args    []string
 }
 
-type pluginBuildConfig struct {
-	Build struct {
-		Commands []string `yaml:"commands"`
-	} `yaml:"build"`
+type targetCommandSection struct {
+	Commands []string `yaml:"commands"`
+}
+
+type targetCommandConfig struct {
+	Build  targetCommandSection `yaml:"build"`
+	Stop   targetCommandSection `yaml:"stop"`
+	Status targetCommandSection `yaml:"status"`
 }
 
 // runBuild builds frontend assets, plugin artifacts, and host binaries.
@@ -102,14 +105,14 @@ func resolveBuildOptions(root string, input commandInput) (buildOptions, error) 
 		}
 	}
 
-	outputDir := input.GetDefault("output_dir", cfg.Build.OutputDir)
+	outputDir := input.GetDefault("output-dir", cfg.Build.OutputDir)
 	if outputDir == "" {
 		outputDir = "temp/output"
 	}
 	if !filepath.IsAbs(outputDir) {
 		outputDir = filepath.Join(root, outputDir)
 	}
-	binaryName := input.GetDefault("binary_name", cfg.Build.BinaryName)
+	binaryName := input.GetDefault("binary-name", cfg.Build.BinaryName)
 	if binaryName == "" {
 		binaryName = "lina"
 	}
@@ -117,7 +120,7 @@ func resolveBuildOptions(root string, input commandInput) (buildOptions, error) 
 	if cfg.Build.CGOEnabled {
 		cgoEnabled = "1"
 	}
-	if raw := input.Get("cgo_enabled"); raw != "" {
+	if raw := input.Get("cgo-enabled"); raw != "" {
 		enabled, parseErr := toolutil.ParseBool(raw, false)
 		if parseErr != nil {
 			return buildOptions{}, parseErr
@@ -170,7 +173,14 @@ func runBuildDir(ctx context.Context, a *app, input commandInput, options buildO
 		return runOnePluginBuild(ctx, a, dir, env, options)
 	default:
 		env := plugins.BuildEnv(a.root, a.env, false, "")
-		return runPackageBuildDir(ctx, a, dir, env, options.Verbose)
+		handled, buildErr := runConfiguredBuildDir(ctx, a, dir, env, options.Verbose)
+		if buildErr != nil {
+			return buildErr
+		}
+		if handled {
+			return nil
+		}
+		return fmt.Errorf("build dir has no hack/config.yaml: %s", toolutil.RelativePath(a.root, dir))
 	}
 }
 
@@ -201,38 +211,64 @@ func runOnePluginBuild(ctx context.Context, a *app, pluginDir string, env []stri
 	if err != nil {
 		return err
 	}
-	steps, err := resolvePluginConfigBuildSteps(a.root, pluginDir)
+	steps, _, err := resolveBuildConfigSteps(a.root, pluginDir)
 	if err != nil {
 		return err
 	}
 	if len(steps) > 0 {
 		fmt.Fprintf(a.stdout, "Building plugin: %s\n", toolutil.RelativePath(a.root, pluginDir))
-		if err = runPluginBuildSteps(ctx, a, pluginDir, env, options.Verbose, steps); err != nil {
+		if err = runBuildSteps(ctx, a, pluginDir, env, options.Verbose, steps); err != nil {
 			return err
 		}
 	} else {
 		fmt.Fprintf(a.stdout, "No plugin build commands configured: %s\n", toolutil.RelativePath(a.root, pluginDir))
 	}
 	if strings.EqualFold(strings.TrimSpace(manifest.Type), "dynamic") {
-		return runWasm(ctx, a, commandInput{Params: map[string]string{"plugin_dir": pluginDir, "out": options.OutputDir}})
+		return runWasm(ctx, a, commandInput{Params: map[string]string{"dir": pluginDir, "out": options.OutputDir}})
 	}
 	return nil
 }
 
-func runPackageBuildDir(ctx context.Context, a *app, dir string, env []string, verbose bool) error {
-	packagePath := filepath.Join(dir, "package.json")
-	if !fileutil.FileExists(packagePath) {
-		return fmt.Errorf("build dir is not a supported target and has no package.json build script: %s", dir)
+func runConfiguredBuildDir(ctx context.Context, a *app, dir string, env []string, verbose bool) (bool, error) {
+	steps, exists, err := resolveBuildConfigSteps(a.root, dir)
+	if err != nil {
+		return false, err
 	}
-	hasBuild, err := hasPackageBuildScript(packagePath)
+	if !exists {
+		return false, nil
+	}
+	relative := toolutil.RelativePath(a.root, dir)
+	if len(steps) == 0 {
+		fmt.Fprintf(a.stdout, "No configured build commands: %s\n", relative)
+		return true, nil
+	}
+	fmt.Fprintf(a.stdout, "Building configured target: %s\n", relative)
+	if err = runBuildSteps(ctx, a, dir, env, verbose, steps); err != nil {
+		return true, err
+	}
+	return true, nil
+}
+
+func runConfiguredCommandDir(ctx context.Context, a *app, rawDir string, commandName string) error {
+	dir, err := resolveBuildDir(a.root, rawDir)
 	if err != nil {
 		return err
 	}
-	if !hasBuild {
-		return fmt.Errorf("build dir package.json has no non-empty build script: %s", dir)
+	steps, exists, err := resolveCommandConfigSteps(a.root, dir, commandName)
+	if err != nil {
+		return err
 	}
-	fmt.Fprintf(a.stdout, "Building package: %s\n", toolutil.RelativePath(a.root, dir))
-	return a.runCommand(ctx, commandOptions{Dir: dir, Env: env, Quiet: !verbose}, "pnpm", "run", "build")
+	relative := toolutil.RelativePath(a.root, dir)
+	if !exists {
+		return fmt.Errorf("%s dir has no hack/config.yaml: %s", commandName, relative)
+	}
+	if len(steps) == 0 {
+		fmt.Fprintf(a.stdout, "No configured %s commands: %s\n", commandName, relative)
+		return nil
+	}
+	fmt.Fprintf(a.stdout, "Running configured %s: %s\n", commandName, relative)
+	env := plugins.BuildEnv(a.root, a.env, false, "")
+	return runBuildSteps(ctx, a, dir, env, true, steps)
 }
 
 func resolveBuildDir(root string, rawDir string) (string, error) {
@@ -335,54 +371,77 @@ func discoverPluginBuildRoots(root string) ([]string, error) {
 	return pluginDirs, nil
 }
 
-// runPluginBuildSteps executes the plugin-owned build steps from its root.
-func runPluginBuildSteps(ctx context.Context, a *app, pluginDir string, env []string, verbose bool, steps []pluginBuildStep) error {
+// runBuildSteps executes configured build steps from the target root.
+func runBuildSteps(ctx context.Context, a *app, dir string, env []string, verbose bool, steps []buildStep) error {
 	for _, step := range steps {
-		if err := a.runCommand(ctx, commandOptions{Dir: pluginDir, Env: env, Quiet: !verbose}, step.Command, step.Args...); err != nil {
+		if err := a.runCommand(ctx, commandOptions{Dir: dir, Env: env, Quiet: !verbose}, step.Command, step.Args...); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// resolvePluginConfigBuildSteps reads build.commands from plugin hack/config.yaml.
-func resolvePluginConfigBuildSteps(root string, pluginDir string) ([]pluginBuildStep, error) {
-	configPath := filepath.Join(pluginDir, "hack", "config.yaml")
+// resolveBuildConfigSteps reads build.commands from a target hack/config.yaml.
+func resolveBuildConfigSteps(root string, dir string) ([]buildStep, bool, error) {
+	return resolveCommandConfigSteps(root, dir, "build")
+}
+
+// resolveCommandConfigSteps reads <command>.commands from a target hack/config.yaml.
+func resolveCommandConfigSteps(root string, dir string, commandName string) ([]buildStep, bool, error) {
+	configPath := filepath.Join(dir, "hack", "config.yaml")
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, nil
+			return nil, false, nil
 		}
-		return nil, fmt.Errorf("read plugin build config %s: %w", configPath, err)
+		return nil, false, fmt.Errorf("read command config %s: %w", configPath, err)
 	}
-	var cfg pluginBuildConfig
+	var cfg targetCommandConfig
 	if err = yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("parse plugin build config %s: %w", configPath, err)
+		return nil, true, fmt.Errorf("parse command config %s: %w", configPath, err)
+	}
+	commands, err := targetConfigCommands(cfg, commandName)
+	if err != nil {
+		return nil, true, err
 	}
 	variables := map[string]string{
-		"PLUGIN_ROOT": pluginDir,
-		"REPO_ROOT":   root,
+		"BUILD_DIR":  dir,
+		"REPO_ROOT":  root,
+		"TARGET_DIR": dir,
 	}
-	steps := []pluginBuildStep{}
-	for index, command := range cfg.Build.Commands {
+	steps := []buildStep{}
+	for index, command := range commands {
 		raw := strings.TrimSpace(expandBuildVariables(command, variables))
 		if raw == "" {
 			continue
 		}
 		fields, splitErr := splitBuildCommandLine(raw)
 		if splitErr != nil {
-			return nil, fmt.Errorf("parse plugin build command %d in %s: %w", index+1, configPath, splitErr)
+			return nil, true, fmt.Errorf("parse %s command %d in %s: %w", commandName, index+1, configPath, splitErr)
 		}
 		if len(fields) == 0 {
 			continue
 		}
-		steps = append(steps, pluginBuildStep{Command: fields[0], Args: fields[1:]})
+		steps = append(steps, buildStep{Command: fields[0], Args: fields[1:]})
 	}
-	return steps, nil
+	return steps, true, nil
+}
+
+func targetConfigCommands(cfg targetCommandConfig, commandName string) ([]string, error) {
+	switch commandName {
+	case "build":
+		return cfg.Build.Commands, nil
+	case "stop":
+		return cfg.Stop.Commands, nil
+	case "status":
+		return cfg.Status.Commands, nil
+	default:
+		return nil, fmt.Errorf("unsupported configured command %q", commandName)
+	}
 }
 
 // expandBuildVariables expands the small $(NAME) and ${NAME} subset needed by
-// plugin build command declarations.
+// target command declarations.
 func expandBuildVariables(value string, variables map[string]string) string {
 	expanded := value
 	for i := 0; i < 8; i++ {
@@ -434,21 +493,6 @@ func splitBuildCommandLine(line string) ([]string, error) {
 		fields = append(fields, current.String())
 	}
 	return fields, nil
-}
-
-func hasPackageBuildScript(manifestPath string) (bool, error) {
-	data, err := os.ReadFile(manifestPath)
-	if err != nil {
-		return false, fmt.Errorf("read package build manifest %s: %w", manifestPath, err)
-	}
-	var manifest struct {
-		Scripts map[string]string `json:"scripts"`
-	}
-	if err = json.Unmarshal(data, &manifest); err != nil {
-		return false, fmt.Errorf("parse package build manifest %s: %w", manifestPath, err)
-	}
-	build, ok := manifest.Scripts["build"]
-	return ok && strings.TrimSpace(build) != "", nil
 }
 
 // ensurePackedPublicPlaceholder recreates the tracked placeholder after the

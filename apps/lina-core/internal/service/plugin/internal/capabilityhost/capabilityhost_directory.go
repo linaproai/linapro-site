@@ -6,7 +6,6 @@ import (
 	filesvc "lina-core/internal/service/file"
 	"lina-core/internal/service/notify"
 	"lina-core/pkg/plugin/capability"
-	capabilityai "lina-core/pkg/plugin/capability/aicap"
 	"lina-core/pkg/plugin/capability/apidoccap"
 	"lina-core/pkg/plugin/capability/authcap"
 	"lina-core/pkg/plugin/capability/bizctxcap"
@@ -42,14 +41,6 @@ func (s *directory) Auth() authcap.Service {
 		return nil
 	}
 	return s.auth
-}
-
-// AI returns the host AI capability namespace.
-func (s *directory) AI() capabilityai.Service {
-	if s == nil || s.ai == nil {
-		return capabilityai.New(nil)
-	}
-	return s.ai
 }
 
 // Users returns the user-domain ordinary capability service.
@@ -196,20 +187,26 @@ func (s *scopedDirectory) APIDoc() apidoccap.Service {
 	return s.base.APIDoc()
 }
 
-// Auth returns the delegated authentication and authorization namespace.
+// Auth returns the plugin-scoped authentication and authorization namespace.
+// Token and Authz sub capabilities are shared; ExternalLogin is rebound to this
+// plugin so provider ownership and enablement are enforced per plugin.
 func (s *scopedDirectory) Auth() authcap.Service {
 	if s == nil || s.base == nil {
 		return nil
 	}
-	return s.base.Auth()
-}
-
-// AI returns the plugin-scoped AI capability namespace.
-func (s *scopedDirectory) AI() capabilityai.Service {
-	if s == nil || s.base == nil {
-		return capabilityai.New(nil)
+	baseAuth := s.base.Auth()
+	if baseAuth == nil {
+		return nil
 	}
-	return capabilityai.ForPlugin(s.base.AI(), s.pluginID)
+	// ExternalLogin is stored on authcap.Service as the public wide interface
+	// (extlogin.Service). The host adapter additionally implements
+	// pluginBoundExternalLogin so ForPlugin can stamp pluginID without keeping a
+	// concrete *externalLoginAdapter field on directory.
+	binder, ok := baseAuth.ExternalLogin().(pluginBoundExternalLogin)
+	if !ok || binder == nil {
+		return baseAuth
+	}
+	return authcap.ForPlugin(baseAuth, binder.forPlugin(s.pluginID))
 }
 
 // Users returns the delegated user-domain ordinary capability service.

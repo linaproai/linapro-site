@@ -184,11 +184,13 @@ function buildAuthorizationPayload(): PluginAuthorizationPayload | undefined {
             service.service === 'storage' || service.service === 'data'
               ? undefined
               : (service.resources ?? []).map((item) => item.ref),
+          owner: service.owner || undefined,
           service: service.service,
           tables:
             service.service === 'data'
               ? [...(service.tables ?? [])]
               : undefined,
+          version: service.version || undefined,
         })),
     },
   };
@@ -309,6 +311,14 @@ function summarizeHostServiceChange(change: PluginUpgradeHostServiceChange) {
     .join(' · ');
 }
 
+function formatHostServiceChangeLabel(change: PluginUpgradeHostServiceChange) {
+  const label = formatServiceLabel(change.service);
+  if (!change.owner) {
+    return label;
+  }
+  return [label, change.owner, change.version].filter(Boolean).join(' · ');
+}
+
 function extractRuntimeErrorEnvelope(error: unknown): null | {
   message?: string;
   messageKey?: string;
@@ -419,7 +429,7 @@ function resolveRuntimeErrorMessage(error: unknown) {
 
         <div class="grid gap-3 lg:grid-cols-2">
           <div
-            class="rounded-md border border-[var(--ant-color-border)] p-3"
+            class="rounded-xl border border-[var(--ant-color-border)] p-3"
             data-testid="plugin-upgrade-from-manifest"
           >
             <div
@@ -445,7 +455,7 @@ function resolveRuntimeErrorMessage(error: unknown) {
           </div>
 
           <div
-            class="rounded-md border border-[var(--ant-color-primary)] bg-[var(--ant-color-primary-bg)] p-3"
+            class="rounded-xl border border-[var(--ant-color-primary)] bg-[var(--ant-color-primary-bg)] p-3"
             data-testid="plugin-upgrade-to-manifest"
           >
             <div
@@ -536,7 +546,7 @@ function resolveRuntimeErrorMessage(error: unknown) {
               :color="getHostServiceChangeColor(change.kind)"
             >
               {{ formatHostServiceChangeKind(change.kind) }}
-              · {{ formatServiceLabel(change.service) }} ·
+              · {{ formatHostServiceChangeLabel(change) }} ·
               {{ summarizeHostServiceChange(change) }}
             </Tag>
           </div>

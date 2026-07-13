@@ -6,7 +6,8 @@ package pluginhost
 import (
 	"io/fs"
 
-	"lina-core/pkg/plugin/capability/aicap/aitext"
+	"lina-core/pkg/plugin/capability/authcap/extlogin/extidspi"
+	"lina-core/pkg/plugin/capability/capregistry"
 	"lina-core/pkg/plugin/capability/orgcap/orgspi"
 	"lina-core/pkg/plugin/capability/tenantcap/tenantspi"
 )
@@ -31,37 +32,40 @@ type sourcePlugin struct {
 	// access exposes grouped menu and permission access-control helpers.
 	access AccessDeclarations
 
-	embeddedFiles     fs.FS
-	tenantProvider    tenantspi.ProviderFactory
-	orgProvider       orgspi.ProviderFactory
-	aiTextProvider    aitext.ProviderFactory
-	beforeInstall     SourcePluginBeforeLifecycleHandler
-	afterInstall      SourcePluginAfterLifecycleHandler
-	beforeUpgrade     SourcePluginBeforeUpgradeHandler
-	upgradeHandler    SourcePluginUpgradeHandler
-	afterUpgrade      SourcePluginUpgradeHandler
-	beforeDisable     SourcePluginBeforeLifecycleHandler
-	afterDisable      SourcePluginAfterLifecycleHandler
-	beforeUninstall   SourcePluginBeforeLifecycleHandler
-	afterUninstall    SourcePluginAfterLifecycleHandler
-	beforeTenantDis   SourcePluginBeforeTenantLifecycleHandler
-	afterTenantDis    SourcePluginAfterTenantLifecycleHandler
-	beforeTenantDel   SourcePluginBeforeTenantLifecycleHandler
-	afterTenantDel    SourcePluginAfterTenantLifecycleHandler
-	beforeModeChange  SourcePluginBeforeInstallModeChangeHandler
-	afterModeChange   SourcePluginAfterInstallModeChangeHandler
-	uninstallHandler  SourcePluginUninstallHandler
-	hookHandlers      []*HookHandlerRegistration
-	routeRegistrars   []*RouteHandlerRegistration
-	jobRegistrars     []*JobHandlerRegistration
-	menuFilters       []*MenuFilterHandlerRegistration
-	permissionFilters []*PermissionFilterHandlerRegistration
+	embeddedFiles          fs.FS
+	tenantProvider         tenantspi.ProviderFactory
+	orgProvider            orgspi.ProviderFactory
+	capabilities           []capregistry.Descriptor
+	externalIdentities     []string
+	externalIdentityEngine extidspi.ProviderFactory
+	beforeInstall          SourcePluginBeforeLifecycleHandler
+	afterInstall           SourcePluginAfterLifecycleHandler
+	beforeUpgrade          SourcePluginBeforeUpgradeHandler
+	upgradeHandler         SourcePluginUpgradeHandler
+	afterUpgrade           SourcePluginUpgradeHandler
+	beforeDisable          SourcePluginBeforeLifecycleHandler
+	afterDisable           SourcePluginAfterLifecycleHandler
+	beforeUninstall        SourcePluginBeforeLifecycleHandler
+	afterUninstall         SourcePluginAfterLifecycleHandler
+	beforeTenantDis        SourcePluginBeforeTenantLifecycleHandler
+	afterTenantDis         SourcePluginAfterTenantLifecycleHandler
+	beforeTenantDel        SourcePluginBeforeTenantLifecycleHandler
+	afterTenantDel         SourcePluginAfterTenantLifecycleHandler
+	beforeModeChange       SourcePluginBeforeInstallModeChangeHandler
+	afterModeChange        SourcePluginAfterInstallModeChangeHandler
+	uninstallHandler       SourcePluginUninstallHandler
+	hookHandlers           []*HookHandlerRegistration
+	routeRegistrars        []*RouteHandlerRegistration
+	jobRegistrars          []*JobHandlerRegistration
+	menuFilters            []*MenuFilterHandlerRegistration
+	permissionFilters      []*PermissionFilterHandlerRegistration
 }
 
 // NewDeclarations creates and returns a new grouped source-plugin declarations facade.
 func NewDeclarations(id string) Declarations {
 	plugin := &sourcePlugin{
 		id:                id,
+		capabilities:      make([]capregistry.Descriptor, 0),
 		hookHandlers:      make([]*HookHandlerRegistration, 0),
 		routeRegistrars:   make([]*RouteHandlerRegistration, 0),
 		jobRegistrars:     make([]*JobHandlerRegistration, 0),
@@ -160,12 +164,43 @@ func (p *sourcePlugin) GetOrgProviderFactory() orgspi.ProviderFactory {
 	return p.orgProvider
 }
 
-// GetAITextProviderFactory returns the declared text AI provider factory.
-func (p *sourcePlugin) GetAITextProviderFactory() aitext.ProviderFactory {
+// GetCapabilityDescriptors returns plugin-owned capability descriptors declared by this source plugin.
+func (p *sourcePlugin) GetCapabilityDescriptors() []capregistry.Descriptor {
+	if p == nil {
+		return []capregistry.Descriptor{}
+	}
+	items := make([]capregistry.Descriptor, 0, len(p.capabilities))
+	for _, descriptor := range p.capabilities {
+		items = append(items, cloneCapabilityDescriptor(descriptor))
+	}
+	return items
+}
+
+// GetExternalIdentityProviderFactory returns the declared external-identity
+// provider engine factory. It is distinct from GetExternalIdentityProviderIDs:
+// the factory supplies the resolve/provision engine (declared by
+// linapro-extlogin-core), while the ID list stamps ownership for calling plugins.
+func (p *sourcePlugin) GetExternalIdentityProviderFactory() extidspi.ProviderFactory {
 	if p == nil {
 		return nil
 	}
-	return p.aiTextProvider
+	return p.externalIdentityEngine
+}
+
+func cloneCapabilityDescriptor(descriptor capregistry.Descriptor) capregistry.Descriptor {
+	descriptor.Methods = append([]capregistry.MethodDescriptor(nil), descriptor.Methods...)
+	return descriptor
+}
+
+// GetExternalIdentityProviderIDs returns a copy of the external-identity
+// provider IDs declared by this source plugin.
+func (p *sourcePlugin) GetExternalIdentityProviderIDs() []string {
+	if p == nil || len(p.externalIdentities) == 0 {
+		return nil
+	}
+	items := make([]string, len(p.externalIdentities))
+	copy(items, p.externalIdentities)
+	return items
 }
 
 // GetBeforeInstallHandler returns the registered source-plugin pre-install callback.

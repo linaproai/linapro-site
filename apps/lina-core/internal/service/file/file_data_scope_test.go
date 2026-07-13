@@ -18,13 +18,13 @@ import (
 	"lina-core/internal/model"
 	"lina-core/internal/model/do"
 	"lina-core/internal/model/entity"
+	storagesvc "lina-core/internal/service/storage"
 	"lina-core/internal/service/bizctx"
 	"lina-core/internal/service/cachecoord"
 	hostconfig "lina-core/internal/service/config"
 	"lina-core/internal/service/datascope"
 	i18nsvc "lina-core/internal/service/i18n"
 	rolesvc "lina-core/internal/service/role"
-	storagesvc "lina-core/internal/service/storage"
 	"lina-core/pkg/bizerr"
 	"lina-core/pkg/plugin/capability/bizctxcap"
 	"lina-core/pkg/plugin/capability/orgcap"
@@ -78,7 +78,7 @@ func TestFileDataScopeFiltersListDetailDownloadDeleteAndSuffixes(t *testing.T) {
 	if _, err = svc.OpenByID(ctx, hiddenID); !bizerr.Is(err, CodeFileDataScopeDenied) {
 		t.Fatalf("expected hidden download to be denied, got %v", err)
 	}
-	if err = svc.Delete(ctx, fmt.Sprintf("%d", hiddenID)); !bizerr.Is(err, CodeFileDataScopeDenied) {
+	if err = svc.Delete(ctx, []int64{hiddenID}); !bizerr.Is(err, CodeFileDataScopeDenied) {
 		t.Fatalf("expected hidden delete to be denied, got %v", err)
 	}
 	if count := countFileScopeRecord(t, ctx, hiddenID); count != 1 {
@@ -188,6 +188,7 @@ func (s *fileTenantUploadStorage) Put(_ context.Context, in storagesvc.PutInput)
 	}
 	return &storagesvc.PutOutput{Object: &storagesvc.Object{Key: in.Key}}, nil
 }
+
 
 // fileTenantUploadAccessProvider grants tenant-wide visibility for the upload
 // regression test without relying on persisted role fixtures.

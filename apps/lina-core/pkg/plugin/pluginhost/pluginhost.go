@@ -6,7 +6,8 @@ package pluginhost
 import (
 	"io/fs"
 
-	"lina-core/pkg/plugin/capability/aicap/aitext"
+	"lina-core/pkg/plugin/capability/authcap/extlogin/extidspi"
+	"lina-core/pkg/plugin/capability/capregistry"
 	"lina-core/pkg/plugin/capability/orgcap/orgspi"
 	"lina-core/pkg/plugin/capability/tenantcap/tenantspi"
 )
@@ -231,8 +232,22 @@ type ProviderDeclarations interface {
 	ProvideTenant(factory tenantspi.ProviderFactory) error
 	// ProvideOrg declares the organization capability provider factory implemented by this source plugin.
 	ProvideOrg(factory orgspi.ProviderFactory) error
-	// ProvideAIText declares the text AI capability provider factory implemented by this source plugin.
-	ProvideAIText(factory aitext.ProviderFactory) error
+	// ProvideCapability declares one plugin-owned capability descriptor published by this source plugin.
+	ProvideCapability(descriptor capregistry.Descriptor) error
+	// ProvideExternalIdentity declares one external-identity provider ID owned
+	// by this source plugin. The host uses the declared ownership set to reject
+	// external-login requests that claim a provider the calling plugin did not
+	// declare, preventing one plugin from minting sessions through another
+	// plugin's provider. A plugin may declare more than one provider ID;
+	// duplicate declarations of the same ID are rejected.
+	ProvideExternalIdentity(providerID string) error
+	// ProvideExternalIdentityProvider declares this source plugin's
+	// external-identity provider engine factory (resolve/provision/link). It is
+	// orthogonal to ProvideExternalIdentity ownership stamping: the engine
+	// plugin (linapro-extlogin-core) supplies resolution and provisioning, while
+	// calling plugins (google/discord) still declare provider-ID ownership. Only
+	// one engine factory may be declared per plugin.
+	ProvideExternalIdentityProvider(factory extidspi.ProviderFactory) error
 }
 
 // SourcePluginDefinition exposes the host-side read model restored from one
@@ -255,8 +270,15 @@ type SourcePluginDefinition interface {
 	GetTenantProviderFactory() tenantspi.ProviderFactory
 	// GetOrgProviderFactory returns the declared organization provider factory.
 	GetOrgProviderFactory() orgspi.ProviderFactory
-	// GetAITextProviderFactory returns the declared text AI provider factory.
-	GetAITextProviderFactory() aitext.ProviderFactory
+	// GetCapabilityDescriptors returns plugin-owned capability descriptors declared by this source plugin.
+	GetCapabilityDescriptors() []capregistry.Descriptor
+	// GetExternalIdentityProviderIDs returns the external-identity provider IDs
+	// declared by this source plugin. The host consults this ownership set to
+	// authorize external-login requests.
+	GetExternalIdentityProviderIDs() []string
+	// GetExternalIdentityProviderFactory returns the declared external-identity
+	// provider engine factory, or nil when this plugin declares none.
+	GetExternalIdentityProviderFactory() extidspi.ProviderFactory
 	// GetBeforeInstallHandler returns the registered pre-install veto callback.
 	GetBeforeInstallHandler() SourcePluginBeforeLifecycleHandler
 	// GetAfterInstallHandler returns the registered post-install callback.

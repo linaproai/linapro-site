@@ -237,11 +237,13 @@ function buildAuthorizationPayload(): PluginAuthorizationPayload | undefined {
             service.service === 'storage' || service.service === 'data'
               ? undefined
               : (service.resources ?? []).map((item) => item.ref),
+          owner: service.owner || undefined,
           tables:
             service.service === 'data'
               ? [...(service.tables ?? [])]
               : undefined,
           service: service.service,
+          version: service.version || undefined,
         })),
     },
     ...installMode,
@@ -497,7 +499,13 @@ function resolveDefaultInstallMode(plugin: null | SystemPlugin): InstallMode {
         :message="currentBannerMessage"
       />
 
-      <Descriptions bordered size="small" :column="2">
+      <Descriptions
+        bordered
+        size="small"
+        :column="2"
+        class="plugin-install-descriptions"
+        data-testid="plugin-install-descriptions"
+      >
         <DescriptionsItem :label="$t('pages.system.plugin.fields.name')">
           {{ currentPlugin.name || '-' }}
         </DescriptionsItem>
@@ -532,7 +540,7 @@ function resolveDefaultInstallMode(plugin: null | SystemPlugin): InstallMode {
 
       <div
         v-if="showInstallModeOption"
-        class="bg-muted/40 flex flex-col gap-3 rounded-md border border-dashed p-3"
+        class="bg-muted/40 flex flex-col gap-3 rounded-xl border border-dashed p-3"
         data-testid="plugin-install-mode-section"
       >
         <div
@@ -580,7 +588,7 @@ function resolveDefaultInstallMode(plugin: null | SystemPlugin): InstallMode {
 
       <div
         v-if="showMockDataOption"
-        class="bg-muted/40 flex items-center gap-2 rounded-md border border-dashed p-3"
+        class="bg-muted/40 flex items-center gap-2 rounded-xl border border-dashed p-3"
         data-testid="plugin-install-mock-data-section"
       >
         <Checkbox
@@ -624,3 +632,12 @@ function resolveDefaultInstallMode(plugin: null | SystemPlugin): InstallMode {
     </div>
   </BasicModal>
 </template>
+
+<style scoped>
+/* Keep the left-hand label column on one line; multi-word English labels
+   otherwise wrap in the two-column bordered Descriptions table. */
+:deep(.plugin-install-descriptions .ant-descriptions-item-label) {
+  min-width: 112px;
+  white-space: nowrap;
+}
+</style>

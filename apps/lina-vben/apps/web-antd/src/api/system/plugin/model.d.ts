@@ -5,6 +5,7 @@ export interface PluginListParams {
   pageNum?: number;
   pageSize?: number;
   id?: string;
+  /** Compatibility field; list always includes builtin plugins. */
   includeBuiltin?: boolean;
   installed?: number;
   name?: string;
@@ -131,7 +132,9 @@ export interface PluginRouteReviewItem {
 }
 
 export interface HostServicePermissionItem {
+  owner?: string;
   service: string;
+  version?: string;
   methods: string[];
   paths?: string[];
   tables?: string[];
@@ -156,11 +159,13 @@ export interface HostServicePermissionResourceItem {
 export interface PluginAuthorizationPayload {
   authorization?: {
     services: Array<{
+      owner?: string;
       methods?: string[];
       paths?: string[];
       resourceRefs?: string[];
       tables?: string[];
       service: string;
+      version?: string;
     }>;
   };
   installMockData?: boolean;
@@ -230,11 +235,15 @@ export interface PluginUpgradeHostServicesDiff {
 }
 
 export interface PluginUpgradeHostServiceChange {
+  owner?: string;
   service: string;
+  version?: string;
   fromMethods?: string[];
   toMethods?: string[];
   fromResourceCount: number;
   toResourceCount: number;
+  fromResourceRefs?: string[];
+  toResourceRefs?: string[];
   fromTables?: string[];
   toTables?: string[];
   fromPaths?: string[];

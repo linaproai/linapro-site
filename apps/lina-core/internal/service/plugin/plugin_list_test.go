@@ -51,7 +51,9 @@ func TestManagementListCacheAvoidsRepeatedManifestScans(t *testing.T) {
 	createTestSourceDependencyPlugin(t, pluginID, "Source Management List Cache", "v0.1.0", "")
 	cleanupTestPluginIDs(t, context.Background(), pluginID)
 
-	first, err := service.List(ctx, ListInput{})
+	// Filter by plugin ID so the assertion is independent of default list page size.
+	// Official plugin workspaces with multi-cloud storage plugins exceed page size 20.
+	first, err := service.List(ctx, ListInput{ID: pluginID})
 	if err != nil {
 		t.Fatalf("build first management list: %v", err)
 	}
@@ -59,7 +61,7 @@ func TestManagementListCacheAvoidsRepeatedManifestScans(t *testing.T) {
 		t.Fatalf("expected first management list to include %s", pluginID)
 	}
 
-	second, err := service.List(ctx, ListInput{})
+	second, err := service.List(ctx, ListInput{ID: pluginID})
 	if err != nil {
 		t.Fatalf("read cached management list: %v", err)
 	}
@@ -73,7 +75,7 @@ func TestManagementListCacheAvoidsRepeatedManifestScans(t *testing.T) {
 	}
 
 	service.InvalidateManagementListCache(ctx, "test")
-	third, err := service.List(ctx, ListInput{})
+	third, err := service.List(ctx, ListInput{ID: pluginID})
 	if err != nil {
 		t.Fatalf("rebuild invalidated management list: %v", err)
 	}
@@ -226,10 +228,10 @@ func TestManagementListCacheIsLocaleScoped(t *testing.T) {
 	}
 }
 
-// TestListHidesBuiltinByDefaultAndIncludesForDiagnostics verifies ordinary
-// management list reads filter builtin plugins without rebuilding or mutating
-// the underlying read model.
-func TestListHidesBuiltinByDefaultAndIncludesForDiagnostics(t *testing.T) {
+// TestListIncludesBuiltinByDefault verifies ordinary management list reads
+// return builtin plugins with distribution projection and reuse the cached
+// read model across repeated queries.
+func TestListIncludesBuiltinByDefault(t *testing.T) {
 	var (
 		service   = newTestService()
 		ctx       = startupstats.WithCollector(context.Background(), startupstats.New())
@@ -254,28 +256,29 @@ func TestListHidesBuiltinByDefaultAndIncludesForDiagnostics(t *testing.T) {
 	if findPluginItem(defaultOut, managedID) == nil {
 		t.Fatalf("expected managed plugin in default list")
 	}
-	if findPluginItem(defaultOut, builtinID) != nil {
-		t.Fatalf("expected builtin plugin to be hidden by default")
-	}
-
-	diagnosticOut, err := service.List(ctx, ListInput{
-		ID:             "plugin-dev-list-",
-		IncludeBuiltin: true,
-	})
-	if err != nil {
-		t.Fatalf("expected include-builtin list to succeed, got error: %v", err)
-	}
-	builtin := findPluginItem(diagnosticOut, builtinID)
+	builtin := findPluginItem(defaultOut, builtinID)
 	if builtin == nil {
-		t.Fatalf("expected builtin plugin in diagnostic list")
+		t.Fatalf("expected builtin plugin in default list")
 	}
 	if builtin.Distribution != pluginv1.PluginDistributionBuiltin.String() {
 		t.Fatalf("expected builtin distribution, got %#v", builtin)
 	}
 
+	// Compatibility flag must not hide builtin plugins or force a rebuild.
+	compatOut, err := service.List(ctx, ListInput{
+		ID:             "plugin-dev-list-",
+		IncludeBuiltin: false,
+	})
+	if err != nil {
+		t.Fatalf("expected compatibility list to succeed, got error: %v", err)
+	}
+	if findPluginItem(compatOut, builtinID) == nil {
+		t.Fatalf("expected builtin plugin even when includeBuiltin=false")
+	}
+
 	snapshot := startupstats.FromContext(ctx).Snapshot()
 	if got := snapshot.CounterValue(startupstats.CounterPluginScans); got != 1 {
-		t.Fatalf("expected diagnostic filtering to reuse cached read model, got %d scans", got)
+		t.Fatalf("expected repeated list reads to reuse cached read model, got %d scans", got)
 	}
 }
 
@@ -424,7 +427,7 @@ func TestListProjectsMissingRuntimeRegistryWithoutWriting(t *testing.T) {
 		t.Fatalf("failed to remove dynamic artifact: %v", err)
 	}
 
-	out, err := service.List(ctx, ListInput{})
+	out, err := service.List(ctx, ListInput{ID: pluginID})
 	if err != nil {
 		t.Fatalf("expected read-only list to tolerate missing dynamic artifact, got error: %v", err)
 	}
@@ -687,6 +690,65 @@ func TestListPaginatesAndKeepsGovernanceDetailsOutOfSummary(t *testing.T) {
 	}
 }
 
+// TestListOwnerHostServiceSummarySkipsFullDependencyChecks verifies the first
+// management list screen stays on the summary projection even when a dynamic
+// plugin declares owner-aware host service dependencies.
+func TestListOwnerHostServiceSummarySkipsFullDependencyChecks(t *testing.T) {
+	var (
+		service    = newTestService()
+		ctx        = startupstats.WithCollector(context.Background(), startupstats.New())
+		ownerID    = "plugin-dev-source-owner-summary-base"
+		consumerID = "plugin-dev-dynamic-owner-summary-consumer"
+	)
+
+	createTestSourceDependencyPlugin(t, ownerID, "Source Owner Summary Base", "v0.1.0", "")
+	writeTestDynamicOwnerHostServiceArtifactWithDependencies(
+		t,
+		consumerID,
+		"Dynamic Owner Summary Consumer",
+		"v0.1.0",
+		&plugintypes.DependencySpec{Plugins: []*plugintypes.PluginDependencySpec{
+			testPluginDependencySpec(ownerID, ">=0.1.0"),
+		}},
+		[]*protocol.HostServiceSpec{{
+			Owner:   ownerID,
+			Service: "ai",
+			Version: "v1",
+			Methods: []string{
+				"text.generate",
+			},
+		}},
+		buildVersionedRuntimeFrontendAssets("owner-summary-consumer"),
+	)
+	cleanupTestPluginIDs(t, context.Background(), ownerID, consumerID)
+
+	out, err := service.List(ctx, ListInput{ID: consumerID})
+	if err != nil {
+		t.Fatalf("expected owner summary list to succeed, got error: %v", err)
+	}
+	item := findPluginItem(out, consumerID)
+	if item == nil {
+		t.Fatalf("expected owner dynamic plugin summary item")
+	}
+	if item.DependencyCheck != nil {
+		t.Fatalf("expected summary list not to attach dependency check, got %#v", item.DependencyCheck)
+	}
+	if len(item.RequestedHostServices) != 0 || len(item.AuthorizedHostServices) != 0 {
+		t.Fatalf("expected summary list to omit owner host service detail, got requested=%#v authorized=%#v", item.RequestedHostServices, item.AuthorizedHostServices)
+	}
+
+	snapshot := startupstats.FromContext(ctx).Snapshot()
+	if got := snapshot.CounterValue(startupstats.CounterPluginScans); got != 1 {
+		t.Fatalf("expected summary list to scan manifests once, got %d", got)
+	}
+	if got := snapshot.CounterValue(startupstats.CounterCatalogSnapshotBuilds); got != 1 {
+		t.Fatalf("expected summary list not to run full dependency snapshots, got %d catalog snapshots", got)
+	}
+	if got := snapshot.CounterValue(startupstats.CounterIntegrationSnapshotBuilds); got != 0 {
+		t.Fatalf("expected summary list not to build integration snapshots, got %d", got)
+	}
+}
+
 // TestReadOnlyListProjectionBatchesDependencyChecks verifies full management
 // projections reuse manifest and store snapshots while attaching dependency
 // status to every row.
@@ -831,7 +893,7 @@ func TestListMarksInstalledDynamicPluginWithHigherArtifactPendingUpgrade(t *test
 		t.Fatalf("expected effective release_id %d to stay pinned, got %d", oldRelease.Id, registry.ReleaseId)
 	}
 
-	out, err := service.List(ctx, ListInput{})
+	out, err := service.List(ctx, ListInput{ID: pluginID})
 	if err != nil {
 		t.Fatalf("expected plugin list to succeed, got error: %v", err)
 	}
@@ -1147,7 +1209,7 @@ func TestListLocalizesUninstalledDynamicPluginMetadataInEnglish(t *testing.T) {
 		t.Fatalf("expected dynamic i18n plugin to remain uninstalled after sync, got %#v", registry)
 	}
 
-	out, err := service.List(ctx, ListInput{})
+	out, err := service.List(ctx, ListInput{ID: pluginID})
 	if err != nil {
 		t.Fatalf("expected plugin list to succeed, got error: %v", err)
 	}

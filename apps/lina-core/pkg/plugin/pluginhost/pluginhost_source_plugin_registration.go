@@ -4,9 +4,12 @@
 package pluginhost
 
 import (
+	"strings"
+
 	"github.com/gogf/gf/v2/errors/gerror"
 
-	"lina-core/pkg/plugin/capability/aicap/aitext"
+	"lina-core/pkg/plugin/capability/authcap/extlogin/extidspi"
+	"lina-core/pkg/plugin/capability/capregistry"
 	"lina-core/pkg/plugin/capability/orgcap/orgspi"
 	"lina-core/pkg/plugin/capability/tenantcap/tenantspi"
 )
@@ -233,18 +236,79 @@ func (p *sourcePlugin) registerOrgProvider(factory orgspi.ProviderFactory) error
 	return nil
 }
 
-// RegisterAITextProvider records the text AI provider factory declared by this source plugin.
-func (p *sourcePlugin) registerAITextProvider(factory aitext.ProviderFactory) error {
+// RegisterCapabilityDescriptor records one plugin-owned capability descriptor declared by this source plugin.
+func (p *sourcePlugin) registerCapabilityDescriptor(descriptor capregistry.Descriptor) error {
+	if p == nil {
+		return gerror.New("pluginhost: source plugin is nil")
+	}
+	if err := validateCapabilityDescriptorOwner(p.id, descriptor); err != nil {
+		return err
+	}
+	registry := capregistry.NewRegistry()
+	for _, existing := range p.capabilities {
+		if err := registry.Register(existing); err != nil {
+			return err
+		}
+	}
+	if err := registry.Register(descriptor); err != nil {
+		return err
+	}
+	p.capabilities = registry.Descriptors()
+	return nil
+}
+
+func validateCapabilityDescriptorOwner(pluginID string, descriptor capregistry.Descriptor) error {
+	declaringPluginID := strings.TrimSpace(pluginID)
+	ownerPluginID := strings.TrimSpace(descriptor.OwnerPluginID)
+	if declaringPluginID == "" || ownerPluginID == "" || ownerPluginID != declaringPluginID {
+		return gerror.Newf(
+			"pluginhost: capability descriptor owner must match declaring source plugin: plugin=%s owner=%s service=%s version=%s",
+			declaringPluginID,
+			ownerPluginID,
+			strings.TrimSpace(descriptor.Service),
+			strings.TrimSpace(descriptor.Version),
+		)
+	}
+	return nil
+}
+
+// registerExternalIdentityProvider records one external-identity provider ID
+// owned by this source plugin. It trims the ID, rejects empty values, and
+// rejects duplicate declarations of the same ID while allowing a plugin to own
+// multiple distinct providers.
+func (p *sourcePlugin) registerExternalIdentityProvider(providerID string) error {
+	if p == nil {
+		return gerror.New("pluginhost: source plugin is nil")
+	}
+	normalized := strings.TrimSpace(providerID)
+	if normalized == "" {
+		return gerror.New("pluginhost: external identity provider id is empty")
+	}
+	for _, existing := range p.externalIdentities {
+		if existing == normalized {
+			return gerror.Newf("pluginhost: external identity provider %q already declared", normalized)
+		}
+	}
+	p.externalIdentities = append(p.externalIdentities, normalized)
+	return nil
+}
+
+// registerExternalIdentityProviderFactory records the external-identity provider
+// engine factory declared by this source plugin (linapro-extlogin-core). It is
+// orthogonal to registerExternalIdentityProvider: the factory supplies the
+// resolve/provision engine, while the ID list stamps ownership for calling
+// plugins. Only one engine factory may be declared per plugin.
+func (p *sourcePlugin) registerExternalIdentityProviderFactory(factory extidspi.ProviderFactory) error {
 	if p == nil {
 		return gerror.New("pluginhost: source plugin is nil")
 	}
 	if factory == nil {
-		return gerror.New("pluginhost: text AI provider factory is nil")
+		return gerror.New("pluginhost: external identity provider factory is nil")
 	}
-	if p.aiTextProvider != nil {
-		return gerror.New("pluginhost: text AI provider factory already declared")
+	if p.externalIdentityEngine != nil {
+		return gerror.New("pluginhost: external identity provider factory already declared")
 	}
-	p.aiTextProvider = factory
+	p.externalIdentityEngine = factory
 	return nil
 }
 

@@ -13,7 +13,7 @@ import (
 	"lina-core/internal/model/entity"
 	"lina-core/internal/service/plugin/internal/capabilityowner"
 	"lina-core/internal/service/plugin/internal/integration"
-	aitextsvc "lina-core/pkg/plugin/capability/aicap/aitext"
+	"lina-core/pkg/plugin/capability/authcap/extlogin/extidspi"
 	"lina-core/pkg/plugin/capability/orgcap/orgspi"
 	"lina-core/pkg/plugin/capability/tenantcap/tenantspi"
 	"lina-core/pkg/plugin/pluginhost"
@@ -39,21 +39,6 @@ func (s *serviceImpl) RegisterJobs(ctx context.Context) error {
 	return s.integrationSvc.RegisterJobs(ctx)
 }
 
-// AITextProviderEnv returns typed, plugin-scoped text AI provider construction inputs.
-func (s *serviceImpl) AITextProviderEnv(_ context.Context, pluginID string) aitextsvc.ProviderEnv {
-	env := aitextsvc.ProviderEnv{PluginID: pluginID}
-	if s == nil || s.capabilities == nil {
-		return env
-	}
-	services := capabilityowner.ServicesForPlugin(s.capabilities, pluginID)
-	if services == nil {
-		return env
-	}
-	env.BizCtx = services.BizCtx()
-	env.Cache = services.Cache()
-	return env
-}
-
 // OrgProviderEnv returns typed, plugin-scoped organization-provider construction inputs.
 func (s *serviceImpl) OrgProviderEnv(_ context.Context, pluginID string) orgspi.ProviderEnv {
 	env := orgspi.ProviderEnv{PluginID: pluginID}
@@ -69,12 +54,30 @@ func (s *serviceImpl) OrgProviderEnv(_ context.Context, pluginID string) orgspi.
 	return env
 }
 
+// ExternalIdentityProviderEnv returns typed, plugin-scoped external-identity
+// provider construction inputs. It exposes only the user capability (for the
+// least-privilege provisioning primitive and user projections) and business
+// context, never host dao/do/entity, token minting, or session storage.
+func (s *serviceImpl) ExternalIdentityProviderEnv(_ context.Context, pluginID string) extidspi.ProviderEnv {
+	env := extidspi.ProviderEnv{PluginID: pluginID}
+	if s == nil || s.capabilities == nil {
+		return env
+	}
+	services := capabilityowner.ServicesForPlugin(s.capabilities, pluginID)
+	if services == nil {
+		return env
+	}
+	env.Users = services.Users()
+	env.BizCtx = services.BizCtx()
+	return env
+}
+
 // RegisterSourcePluginProviderFactories registers compile-time source-plugin
 // provider declarations into the startup-owned shared provider managers.
 func (s *serviceImpl) RegisterSourcePluginProviderFactories(
 	tenantManager *tenantspi.Manager,
 	orgManager *orgspi.Manager,
-	aiTextManager *aitextsvc.Manager,
+	externalIdentityManager *extidspi.Manager,
 ) error {
 	for _, definition := range pluginhost.ListSourcePlugins() {
 		if definition == nil {
@@ -97,11 +100,11 @@ func (s *serviceImpl) RegisterSourcePluginProviderFactories(
 				return err
 			}
 		}
-		if factory := definition.GetAITextProviderFactory(); factory != nil {
-			if aiTextManager == nil {
-				return gerror.New("plugin service requires text AI provider manager")
+		if factory := definition.GetExternalIdentityProviderFactory(); factory != nil {
+			if externalIdentityManager == nil {
+				return gerror.New("plugin service requires external identity provider manager")
 			}
-			if err := aiTextManager.RegisterFactory(pluginID, factory); err != nil {
+			if err := externalIdentityManager.RegisterFactory(pluginID, factory); err != nil {
 				return err
 			}
 		}

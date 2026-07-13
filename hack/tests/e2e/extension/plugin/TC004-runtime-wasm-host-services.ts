@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
@@ -154,8 +154,19 @@ async function createAdminApiContext(): Promise<APIRequestContext> {
   });
 }
 
-async function listPlugins(adminApi: APIRequestContext): Promise<PluginListItem[]> {
-  const response = await adminApi.get("plugins");
+async function listPlugins(
+  adminApi: APIRequestContext,
+  options?: { id?: string },
+): Promise<PluginListItem[]> {
+  // pageSize + optional id keep lookups reliable once multi-cloud storage
+  // plugins push the official workspace past the default page size of 20.
+  const response = await adminApi.get("plugins", {
+    params: {
+      pageNum: 1,
+      pageSize: 100,
+      ...(options?.id ? { id: options.id } : {}),
+    },
+  });
   const payload = await expectApiSuccess<{ list?: PluginListItem[] }>(
     response,
     "查询插件列表失败",
@@ -164,7 +175,7 @@ async function listPlugins(adminApi: APIRequestContext): Promise<PluginListItem[
 }
 
 async function findPlugin(adminApi: APIRequestContext, pluginID: string) {
-  const list = await listPlugins(adminApi);
+  const list = await listPlugins(adminApi, { id: pluginID });
   return list.find((item) => item.id === pluginID) ?? null;
 }
 
@@ -930,7 +941,7 @@ function buildDynamicPluginArtifact(pluginDir: string, pluginID: string) {
         "run",
         ".",
         "wasm",
-        `plugin_dir=${pluginDir}`,
+        `dir=${pluginDir}`,
         `out=${buildOutputDir()}`,
       ],
       {
@@ -945,7 +956,13 @@ function buildDynamicPluginArtifact(pluginDir: string, pluginID: string) {
   } finally {
     rmSync(goWorkPath, { force: true });
   }
-  return builtArtifactPath(pluginID);
+  const artifactPath = builtArtifactPath(pluginID);
+  if (!existsSync(artifactPath)) {
+    throw new Error(
+      `linactl wasm 未生成预期产物: ${artifactPath} (pluginDir=${pluginDir})`,
+    );
+  }
+  return artifactPath;
 }
 
 function appendWasmULEB128(target: number[], value: number) {

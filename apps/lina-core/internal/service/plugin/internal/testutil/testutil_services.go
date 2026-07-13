@@ -39,14 +39,13 @@ import (
 	"lina-core/internal/service/role"
 	"lina-core/internal/service/session"
 	"lina-core/pkg/plugin/capability"
-	capabilityai "lina-core/pkg/plugin/capability/aicap"
-	capabilityaitext "lina-core/pkg/plugin/capability/aicap/aitext"
 	"lina-core/pkg/plugin/capability/apidoccap"
 	"lina-core/pkg/plugin/capability/authcap"
 	capabilityauthz "lina-core/pkg/plugin/capability/authcap/authz"
 	"lina-core/pkg/plugin/capability/bizctxcap"
 	"lina-core/pkg/plugin/capability/cachecap"
 	"lina-core/pkg/plugin/capability/capmodel"
+	"lina-core/pkg/plugin/capability/capregistry"
 	capabilitydictcap "lina-core/pkg/plugin/capability/dictcap"
 	capabilityfilecap "lina-core/pkg/plugin/capability/filecap"
 	"lina-core/pkg/plugin/capability/hostconfigcap"
@@ -199,6 +198,7 @@ func newServicesWithInjected(
 	}
 	wasmRuntime, err := wasm.NewRuntime(
 		capabilitySvc,
+		capregistry.NewRegistry(),
 		pluginconfig.NewFactory("", ""),
 		hostconfigadapter.NewStaticCapabilityAdapter(configProvider),
 		manifestresource.NewFactory(""),
@@ -267,6 +267,9 @@ func newServicesWithInjected(
 	)
 	if err != nil {
 		panic(fmt.Sprintf("create test upgrade service: %v", err))
+	}
+	if err = lifecycleSvc.BindUpgrade(upgradeSvc); err != nil {
+		panic(fmt.Sprintf("bind test upgrade service: %v", err))
 	}
 
 	return &Services{
@@ -469,17 +472,13 @@ func newTestCapabilities(bizCtxSvc bizctxcap.Service) capability.Services {
 // APIDoc returns a fallback apidoc service for plugin integration tests.
 func (s *testCapabilities) APIDoc() apidoccap.Service { return testNoopAPIDoc{} }
 
-// Auth returns a no-op auth namespace for plugin integration tests.
+// Auth returns a no-op auth namespace for plugin integration tests, including a
+// non-nil ExternalLogin sub-capability so external-login plugins can register routes.
 func (s *testCapabilities) Auth() authcap.Service {
 	if s == nil {
-		return authcap.New(testNoopAuth{}, nil)
+		return authcap.New(testNoopAuth{}, nil, testNoopExternalLogin{})
 	}
-	return authcap.New(testNoopAuth{}, s.authz)
-}
-
-// AI returns the default AI capability fallback namespace.
-func (s *testCapabilities) AI() capabilityai.Service {
-	return capabilityai.New(capabilityaitext.New(nil, nil, nil))
+	return authcap.New(testNoopAuth{}, s.authz, testNoopExternalLogin{})
 }
 
 // Users returns an empty user-domain service for plugin integration tests.
@@ -1269,6 +1268,11 @@ func (testUsersService) EnsureVisible(context.Context, []capabilityusercap.UserI
 
 // Create accepts user creation without mutating test state.
 func (testUsersService) Create(context.Context, capabilityusercap.CreateInput) (capabilityusercap.UserID, error) {
+	return "", nil
+}
+
+// CreateFromExternal accepts external-identity provisioning without mutating test state.
+func (testUsersService) CreateFromExternal(context.Context, capabilityusercap.CreateFromExternalInput) (capabilityusercap.UserID, error) {
 	return "", nil
 }
 

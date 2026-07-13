@@ -21,10 +21,10 @@ import (
 	"lina-core/internal/service/plugin/internal/capabilityowner"
 	"lina-core/internal/service/plugin/internal/testutil"
 	"lina-core/pkg/plugin/capability"
-	capabilityai "lina-core/pkg/plugin/capability/aicap"
 	"lina-core/pkg/plugin/capability/apidoccap"
 	"lina-core/pkg/plugin/capability/authcap"
 	capabilityauthz "lina-core/pkg/plugin/capability/authcap/authz"
+	"lina-core/pkg/plugin/capability/authcap/extlogin"
 	"lina-core/pkg/plugin/capability/authcap/token"
 	"lina-core/pkg/plugin/capability/bizctxcap"
 	"lina-core/pkg/plugin/capability/cachecap"
@@ -120,9 +120,10 @@ func (d *scopedSourceServicesDirectory) APIDoc() apidoccap.Service {
 	return scopedCapabilityAPIDoc{}
 }
 
-// Auth returns a no-op auth namespace required by tenant-core route registration.
+// Auth returns a no-op auth namespace required by tenant-core and external-login
+// route registration (LDAP/OIDC plugins require ExternalLogin at register time).
 func (d *scopedSourceServicesDirectory) Auth() authcap.Service {
-	return authcap.New(scopedCapabilityAuth{}, scopedCapabilityAuthz{})
+	return authcap.New(scopedCapabilityAuth{}, scopedCapabilityAuthz{}, scopedCapabilityExternalLogin{})
 }
 
 // BizCtx returns a minimal non-nil business context service required by source
@@ -231,6 +232,19 @@ func (scopedCapabilityAuth) IssueImpersonationToken(context.Context, token.Imper
 // RevokeImpersonationToken performs no revocation in registration-only tests.
 func (scopedCapabilityAuth) RevokeImpersonationToken(context.Context, token.ImpersonationTokenRevokeInput) error {
 	return nil
+}
+
+// scopedCapabilityExternalLogin is a no-op external-login fixture for registration-only
+// tests. OIDC/LDAP plugins only require a non-nil sub-capability while wiring routes.
+type scopedCapabilityExternalLogin struct{}
+
+// LoginByVerifiedIdentity returns an empty outcome because registration-only tests
+// never complete an external-identity login exchange.
+func (scopedCapabilityExternalLogin) LoginByVerifiedIdentity(
+	context.Context,
+	extlogin.LoginInput,
+) (*extlogin.LoginOutput, error) {
+	return &extlogin.LoginOutput{}, nil
 }
 
 // scopedCapabilityAuthz is an empty authorization fixture for registration-only tests.
@@ -912,6 +926,10 @@ func (scopedCapabilityUsers) Create(context.Context, capabilityusercap.CreateInp
 	return "", nil
 }
 
+func (scopedCapabilityUsers) CreateFromExternal(context.Context, capabilityusercap.CreateFromExternalInput) (capabilityusercap.UserID, error) {
+	return "", nil
+}
+
 // Update accepts user updates without mutating state.
 func (scopedCapabilityUsers) Update(context.Context, capabilityusercap.UpdateInput) error {
 	return nil
@@ -996,9 +1014,6 @@ func (emptySourceServicesDirectory) APIDoc() apidoccap.Service { return nil }
 
 // Auth returns no auth namespace for this capability-scope test.
 func (emptySourceServicesDirectory) Auth() authcap.Service { return nil }
-
-// AI returns the default AI fallback namespace for this capability-scope test.
-func (emptySourceServicesDirectory) AI() capabilityai.Service { return capabilityai.New(nil) }
 
 // Users returns no user-domain service for this capability-scope test.
 func (emptySourceServicesDirectory) Users() capabilityusercap.Service { return nil }

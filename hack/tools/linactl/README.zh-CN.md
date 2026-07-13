@@ -9,8 +9,8 @@ cd hack/tools/linactl
 go run . help
 go run . status
 go run . pack.assets
-go run . wasm p=linapro-demo-dynamic
-go run . wasm plugin_dir=/path/to/plugin out=temp/output
+go run . wasm dir=apps/lina-plugins/linapro-demo-dynamic
+go run . wasm dir=/path/to/plugin out=temp/output
 go run . plugins.status
 go run . i18n.check
 go run . db.init confirm=init
@@ -20,10 +20,18 @@ go run . tidy
 go run . lint.go plugins=0
 go run . lint.go plugins=1
 go run . lint.go plugins=0 fix=true
+go run . lint.go dir=apps/lina-core plugins=0
 go run . build platforms=linux/amd64,linux/arm64
 go run . build dir=apps/lina-plugins/john-ai-agentbox
+go run . dev dir=tools/custom-builder
+go run . stop dir=tools/custom-builder
+go run . status dir=tools/custom-builder
 go run . image tag=v0.2.0 push=0
 go run . version to=v0.2.0
+go run . upgrade
+go run . upgrade v=v0.5.0
+go run . upgrade v=main
+go run . upgrade force=1
 go run . release.tag.check tag=v0.2.0
 go run . release.tag.check print-version=1
 ```
@@ -45,6 +53,9 @@ make.cmd tidy
 make.cmd lint.go plugins=0
 make.cmd lint.go plugins=1
 make.cmd version to=v0.2.0
+make.cmd upgrade
+make.cmd upgrade v=v0.5.0
+make.cmd upgrade v=main
 make.cmd release.tag.check tag=v0.2.0
 ```
 
@@ -57,44 +68,54 @@ make.cmd release.tag.check tag=v0.2.0
 .\make.cmd i18n.check
 .\make.cmd lint.go plugins=0
 .\make.cmd version to=v0.2.0
+.\make.cmd upgrade
+.\make.cmd upgrade v=main
 .\make.cmd release.tag.check tag=v0.2.0
 ```
 
 ## 参数
 
-`linactl`支持现有`make`风格的`key=value`参数，降低命令迁移成本。
+`linactl`支持`make`风格的`key=value`参数，公开参数`key`使用`kebab-case`。
 
 | 参数 | 示例 | 用途 |
 |------|------|------|
 | `confirm` | `confirm=upgrade` | 确认高风险数据库维护命令。 |
 | `rebuild` | `rebuild=true` | 在`db.init`时重建配置中的数据库。 |
-| `dir` | `dir=apps/lina-plugins/john-ai-agentbox` | 为`build`选择单个构建目标目录。省略时构建宿主框架、默认工作台和所有已启用插件。 |
+| `dir` | `dir=tools/custom-builder` | 为`build`、`dev`、`stop`或`status`选择单个定向命令目录；为`wasm`选择单个显式动态插件源码目录；或为`lint.go`选择单个组件路径（解析为其所属`Go module`）。省略时执行对应命令的默认完整流程。 |
 | `platforms` | `platforms=linux/amd64,linux/arm64` | 指定构建目标平台。 |
 | `plugins` | `plugins=0` | 覆盖构建、开发、镜像、`Go`测试和`Go`静态检查命令的自动插件完整模式探测。 |
 | `fix` | `fix=true` | 允许`lint.go`向`golangci-lint`传入`--fix`；默认不启用，避免检查路径改写文件。 |
 | `to` | `to=v0.2.0` | 指定`version`写入的框架版本号。 |
+| `v` | `v=v0.5.0`或`v=main` | 指定`upgrade`的升级目标：省略时从官方仓库取最新稳定 tag；可传稳定版本号或分支名（如`main`）。 |
 | `tag` | `tag=v0.2.0` | 指定`release.tag.check`校验的 release tag。 |
 | `print-version` | `print-version=1` | 输出已校验的`framework.version`，供发布自动化使用。 |
-| `p` | `p=linapro-tenant-core` | 为 Wasm 构建或插件工作区管理命令选择单个插件。 |
-| `plugin-dir` | `plugin_dir=/path/to/plugin` | 从显式源码目录构建单个动态插件产物。 |
+| `p` | `p=linapro-tenant-core` | 为插件工作区管理命令选择单个插件。 |
 | `out` | `out=temp/output` | 指定动态插件产物输出目录；相对路径按仓库根目录解析。 |
 | `source` | `source=official` | 为插件工作区管理命令选择单个已配置来源。 |
-| `force` | `force=1` | 允许插件安装或更新命令覆盖已存在或存在本地改动的插件目录。 |
+| `force` | `force=1` | 允许插件安装或更新命令覆盖已存在或存在本地改动的插件目录；对`upgrade`仅跳过工作区干净检查。 |
 | `verbose` | `verbose=1` | 构建任务展示子命令输出。 |
 
 未传入`plugins`时，构建和开发命令会在`apps/lina-plugins`存在插件清单时启用插件完整模式。插件完整模式会基于宿主专用的根目录`go.work`生成或刷新已忽略的`temp/go.work.plugins`，并通过`GOWORK`解析源码插件`Go`模块。
 
-未传入`dir`时，`linactl build`会构建宿主框架后端、默认管理工作台前端、宿主`manifest`资源和所有已启用官方插件。需要从仓库根目录或通过`make.cmd`跨平台定向构建时，使用`dir=<path>`，例如`dir=apps/lina-vben`、`dir=apps/lina-core`或`dir=apps/lina-plugins/<plugin-id>`。
+未传入`dir`时，`linactl build`会构建宿主框架后端、默认管理工作台前端、宿主`manifest`资源和所有已启用官方插件。需要从仓库根目录或通过`make.cmd`跨平台定向构建时，使用`dir=<path>`，例如`dir=apps/lina-vben`、`dir=apps/lina-core`、`dir=apps/lina-plugins/<plugin-id>`，或任意拥有`hack/config.yaml`的目录。
 
-插件在插件根`hack/config.yaml`的`build.commands`下维护自定义构建指令。`linactl build`会在插件根目录执行这些指令；`$(PLUGIN_ROOT)`展开为插件目录，`$(REPO_ROOT)`展开为仓库根目录：
+目标目录可以在自身`hack/config.yaml`的对应命令分段下维护自定义指令。`linactl build dir=<path>`和`linactl dev dir=<path>`执行`build.commands`；`linactl stop dir=<path>`执行`stop.commands`；`linactl status dir=<path>`执行`status.commands`。指令会在所选目录执行。`$(TARGET_DIR)`和`$(BUILD_DIR)`都会展开为所选目录，`$(REPO_ROOT)`展开为仓库根目录：
 
 ```yaml
 build:
   commands:
-    - pnpm --dir "$(PLUGIN_ROOT)/frontend" run build
+    - pnpm --dir "$(BUILD_DIR)/frontend" run build
+stop:
+  commands:
+    - node scripts/stop.mjs --root "$(TARGET_DIR)"
+status:
+  commands:
+    - node scripts/status.mjs --root "$(TARGET_DIR)"
 ```
 
-传入`dir=apps/lina-plugins/<plugin-id>`时，`linactl build`只执行该插件的配置指令。
+传入`dir=apps/lina-plugins/<plugin-id>`时，官方插件模式仍作用于该插件。源码插件会使用官方插件构建环境，动态插件会在配置指令完成后继续生成自身`WASM`产物。非插件目录必须提供`hack/config.yaml`；没有该配置的目录会被拒绝，不再回退读取其它本地清单。
+
+传入`dir`给`linactl dev`时，命令会执行与`linactl build dir=<path>`一致的定向构建路径，不启动或重启开发服务。传入`dir`给`linactl stop`或`linactl status`时，目录配置指令会替代默认宿主服务停止或状态查询流程。
 
 ## Go 静态检查
 
@@ -106,10 +127,15 @@ build:
 make lint.go plugins=0
 make lint.go plugins=1
 make lint.go plugins=0 fix=true
+make lint dir=apps/lina-core plugins=0
+make lint dir=hack/tools/linactl plugins=0
+make lint dir=apps/lina-plugins/<plugin-id> plugins=1
 go run . lint.go plugins=0
 ```
 
 使用`plugins=0`检查宿主工作区，覆盖`apps/lina-core`和`hack/tools/linactl`。官方插件源码已初始化时，使用`plugins=1`；该模式会准备已忽略的`temp/go.work.plugins`工作区，并检查宿主、工具和官方插件`Go`模块。未传入`plugins`时，`linactl`沿用构建和测试命令的自动探测行为。
+
+可选`dir=<path>`会将扫描范围收敛到该路径所属的单个`Go module`。包含`plugin.yaml`且存在`backend/go.mod`的插件根目录会解析到`backend`模块；子包目录会向上查找仓库根内最近的`go.mod`。plan 与 summary 输出会打印`scope=dir`和解析后的模块路径，避免本地或 Agent 定向检查被误认为全量覆盖。`CI`与审查门禁仍以不传`dir`的工作区全量扫描为准。
 
 `golangci-lint`不启用独立`unused` linter。`linactl lint.go`会对所有包运行`staticcheck U1000`作为死代码检查；非测试文件包含`//go:build wasip1`或`//go:build !wasip1`的包使用宿主目标和`GOOS=wasip1 GOARCH=wasm`矩阵，避免 guest 专属桥接代码在默认宿主构建下被误报为死代码。
 
@@ -122,10 +148,10 @@ go run . lint.go plugins=0
 ```bash
 make image tag=v0.2.0 push=0
 make image.build tag=v0.2.0
-make wasm p=linapro-demo-dynamic
+make wasm dir=apps/lina-plugins/linapro-demo-dynamic
 ```
 
-当测试或本地夹具需要打包`apps/lina-plugins`之外的动态插件目录时，可以使用`plugin_dir=<path>`。
+当测试或本地夹具需要打包`apps/lina-plugins`之外的动态插件目录时，可以使用`dir=<path>`。
 
 ## GoFrame 代码生成
 
@@ -142,12 +168,19 @@ go run . dao dir=apps/lina-plugins/linapro-content-notice/backend
 
 ## 运行时 I18n 检查
 
-`linactl i18n.check`统一承载运行时`i18n`治理检查。该命令会扫描高风险运行时可见硬编码文案，并校验宿主和插件运行时消息`key`覆盖：
+`linactl i18n.check`统一承载运行时`i18n`治理检查。该命令会：
+
+1. 扫描高风险运行时可见硬编码文案；
+2. 校验宿主与插件运行时语言包的 **locale key 对等**；
+3. 校验宿主与所有`plugin.yaml`中`i18n.enabled: true`的插件：**每个`bizerr.MustDefine`按约定派生的`messageKey`都必须存在于对应`manifest/i18n/<locale>/`资源中**；
+4. 校验前端静态`$t(...)`引用覆盖。
 
 ```bash
 make i18n.check
 go run . i18n.check
 ```
+
+CI 通过可复用工作流`.github/workflows/reusable-i18n-check.yml`在 Main CI、Nightly 与 Release 验证套件中执行同一入口（检出官方插件 submodule 后运行`make i18n.check`）。
 
 默认扫描`allowlist`维护在`hack/tools/linactl/internal/runtimei18n/allowlist.json`。
 
@@ -163,7 +196,7 @@ go run . plugins.check format=json
 
 ## Agent 软链管理（agents.* 命令树）
 
-`linactl agents.<resource>.<action>` 用于管理仓库内三类资源的本地软链，把 `.agents/`（以及 `AGENTS.md`）下的标准源映射到各 AI Coding 工具的私有项目路径：
+`linactl agents.<resource>.<action>` 用于管理仓库内三类资源的本地软链，把 `.agents/`（以及 `AGENTS.md`）下的标准源映射到各 AI Coding 工具的私有项目路径。**Agent 产品定义与资源 apply 逻辑集中在一处**：`internal/agents/registry`（每个产品可选配置 `Skills` / `Prompts` / `MD` 绑定）。原 `skills` / `prompts` / `md` 包已删除；命令通过 `registry.ApplyLink` / `ApplyUnlink` 并指定资源类型调用。
 
 - **skills**：目录级软链，`.<tool>/skills` → `.agents/skills`。受支持的 Agent 列表与 [vercel-labs/skills](https://github.com/vercel-labs/skills#supported-agents) 官方项目路径表一致。
 - **prompts**：目录级软链，各 Agent 的 commands/prompts 根目录（例如 `.claude/commands`）→ `.agents/prompts`。
@@ -175,10 +208,16 @@ go run . plugins.check format=json
 
 聚合命令 `agents` 采用 **Agent 优先** 设计：选定一个 Agent，所选动作会自动作用到该 Agent 在 skills/prompts/md 三类资源中所有适用的绑定；对该 Agent 而言为 `native` 或未注册的资源会在最终摘要中显式列出跳过原因。
 
+交互选择列表会展示**全部已注册 Agent**，并分为两组（组内均按字母序 A-Z 排序，颜色区分）：
+
+1. **Built-in support**（绿色）— 已原生读取`.agents/skills`与`AGENTS.md`的工具。分组**不考虑**`prompts`（可选 slash/prompt 软链仍走`agents.prompts.*`）。选中后仅打印就绪说明，无需建链。
+2. **Needs setup**（黄色）— `skills`和/或`md`仍需受管软链的工具；选中后继续选择`link` / `unlink`。
+
 ```bash
 # 交互模式（终端）：
-#   第 1 步：方向键选择 Agent（可输入字符过滤）。
-#   第 2 步：方向键选择 `link` 或 `unlink`。
+#   第 1 步：方向键从双分组列表中选择 Agent（可输入字符过滤）。
+#   第 2 步：对 needs-setup Agent，方向键选择 `link` 或 `unlink`。
+#           对 built-in Agent，仅输出就绪说明后结束。
 make agents
 
 # 一键模式（CI/管道也可用）：
@@ -240,7 +279,7 @@ make agents.md.unlink agent=claude-code              # 移除 AGENTS.md 软链
 - `link`：Agent 使用其它项目路径，按需创建相对软链指向标准源。
 - `rootCollision`：项目路径为仓库根的裸名（仅 skills 中的 `skills/`，由 `openclaw` 使用）。默认跳过；显式`agent=openclaw force=1`才创建。prompts 与 md 资源中不存在该分类。
 
-> **md 资源的 fallback 行为说明**：部分 Agent 在私有规范文件（如 `CODEBUDDY.md`、`CLAUDE.md`）不存在时，会自动 fallback 读取 `AGENTS.md`。`CodeBuddy` 就是这样一个 Agent——根据腾讯官方文档，CodeBuddy 优先读取 `CODEBUDDY.md`，但当 `CODEBUDDY.md` 不存在时会自动加载 `AGENTS.md`。这类有官方文档支持的自动 fallback 机制的 Agent，在 md 注册表中按 `native` 注册，这样仓库 clone 即可用，无需建链；只有当 Agent 仅读取私有规范文件、不存在 fallback 路径时，才注册为 `link` 以便用户显式建链接入。每条 Agent 的证据来源都记录在 `internal/agents/md/md_agents.go` 的行内注释中。
+> **md 资源的 fallback 行为说明**：部分 Agent 在私有规范文件（如 `CODEBUDDY.md`、`CLAUDE.md`）不存在时，会自动 fallback 读取 `AGENTS.md`。`CodeBuddy` 就是这样一个 Agent——根据腾讯官方文档，CodeBuddy 优先读取 `CODEBUDDY.md`，但当 `CODEBUDDY.md` 不存在时会自动加载 `AGENTS.md`。这类有官方文档支持的自动 fallback 机制的 Agent，在 统一 agents 注册表中按 `native` 注册，这样仓库 clone 即可用，无需建链；只有当 Agent 仅读取私有规范文件、不存在 fallback 路径时，才注册为 `link` 以便用户显式建链接入。每条 Agent 的证据来源都记录在 `internal/agents/registry/agents.go` 的行内注释中。
 
 任何情况下命令都不会自动删除已存在的真实目录或文件，**除非**该文件是 Git 在`core.symlinks=false`时创建的降级软链伪文件。Git 在禁用符号链接时会将预期的链接目标路径作为纯文本写入文件内容；`force=1`能自动检测这类伪文件（普通文件、≤512 字节、内容与预期的相对源路径匹配）并将其替换为真正的符号链接。具有任意内容的正常文件仍然不会被触碰。`force=1`同时也会重建"已是软链但指向其它位置"的情况。所有 skills 与 prompts 受管软链目录已在`.gitignore`中忽略，本地创建不会污染仓库。
 
@@ -271,6 +310,26 @@ make.cmd version to=v0.2.0
 make version to=v0.2.0
 ```
 
+## 框架升级
+
+`upgrade`**始终**从官方仓库`https://github.com/linaproai/linapro.git`拉取（工具托管 remote 名`linapro`），再**合并到当前本地分支**。不会使用本地`origin`或 fork remote。随后：
+
+- 不传`v`：合并最新稳定版本 tag（`vMAJOR.MINOR.PATCH`；带`-rc`等预发布后缀的 tag 不会被默认选中）；
+- `v=v0.5.0`或`v=0.5.0`：合并指定稳定版本 tag；
+- `v=main`（或其它分支名）：合并`linapro/<branch>`。
+
+`apps/lina-plugins`**不会被自动更新**。合并后会保留升级前的插件工作区（submodule 指针或本地目录树）。只有在你主动需要时，才通过`make plugins.update` / `linactl plugins.update`更新插件。
+
+工作区必须干净，且`HEAD`必须位于已命名分支。仅在需要跳过工作区干净检查时传入`force=1`。插件路径以外的合并冲突需手动解决（或使用`git merge --abort`取消）。
+
+```bash
+make upgrade
+make upgrade v=v0.5.0
+make upgrade v=main
+make.cmd upgrade v=main
+go run . upgrade v=v0.5.0
+```
+
 ## Release Tag 校验
 
 `release.tag.check`会读取`apps/lina-core/manifest/config/metadata.yaml`，并校验 release tag 与`framework.version`完全一致。
@@ -280,8 +339,6 @@ make.cmd release.tag.check tag=v0.2.0
 make release.tag.check tag=v0.2.0
 make release.tag.check metadata=apps/lina-core/manifest/config/metadata.yaml tag=v0.2.0
 ```
-
-在 GitHub Actions 中，如果未传入 `tag`，该命令也会使用 `GITHUB_REF_NAME` 作为待校验标签。
 
 ## 插件工作区命令
 
