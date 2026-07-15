@@ -64,7 +64,7 @@ func (s *serviceImpl) UpdateStatus(
 		}
 	}
 	if status == statusflag.Disabled.Int() {
-		if err = s.ensureNoReverseDependencies(ctx, pluginID); err != nil {
+		if err = s.ensureNoEnabledReverseDependencies(ctx, pluginID); err != nil {
 			return err
 		}
 	}
@@ -94,9 +94,10 @@ func (s *serviceImpl) syncDiscoveredManifestsForStatus(ctx context.Context) erro
 	return s.integrationSvc.RefreshEnabledSnapshot(syncCtx)
 }
 
-// ensureEnableDependencies blocks enable when hard plugin dependencies are not satisfied.
+// ensureEnableDependencies blocks enable when hard plugin dependencies are not
+// installed, not enabled, or version-unsatisfied on the runtime enable axis.
 func (s *serviceImpl) ensureEnableDependencies(ctx context.Context, pluginID string, frameworkVersion string) error {
-	check, err := s.resolveInstallDependencies(ctx, pluginID, frameworkVersion)
+	check, err := s.resolveEnableDependencies(ctx, pluginID, frameworkVersion)
 	if err != nil {
 		return err
 	}
@@ -104,6 +105,20 @@ func (s *serviceImpl) ensureEnableDependencies(ctx context.Context, pluginID str
 		return nil
 	}
 	return buildDependencyBlockedError(pluginID, check.Blockers)
+}
+
+// ensureNoEnabledReverseDependencies blocks disable when enabled downstream
+// plugins still hard-depend on the target. Installed-but-disabled dependents
+// do not block disable; uninstall continues to protect them separately.
+func (s *serviceImpl) ensureNoEnabledReverseDependencies(ctx context.Context, pluginID string) error {
+	result, err := s.resolveReverseDependencies(ctx, pluginID, "", true)
+	if err != nil {
+		return err
+	}
+	if !plugindep.HasBlockers(result.Blockers) {
+		return nil
+	}
+	return buildReverseEnabledDependencyBlockedError(pluginID, result)
 }
 
 // updateDynamicStatus dispatches dynamic enable or disable into named branches.
@@ -180,20 +195,33 @@ func (s *serviceImpl) updateSourceStatus(
 	status int,
 ) error {
 	if status == statusflag.EnabledValue.Int() {
-		return s.enableSourcePlugin(ctx, pluginID)
+		return s.enableSourcePlugin(ctx, manifest, pluginID)
 	}
 	return s.disableSourcePlugin(ctx, manifest, pluginID)
 }
 
-// enableSourcePlugin updates source governance state and publishes successful enable side effects.
-func (s *serviceImpl) enableSourcePlugin(ctx context.Context, pluginID string) error {
+// enableSourcePlugin runs BeforeEnable preconditions, updates source governance
+// state, and publishes successful enable side effects including AfterEnable.
+func (s *serviceImpl) enableSourcePlugin(ctx context.Context, manifest *catalog.Manifest, pluginID string) error {
+	if err := s.executeSourcePluginBeforeLifecycle(
+		ctx,
+		manifest,
+		pluginhost.LifecycleHookBeforeEnable,
+		sourceLifecyclePolicy{},
+	); err != nil {
+		return err
+	}
 	if err := s.storeSvc.SetPluginStatus(ctx, pluginID, statusflag.EnabledValue.Int()); err != nil {
 		return err
 	}
 	if err := s.syncEnabledSnapshotAndPublishRuntimeChange(ctx, pluginID, "source_plugin_status_changed"); err != nil {
 		return err
 	}
-	return s.notifyPluginEnabled(ctx, pluginID)
+	if err := s.notifyPluginEnabled(ctx, pluginID); err != nil {
+		return err
+	}
+	s.executeSourcePluginAfterLifecycle(ctx, manifest, pluginhost.LifecycleHookAfterEnable, sourceLifecyclePolicy{})
+	return nil
 }
 
 // disableSourcePlugin runs BeforeDisable, updates source governance state, and

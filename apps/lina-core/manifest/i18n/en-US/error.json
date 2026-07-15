@@ -2,7 +2,13 @@
   "error": {
     "auth": {
       "password": {
-        "hashFailed": "Failed to hash password"
+        "hashFailed": "Failed to hash password",
+        "reset": {
+          "unavailable": "Password recovery is temporarily unavailable",
+          "token": {
+            "invalid": "Password reset token is invalid or expired"
+          }
+        }
       },
       "tenant": {
         "unavailable": "Tenant is not available"
@@ -47,6 +53,31 @@
           "not": {
             "provisioned": "No local account is linked to this external identity"
           }
+        }
+      },
+      "register": {
+        "disabled": "Public registration is disabled",
+        "username": {
+          "exists": "Username already exists"
+        },
+        "email": {
+          "exists": "Email is already registered"
+        },
+        "rate": {
+          "limited": "Too many registration attempts, please try again later"
+        }
+      },
+      "forget": {
+        "password": {
+          "disabled": "Password recovery is disabled",
+          "rate": {
+            "limited": "Too many password recovery attempts, please try again later"
+          }
+        }
+      },
+      "default": {
+        "role": {
+          "missing": "Default user role is not available"
         }
       }
     },
@@ -116,6 +147,16 @@
           "rename": {
             "denied": "Built-in runtime configuration keys cannot be renamed"
           }
+        },
+        "type": {
+          "change": {
+            "denied": "Built-in system parameter type and options cannot be modified"
+          }
+        }
+      },
+      "system": {
+        "manage": {
+          "denied": "This system configuration cannot be maintained on the system settings page"
         }
       },
       "import": {
@@ -157,6 +198,19 @@
       "protected": {
         "value": {
           "invalid": "Built-in system configuration value is invalid"
+        }
+      },
+      "value": {
+        "type": {
+          "invalid": "System configuration value type is invalid"
+        }
+      },
+      "options": {
+        "invalid": "System configuration options are invalid"
+      },
+      "typed": {
+        "value": {
+          "invalid": "System configuration value does not match its value type"
         }
       }
     },
@@ -722,6 +776,15 @@
         "create": {
           "failed": "Failed to create notification delivery"
         }
+      },
+      "email": {
+        "delivery": {
+          "unavailable": "Email notification delivery is unavailable; install and enable linapro-mail-core",
+          "failed": "Email notification delivery failed"
+        },
+        "recipient": {
+          "required": "Email notification recipients cannot be empty"
+        }
       }
     },
     "permission": {
@@ -1002,6 +1065,11 @@
       "reverse": {
         "dependency": {
           "blocked": "Plugin {pluginId} cannot be changed because installed plugins depend on it: {dependents}"
+        },
+        "enabled": {
+          "dependency": {
+            "blocked": "Plugin {pluginId} cannot be disabled because enabled plugins depend on it: {dependents}"
+          }
         }
       },
       "lock": {

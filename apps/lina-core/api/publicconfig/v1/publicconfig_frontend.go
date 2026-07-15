@@ -82,12 +82,17 @@ type FrontendAppRes struct {
 	LogoDark string `json:"logoDark" dc:"Dark theme logo image address" eg:"/logo.webp"`
 }
 
-// FrontendAuthRes stores login-page public copy settings.
+// FrontendAuthRes stores login-page public copy and entry-switch settings.
 type FrontendAuthRes struct {
-	PageTitle     string      `json:"pageTitle" dc:"Login page main title copywriting" eg:"An AI-native full-stack framework engineered for sustainable delivery"`
-	PageDesc      string      `json:"pageDesc" dc:"Login page description copy" eg:"Facing business evolution, it provides out-of-the-box management portals and flexible pluggable expansion mechanisms."`
-	LoginSubtitle string      `json:"loginSubtitle" dc:"Login form subtitle copywriting" eg:"Please enter your account information to enter the LinaPro hosting workspace"`
-	PanelLayout   PanelLayout `json:"panelLayout" dc:"Login box layout: panel-left=left panel-center=center panel-right=right" eg:"panel-right"`
+	PageTitle             string      `json:"pageTitle" dc:"Login page main title copywriting" eg:"An AI-native full-stack framework engineered for sustainable delivery"`
+	PageDesc              string      `json:"pageDesc" dc:"Login page description copy" eg:"Facing business evolution, it provides out-of-the-box management portals and flexible pluggable expansion mechanisms."`
+	LoginSubtitle         string      `json:"loginSubtitle" dc:"Login form subtitle copywriting" eg:"Please enter your account information to enter the LinaPro hosting workspace"`
+	PanelLayout           PanelLayout `json:"panelLayout" dc:"Login box layout: panel-left=left panel-center=center panel-right=right" eg:"panel-center"`
+	SloganImage           string      `json:"sloganImage" dc:"Login-side slogan illustration image URL; default /slogan.svg is the built-in Vben graphic, empty hides the illustration" eg:"/slogan.svg"`
+	ForgetPasswordEnabled bool        `json:"forgetPasswordEnabled" dc:"Whether the login page exposes the forget-password entry: true=show false=hide" eg:"true"`
+	RegisterEnabled       bool        `json:"registerEnabled" dc:"Whether the login page exposes the create-account entry: true=show false=hide" eg:"true"`
+	PrivacyPolicy         string      `json:"privacyPolicy" dc:"Privacy policy body shown in the registration consent dialog" eg:"Privacy Policy\n\n..."`
+	TermsOfService        string      `json:"termsOfService" dc:"Terms of service body shown in the registration consent dialog" eg:"Terms of Service\n\n..."`
 }
 
 // FrontendUserRes stores user-facing public fallback settings.

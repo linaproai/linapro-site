@@ -18,6 +18,7 @@ import (
 	hostconfig "lina-core/internal/service/config"
 	"lina-core/internal/service/datascope"
 	"lina-core/pkg/bizerr"
+	"lina-core/pkg/configvaluetype"
 )
 
 // List queries config list with pagination and filters.
@@ -27,6 +28,9 @@ func (s *serviceImpl) List(ctx context.Context, in ListInput) (*ListOutput, erro
 		m    = dao.SysConfig.Ctx(ctx)
 	)
 	m = applySysconfigFallbackScope(ctx, m)
+	// Management surface only lists system-manageable rows; plugin closed-loop
+	// settings (system_manageable=0) stay out of this page.
+	m = m.Where(cols.SystemManageable, 1)
 
 	// Apply filters
 	if in.Name != "" {
@@ -90,8 +94,22 @@ func (s *serviceImpl) refreshRuntimeParamSnapshotIfNeeded(
 	return s.configSvc.MarkRuntimeParamsChanged(ctx)
 }
 
-// GetById retrieves config by ID.
+// GetById retrieves config by ID for edit/detail display. Name and remark are
+// localized for the request language; value stays as the stored raw text.
+// Non system-manageable rows are not found on the management surface.
 func (s *serviceImpl) GetById(ctx context.Context, id int64) (*entity.SysConfig, error) {
+	cfg, err := s.getByIdRawForManagement(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	s.localizeConfigEntityMetadata(ctx, cfg)
+	return cfg, nil
+}
+
+// getByIdRaw loads one config row by ID without i18n projection. Mutation paths
+// must use this helper so localized name/remark never drive write-back or
+// built-in protection checks against display text.
+func (s *serviceImpl) getByIdRaw(ctx context.Context, id int64) (*entity.SysConfig, error) {
 	var cfg *entity.SysConfig
 	model := dao.SysConfig.Ctx(ctx).Where(do.SysConfig{Id: id})
 	model = datascope.ApplyTenantScope(ctx, model, datascope.TenantColumn)
@@ -105,14 +123,42 @@ func (s *serviceImpl) GetById(ctx context.Context, id int64) (*entity.SysConfig,
 	return cfg, nil
 }
 
+// getByIdRawForManagement loads one management-surface config row. Non
+// system-manageable rows are treated as not found so plugin closed-loop
+// settings cannot be inspected or mutated through system settings APIs.
+func (s *serviceImpl) getByIdRawForManagement(ctx context.Context, id int64) (*entity.SysConfig, error) {
+	cfg, err := s.getByIdRaw(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if !isSystemManageableRecord(cfg) {
+		return nil, bizerr.NewCode(CodeSysConfigNotFound)
+	}
+	return cfg, nil
+}
+
+// isSystemManageableRecord reports whether a sys_config row may appear and be
+// mutated on the system config management page (system_manageable = 1).
+func isSystemManageableRecord(record *entity.SysConfig) bool {
+	return record != nil && record.SystemManageable == 1
+}
+
 // Create creates a new config record.
 func (s *serviceImpl) Create(ctx context.Context, in CreateInput) (int64, error) {
-	if err := validateManagedConfigValue(in.Key, in.Value); err != nil {
+	valueType, optionsRaw, err := resolveCreateTypeMetadata(ctx, in.Key, in.ValueType, in.Options)
+	if err != nil {
+		return 0, err
+	}
+	value := normalizePersistedValue(valueType, in.Value)
+	if err = validateTypedConfigValue(valueType, optionsRaw, value); err != nil {
+		return 0, err
+	}
+	if err = validateManagedConfigValue(in.Key, value); err != nil {
 		return 0, err
 	}
 
 	var createdID int64
-	err := s.withConfigMutation(ctx, func(ctx context.Context) error {
+	err = s.withConfigMutation(ctx, func(ctx context.Context) error {
 		// Check key uniqueness (GoFrame auto-adds deleted_at IS NULL)
 		model := dao.SysConfig.Ctx(ctx).Where(do.SysConfig{Key: in.Key})
 		model = datascope.ApplyTenantScope(ctx, model, datascope.TenantColumn)
@@ -124,12 +170,16 @@ func (s *serviceImpl) Create(ctx context.Context, in CreateInput) (int64, error)
 			return bizerr.NewCode(CodeSysConfigKeyExists, bizerr.P("key", in.Key))
 		}
 
-		// Insert config (GoFrame auto-fills created_at and updated_at)
+		// Insert config (GoFrame auto-fills created_at and updated_at).
+		// Management-surface creates are always system-manageable.
 		data := currentTenantConfigDO(ctx)
 		data.Name = in.Name
 		data.Key = in.Key
-		data.Value = in.Value
+		data.Value = value
+		data.ValueType = valueType.String()
+		data.Options = optionsRaw
 		data.IsBuiltin = builtInConfigFlag(in.Key)
+		data.SystemManageable = 1
 		data.Remark = in.Remark
 
 		insertedID, insertErr := dao.SysConfig.Ctx(ctx).Data(data).InsertAndGetId()
@@ -143,7 +193,7 @@ func (s *serviceImpl) Create(ctx context.Context, in CreateInput) (int64, error)
 		return 0, err
 	}
 
-	if err = s.refreshRuntimeParamSnapshotIfNeeded(ctx, in.Key, "", in.Value, true); err != nil {
+	if err = s.refreshRuntimeParamSnapshotIfNeeded(ctx, in.Key, "", value, true); err != nil {
 		return 0, err
 	}
 
@@ -159,8 +209,9 @@ func (s *serviceImpl) Update(ctx context.Context, in UpdateInput) error {
 		finalValue    string
 	)
 	if err := s.withConfigMutation(ctx, func(ctx context.Context) error {
-		// Check config exists
-		existing, err := s.GetById(ctx, in.Id)
+		// Check config exists using raw storage values (not display projections).
+		// Non system-manageable rows are outside the management surface.
+		existing, err := s.getByIdRawForManagement(ctx, in.Id)
 		if err != nil {
 			return err
 		}
@@ -194,22 +245,70 @@ func (s *serviceImpl) Update(ctx context.Context, in UpdateInput) error {
 		if in.Value != nil {
 			finalValue = *in.Value
 		}
+
+		finalValueType := entityValueType(existing.ValueType)
+		finalOptionsRaw := existing.Options
+		if isBuiltInConfigRecord(existing) {
+			if in.ValueType != nil && strings.TrimSpace(*in.ValueType) != "" &&
+				entityValueType(*in.ValueType) != finalValueType {
+				return bizerr.NewCode(CodeSysConfigBuiltinTypeChangeDenied)
+			}
+			if in.Options != nil {
+				encoded, encodeErr := configvaluetype.EncodeOptions(*in.Options)
+				if encodeErr != nil {
+					return bizerr.WrapCode(encodeErr, CodeSysConfigOptionsInvalid)
+				}
+				if encoded != strings.TrimSpace(existing.Options) {
+					return bizerr.NewCode(CodeSysConfigBuiltinTypeChangeDenied)
+				}
+			}
+		} else {
+			if in.ValueType != nil {
+				resolved, resolveErr := configvaluetype.ResolveCode(*in.ValueType)
+				if resolveErr != nil {
+					return bizerr.WrapCode(resolveErr, CodeSysConfigValueTypeInvalid)
+				}
+				finalValueType = resolved
+			}
+			if in.Options != nil {
+				encoded, encodeErr := configvaluetype.EncodeOptions(*in.Options)
+				if encodeErr != nil {
+					return bizerr.WrapCode(encodeErr, CodeSysConfigOptionsInvalid)
+				}
+				finalOptionsRaw = encoded
+			}
+		}
+
+		finalValue = normalizePersistedValue(finalValueType, finalValue)
+		if err = validateTypedConfigValue(finalValueType, finalOptionsRaw, finalValue); err != nil {
+			return err
+		}
 		if err = validateManagedConfigValue(finalKey, finalValue); err != nil {
 			return err
 		}
 
 		data := do.SysConfig{}
-		if in.Name != nil {
-			data.Name = *in.Name
+		// Built-in name/remark are framework display metadata owned by i18n
+		// resources; never persist edit-form projections back into sys_config.
+		if !isBuiltInConfigRecord(existing) {
+			if in.Name != nil {
+				data.Name = *in.Name
+			}
+			if in.Remark != nil {
+				data.Remark = *in.Remark
+			}
+			if in.ValueType != nil {
+				data.ValueType = finalValueType.String()
+			}
+			if in.Options != nil {
+				data.Options = finalOptionsRaw
+			}
 		}
 		if in.Key != nil {
 			data.Key = *in.Key
 		}
 		if in.Value != nil {
-			data.Value = *in.Value
-		}
-		if in.Remark != nil {
-			data.Remark = *in.Remark
+			data.Value = finalValue
 		}
 
 		_, err = dao.SysConfig.Ctx(ctx).Where(do.SysConfig{Id: in.Id}).Data(data).Update()
@@ -226,8 +325,9 @@ func (s *serviceImpl) Update(ctx context.Context, in UpdateInput) error {
 
 // Delete soft-deletes a config record using GoFrame's auto soft-delete feature.
 func (s *serviceImpl) Delete(ctx context.Context, id int64) error {
-	// Check config exists
-	existing, err := s.GetById(ctx, id)
+	// Check config exists using raw storage values; non system-manageable rows
+	// are outside the management surface.
+	existing, err := s.getByIdRawForManagement(ctx, id)
 	if err != nil {
 		return err
 	}
@@ -272,10 +372,11 @@ func builtInConfigFlag(key string) int {
 	return 0
 }
 
-// GetByKey retrieves config by key name.
+// GetByKey retrieves config by key name for the management surface.
+// Non system-manageable rows are reported as key-not-found.
 func (s *serviceImpl) GetByKey(ctx context.Context, key string) (*ConfigProjection, error) {
 	var cfg *entity.SysConfig
-	model := dao.SysConfig.Ctx(ctx).Where(do.SysConfig{Key: key})
+	model := dao.SysConfig.Ctx(ctx).Where(do.SysConfig{Key: key, SystemManageable: 1})
 	model = applySysconfigFallbackScope(ctx, model).
 		OrderDesc(datascope.TenantColumn)
 	err := model.Scan(&cfg)
@@ -294,6 +395,8 @@ func (s *serviceImpl) Export(ctx context.Context, in ExportInput) (data []byte, 
 	cols := dao.SysConfig.Columns()
 	m := dao.SysConfig.Ctx(ctx)
 	m = applySysconfigFallbackScope(ctx, m)
+	// Keep export aligned with the management list: only system-manageable rows.
+	m = m.Where(cols.SystemManageable, 1)
 
 	if len(in.Ids) > 0 {
 		m = m.WhereIn(cols.Id, in.Ids)
@@ -342,16 +445,27 @@ func (s *serviceImpl) Export(ctx context.Context, in ExportInput) (data []byte, 
 		if err = setCellValue(f, sheet, 3, row, c.Value); err != nil {
 			return nil, err
 		}
-		if err = setCellValue(f, sheet, 4, row, c.Remark); err != nil {
+		if err = setCellValue(f, sheet, 4, row, entityValueType(c.ValueType).String()); err != nil {
+			return nil, err
+		}
+		// Export options in simple line format for human-friendly Excel editing.
+		exportedOptions := c.Options
+		if parsed, parseErr := configvaluetype.ParseOptions(c.Options); parseErr == nil {
+			exportedOptions = configvaluetype.FormatOptionsSimple(parsed)
+		}
+		if err = setCellValue(f, sheet, 5, row, exportedOptions); err != nil {
+			return nil, err
+		}
+		if err = setCellValue(f, sheet, 6, row, c.Remark); err != nil {
 			return nil, err
 		}
 		if c.CreatedAt != nil {
-			if err = setCellValue(f, sheet, 5, row, c.CreatedAt.String()); err != nil {
+			if err = setCellValue(f, sheet, 7, row, c.CreatedAt.String()); err != nil {
 				return nil, err
 			}
 		}
 		if c.UpdatedAt != nil {
-			if err = setCellValue(f, sheet, 6, row, c.UpdatedAt.String()); err != nil {
+			if err = setCellValue(f, sheet, 8, row, c.UpdatedAt.String()); err != nil {
 				return nil, err
 			}
 		}

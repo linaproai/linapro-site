@@ -6,20 +6,12 @@
       "name": "参数名称",
       "remark": "备注",
       "updatedAt": "修改时间",
-      "value": "参数键值"
+      "value": "参数键值",
+      "valueType": "参数类型",
+      "options": "选项列表"
     },
     "cron": {
-      "log": {
-        "retention": {
-          "name": "定时任务-执行日志保留策略",
-          "remark": "控制定时任务执行日志默认保留策略，使用 JSON：{\"mode\":\"days|count|none\",\"value\":N}。"
-        }
-      },
       "shell": {
-        "enabled": {
-          "name": "定时任务-Shell 模式全局开关",
-          "remark": "控制 Shell 类型任务是否允许创建、修改、触发与终止，可选值：true、false。"
-        },
         "unsupportedReason": "当前平台不支持 Shell 模式"
       }
     },
@@ -53,9 +45,18 @@
         }
       },
       "auth": {
+        "forgetPasswordEnabled": {
+          "name": "登录展示-忘记密码入口",
+          "remark": "控制登录页是否显示忘记密码入口，可选值：true、false。关闭后访问忘记密码路由会回退到登录页。"
+        },
         "loginPanelLayout": {
           "name": "登录展示-登录框位置",
-          "remark": "控制登录框默认布局，可选值：panel-left、panel-center、panel-right。"
+          "remark": "控制登录框默认布局，可选值：panel-left、panel-center、panel-right。",
+          "option": {
+            "panel-left": "左侧",
+            "panel-center": "居中",
+            "panel-right": "右侧"
+          }
         },
         "loginSubtitle": {
           "name": "登录展示-登录副标题",
@@ -68,16 +69,36 @@
         "pageTitle": {
           "name": "登录展示-页面标题",
           "remark": "控制登录页顶部主标题文案。"
+        },
+        "sloganImage": {
+          "name": "登录展示-Slogan 插画",
+          "remark": "控制登录页侧栏 slogan 插画图片地址，支持 http(s) 或站内绝对路径；默认 /slogan.svg 为 Vben 内置插画，留空表示不使用插画。"
+        },
+        "privacyPolicy": {
+          "name": "登录展示-隐私政策正文",
+          "remark": "控制注册页“隐私政策”弹窗正文，支持多行文本。"
+        },
+        "registerEnabled": {
+          "name": "登录展示-创建账号入口",
+          "remark": "控制登录页是否显示创建账号入口，可选值：true、false。关闭后访问注册路由会回退到登录页。"
+        },
+        "termsOfService": {
+          "name": "登录展示-服务条款正文",
+          "remark": "控制注册页“服务条款”弹窗正文，支持多行文本。"
         }
       },
       "cron": {
-        "logRetention": {
-          "name": "定时任务-日志保留策略",
-          "remark": "控制默认的定时任务日志清理策略，JSON 格式：{\"mode\":\"days|count|none\",\"value\":N}。"
+        "log": {
+          "retention": {
+            "name": "定时任务-执行日志保留策略",
+            "remark": "控制定时任务执行日志默认保留策略，使用 JSON：{\"mode\":\"days|count|none\",\"value\":N}。"
+          }
         },
-        "shellEnabled": {
-          "name": "定时任务-Shell 模式开关",
-          "remark": "控制是否允许创建、修改和执行 Shell 类型定时任务，可选值：true、false。"
+        "shell": {
+          "enabled": {
+            "name": "定时任务-Shell 模式全局开关",
+            "remark": "控制 Shell 类型任务是否允许创建、修改、触发与终止，可选值：true、false。"
+          }
         }
       },
       "jwt": {
@@ -107,12 +128,26 @@
       "ui": {
         "layout": {
           "name": "界面风格-工作台布局",
-          "remark": "控制后台默认布局，可选值：sidebar-nav、sidebar-mixed-nav、header-nav、header-sidebar-nav、header-mixed-nav、mixed-nav、full-content。"
+          "remark": "控制后台默认布局，可选值：sidebar-nav、sidebar-mixed-nav、header-nav、header-sidebar-nav、header-mixed-nav、mixed-nav、full-content。",
+          "option": {
+            "sidebar-nav": "侧边导航",
+            "sidebar-mixed-nav": "侧边混合导航",
+            "header-nav": "顶部导航",
+            "header-sidebar-nav": "顶部侧边导航",
+            "header-mixed-nav": "顶部混合导航",
+            "mixed-nav": "混合导航",
+            "full-content": "全内容"
+          }
         },
         "theme": {
           "mode": {
             "name": "界面风格-主题模式",
-            "remark": "控制默认主题模式，可选值：light、dark、auto。"
+            "remark": "控制默认主题模式，可选值：light、dark、auto。",
+            "option": {
+              "light": "浅色",
+              "dark": "深色",
+              "auto": "跟随系统"
+            }
           }
         },
         "watermark": {

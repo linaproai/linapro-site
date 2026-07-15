@@ -17,6 +17,8 @@ var publicFrontendConfigValueMessageKeys = map[string]string{
 	hostconfig.PublicFrontendSettingKeyAuthPageTitle:      "publicFrontend.auth.pageTitle",
 	hostconfig.PublicFrontendSettingKeyAuthPageDesc:       "publicFrontend.auth.pageDesc",
 	hostconfig.PublicFrontendSettingKeyAuthLoginSubtitle:  "publicFrontend.auth.loginSubtitle",
+	hostconfig.PublicFrontendSettingKeyAuthPrivacyPolicy:  "publicFrontend.auth.privacyPolicy",
+	hostconfig.PublicFrontendSettingKeyAuthTermsOfService: "publicFrontend.auth.termsOfService",
 	hostconfig.PublicFrontendSettingKeyUIWatermarkContent: "publicFrontend.ui.watermarkContent",
 }
 
@@ -27,8 +29,24 @@ func (s *serviceImpl) localizeConfigEntities(ctx context.Context, items []*entit
 	}
 }
 
-// localizeConfigEntity localizes one config entity in place.
+// localizeConfigEntity localizes one config entity in place for list and
+// key-based reads, including optional public-frontend default value projection.
 func (s *serviceImpl) localizeConfigEntity(ctx context.Context, item *entity.SysConfig) {
+	if item == nil {
+		return
+	}
+	s.localizeConfigEntityMetadata(ctx, item)
+	trimmedKey := strings.TrimSpace(item.Key)
+	if trimmedKey == "" {
+		return
+	}
+	item.Value = s.localizedConfigDisplayValue(ctx, trimmedKey, item.Value)
+}
+
+// localizeConfigEntityMetadata localizes name and remark for display without
+// projecting value. Edit/detail APIs use this so stored parameter values stay
+// authoritative for form backfill and save.
+func (s *serviceImpl) localizeConfigEntityMetadata(ctx context.Context, item *entity.SysConfig) {
 	if s == nil || s.i18nSvc == nil || item == nil {
 		return
 	}
@@ -38,7 +56,6 @@ func (s *serviceImpl) localizeConfigEntity(ctx context.Context, item *entity.Sys
 	}
 	item.Name = s.i18nSvc.Translate(ctx, "config."+trimmedKey+".name", item.Name)
 	item.Remark = s.i18nSvc.Translate(ctx, "config."+trimmedKey+".remark", item.Remark)
-	item.Value = s.localizedConfigDisplayValue(ctx, trimmedKey, item.Value)
 }
 
 // localizedConfigName returns one localized config display name.
@@ -100,6 +117,8 @@ func (s *serviceImpl) buildLocalizedImportTemplateHeaders(ctx context.Context) [
 		s.localizedConfigFieldLabel(ctx, "name", "Parameter Name"),
 		s.localizedConfigFieldLabel(ctx, "key", "Parameter Key"),
 		s.localizedConfigFieldLabel(ctx, "value", "Parameter Value"),
+		s.localizedConfigFieldLabel(ctx, "valueType", "Value Type"),
+		s.localizedConfigFieldLabel(ctx, "options", "Options"),
 		s.localizedConfigFieldLabel(ctx, "remark", "Remark"),
 	}
 }
@@ -110,6 +129,8 @@ func (s *serviceImpl) buildLocalizedExportHeaders(ctx context.Context) []string 
 		s.localizedConfigFieldLabel(ctx, "name", "Parameter Name"),
 		s.localizedConfigFieldLabel(ctx, "key", "Parameter Key"),
 		s.localizedConfigFieldLabel(ctx, "value", "Parameter Value"),
+		s.localizedConfigFieldLabel(ctx, "valueType", "Value Type"),
+		s.localizedConfigFieldLabel(ctx, "options", "Options"),
 		s.localizedConfigFieldLabel(ctx, "remark", "Remark"),
 		s.localizedConfigFieldLabel(ctx, "createdAt", "Created At"),
 		s.localizedConfigFieldLabel(ctx, "updatedAt", "Updated At"),

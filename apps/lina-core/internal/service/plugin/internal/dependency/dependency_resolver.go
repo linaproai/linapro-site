@@ -10,15 +10,17 @@ import (
 	"strings"
 )
 
-// CheckInstall evaluates whether target can be installed with all declared
-// plugin dependencies already installed and version-compatible.
+// CheckInstall evaluates whether target can be installed or enabled with all
+// declared plugin dependencies satisfied for the selected lifecycle axis.
 func (r *Resolver) CheckInstall(input InstallCheckInput) *InstallCheckResult {
-	targetID := strings.TrimSpace(input.TargetID)
-	result := &InstallCheckResult{
-		TargetID: targetID,
-	}
-	plugins := buildPluginMap(input.Plugins)
-	target := plugins[targetID]
+	var (
+		targetID = strings.TrimSpace(input.TargetID)
+		result   = &InstallCheckResult{
+			TargetID: targetID,
+		}
+		plugins = buildPluginMap(input.Plugins)
+		target  = plugins[targetID]
+	)
 	if target == nil {
 		result.Blockers = append(result.Blockers, &Blocker{
 			Code:     pluginv1.BlockerCodeDependencyMissing,
@@ -43,26 +45,29 @@ func (r *Resolver) CheckInstall(input InstallCheckInput) *InstallCheckResult {
 	visited := map[string]bool{}
 	visiting := map[string]int{}
 	r.walkDependencies(walkState{
-		owner:    target,
-		plugins:  plugins,
-		chain:    []string{targetID},
-		visited:  visited,
-		visiting: visiting,
-		result:   result,
+		owner:          target,
+		plugins:        plugins,
+		chain:          []string{targetID},
+		visited:        visited,
+		visiting:       visiting,
+		result:         result,
+		requireEnabled: input.RequireEnabled,
 	})
 	sortInstallResult(result)
 	return result
 }
 
-// CheckReverse evaluates whether uninstalling or upgrading target would break
-// installed downstream hard dependencies.
+// CheckReverse evaluates whether uninstalling, disabling, or upgrading target
+// would break downstream hard dependencies for the selected lifecycle axis.
 func (r *Resolver) CheckReverse(input ReverseCheckInput) *ReverseCheckResult {
-	targetID := strings.TrimSpace(input.TargetID)
-	result := &ReverseCheckResult{
-		TargetID:         targetID,
-		CandidateVersion: strings.TrimSpace(input.CandidateVersion),
-	}
-	index := input.ReverseIndex
+	var (
+		targetID = strings.TrimSpace(input.TargetID)
+		result   = &ReverseCheckResult{
+			TargetID:         targetID,
+			CandidateVersion: strings.TrimSpace(input.CandidateVersion),
+		}
+		index = input.ReverseIndex
+	)
 	if index == nil {
 		index = NewReverseDependencyIndex(input.Plugins)
 	}
@@ -81,6 +86,11 @@ func (r *Resolver) CheckReverse(input ReverseCheckInput) *ReverseCheckResult {
 		if dependentID == targetID {
 			continue
 		}
+		// Disable axis only blocks currently enabled downstream dependents.
+		// Unknown-snapshot dependents stay fail-closed only when still enabled.
+		if input.OnlyEnabledDependents && !entry.dependent.Enabled {
+			continue
+		}
 		if entry.unknown {
 			result.Blockers = append(result.Blockers, &Blocker{
 				Code:     pluginv1.BlockerCodeDependencySnapshotUnknown,
@@ -94,19 +104,26 @@ func (r *Resolver) CheckReverse(input ReverseCheckInput) *ReverseCheckResult {
 			Name:              strings.TrimSpace(entry.dependent.Name),
 			Version:           strings.TrimSpace(entry.dependent.Version),
 			RequiredVersion:   strings.TrimSpace(entry.requiredVersion),
+			Enabled:           entry.dependent.Enabled,
 			OwnerHostServices: ownerHostServiceSummariesForOwner(entry.dependent.OwnerHostServices, targetID),
 		}
 		result.Dependents = append(result.Dependents, dependent)
 
 		if result.CandidateVersion == "" {
+			blockerCode := pluginv1.BlockerCodeReverseDependency
+			detail := "installed plugin depends on target plugin"
+			if input.OnlyEnabledDependents {
+				blockerCode = pluginv1.BlockerCodeReverseEnabledDependency
+				detail = "enabled plugin depends on target plugin"
+			}
 			result.Blockers = append(result.Blockers, &Blocker{
-				Code:            pluginv1.BlockerCodeReverseDependency,
+				Code:            blockerCode,
 				PluginID:        dependent.PluginID,
 				DependencyID:    targetID,
 				RequiredVersion: dependent.RequiredVersion,
 				CurrentVersion:  result.CandidateVersion,
 				Chain:           []string{dependent.PluginID, targetID},
-				Detail:          "installed plugin depends on target plugin",
+				Detail:          detail,
 			})
 			continue
 		}
@@ -217,12 +234,13 @@ func reverseDependencyEntrySortKey(entry *reverseDependencyEntry) string {
 
 // walkState carries mutable traversal state for install dependency resolution.
 type walkState struct {
-	owner    *PluginSnapshot
-	plugins  map[string]*PluginSnapshot
-	chain    []string
-	visited  map[string]bool
-	visiting map[string]int
-	result   *InstallCheckResult
+	owner          *PluginSnapshot
+	plugins        map[string]*PluginSnapshot
+	chain          []string
+	visited        map[string]bool
+	visiting       map[string]int
+	result         *InstallCheckResult
+	requireEnabled bool
 }
 
 // checkFramework evaluates the target plugin framework-version declaration.
@@ -288,7 +306,7 @@ func (r *Resolver) walkDependencies(state walkState) {
 			})
 			continue
 		}
-		check := r.evaluateDependency(state.owner, declaredDependency, state.plugins, state.chain)
+		check := r.evaluateDependency(state.owner, declaredDependency, state.plugins, state.chain, state.requireEnabled)
 		state.result.Dependencies = append(state.result.Dependencies, check)
 		if check == nil {
 			continue
@@ -299,12 +317,13 @@ func (r *Resolver) walkDependencies(state walkState) {
 			if next != nil {
 				nextChain := append(append([]string(nil), state.chain...), check.DependencyID)
 				r.walkDependencies(walkState{
-					owner:    next,
-					plugins:  state.plugins,
-					chain:    nextChain,
-					visited:  state.visited,
-					visiting: state.visiting,
-					result:   state.result,
+					owner:          next,
+					plugins:        state.plugins,
+					chain:          nextChain,
+					visited:        state.visited,
+					visiting:       state.visiting,
+					result:         state.result,
+					requireEnabled: state.requireEnabled,
 				})
 			}
 		}
@@ -313,21 +332,24 @@ func (r *Resolver) walkDependencies(state walkState) {
 	state.visited[ownerID] = true
 }
 
-// evaluateDependency classifies one declared dependency edge.
+// evaluateDependency classifies one declared dependency edge for the active axis.
 func (r *Resolver) evaluateDependency(
 	owner *PluginSnapshot,
 	declaredDependency *plugintypes.PluginDependencySpec,
 	plugins map[string]*PluginSnapshot,
 	chain []string,
+	requireEnabled bool,
 ) *PluginDependencyCheck {
-	dependencyID := strings.TrimSpace(declaredDependency.ID)
-	dependency := plugins[dependencyID]
-	check := &PluginDependencyCheck{
-		OwnerID:         strings.TrimSpace(owner.ID),
-		DependencyID:    dependencyID,
-		RequiredVersion: strings.TrimSpace(declaredDependency.Version),
-		Chain:           append(append([]string(nil), chain...), dependencyID),
-	}
+	var (
+		dependencyID = strings.TrimSpace(declaredDependency.ID)
+		dependency   = plugins[dependencyID]
+		check        = &PluginDependencyCheck{
+			OwnerID:         strings.TrimSpace(owner.ID),
+			DependencyID:    dependencyID,
+			RequiredVersion: strings.TrimSpace(declaredDependency.Version),
+			Chain:           append(append([]string(nil), chain...), dependencyID),
+		}
+	)
 	if dependency == nil {
 		check.Status = pluginv1.DependencyStatusMissing
 		return check
@@ -336,6 +358,7 @@ func (r *Resolver) evaluateDependency(
 	check.DependencyName = strings.TrimSpace(dependency.Name)
 	check.CurrentVersion = strings.TrimSpace(dependency.Version)
 	check.Installed = dependency.Installed
+	check.Enabled = dependency.Installed && dependency.Enabled
 	check.Discovered = true
 	if check.RequiredVersion != "" {
 		matches, err := plugintypes.MatchesSemanticVersionRange(check.CurrentVersion, check.RequiredVersion)
@@ -344,11 +367,15 @@ func (r *Resolver) evaluateDependency(
 			return check
 		}
 	}
-	if dependency.Installed {
-		check.Status = pluginv1.DependencyStatusSatisfied
+	if !dependency.Installed {
+		check.Status = pluginv1.DependencyStatusMissing
 		return check
 	}
-	check.Status = pluginv1.DependencyStatusMissing
+	if requireEnabled && !dependency.Enabled {
+		check.Status = pluginv1.DependencyStatusNotEnabled
+		return check
+	}
+	check.Status = pluginv1.DependencyStatusSatisfied
 	return check
 }
 
@@ -361,6 +388,8 @@ func (r *Resolver) recordDependencyOutcome(state walkState, check *PluginDepende
 		state.result.Blockers = appendDependencyBlocker(state.result.Blockers, pluginv1.BlockerCodeDependencyMissing, check)
 	case pluginv1.DependencyStatusVersionUnsatisfied:
 		state.result.Blockers = appendDependencyBlocker(state.result.Blockers, pluginv1.BlockerCodeDependencyVersionUnsatisfied, check)
+	case pluginv1.DependencyStatusNotEnabled:
+		state.result.Blockers = appendDependencyBlocker(state.result.Blockers, pluginv1.BlockerCodeDependencyNotEnabled, check)
 	}
 }
 

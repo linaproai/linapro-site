@@ -9,6 +9,7 @@ import (
 	"lina-core/internal/model/entity"
 	hostconfig "lina-core/internal/service/config"
 	i18nsvc "lina-core/internal/service/i18n"
+	"lina-core/pkg/configvaluetype"
 )
 
 // Service defines the sysconfig service contract.
@@ -19,7 +20,10 @@ type Service interface {
 	// is configured. Database errors are returned unchanged.
 	List(ctx context.Context, in ListInput) (*ListOutput, error)
 	// GetById retrieves one config record by ID within the current tenant data
-	// scope. Missing or out-of-scope records return a sysconfig not-found
+	// scope for edit/detail display. Name and remark are localized for the
+	// request language when an i18n translator is configured; value remains the
+	// raw stored text so editable values are not overwritten by display
+	// projections. Missing or out-of-scope records return a sysconfig not-found
 	// business error.
 	GetById(ctx context.Context, id int64) (*entity.SysConfig, error)
 	// Create creates a new config record in the current tenant scope. Protected
@@ -28,9 +32,11 @@ type Service interface {
 	// are refreshed after successful creation.
 	Create(ctx context.Context, in CreateInput) (int64, error)
 	// Update updates an existing config record in the current tenant scope.
-	// Built-in protected keys cannot be renamed, duplicate keys are rejected,
-	// protected values are validated, and sys_config runtime snapshots are
-	// refreshed after effective key or value changes.
+	// Built-in protected keys cannot be renamed, built-in name and remark are
+	// ignored on write so localized edit projections cannot pollute storage,
+	// duplicate keys are rejected, protected values are validated, and
+	// sys_config runtime snapshots are refreshed after effective key or value
+	// changes.
 	Update(ctx context.Context, in UpdateInput) error
 	// Delete soft-deletes a config record using GoFrame's auto soft-delete
 	// feature after tenant-scope visibility and built-in protection checks.
@@ -91,19 +97,23 @@ type ListOutput struct {
 
 // CreateInput defines input for Create function.
 type CreateInput struct {
-	Name   string // Parameter name
-	Key    string // Parameter key
-	Value  string // Parameter value
-	Remark string // Remark
+	Name      string                   // Parameter name
+	Key       string                   // Parameter key
+	Value     string                   // Parameter value
+	ValueType string                   // Parameter value input type; empty defaults to text
+	Options   []configvaluetype.Option // Selectable options for enum-like types
+	Remark    string                   // Remark
 }
 
 // UpdateInput defines input for Update function.
 type UpdateInput struct {
-	Id     int64   // Parameter ID
-	Name   *string // Parameter name
-	Key    *string // Parameter key
-	Value  *string // Parameter value
-	Remark *string // Remark
+	Id        int64                     // Parameter ID
+	Name      *string                   // Parameter name
+	Key       *string                   // Parameter key
+	Value     *string                   // Parameter value
+	ValueType *string                   // Parameter value input type
+	Options   *[]configvaluetype.Option // Selectable options for enum-like types
+	Remark    *string                   // Remark
 }
 
 // ExportInput defines input for Export function.

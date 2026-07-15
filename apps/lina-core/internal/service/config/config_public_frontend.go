@@ -31,6 +31,21 @@ const (
 	PublicFrontendSettingKeyAuthLoginSubtitle = "sys.auth.loginSubtitle"
 	// PublicFrontendSettingKeyAuthLoginPanelLayout stores the login-form panel layout.
 	PublicFrontendSettingKeyAuthLoginPanelLayout = "sys.auth.loginPanelLayout"
+	// PublicFrontendSettingKeyAuthSloganImage stores the optional login-page
+	// side slogan illustration image source.
+	PublicFrontendSettingKeyAuthSloganImage = "sys.auth.sloganImage"
+	// PublicFrontendSettingKeyAuthForgetPasswordEnabled stores whether the
+	// login-page forget-password entry is exposed.
+	PublicFrontendSettingKeyAuthForgetPasswordEnabled = "sys.auth.forgetPasswordEnabled"
+	// PublicFrontendSettingKeyAuthRegisterEnabled stores whether the
+	// login-page create-account entry is exposed.
+	PublicFrontendSettingKeyAuthRegisterEnabled = "sys.auth.registerEnabled"
+	// PublicFrontendSettingKeyAuthPrivacyPolicy stores the privacy-policy body
+	// shown on the public registration page.
+	PublicFrontendSettingKeyAuthPrivacyPolicy = "sys.auth.privacyPolicy"
+	// PublicFrontendSettingKeyAuthTermsOfService stores the terms-of-service body
+	// shown on the public registration page.
+	PublicFrontendSettingKeyAuthTermsOfService = "sys.auth.termsOfService"
 	// PublicFrontendSettingKeyUIThemeMode stores the frontend theme mode.
 	PublicFrontendSettingKeyUIThemeMode = "sys.ui.theme.mode"
 	// PublicFrontendSettingKeyUILayout stores the admin layout mode.
@@ -93,12 +108,37 @@ var publicFrontendSettingSpecs = []RuntimeParamSpec{
 	},
 	{
 		Key:          PublicFrontendSettingKeyAuthLoginPanelLayout,
-		DefaultValue: string(PublicFrontendAuthPanelLayoutRight),
+		DefaultValue: string(PublicFrontendAuthPanelLayoutCenter),
 		validator: validateAllowedStringConfigValue(
 			string(PublicFrontendAuthPanelLayoutLeft),
 			string(PublicFrontendAuthPanelLayoutCenter),
 			string(PublicFrontendAuthPanelLayoutRight),
 		),
+	},
+	{
+		Key:          PublicFrontendSettingKeyAuthSloganImage,
+		DefaultValue: "/slogan.svg",
+		validator:    validateOptionalTextConfigValue(500),
+	},
+	{
+		Key:          PublicFrontendSettingKeyAuthForgetPasswordEnabled,
+		DefaultValue: "true",
+		validator:    validateStrictBoolConfigValue,
+	},
+	{
+		Key:          PublicFrontendSettingKeyAuthRegisterEnabled,
+		DefaultValue: "true",
+		validator:    validateStrictBoolConfigValue,
+	},
+	{
+		Key:          PublicFrontendSettingKeyAuthPrivacyPolicy,
+		DefaultValue: "Privacy Policy\n\nThis service collects account information required for authentication and workspace access, including username and email. Data is used only to provide the host workspace and related security features. Contact your administrator for data retention and export requests.",
+		validator:    validateRequiredTextConfigValue(20000),
+	},
+	{
+		Key:          PublicFrontendSettingKeyAuthTermsOfService,
+		DefaultValue: "Terms of Service\n\nBy creating an account you agree to use this workspace in accordance with your organization's policies. Accounts may be suspended for abuse or security risk. The operator may update these terms; continued use after notice constitutes acceptance.",
+		validator:    validateRequiredTextConfigValue(20000),
 	},
 	{
 		Key:          PublicFrontendSettingKeyUIThemeMode,
@@ -157,12 +197,17 @@ type PublicFrontendAppConfig struct {
 	LogoDark string `json:"logoDark"` // LogoDark is the dark-theme logo source.
 }
 
-// PublicFrontendAuthConfig stores login-page copy settings.
+// PublicFrontendAuthConfig stores login-page copy and entry-switch settings.
 type PublicFrontendAuthConfig struct {
-	PageTitle     string                        `json:"pageTitle"`     // PageTitle is the login-page headline.
-	PageDesc      string                        `json:"pageDesc"`      // PageDesc is the login-page description.
-	LoginSubtitle string                        `json:"loginSubtitle"` // LoginSubtitle is the form subtitle.
-	PanelLayout   PublicFrontendAuthPanelLayout `json:"panelLayout"`   // PanelLayout selects the login-panel placement.
+	PageTitle             string                        `json:"pageTitle"`             // PageTitle is the login-page headline.
+	PageDesc              string                        `json:"pageDesc"`              // PageDesc is the login-page description.
+	LoginSubtitle         string                        `json:"loginSubtitle"`         // LoginSubtitle is the form subtitle.
+	PanelLayout           PublicFrontendAuthPanelLayout `json:"panelLayout"`           // PanelLayout selects the login-panel placement.
+	SloganImage           string                        `json:"sloganImage"`           // SloganImage is the optional login side-slogan illustration URL.
+	ForgetPasswordEnabled bool                          `json:"forgetPasswordEnabled"` // ForgetPasswordEnabled reports whether the forget-password entry is exposed.
+	RegisterEnabled       bool                          `json:"registerEnabled"`       // RegisterEnabled reports whether the create-account entry is exposed.
+	PrivacyPolicy         string                        `json:"privacyPolicy"`         // PrivacyPolicy is the privacy-policy body for registration consent.
+	TermsOfService        string                        `json:"termsOfService"`        // TermsOfService is the terms body for registration consent.
 }
 
 // PublicFrontendUserConfig stores user-facing fallback settings.
@@ -289,6 +334,28 @@ func (s *serviceImpl) GetPublicFrontend(ctx context.Context) (*PublicFrontendCon
 	if err != nil {
 		return nil, err
 	}
+	// Empty sloganImage is intentional ("hide illustration") and must not fall
+	// back to the built-in default when the sys_config row exists with "".
+	authSloganImage, err := s.getProtectedConfigValueAllowEmpty(ctx, PublicFrontendSettingKeyAuthSloganImage)
+	if err != nil {
+		return nil, err
+	}
+	authForgetPasswordEnabled, err := s.getProtectedConfigBoolOrDefault(ctx, PublicFrontendSettingKeyAuthForgetPasswordEnabled)
+	if err != nil {
+		return nil, err
+	}
+	authRegisterEnabled, err := s.getProtectedConfigBoolOrDefault(ctx, PublicFrontendSettingKeyAuthRegisterEnabled)
+	if err != nil {
+		return nil, err
+	}
+	authPrivacyPolicy, err := s.getProtectedConfigValueOrDefault(ctx, PublicFrontendSettingKeyAuthPrivacyPolicy)
+	if err != nil {
+		return nil, err
+	}
+	authTermsOfService, err := s.getProtectedConfigValueOrDefault(ctx, PublicFrontendSettingKeyAuthTermsOfService)
+	if err != nil {
+		return nil, err
+	}
 	userDefaultAvatar, err := s.getProtectedConfigValueOrDefault(ctx, PublicFrontendSettingKeyUserDefaultAvatar)
 	if err != nil {
 		return nil, err
@@ -313,10 +380,15 @@ func (s *serviceImpl) GetPublicFrontend(ctx context.Context) (*PublicFrontendCon
 			LogoDark: appLogoDark,
 		},
 		Auth: PublicFrontendAuthConfig{
-			PageTitle:     authPageTitle,
-			PageDesc:      authPageDesc,
-			LoginSubtitle: authLoginSubtitle,
-			PanelLayout:   PublicFrontendAuthPanelLayout(authPanelLayout),
+			PageTitle:             authPageTitle,
+			PageDesc:              authPageDesc,
+			LoginSubtitle:         authLoginSubtitle,
+			PanelLayout:           PublicFrontendAuthPanelLayout(authPanelLayout),
+			SloganImage:           authSloganImage,
+			ForgetPasswordEnabled: authForgetPasswordEnabled,
+			RegisterEnabled:       authRegisterEnabled,
+			PrivacyPolicy:         authPrivacyPolicy,
+			TermsOfService:        authTermsOfService,
 		},
 		User: PublicFrontendUserConfig{
 			DefaultAvatar: userDefaultAvatar,
@@ -370,6 +442,8 @@ func resolveSystemTimezone(envTimezone string, processTimezone string) string {
 
 // getProtectedConfigValueOrDefault returns the runtime override when present,
 // then the active static config value, then built-in host default metadata.
+// Empty runtime or static values are treated as missing so required settings
+// fall back to their built-in defaults.
 func (s *serviceImpl) getProtectedConfigValueOrDefault(ctx context.Context, key string) (string, error) {
 	normalizedKey := strings.TrimSpace(key)
 	if value, ok, err := s.lookupRuntimeParamValue(ctx, normalizedKey); err != nil {
@@ -388,6 +462,31 @@ func (s *serviceImpl) getProtectedConfigValueOrDefault(ctx context.Context, key 
 		if trimmed != "" {
 			return trimmed, nil
 		}
+	}
+
+	defaultValue, ok := lookupHostConfigDefaultValue(normalizedKey)
+	if ok {
+		return strings.TrimSpace(hostConfigDefaultValueString(defaultValue)), nil
+	}
+	return "", nil
+}
+
+// getProtectedConfigValueAllowEmpty returns the runtime override when the key
+// exists (including intentional empty strings), then the static config value
+// when present, then the built-in default. Use this for optional display assets
+// where empty means "disabled" rather than "use default".
+func (s *serviceImpl) getProtectedConfigValueAllowEmpty(ctx context.Context, key string) (string, error) {
+	normalizedKey := strings.TrimSpace(key)
+	if value, ok, err := s.lookupRuntimeParamValue(ctx, normalizedKey); err != nil {
+		return "", err
+	} else if ok {
+		return strings.TrimSpace(value), nil
+	}
+
+	if value, ok, err := lookupStaticHostConfigValue(ctx, normalizedKey); err != nil {
+		return "", err
+	} else if ok {
+		return strings.TrimSpace(value.String()), nil
 	}
 
 	defaultValue, ok := lookupHostConfigDefaultValue(normalizedKey)
@@ -432,6 +531,14 @@ func validateRequiredTextConfigValue(maxLen int) protectedConfigValidator {
 	}
 }
 
+// validateOptionalTextConfigValue returns metadata validation for optional text
+// protected settings. Empty values are accepted; non-empty values enforce maxLen.
+func validateOptionalTextConfigValue(maxLen int) protectedConfigValidator {
+	return func(key string, value string) error {
+		return validateOptionalTextValue(key, value, maxLen)
+	}
+}
+
 // validateAllowedStringConfigValue returns metadata validation for enum-style
 // protected settings.
 func validateAllowedStringConfigValue(allowed ...string) protectedConfigValidator {
@@ -461,6 +568,23 @@ func validateRequiredTextValue(key string, value string, maxLen int) error {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
 		return bizerr.NewCode(CodeConfigParamRequired, bizerr.P("key", key))
+	}
+	if utf8.RuneCountInString(trimmed) > maxLen {
+		return bizerr.NewCode(
+			CodeConfigParamTextTooLong,
+			bizerr.P("key", key),
+			bizerr.P("maxLen", maxLen),
+		)
+	}
+	return nil
+}
+
+// validateOptionalTextValue validates one protected text value that may be
+// empty, while still enforcing a maximum character-length constraint when set.
+func validateOptionalTextValue(key string, value string, maxLen int) error {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return nil
 	}
 	if utf8.RuneCountInString(trimmed) > maxLen {
 		return bizerr.NewCode(

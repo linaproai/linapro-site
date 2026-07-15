@@ -511,6 +511,127 @@ func TestRunFrontendKeysCommandPasses(t *testing.T) {
 	}
 }
 
+// TestValidatePluginDisplayMetadataKeysReportsBareKeys verifies i18n-enabled
+// plugins cannot ship bare name/description keys for management-list localization.
+func TestValidatePluginDisplayMetadataKeysReportsBareKeys(t *testing.T) {
+	t.Parallel()
+
+	repoRoot := t.TempDir()
+	mustWriteToolTestFile(
+		t,
+		filepath.Join(repoRoot, "apps", "lina-plugins", "demo-mail", "plugin.yaml"),
+		"id: demo-mail\ni18n:\n  enabled: true\n",
+	)
+	mustWriteToolTestFile(
+		t,
+		filepath.Join(repoRoot, "apps", "lina-plugins", "demo-mail", "manifest", "i18n", "zh-CN", "plugin.json"),
+		"{\"name\":\"邮件演示\",\"description\":\"错误的顶层 key\"}\n",
+	)
+	mustWriteToolTestFile(
+		t,
+		filepath.Join(repoRoot, "apps", "lina-plugins", "demo-mail", "manifest", "i18n", "en-US", "plugin.json"),
+		"{\"name\":\"Mail Demo\",\"description\":\"bare keys\"}\n",
+	)
+
+	errors, err := validatePluginDisplayMetadataKeys(repoRoot)
+	if err != nil {
+		t.Fatalf("expected validation to run, got error: %v", err)
+	}
+	if len(errors) == 0 {
+		t.Fatal("expected bare metadata key failures")
+	}
+	joined := strings.Join(errors, "\n")
+	for _, expected := range []string{
+		"plugin:demo-mail",
+		"plugin.demo-mail.name",
+		"plugin.demo-mail.description",
+		"bare name/description",
+	} {
+		if !strings.Contains(joined, expected) {
+			t.Fatalf("expected error to mention %q, got:\n%s", expected, joined)
+		}
+	}
+}
+
+// TestValidatePluginDisplayMetadataKeysPassesWhenNamespaced verifies correct
+// plugin.<id>.name/description keys pass the management-list metadata check.
+func TestValidatePluginDisplayMetadataKeysPassesWhenNamespaced(t *testing.T) {
+	t.Parallel()
+
+	repoRoot := t.TempDir()
+	mustWriteToolTestFile(
+		t,
+		filepath.Join(repoRoot, "apps", "lina-plugins", "demo-mail", "plugin.yaml"),
+		"id: demo-mail\ni18n:\n  enabled: true\n",
+	)
+	mustWriteToolTestFile(
+		t,
+		filepath.Join(repoRoot, "apps", "lina-plugins", "demo-mail", "manifest", "i18n", "zh-CN", "plugin.json"),
+		"{\"plugin\":{\"demo-mail\":{\"name\":\"邮件演示\",\"description\":\"正确的命名空间\"}}}\n",
+	)
+	mustWriteToolTestFile(
+		t,
+		filepath.Join(repoRoot, "apps", "lina-plugins", "demo-mail", "manifest", "i18n", "en-US", "plugin.json"),
+		"{\"plugin\":{\"demo-mail\":{\"name\":\"Mail Demo\",\"description\":\"correct namespace\"}}}\n",
+	)
+	mustWriteToolTestFile(
+		t,
+		filepath.Join(repoRoot, "apps", "lina-plugins", "single-lang", "plugin.yaml"),
+		"id: single-lang\ni18n:\n  enabled: false\n",
+	)
+
+	errors, err := validatePluginDisplayMetadataKeys(repoRoot)
+	if err != nil {
+		t.Fatalf("expected validation to run, got error: %v", err)
+	}
+	if len(errors) != 0 {
+		t.Fatalf("expected namespaced keys to pass, got %#v", errors)
+	}
+}
+
+// TestValidateRuntimeI18NMessagesIncludesPluginDisplayMetadata verifies the
+// consolidated messages check surfaces bare plugin display keys.
+func TestValidateRuntimeI18NMessagesIncludesPluginDisplayMetadata(t *testing.T) {
+	t.Parallel()
+
+	repoRoot := t.TempDir()
+	mustWriteToolTestFile(t, filepath.Join(repoRoot, "apps", "lina-core", "go.mod"), "module lina-core\n")
+	mustWriteToolTestFile(
+		t,
+		filepath.Join(repoRoot, "apps", "lina-core", "manifest", "i18n", "zh-CN", "framework.json"),
+		"{\"framework\":{\"name\":\"LinaPro\"}}\n",
+	)
+	mustWriteToolTestFile(
+		t,
+		filepath.Join(repoRoot, "apps", "lina-core", "manifest", "i18n", "en-US", "framework.json"),
+		"{\"framework\":{\"name\":\"LinaPro\"}}\n",
+	)
+	mustWriteToolTestFile(
+		t,
+		filepath.Join(repoRoot, "apps", "lina-plugins", "demo-mail", "plugin.yaml"),
+		"id: demo-mail\ni18n:\n  enabled: true\n",
+	)
+	mustWriteToolTestFile(
+		t,
+		filepath.Join(repoRoot, "apps", "lina-plugins", "demo-mail", "manifest", "i18n", "zh-CN", "plugin.json"),
+		"{\"name\":\"邮件演示\",\"description\":\"错误的顶层 key\"}\n",
+	)
+	mustWriteToolTestFile(
+		t,
+		filepath.Join(repoRoot, "apps", "lina-plugins", "demo-mail", "manifest", "i18n", "en-US", "plugin.json"),
+		"{\"name\":\"Mail Demo\",\"description\":\"bare keys\"}\n",
+	)
+
+	errors, err := validateRuntimeI18NMessages(repoRoot)
+	if err != nil {
+		t.Fatalf("expected validation to run, got error: %v", err)
+	}
+	joined := strings.Join(errors, "\n")
+	if !strings.Contains(joined, "plugin.demo-mail.name") {
+		t.Fatalf("expected consolidated messages check to report display key gap, got:\n%s", joined)
+	}
+}
+
 // TestRunMessagesCommandPasses verifies the command prints the expected pass message.
 func TestRunMessagesCommandPasses(t *testing.T) {
 	t.Parallel()
@@ -537,11 +658,164 @@ func TestRunMessagesCommandPasses(t *testing.T) {
 	if exitCode != 0 {
 		t.Fatalf("expected exit code 0, got %d", exitCode)
 	}
-	if !strings.Contains(out.String(), "Runtime i18n message coverage passed") {
+	if !strings.Contains(out.String(), "Runtime i18n message coverage passed for host and plugin scopes.") {
 		t.Fatalf("expected pass message, got %q", out.String())
 	}
-	if !strings.Contains(out.String(), "bizerr messageKey coverage") {
-		t.Fatalf("expected bizerr coverage mention in pass message, got %q", out.String())
+}
+
+// TestValidateConfigDisplayMetadataKeysReportsHostSQLGaps verifies host
+// sys_config seed keys require config.<key>.name/remark in every locale.
+func TestValidateConfigDisplayMetadataKeysReportsHostSQLGaps(t *testing.T) {
+	t.Parallel()
+
+	repoRoot := t.TempDir()
+	mustWriteToolTestFile(
+		t,
+		filepath.Join(repoRoot, "apps", "lina-core", "manifest", "sql", "005-config.sql"),
+		"INSERT INTO sys_config (\"name\", \"key\", \"value\") VALUES ('JWT', 'sys.jwt.expire', '24h');\n",
+	)
+	mustWriteToolTestFile(
+		t,
+		filepath.Join(repoRoot, "apps", "lina-core", "manifest", "i18n", "zh-CN", "framework.json"),
+		"{\"framework\":{\"name\":\"LinaPro\"}}\n",
+	)
+	mustWriteToolTestFile(
+		t,
+		filepath.Join(repoRoot, "apps", "lina-core", "manifest", "i18n", "en-US", "framework.json"),
+		"{\"framework\":{\"name\":\"LinaPro\"}}\n",
+	)
+
+	errors, err := validateConfigDisplayMetadataKeys(repoRoot)
+	if err != nil {
+		t.Fatalf("expected validation to run, got error: %v", err)
+	}
+	if len(errors) == 0 {
+		t.Fatal("expected host config display gaps")
+	}
+	joined := strings.Join(errors, "\n")
+	if !strings.Contains(joined, "host:core") ||
+		!strings.Contains(joined, "sys.jwt.expire") ||
+		!strings.Contains(joined, "config.sys.jwt.expire.name") {
+		t.Fatalf("expected host config.sys.jwt.expire.name gap, got:\n%s", joined)
+	}
+}
+
+// TestValidateConfigDisplayMetadataKeysReportsPluginSysConfigKeyGaps verifies
+// i18n-enabled plugins must ship config.<SysConfigKey>.name/remark entries.
+func TestValidateConfigDisplayMetadataKeysReportsPluginSysConfigKeyGaps(t *testing.T) {
+	t.Parallel()
+
+	repoRoot := t.TempDir()
+	mustWriteToolTestFile(
+		t,
+		filepath.Join(repoRoot, "apps", "lina-plugins", "demo-storage", "plugin.yaml"),
+		"id: demo-storage\ni18n:\n  enabled: true\n",
+	)
+	mustWriteToolTestFile(
+		t,
+		filepath.Join(repoRoot, "apps", "lina-plugins", "demo-storage", "backend", "settings.go"),
+		"package settings\n\nconst ConfigKeyBucket hostconfigcap.SysConfigKey = \"plugin.demo-storage.bucket\"\n",
+	)
+	mustWriteToolTestFile(
+		t,
+		filepath.Join(repoRoot, "apps", "lina-plugins", "demo-storage", "manifest", "i18n", "zh-CN", "plugin.json"),
+		"{\"plugin\":{\"demo-storage\":{\"name\":\"演示存储\"}}}\n",
+	)
+	mustWriteToolTestFile(
+		t,
+		filepath.Join(repoRoot, "apps", "lina-plugins", "demo-storage", "manifest", "i18n", "en-US", "plugin.json"),
+		"{\"plugin\":{\"demo-storage\":{\"name\":\"Demo Storage\"}}}\n",
+	)
+
+	errors, err := validateConfigDisplayMetadataKeys(repoRoot)
+	if err != nil {
+		t.Fatalf("expected validation to run, got error: %v", err)
+	}
+	if len(errors) != 4 {
+		t.Fatalf("expected 2 locales * 2 fields = 4 gaps, got %#v", errors)
+	}
+	for _, item := range errors {
+		if !strings.Contains(item, "plugin:demo-storage") ||
+			!strings.Contains(item, "plugin.demo-storage.bucket") {
+			t.Fatalf("unexpected gap message: %s", item)
+		}
+	}
+}
+
+// TestValidateConfigDisplayMetadataKeysSkipsI18nDisabledPlugins verifies
+// plugins without i18n.enabled=true are not required to ship config display keys.
+func TestValidateConfigDisplayMetadataKeysSkipsI18nDisabledPlugins(t *testing.T) {
+	t.Parallel()
+
+	repoRoot := t.TempDir()
+	mustWriteToolTestFile(
+		t,
+		filepath.Join(repoRoot, "apps", "lina-plugins", "single-lang", "plugin.yaml"),
+		"id: single-lang\ni18n:\n  enabled: false\n",
+	)
+	mustWriteToolTestFile(
+		t,
+		filepath.Join(repoRoot, "apps", "lina-plugins", "single-lang", "backend", "settings.go"),
+		"package settings\n\nconst ConfigKeyX hostconfigcap.SysConfigKey = \"plugin.single-lang.x\"\n",
+	)
+
+	errors, err := validateConfigDisplayMetadataKeys(repoRoot)
+	if err != nil {
+		t.Fatalf("expected validation to run, got error: %v", err)
+	}
+	if len(errors) != 0 {
+		t.Fatalf("expected disabled plugin to be skipped, got %#v", errors)
+	}
+}
+
+// TestValidateConfigDisplayMetadataKeysPassesWhenCatalogMatches verifies host
+// SQL keys and plugin SysConfigKey constants pass when catalogs are complete.
+func TestValidateConfigDisplayMetadataKeysPassesWhenCatalogMatches(t *testing.T) {
+	t.Parallel()
+
+	repoRoot := t.TempDir()
+	mustWriteToolTestFile(
+		t,
+		filepath.Join(repoRoot, "apps", "lina-core", "manifest", "sql", "005-config.sql"),
+		"INSERT INTO sys_config (\"name\", \"key\", \"value\") VALUES ('JWT', 'sys.jwt.expire', '24h');\n",
+	)
+	mustWriteToolTestFile(
+		t,
+		filepath.Join(repoRoot, "apps", "lina-core", "manifest", "i18n", "zh-CN", "config.json"),
+		"{\"config\":{\"sys\":{\"jwt\":{\"expire\":{\"name\":\"JWT 有效期\",\"remark\":\"时长\"}}}}}\n",
+	)
+	mustWriteToolTestFile(
+		t,
+		filepath.Join(repoRoot, "apps", "lina-core", "manifest", "i18n", "en-US", "config.json"),
+		"{\"config\":{\"sys\":{\"jwt\":{\"expire\":{\"name\":\"JWT Expiration\",\"remark\":\"Duration\"}}}}}\n",
+	)
+	mustWriteToolTestFile(
+		t,
+		filepath.Join(repoRoot, "apps", "lina-plugins", "demo-storage", "plugin.yaml"),
+		"id: demo-storage\ni18n:\n  enabled: true\n",
+	)
+	mustWriteToolTestFile(
+		t,
+		filepath.Join(repoRoot, "apps", "lina-plugins", "demo-storage", "backend", "settings.go"),
+		"package settings\n\nconst ConfigKeyBucket hostconfigcap.SysConfigKey = \"plugin.demo-storage.bucket\"\n",
+	)
+	mustWriteToolTestFile(
+		t,
+		filepath.Join(repoRoot, "apps", "lina-plugins", "demo-storage", "manifest", "i18n", "zh-CN", "config.json"),
+		"{\"config\":{\"plugin\":{\"demo-storage\":{\"bucket\":{\"name\":\"存储桶\",\"remark\":\"桶名\"}}}}}\n",
+	)
+	mustWriteToolTestFile(
+		t,
+		filepath.Join(repoRoot, "apps", "lina-plugins", "demo-storage", "manifest", "i18n", "en-US", "config.json"),
+		"{\"config\":{\"plugin\":{\"demo-storage\":{\"bucket\":{\"name\":\"Bucket\",\"remark\":\"Bucket name\"}}}}}\n",
+	)
+
+	errors, err := validateConfigDisplayMetadataKeys(repoRoot)
+	if err != nil {
+		t.Fatalf("expected validation to run, got error: %v", err)
+	}
+	if len(errors) != 0 {
+		t.Fatalf("expected complete catalogs to pass, got %#v", errors)
 	}
 }
 

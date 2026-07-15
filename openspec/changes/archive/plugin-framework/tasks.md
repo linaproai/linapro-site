@@ -36,7 +36,8 @@
 - [x] 缓存一致性：权威源、触发点、跨实例同步、最大陈旧窗口、故障降级未因重构改变；「管理」入口无缓存影响
 - [x] DI：所有内部 service 构造函数逐项显式注入，不使用 Deps/Options 聚合结构体
 - [x] 「管理」入口不修改 HTTP API、DTO、SQL schema 或列表读模型字段；前端仅用 page-registry 与路由表
-- [x] Builtin 插件分发治理：新增`distribution`字段支持`builtin`声明；启动期自动安装/启用/安全升级 builtin 源码插件；普通管理入口隐藏并拒绝写操作；`sys_plugin.distribution`进入基线表结构。普通可管理枚举由`marketplace`重命名为`managed`，缺省归一化为`managed`，旧`marketplace`在有效契约中拒绝，无兼容分支。
+- [x] Builtin 插件分发治理：新增`distribution`字段支持`builtin`声明；启动期自动安装/启用/安全升级 builtin 源码插件；服务端拒绝普通管理写操作；`sys_plugin.distribution`进入基线表结构。普通可管理枚举由`marketplace`重命名为`managed`，缺省归一化为`managed`，旧`marketplace`在有效契约中拒绝，无兼容分支。
+- [x] 插件管理默认展示 builtin：普通列表投影默认含`distribution=builtin`；UI 内置标识（可与自动启用并存）；安装/启停/升级/租户策略隐藏；卸载置灰+tooltip；详情与管理可用；`includeBuiltin`兼容；写拒绝边界不变；TC016/列表单测对齐。
 - [x] 插件领域能力扩展阶段 0/1：冻结四类矩阵，实现`Users.Current`、`Users.BatchResolve`、`Authz.BatchHasPermissions`、`Dict.EnsureValuesVisible`、`Sessions.Current`，同步动态 host service catalog/guest/dispatcher/README。
 - [x] 插件领域能力扩展阶段 1.5-5：完成候选搜索、组织/租户/插件治理投影、插件私有资源批量、通知类型化和 AI 状态，覆盖 40+ 个新方法；FB-1 至 FB-3 收敛 Storage provider 选择为零配置、新增冲突错误码。
 - [x] 插件领域服务统一：废除`AdminServices`和各领域`AdminService`；动态 wire method 一次性标准化；治理能力内聚到对应领域`Service`；FB-1 至 FB-59 大量反馈闭环。
@@ -52,3 +53,6 @@
 
 - [x] 发布动态外部登录与从外部建号 host service（`external_login.login_by_verified_identity`、`users.create_from_external`），对齐安装授权后源码/动态同权同信；更新 README/规则与 fail-closed 单测为未授权拒绝/授权成功。
 - [x] 验证：相关 go test、OpenSpec strict；治理：i18n 文档表述同步，无新增用户可见运行时文案要求；数据权限与 ownership 校验保持 fail-closed。
+- [x] 依赖两轴：`PluginSnapshot.Enabled`、`RequireEnabled`/`OnlyEnabledDependents`、启用正向与禁用反向矩阵、错误码/文案分流；resolver + lifecycle 单测/集成测通过。
+- [x] 静默路由刷新：access-refresh 在 generateAccess 后按可访问性判定是否 force 导航；宿主静态页启停不 remount；单测锁定静默/fallback/replacement 决策。
+- [x] 验证：相关 Go 测试包、前端 access-refresh 单测、`openspec validate --strict`、lina-review；治理：禁用反向新增 i18n 错误文案；无 DB schema；静默刷新无后端/权限契约变更。

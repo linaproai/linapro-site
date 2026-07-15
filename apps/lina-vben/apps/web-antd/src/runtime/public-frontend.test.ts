@@ -12,7 +12,7 @@ const updatePreferences = vi.fn();
 const hasUserThemePreference = vi.fn(() => false);
 const getInitialPreferences = vi.fn(() => ({
   app: {
-    authPageLayout: 'panel-right',
+    authPageLayout: 'panel-center',
     defaultAvatar: '/avatar.webp',
     layout: 'sidebar-nav',
     name: 'LinaPro',
@@ -115,6 +115,8 @@ describe('public frontend runtime settings', () => {
     expect(publicFrontendSettings.cron.shell.enabled).toBe(true);
     expect(publicFrontendSettings.cron.timezone.current).toBe('UTC');
     expect(publicFrontendSettings.auth.panelLayout).toBe('panel-right');
+    expect(publicFrontendSettings.auth.forgetPasswordEnabled).toBe(true);
+    expect(publicFrontendSettings.auth.registerEnabled).toBe(true);
     expect(publicFrontendSettings.user.defaultAvatar).toBe('/avatar.webp');
     expect(publicFrontendSettings.ui.themeMode).toBe('dark');
     expect(publicFrontendSettings.workspace.basePath).toBe('/admin');
@@ -180,7 +182,7 @@ describe('public frontend runtime settings', () => {
     expect(options).toEqual({ markUserThemePreference: false });
   });
 
-  it('falls back to panel-right when the server omits auth panel layout', async () => {
+  it('falls back to panel-center when the server omits auth panel layout', async () => {
     vi.mocked(fetch).mockResolvedValue({
       json: async () => ({
         data: {
@@ -197,14 +199,14 @@ describe('public frontend runtime settings', () => {
       await import('./public-frontend');
     const settings = await syncPublicFrontendSettings();
 
-    expect(publicFrontendSettings.auth.panelLayout).toBe('panel-right');
+    expect(publicFrontendSettings.auth.panelLayout).toBe('panel-center');
     expect(publicFrontendSettings.user.defaultAvatar).toBe('');
-    expect(settings?.auth.panelLayout).toBe('panel-right');
+    expect(settings?.auth.panelLayout).toBe('panel-center');
     expect(settings?.user.defaultAvatar).toBe('');
     expect(updatePreferences).toHaveBeenCalledWith(
       expect.objectContaining({
         app: expect.objectContaining({
-          authPageLayout: 'panel-right',
+          authPageLayout: 'panel-center',
           defaultAvatar: '/admin/avatar.webp',
         }),
       }),

@@ -6,20 +6,12 @@
       "name": "Parameter Name",
       "remark": "Remark",
       "updatedAt": "Updated At",
-      "value": "Parameter Value"
+      "value": "Parameter Value",
+      "valueType": "Value Type",
+      "options": "Options"
     },
     "cron": {
-      "log": {
-        "retention": {
-          "name": "Scheduled Jobs - Execution Log Retention Policy",
-          "remark": "Controls the default retention policy for scheduled-job execution logs. Use JSON: {\"mode\":\"days|count|none\",\"value\":N}."
-        }
-      },
       "shell": {
-        "enabled": {
-          "name": "Scheduled Jobs - Global Shell Mode Switch",
-          "remark": "Controls whether Shell-type jobs can be created, updated, triggered, and stopped. Supported values: true, false."
-        },
         "unsupportedReason": "Current platform does not support shell mode"
       }
     },
@@ -53,9 +45,18 @@
         }
       },
       "auth": {
+        "forgetPasswordEnabled": {
+          "name": "Login - Forget Password Entry",
+          "remark": "Controls whether the login page shows the forget-password entry. Allowed values: true, false. When false, visiting the forget-password route redirects to login."
+        },
         "loginPanelLayout": {
           "name": "Login - Panel Layout",
-          "remark": "Controls the default login panel layout: panel-left, panel-center, or panel-right."
+          "remark": "Controls the default login panel layout: panel-left, panel-center, or panel-right.",
+          "option": {
+            "panel-left": "Left",
+            "panel-center": "Center",
+            "panel-right": "Right"
+          }
         },
         "loginSubtitle": {
           "name": "Login - Form Subtitle",
@@ -68,16 +69,36 @@
         "pageTitle": {
           "name": "Login - Page Title",
           "remark": "Controls the headline shown at the top of the login page."
+        },
+        "sloganImage": {
+          "name": "Login - Slogan Illustration",
+          "remark": "Controls the login side-slogan illustration image URL. Supports http(s) or site-absolute paths. Default /slogan.svg is the built-in Vben illustration. Leave empty to hide the illustration."
+        },
+        "privacyPolicy": {
+          "name": "Login - Privacy Policy Body",
+          "remark": "Controls the privacy-policy body shown in the registration consent dialog. Multi-line plain text is supported."
+        },
+        "registerEnabled": {
+          "name": "Login - Create Account Entry",
+          "remark": "Controls whether the login page shows the create-account entry. Allowed values: true, false. When false, visiting the register route redirects to login."
+        },
+        "termsOfService": {
+          "name": "Login - Terms of Service Body",
+          "remark": "Controls the terms-of-service body shown in the registration consent dialog. Multi-line plain text is supported."
         }
       },
       "cron": {
-        "logRetention": {
-          "name": "Cron - Log Retention Policy",
-          "remark": "Controls the default cleanup policy for cron logs in JSON format."
+        "log": {
+          "retention": {
+            "name": "Scheduled Jobs - Execution Log Retention Policy",
+            "remark": "Controls the default retention policy for scheduled-job execution logs. Use JSON: {\"mode\":\"days|count|none\",\"value\":N}."
+          }
         },
-        "shellEnabled": {
-          "name": "Cron - Shell Mode Switch",
-          "remark": "Controls whether Shell-type scheduled jobs may be created, updated, and executed."
+        "shell": {
+          "enabled": {
+            "name": "Scheduled Jobs - Global Shell Mode Switch",
+            "remark": "Controls whether Shell-type jobs can be created, updated, triggered, and stopped. Supported values: true, false."
+          }
         }
       },
       "jwt": {
@@ -107,12 +128,26 @@
       "ui": {
         "layout": {
           "name": "UI - Workspace Layout",
-          "remark": "Controls the default workspace layout mode."
+          "remark": "Controls the default workspace layout mode.",
+          "option": {
+            "sidebar-nav": "Sidebar Nav",
+            "sidebar-mixed-nav": "Sidebar Mixed Nav",
+            "header-nav": "Header Nav",
+            "header-sidebar-nav": "Header Sidebar Nav",
+            "header-mixed-nav": "Header Mixed Nav",
+            "mixed-nav": "Mixed Nav",
+            "full-content": "Full Content"
+          }
         },
         "theme": {
           "mode": {
             "name": "UI - Theme Mode",
-            "remark": "Controls the default theme mode: light, dark, or auto."
+            "remark": "Controls the default theme mode: light, dark, or auto.",
+            "option": {
+              "light": "Light",
+              "dark": "Dark",
+              "auto": "Auto"
+            }
           }
         },
         "watermark": {

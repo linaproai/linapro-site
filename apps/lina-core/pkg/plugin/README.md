@@ -33,7 +33,7 @@ Dynamic plugins may use only the concrete methods that are registered in the dyn
 | `BizCtx` | Projects the current business request context. | Used as a read-only runtime context bridge for request user, tenant, locale, and request metadata. |
 | `Dict` | Resolves dictionary value labels, lists bounded value candidates, and validates typed value visibility. | Host validation stays within visible dictionary types and values. |
 | `Files` | Provides host file-center projections, bounded search, visibility enforcement, content reads, governed uploads, and creation from plugin storage into `sys_file`. | Host validation prevents plugins from probing or using file IDs outside their visible boundary. Uploads create host file-center metadata while plugin-private objects remain owned by `Storage()`. |
-| `HostConfig` | Reads host configuration values through the host priority chain and exposes governed `SysConfig()` projections and writes for `sys_config` rows. | Dynamic declarations must list `resources.keys` for `get` and single-key `sys_config` methods. This capability is separate from plugin-scoped business config. |
+| `HostConfig` | Reads host configuration values through the host priority chain and exposes governed `SysConfig()` projections and writes for `sys_config` rows. `SetValue(ctx, key, value, options)` writes one key; `BatchSetValue(ctx, items, options)` writes many keys in one transaction and one runtime-config revision (prefer batch for multi-field settings saves). `options.SystemManageable` nil on insert defaults to false / plugin closed-loop. | Dynamic declarations must list `resources.keys` for `get` and single-key `sys_config` methods. This capability is separate from plugin-scoped business config. Plugin-owned settings MUST pass `options.SystemManageable: gconv.PtrBool(false)`. |
 | `I18n` | Reads locale and translates messages for source plugins. | Source plugins receive this through `capability.Services` from `pluginhost` inputs; dynamic plugins do not receive an `i18n` host service because their i18n resources are host-managed. |
 | `Jobs` | Reads scheduled-job metadata, searches bounded job candidates, validates job visibility, and performs governed runtime job actions. | Declaration-time job contracts are submitted through `pluginbridge.Declarations.Jobs().Register(...)`; runtime services do not expose `Register`. |
 | `Notifications` | Lists and reads typed notification message projections, batch-loads messages by business source, validates visibility, deletes messages, updates read state, and sends governed notifications. | Actor-scoped read, delete, and read-state calls do not require resource declarations; `messages.send` requires a `resources[].ref` boundary. |
@@ -81,8 +81,8 @@ when multiple provider plugins are serviceable. File-center object content
 (upload/download/delete) uses the same provider selection rules; list and search
 remain on `sys_file`. Official cloud backends
 (`linapro-storage-cos`, `linapro-storage-oss`, `linapro-storage-aws`, `linapro-storage-s3`) register via
-`storagecap.Provide` and expose credentials under the host stable **Storage**
-menu (`menu_key=storage`).
+`storagecap.Provide` and expose credentials under the host stable **System Settings**
+menu (`menu_key=setting`).
 
 ## Plugin Configuration Sources
 
@@ -135,6 +135,13 @@ new `Provide<Domain>` facades, such as `ProvideAIText`, for non-core domains.
 
 `apps/lina-core/internal/service/plugin` is the host-side plugin domain component. The root package exposes a unified facade covering plugin discovery, management lists, install, enable, disable, uninstall, runtime upgrades, source upgrades, runtime route dispatch, frontend asset serving, dependency checks, and capability wiring.
 
+Hard `dependencies.plugins` checks use two lifecycle axes:
+
+- **Install axis** (install / uninstall / upgrade version contracts): forward checks require dependencies to be installed and version-compatible; reverse checks protect all **installed** downstream dependents.
+- **Runtime axis** (enable / disable): forward enable requires dependencies to be installed, **enabled**, and version-compatible; reverse disable is blocked only by **enabled** downstream dependents. Installed-but-disabled dependents do not block disable, but still block uninstall.
+
+The host never auto-installs, auto-enables, auto-disables, or auto-uninstalls dependency chains.
+
 ## Declaration-Time and Runtime Capabilities
 
 ### Declaration-Time Capabilities
@@ -142,6 +149,31 @@ new `Provide<Domain>` facades, such as `ProvideAIText`, for non-core domains.
 Declaration-time capabilities are the plugin's static declarations and registration output. The host uses them before business execution to build governance state.
 
 Source plugins express declaration-time contracts through `pluginhost.Declarations`, including `Assets()`, `Lifecycle()`, `Hooks()`, `HTTP()`, `Jobs()`, and `Access()`.
+
+### Route registration: bind controller objects with `group.Bind`
+
+When registering source-plugin or host HTTP routes, `group.Bind` **defaults to controller objects** (for example `group.Bind(controller.NewV1(svc))` or `group.Bind(ctrl)`). GoFrame discovers route methods with metadata on the bound object.
+
+Within one middleware group, avoid listing individual methods unless necessary.
+
+When methods on the same logical controller must sit in **different middleware groups** (for example public login vs authenticated management APIs), the host keeps the original split-registration design: bind the public methods on the public group and the protected methods on the protected group, instead of adding Public/Protected controller wrapper types.
+
+### Lifecycle preconditions (target vs global)
+
+`Lifecycle()` supports two precondition styles:
+
+| Kind | Registration | Input | Semantics |
+|------|--------------|-------|-----------|
+| Target | `RegisterBeforeInstallHandler` / `RegisterBeforeEnableHandler`, etc. | `SourcePluginLifecycleInput` | Invoked only when **this** plugin is installed/enabled/disabled/uninstalled; may veto self |
+| Global | `RegisterGlobalBeforeInstallHandler` / `RegisterGlobalBeforeEnableHandler` / `RegisterGlobalBeforeDisableHandler` / `RegisterGlobalBeforeUninstallHandler` | `SourcePluginGlobalLifecycleInput` (includes `TargetPluginID`) | Invoked when **another** plugin is installed/enabled/disabled/uninstalled; owners implement cross-plugin governance (for example singleton kind slots) |
+
+Orchestration:
+
+- Install, enable, disable, and uninstall aggregate **target Before\*** plus explicitly registered **GlobalBefore\*** before state writes.
+- Enable exposes `BeforeEnable` / `AfterEnable`; `AfterEnable` is best-effort and does not roll back a successful enable.
+- Global participant lists include only plugins that registered that global hook (no empty fan-out).
+- The host never hard-codes domain rules (such as mail transport kinds); owners implement conflict logic inside global hooks.
+- Do not simulate global intercept by broadcasting self-scoped `BeforeInstall` to every plugin.
 
 Dynamic plugins express declaration-time contracts through `plugin.yaml`, WASM custom sections, `pluginbridge.Declarations.Routes().Group(...)`, `pluginbridge.Declarations.Jobs().Register(...)`, and embedded `protocol` contracts, such as routes, jobs, lifecycle handlers, backend resources, frontend assets, SQL, i18n resources, and `hostServices`.
 
