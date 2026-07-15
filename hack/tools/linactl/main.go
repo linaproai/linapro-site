@@ -136,6 +136,9 @@ func (a *app) runCommand(ctx context.Context, options commandOptions, name strin
 	}
 	if options.Stdin != nil {
 		cmd.Stdin = options.Stdin
+	} else if options.Quiet {
+		// Quiet plumbing must not drain interactive stdin (e.g. confirmation prompts).
+		cmd.Stdin = strings.NewReader("")
 	} else {
 		cmd.Stdin = a.stdin
 	}
@@ -169,12 +172,17 @@ func (a *app) runCommand(ctx context.Context, options commandOptions, name strin
 }
 
 // runCommandOutput executes a child command and returns stdout.
+// Unless Stdin is explicitly set, child stdin is empty so plumbing does not
+// consume interactive input intended for linactl prompts.
 func (a *app) runCommandOutput(ctx context.Context, options commandOptions, name string, args ...string) (string, error) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	options.Quiet = false
 	options.Stdout = &stdout
 	options.Stderr = &stderr
+	if options.Stdin == nil {
+		options.Stdin = strings.NewReader("")
+	}
 	err := a.runCommand(ctx, options, name, args...)
 	if err != nil {
 		if stderr.Len() > 0 {

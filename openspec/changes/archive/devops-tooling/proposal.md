@@ -16,7 +16,7 @@ LinaPro 的开发与运维工具链需要支撑跨平台协作、可持续交付
 - 建立月度 OpenSpec 自动归档和归档聚合 workflow，支持 Codex、Claude Code 和 GitHub Copilot CLI，使用共享 prompt、运行时凭据注入、阶段性 fail-fast、OpenSpec 校验和 PR 写回。
 - 加强 release 与 nightly 镜像发布治理：release 复用共享测试验证套件，校验 tag 与`framework.version`一致，成功后创建 GitHub Release；manual nightly 可显式跳过测试门禁用于维护重发。
 - 提供受控 release tag 创建入口、跨平台 tag 校验、GitHub App token 规则集绕过说明和 Docker tag 兼容版本格式约束。
-- 提供跨平台框架源码升级入口`make upgrade` / `linactl upgrade`：固定从官方 remote`linapro`（`https://github.com/linaproai/linapro.git`）拉取；默认合并最新稳定 tag（`vMAJOR.MINOR.PATCH`，排除预发布）；支持`v=<version>`指定稳定版本与`v=main`（或其它分支名）合并 remote 分支；默认拒绝脏工作区与 detached HEAD，`force=1`仅跳过脏工作区检查；合并时保留本地`apps/lina-plugins`，不自动更新插件。
+- 提供跨平台框架源码升级入口`make upgrade` / `linactl upgrade`：固定从官方 remote`linapro`（`https://github.com/linaproai/linapro.git`）拉取；默认合并最新稳定 tag（`vMAJOR.MINOR.PATCH`，排除预发布）；支持`v=<version>`指定稳定版本与`v=main`（或其它分支名）合并 remote 分支；detached HEAD 始终拒绝；脏工作区且未传`force`时提示并要求交互确认（`y`/`yes`继续，其它输入、空输入或非交互空 stdin 则退出），`force=1`跳过脏检查与确认；合并时保留本地`apps/lina-plugins`，不自动更新插件。
 - 扩展`linactl i18n.check` / `make i18n.check`：静态收集宿主 SQL seed 与受保护常量、以及`i18n.enabled: true`插件的`SysConfigKey`，强制各运行时 locale 具备`config.<key>.name`与`config.<key>.remark`；同步`.agents/rules/i18n.md`与`linactl`文档；参数设置页 config 展示键可本地化。
 - 提供跨平台安装脚本、内存态 demo Compose、开发容器 Compose、`lina-perf-audit`手动触发性能审计技能和持久 issue-card 机制。
 - 将非工具链 owner 的项目初始化、数据库启动、E2E 组织和定时任务清理内容迁移为交叉影响摘要，避免在本分组重复保存完整能力规范。

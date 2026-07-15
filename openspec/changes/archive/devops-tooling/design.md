@@ -107,7 +107,7 @@ release 发布链路以`framework.version`为唯一 tag 基线。`linactl releas
 | 稳定版本模式 | 合并对应 tag（缺`v`前缀则补齐）；用户显式指定时可尝试含预发布的 tag |
 | 其它非空（如`main`） | 合并`linapro/<name>`分支 |
 
-**安全门禁**：detached HEAD 始终拒绝；默认要求工作区干净（`git status --porcelain`为空），`force=1`仅跳过脏检查。门禁失败不执行 merge。
+**安全门禁**：detached HEAD 始终拒绝（`force`不得跳过）。脏工作区且未传`force`时，在`ensureCleanWorktree`中提示工作区不干净，向 stdout 输出`Continue upgrade with a dirty worktree? [y/N]: `，从`app.stdin`用`bufio.Reader`读取一行：`y`/`yes`（大小写不敏感、trim）则继续；其它值、空行或 EOF 返回错误且不执行 merge。`force=1`跳过脏检查与确认提示。不强制 TTY：管道可注入`y\n`继续；CI 默认空 stdin 失败，需显式`force=1`。逻辑在 Go`linactl`中实现，Windows/Linux/macOS 一致；不自动 stash/commit。
 
 **Git 操作序列**：确认`git`可用与仓库根 → 解析当前分支 → 安全门禁 → 确保官方 remote 并`git fetch linapro --tags --prune` → 解析目标 ref → 记录 pre-merge`HEAD` →`git merge --no-edit --no-commit <ref>` → 将`apps/lina-plugins`恢复为升级前状态（官方插件变更不进入结果；升级前不存在则丢弃官方引入的该路径）→ 若剔除插件后无差异则`merge --abort`并报告无宿主变更 → 否则`git commit --no-edit`完成合并并提示插件需`plugins.update`单独更新。不自动处理冲突、不 hard reset、不 rebase、不 force-push；不自动执行`db.upgrade`、依赖 tidy 或服务重启。
 

@@ -4,8 +4,11 @@
 package main
 
 import (
+	"bufio"
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"regexp"
 	"strconv"
 	"strings"
@@ -244,7 +247,8 @@ func currentGitBranch(ctx context.Context, a *app) (string, error) {
 	return branch, nil
 }
 
-// ensureCleanWorktree rejects uncommitted changes unless force is set.
+// ensureCleanWorktree rejects uncommitted changes unless force is set or the
+// user interactively confirms continuing with a dirty worktree.
 func ensureCleanWorktree(ctx context.Context, a *app, force bool) error {
 	if force {
 		return nil
@@ -253,10 +257,29 @@ func ensureCleanWorktree(ctx context.Context, a *app, force bool) error {
 	if err != nil {
 		return fmt.Errorf("check worktree status: %w", err)
 	}
-	if strings.TrimSpace(status) != "" {
-		return fmt.Errorf("worktree is not clean; commit or stash changes, or pass force=1 to continue")
+	if strings.TrimSpace(status) == "" {
+		return nil
 	}
-	return nil
+	return confirmDirtyWorktreeContinue(a)
+}
+
+// confirmDirtyWorktreeContinue prompts the operator to continue despite a dirty
+// worktree. Only y/yes (case-insensitive) proceeds; any other answer, empty
+// input, or unreadable stdin aborts the upgrade.
+func confirmDirtyWorktreeContinue(a *app) error {
+	fmt.Fprintln(a.stdout, "Worktree is not clean (uncommitted changes detected).")
+	fmt.Fprint(a.stdout, "Continue upgrade with a dirty worktree? [y/N]: ")
+	line, err := bufio.NewReader(a.stdin).ReadString('\n')
+	if err != nil && !errors.Is(err, io.EOF) {
+		return fmt.Errorf("read dirty worktree confirmation: %w", err)
+	}
+	// EOF with partial line is still usable (e.g. piped "y" without trailing newline).
+	answer := strings.ToLower(strings.TrimSpace(line))
+	if answer == "y" || answer == "yes" {
+		fmt.Fprintln(a.stdout, "Continuing with dirty worktree...")
+		return nil
+	}
+	return fmt.Errorf("worktree is not clean; commit or stash changes, pass force=1, or answer y at the confirmation prompt")
 }
 
 // resolveUpgradeTarget decides whether to merge a tag or a remote branch from

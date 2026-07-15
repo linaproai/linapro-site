@@ -92,7 +92,7 @@ In PowerShell, run it with an explicit current-directory prefix:
 | `p` | `p=linapro-tenant-core` | Selects one plugin for plugin workspace management commands. |
 | `out` | `out=temp/output` | Selects the dynamic plugin artifact output directory. Relative paths resolve from the repository root. |
 | `source` | `source=official` | Selects one configured plugin source for plugin workspace management commands. |
-| `force` | `force=1` | Allows plugin install/update commands to overwrite existing or dirty plugin directories; for `upgrade`, skips the clean-worktree check only. |
+| `force` | `force=1` | Allows plugin install/update commands to overwrite existing or dirty plugin directories; for `upgrade`, skips the clean-worktree check and dirty-worktree confirmation prompt only. |
 | `verbose` | `verbose=1` | Shows child command output for build tasks. |
 
 When `plugins` is omitted, build and dev commands enable plugin-full mode if `apps/lina-plugins` contains plugin manifests. Plugin-full mode generates or refreshes ignored `temp/go.work.plugins` from the host-only root `go.work`, then resolves source-plugin Go modules through `GOWORK`.
@@ -322,12 +322,13 @@ make version to=v0.2.0
 
 `apps/lina-plugins` is **never auto-updated**. The pre-upgrade plugin workspace (submodule pointer or local tree) is preserved after the merge. Update plugins only when you intend to, via `make plugins.update` / `linactl plugins.update`.
 
-The worktree must be clean and HEAD must be on a named branch. Pass `force=1` only to skip the clean-worktree check. Merge conflicts outside plugins are left for manual resolution (`git merge --abort` if you need to cancel).
+HEAD must be on a named branch. A clean worktree is recommended: if uncommitted changes exist, the command prompts for confirmation — type `y` (or `yes`) to continue, any other answer to abort. Pass `force=1` to skip the prompt non-interactively. Merge conflicts outside plugins are left for manual resolution (`git merge --abort` if you need to cancel).
 
 ```bash
 make upgrade
 make upgrade v=v0.5.0
 make upgrade v=main
+make upgrade force=1
 make.cmd upgrade v=main
 go run . upgrade v=v0.5.0
 ```

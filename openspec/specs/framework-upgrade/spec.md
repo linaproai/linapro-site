@@ -100,20 +100,34 @@ TBD - created by archiving change make-upgrade-framework. Update Purpose after a
 系统 SHALL 在执行 merge 前校验：
 
 1. 当前不处于 detached HEAD
-2. 工作区干净（`git status --porcelain` 无输出），除非显式传入 `force=1` / `force=true`
+2. 工作区干净（`git status --porcelain` 无输出），或用户在交互确认中明确同意在脏工作区继续，或显式传入 `force=1` / `force=true`
 
-系统 MUST NOT 在门禁失败时执行 merge。`force` MUST NOT 跳过 detached HEAD 检查。
+当工作区不干净且未传 `force` 时，系统 MUST：
 
-#### Scenario: 脏工作区默认拒绝
+1. 向标准输出提示工作区不干净；
+2. 请求用户确认是否继续（提示中说明输入 `y` 继续）；
+3. 仅当用户输入 `y` / `yes`（大小写不敏感，忽略首尾空白）时继续后续 fetch/merge；
+4. 其它输入、空输入或读取失败时 MUST 以非零退出码结束，且 MUST NOT 执行 merge。
+
+系统 MUST NOT 在门禁失败时执行 merge。`force` MUST NOT 跳过 detached HEAD 检查。`force=1` 时 MUST 跳过脏工作区检查与确认提示。
+
+#### Scenario: 脏工作区用户确认 y 后继续
 
 - **WHEN** 工作区存在未提交变更且未传 `force`
+- **AND** 用户在确认提示中输入 `y` 或 `yes`
+- **THEN** 系统继续后续 fetch/merge 流程
+
+#### Scenario: 脏工作区用户拒绝或未确认
+
+- **WHEN** 工作区存在未提交变更且未传 `force`
+- **AND** 用户输入非 `y`/`yes` 的内容、空行，或 stdin 无可用输入（如非交互管道）
 - **THEN** 命令失败且不执行 merge
 
 #### Scenario: force 允许脏工作区继续
 
 - **WHEN** 工作区存在未提交变更且传入 `force=1`
 - **AND** 当前位于已命名分支
-- **THEN** 系统跳过脏工作区检查并继续 fetch/merge
+- **THEN** 系统跳过脏工作区检查与确认提示并继续 fetch/merge
 
 #### Scenario: detached HEAD 拒绝
 

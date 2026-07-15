@@ -257,6 +257,51 @@ func TestRunFrameworkUpgradeRejectsDirtyWorktree(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "worktree is not clean") {
 		t.Fatalf("expected dirty worktree error, got %v", err)
 	}
+	if !strings.Contains(stdout.String(), "Continue upgrade with a dirty worktree?") {
+		t.Fatalf("expected dirty worktree confirmation prompt, output:\n%s", stdout.String())
+	}
+}
+
+func TestRunFrameworkUpgradeRejectsDirtyWorktreeOnNo(t *testing.T) {
+	local, cleanup := setupUpgradeRepos(t)
+	defer cleanup()
+
+	writeFile(t, filepath.Join(local, "dirty.txt"), "dirty\n")
+
+	var stdout bytes.Buffer
+	application := newApp(&stdout, &stdout, strings.NewReader("n\n"))
+	application.root = local
+
+	err := runFrameworkUpgrade(context.Background(), application, commandInput{Params: map[string]string{}})
+	if err == nil || !strings.Contains(err.Error(), "worktree is not clean") {
+		t.Fatalf("expected dirty worktree rejection on n, got %v", err)
+	}
+}
+
+func TestRunFrameworkUpgradeDirtyWorktreeConfirmedYes(t *testing.T) {
+	local, cleanup := setupUpgradeRepos(t)
+	defer cleanup()
+
+	writeFile(t, filepath.Join(local, "dirty.txt"), "dirty\n")
+
+	var stdout bytes.Buffer
+	application := newApp(&stdout, &stdout, strings.NewReader("y\n"))
+	application.root = local
+
+	if err := runFrameworkUpgrade(context.Background(), application, commandInput{Params: map[string]string{"v": "v0.5.0"}}); err != nil {
+		t.Fatalf("confirmed dirty upgrade should continue: %v\n%s", err, stdout.String())
+	}
+	if !strings.Contains(stdout.String(), "Continuing with dirty worktree") {
+		t.Fatalf("expected continue message after y confirmation, output:\n%s", stdout.String())
+	}
+	content := readFileString(t, filepath.Join(local, "VERSION"))
+	if strings.TrimSpace(content) != "0.5.0" {
+		t.Fatalf("merged VERSION=%q want 0.5.0", content)
+	}
+	// Untracked dirty file must still be present after upgrade.
+	if _, err := os.Stat(filepath.Join(local, "dirty.txt")); err != nil {
+		t.Fatalf("dirty.txt should remain after confirmed upgrade: %v", err)
+	}
 }
 
 func TestRunFrameworkUpgradeForceAllowsDirtyWorktree(t *testing.T) {
@@ -271,6 +316,10 @@ func TestRunFrameworkUpgradeForceAllowsDirtyWorktree(t *testing.T) {
 
 	if err := runFrameworkUpgrade(context.Background(), application, commandInput{Params: map[string]string{"force": "1", "v": "v0.5.0"}}); err != nil {
 		t.Fatalf("force upgrade should continue: %v\n%s", err, stdout.String())
+	}
+	// force must not wait for interactive confirmation.
+	if strings.Contains(stdout.String(), "Continue upgrade with a dirty worktree?") {
+		t.Fatalf("force=1 must skip confirmation prompt, output:\n%s", stdout.String())
 	}
 }
 
