@@ -35,6 +35,24 @@ type PublisherCreateRes struct {
 	Publisher *MarketplacePublisherItem `json:"publisher" dc:"Created marketplace publisher profile" eg:"{}"`
 }
 
+// PublisherUpdateReq is the request for updating the current operator's marketplace publisher profile.
+type PublisherUpdateReq struct {
+	g.Meta `path:"/market/publishers/{publisherKey}" method:"put" tags:"Plugin Marketplace" summary:"Update marketplace publisher" permission:"market:plugin:publish" dc:"Update the marketplace publisher profile owned by the current operator. The URL path publisher key locates the owned profile; the JSON body publisherKey is the desired key after update and may rename the profile when it differs and remains unique."`
+	// PathPublisherKey is the current key from the URL path used only for ownership lookup.
+	PathPublisherKey string `p:"publisherKey" json:"-" v:"required|length:1,64" dc:"Current publisher key in the URL path used to locate the owned profile" eg:"linapro"`
+	// PublisherKey is the desired key after update from the JSON body.
+	PublisherKey string `json:"publisherKey" v:"required|length:1,64" dc:"Desired publisher key after update; may differ from the path key to rename the profile when the new key is still unique" eg:"linapro"`
+	Name         string `json:"name" v:"required|length:1,128" dc:"Publisher display name shown in marketplace catalog pages" eg:"LinaPro"`
+	Summary      string `json:"summary" v:"length:0,512" dc:"Short publisher summary for marketplace trust and discovery display" eg:"Official LinaPro plugin publisher"`
+	Homepage     string `json:"homepage" v:"length:0,512" dc:"Publisher homepage URL, empty when the publisher does not provide one" eg:"https://linapro.ai"`
+	ContactEmail string `json:"contactEmail" v:"length:0,128" dc:"Publisher contact email used by marketplace reviewers, empty when unavailable" eg:"plugins@linapro.ai"`
+}
+
+// PublisherUpdateRes is the response for updating the current operator's marketplace publisher profile.
+type PublisherUpdateRes struct {
+	Publisher *MarketplacePublisherItem `json:"publisher" dc:"Updated marketplace publisher profile" eg:"{}"`
+}
+
 // PluginCreateReq is the request for creating or updating a marketplace plugin draft.
 type PluginCreateReq struct {
 	g.Meta       `path:"/market/plugins" method:"post" tags:"Plugin Marketplace" summary:"Create marketplace plugin draft" permission:"market:plugin:publish" dc:"Create a marketplace plugin identity draft and bind it to a publisher before release upload. The plugin ID ownership check prevents another publisher from silently taking over an existing marketplace plugin ID."`

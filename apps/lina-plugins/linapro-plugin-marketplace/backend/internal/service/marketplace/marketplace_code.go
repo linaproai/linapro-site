@@ -23,6 +23,12 @@ var (
 		"Marketplace publisher already exists",
 		gcode.CodeInvalidParameter,
 	)
+	// CodeMarketplacePublisherOwnerAlreadyBound reports that the operator already owns one publisher profile.
+	CodeMarketplacePublisherOwnerAlreadyBound = bizerr.MustDefine(
+		"PLUGIN_MARKETPLACE_PUBLISHER_OWNER_ALREADY_BOUND",
+		"Marketplace user already has a publisher profile",
+		gcode.CodeInvalidParameter,
+	)
 	// CodeMarketplacePublisherNotFound reports that the requested publisher does not exist.
 	CodeMarketplacePublisherNotFound = bizerr.MustDefine(
 		"PLUGIN_MARKETPLACE_PUBLISHER_NOT_FOUND",

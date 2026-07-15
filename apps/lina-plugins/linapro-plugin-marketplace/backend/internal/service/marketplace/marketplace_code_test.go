@@ -58,6 +58,7 @@ func marketplaceErrorCodesForTest() []*bizerr.Code {
 	return []*bizerr.Code{
 		CodeMarketplaceInvalidInput,
 		CodeMarketplacePublisherAlreadyExists,
+		CodeMarketplacePublisherOwnerAlreadyBound,
 		CodeMarketplacePublisherNotFound,
 		CodeMarketplacePublisherUnavailable,
 		CodeMarketplacePluginNotFound,

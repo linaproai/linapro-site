@@ -63,11 +63,14 @@ func (s *serviceImpl) UploadSourcePackage(
 			return nil, bizerr.NewCode(CodeMarketplaceSourceKindConflict)
 		}
 	}
-	publisherKey, err := s.resolvePublisherKeyForPlugin(
+	publisherKey, err := s.resolvePublisherKeyForPackageUpload(
 		ctx,
 		in.PublisherKey,
-		scan.manifest.ID,
 		in.OwnerUserID,
+		scan.manifest,
+		marketv1.MarketplacePluginTypeSource,
+		in.Visibility,
+		in.AutoCreate,
 	)
 	if err != nil {
 		return nil, err
@@ -110,7 +113,14 @@ func (s *serviceImpl) UploadSourcePackage(
 		if err = s.replaceReleaseDocuments(ctx, release, scan.docsIndex); err != nil {
 			return err
 		}
-		return s.replaceReleaseRisks(ctx, release, scan.diagnostics)
+		if err = s.replaceReleaseRisks(ctx, release, scan.diagnostics); err != nil {
+			return err
+		}
+		plugin, pluginErr := s.getPluginByID(ctx, scan.manifest.ID)
+		if pluginErr != nil {
+			return pluginErr
+		}
+		return s.touchPluginLatestDraft(ctx, plugin, release)
 	}); err != nil {
 		return nil, err
 	}

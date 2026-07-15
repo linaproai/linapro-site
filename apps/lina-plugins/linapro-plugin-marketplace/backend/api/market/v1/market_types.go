@@ -181,6 +181,7 @@ type MarketplacePublisherItem struct {
 	Summary      string `json:"summary" dc:"Short publisher summary for marketplace trust and discovery display" eg:"Official LinaPro plugin publisher"`
 	Verified     bool   `json:"verified" dc:"Whether the marketplace publisher has been verified by the review authority" eg:"true"`
 	Homepage     string `json:"homepage" dc:"Publisher homepage URL, empty when the publisher does not provide one" eg:"https://linapro.ai"`
+	ContactEmail string `json:"contactEmail" dc:"Publisher contact email used by marketplace reviewers, empty when unavailable" eg:"plugins@linapro.ai"`
 }
 
 // MarketplaceTagItem is the lightweight marketplace category or tag projection.

@@ -7,13 +7,12 @@ import "github.com/gogf/gf/v2/frame/g"
 
 // GitSourceRegisterReq is the request for registering one Git-backed marketplace plugin.
 type GitSourceRegisterReq struct {
-	g.Meta       `path:"/market/plugins/git-sources" method:"post" tags:"Plugin Marketplace" summary:"Register marketplace Git source" permission:"market:plugin:publish" dc:"Register a GitHub or Gitee repository as a marketplace plugin source. The service stores repository coordinates and optional encrypted credentials, discovers version tags as metadata only without cloning full source trees, and creates draft releases for review."`
-	PublisherKey string                `json:"publisherKey" v:"required|length:1,64" dc:"Stable publisher key that owns the marketplace plugin identity" eg:"linapro"`
-	RepoUrl      string                `json:"repoUrl" v:"required|length:1,512" dc:"GitHub or Gitee HTTPS repository URL" eg:"https://github.com/linaproai/linapro-demo-source"`
-	AccessToken  string                `json:"accessToken" v:"length:0,512" dc:"Optional private repository access token stored encrypted by the platform; never returned by later APIs" eg:""`
-	Visibility   MarketplaceVisibility `json:"visibility" d:"public" dc:"Initial visibility policy: public, private, or reserved; defaults to public" eg:"public"`
-	Homepage     string                `json:"homepage" v:"length:0,512" dc:"Optional marketplace homepage override" eg:"https://linapro.ai/plugins/source-demo"`
-	License      string                `json:"license" v:"length:0,64" dc:"Optional license identifier when not discovered from plugin.yaml" eg:"Apache-2.0"`
+	g.Meta       `path:"/market/plugins/git-sources" method:"post" tags:"Plugin Marketplace" summary:"Register marketplace Git source" permission:"market:plugin:publish" dc:"Register a GitHub or Gitee repository as a marketplace plugin source owned by the current publisher. The service stores repository coordinates and optional encrypted credentials, discovers version tags as metadata only without cloning full source trees, and creates private draft releases that stay owner-visible until an explicit publish review is approved."`
+	PublisherKey string `json:"publisherKey" v:"required|length:1,64" dc:"Stable publisher key that owns the marketplace plugin identity" eg:"linapro"`
+	RepoUrl      string `json:"repoUrl" v:"required|length:1,512" dc:"GitHub or Gitee HTTPS repository URL" eg:"https://github.com/linaproai/linapro-demo-source"`
+	AccessToken  string `json:"accessToken" v:"length:0,512" dc:"Optional private repository access token stored encrypted by the platform; never returned by later APIs" eg:""`
+	Homepage     string `json:"homepage" v:"length:0,512" dc:"Optional marketplace homepage override" eg:"https://linapro.ai/plugins/source-demo"`
+	License      string `json:"license" v:"length:0,64" dc:"Optional license identifier when not discovered from plugin.yaml" eg:"Apache-2.0"`
 }
 
 // GitSourceRegisterRes is the response for registering one Git-backed marketplace plugin.

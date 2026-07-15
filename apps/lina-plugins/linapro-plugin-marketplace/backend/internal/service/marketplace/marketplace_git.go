@@ -168,6 +168,8 @@ func (s *serviceImpl) RegisterGitSource(ctx context.Context, in RegisterGitSourc
 		summary = summary[:512]
 	}
 
+	// Git add keeps plugins private/draft until an explicit publish review passes.
+	gitVisibility := marketv1.MarketplaceVisibilityPrivate
 	if existing == nil {
 		id, insertErr := dao.PluginMarketplacePlugin.Ctx(ctx).Data(do.PluginMarketplacePlugin{
 			PublisherId:     publisher.Id,
@@ -177,7 +179,7 @@ func (s *serviceImpl) RegisterGitSource(ctx context.Context, in RegisterGitSourc
 			Description:     normalizeKey(manifest.Description),
 			PluginType:      marketv1.MarketplacePluginTypeSource.String(),
 			MarketStatus:    marketv1.MarketplaceStatusDraft.String(),
-			Visibility:      normalizeVisibility(in.Visibility).String(),
+			Visibility:      gitVisibility.String(),
 			LatestReleaseId: 0,
 			LatestVersion:   "",
 			Homepage:        firstNonEmpty(in.Homepage, manifest.Homepage),
@@ -201,13 +203,17 @@ func (s *serviceImpl) RegisterGitSource(ctx context.Context, in RegisterGitSourc
 			Name:         name,
 			Summary:      summary,
 			Description:  normalizeKey(manifest.Description),
-			Visibility:   normalizeVisibility(in.Visibility).String(),
 			Homepage:     firstNonEmpty(in.Homepage, manifest.Homepage, existing.Homepage),
 			Repository:   repo.CloneURL,
 			License:      firstNonEmpty(in.License, manifest.License, existing.License),
 			SourceKind:   gitSourceKind,
 			RepoUrl:      repo.CloneURL,
 			RepoProvider: repo.Provider.String(),
+		}
+		// Preserve marketplace visibility for already-published plugins; only
+		// force private while the plugin is still a draft add.
+		if marketv1.MarketplaceStatus(existing.MarketStatus) == marketv1.MarketplaceStatusDraft {
+			update.Visibility = gitVisibility.String()
 		}
 		if credentialRef != "" {
 			update.CredentialRef = credentialRef

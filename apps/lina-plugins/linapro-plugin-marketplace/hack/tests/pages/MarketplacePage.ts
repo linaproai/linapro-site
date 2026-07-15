@@ -98,7 +98,10 @@ export class MarketplacePage {
   publishDrawer() {
     return this.page
       .locator('[role="dialog"]:visible, .ant-drawer-content:visible')
-      .filter({ hasText: /发布插件|Publish Plugin|新版本|New Version/u })
+      .filter({
+        hasText:
+          /添加插件|Add Plugin|发布插件|Publish Plugin|新版本|New Version/u,
+      })
       .last();
   }
 
@@ -113,15 +116,6 @@ export class MarketplacePage {
     return this.page
       .locator(".marketplace-review-drawer-content:visible")
       .last();
-  }
-
-  async filterMineByKeyword(keyword: string) {
-    await this.fillField(this.page, /关键词|Keyword/u, keyword);
-    await this.searchGrid(mineTableSelector, "/market/my-plugins");
-  }
-
-  async resetMineFilters() {
-    await this.resetGrid(mineTableSelector, "/market/my-plugins");
   }
 
   async filterAdminByKeyword(keyword: string) {
@@ -171,7 +165,9 @@ export class MarketplacePage {
       .filter({ hasText: title })
       .first();
     const actionColumn = this.page
-      .locator(`${adminTableSelector} .vxe-table--main-wrapper .vxe-header--column`)
+      .locator(
+        `${adminTableSelector} .vxe-table--main-wrapper .vxe-header--column`,
+      )
       .filter({ hasText: /操作|Actions/u })
       .first();
     await expect(column).toBeVisible();
@@ -229,14 +225,93 @@ export class MarketplacePage {
 
   async openPublishDrawer() {
     await this.page
-      .getByRole("button", { name: /发布插件|Publish Plugin/u })
+      .getByRole("button", { name: /添加插件|Add Plugin/u })
       .click();
     await expect(this.publishDrawer()).toBeVisible();
+    await expect(
+      this.publishDrawer()
+        .locator("h2")
+        .filter({
+          hasText: /添加插件|Add Plugin/u,
+        }),
+    ).toBeVisible();
     await expect(
       this.publishDrawer().getByRole("heading", {
         name: /发布者资料|Publisher Profile/u,
       }),
+    ).toHaveCount(0);
+  }
+
+  async openPublisherDrawer() {
+    await this.page
+      .getByRole("button", {
+        name: /登记发布者|编辑发布者|Register Publisher|Edit Publisher/u,
+      })
+      .click();
+    await expect(this.publisherDrawer()).toBeVisible();
+    await expect(
+      this.publisherDrawer().getByRole("heading", {
+        name: /发布者资料|Publisher Profile/u,
+      }),
     ).toBeVisible();
+  }
+
+  publisherDrawer() {
+    return this.page
+      .locator('[role="dialog"]:visible, .ant-drawer-content:visible')
+      .filter({
+        hasText: /登记发布者|编辑发布者|Register Publisher|Edit Publisher/u,
+      })
+      .last();
+  }
+
+  async expectPublisherFormValues(values: {
+    contactEmail?: string;
+    homepage?: string;
+    name: string;
+    publisherKey: string;
+    summary?: string;
+  }) {
+    const drawer = this.publisherDrawer();
+    await expect(
+      this.formItem(drawer, /发布者 Key|Publisher Key/u)
+        .locator("input")
+        .first(),
+    ).toHaveValue(values.publisherKey);
+    await expect(
+      this.formItem(drawer, /发布者名称|Publisher Name/u)
+        .locator("input")
+        .first(),
+    ).toHaveValue(values.name);
+    if (values.homepage !== undefined) {
+      await expect(
+        this.formItem(drawer, /主页|Homepage/u)
+          .locator("input")
+          .first(),
+      ).toHaveValue(values.homepage);
+    }
+    if (values.contactEmail !== undefined) {
+      await expect(
+        this.formItem(drawer, /联系邮箱|Contact Email/u)
+          .locator("input")
+          .first(),
+      ).toHaveValue(values.contactEmail);
+    }
+    if (values.summary !== undefined) {
+      await expect(
+        this.formItem(drawer, /摘要|Summary/u)
+          .locator("textarea")
+          .first(),
+      ).toHaveValue(values.summary);
+    }
+  }
+
+  async expectPublisherKeyEditable() {
+    await expect(
+      this.formItem(this.publisherDrawer(), /发布者 Key|Publisher Key/u)
+        .locator("input")
+        .first(),
+    ).toBeEnabled();
   }
 
   async openNewVersionDrawer(pluginId: string) {
@@ -260,49 +335,91 @@ export class MarketplacePage {
     await expect(this.publishDrawer()).toBeHidden();
   }
 
-  async expectExistingPublisher(label: string) {
-    const publisher = this.publishSection(/发布者资料|Publisher Profile/u)
-      .locator(".ant-select-selection-item")
-      .first();
-    await expect(publisher).toHaveText(label);
+  async closePublisherDrawer() {
+    await this.publisherDrawer().getByRole("button").first().click();
+    await expect(this.publisherDrawer()).toBeHidden();
+  }
+
+  async expectNoMineSearchForm() {
+    await expect(
+      this.page.getByRole("button", { name: /搜\s*索|Search/u }),
+    ).toHaveCount(0);
+    await expect(
+      this.page.getByText(/关键词|Keyword/u, { exact: true }),
+    ).toHaveCount(0);
+  }
+
+  async expectNoRegisterGitToolbarAction() {
+    await expect(
+      this.page.getByRole("button", {
+        name: /登记 Git 源|Register Git Source/u,
+      }),
+    ).toHaveCount(0);
   }
 
   async expectPluginDraftReset() {
-    const section = this.publishSection(/插件草稿|Plugin Draft/u);
+    // Package-add form only keeps distribution mode; upload list must reset.
     await expect(
-      this.formItem(section, /插件 ID|Plugin ID/u)
-        .locator("input")
-        .first(),
-    ).toHaveValue("");
+      this.publishDrawer().locator(".ant-upload-list-item"),
+    ).toHaveCount(0);
     await expect(
-      this.formItem(section, /插件名称|Plugin Name/u)
-        .locator("input")
-        .first(),
-    ).toHaveValue("");
-    await expect(
-      this.formItem(section, /摘要|Summary/u)
-        .locator("textarea")
-        .first(),
-    ).toHaveValue("");
+      this.publishDrawer()
+        .locator("label.ant-radio-button-wrapper-checked")
+        .filter({ hasText: /上传包|Upload Package/u }),
+    ).toBeVisible();
   }
 
-  async expectReleaseTarget(pluginId: string, pluginType: PluginTypeLabel) {
-    const section = this.publishSection(/版本包|Release Package/u);
+  async selectPublishSourceKind(kind: "git" | "upload") {
+    const label =
+      kind === "git" ? /Git 仓库|Git Repository/u : /上传包|Upload Package/u;
+    const radio = this.publishDrawer().getByRole("radio", { name: label });
+    await expect(radio).toBeAttached();
+    // Ant Design button-style radios keep the native input hidden; click the
+    // visible button label wrapper instead of the input itself.
+    const button = this.publishDrawer()
+      .locator("label.ant-radio-button-wrapper")
+      .filter({ hasText: label })
+      .first();
+    if (await button.isVisible().catch(() => false)) {
+      await button.click();
+      return;
+    }
+    await radio.evaluate((element: HTMLInputElement) => {
+      element.click();
+    });
+  }
+
+  async expectAddPluginDrawerLayout() {
     await expect(
-      this.formItem(section, /插件 ID|Plugin ID/u)
-        .locator("input")
-        .first(),
-    ).toHaveValue(pluginId);
+      this.publishDrawer().locator(".mine-add-layout"),
+    ).toBeVisible();
+    await expect(this.publishDrawer().locator(".mine-add-aside")).toBeVisible();
     await expect(
-      this.formItem(section, /类型|Type/u)
-        .locator(".ant-select-selection-item")
-        .first(),
-    ).toHaveText(pluginType);
+      this.publishDrawer()
+        .locator(".mine-drawer-actions")
+        .getByRole("button", { name: /添加插件|Add Plugin/u }),
+    ).toBeVisible();
+    await expect(
+      this.publishDrawer()
+        .locator(".mine-section-header")
+        .getByRole("button", {
+          name: /添加插件|Add Plugin|保存并发现版本|Save and Discover|上传草稿|Upload Draft/u,
+        }),
+    ).toHaveCount(0);
+  }
+
+  async expectReleaseTarget(_pluginId: string, _pluginType: PluginTypeLabel) {
+    await expect(
+      this.publishDrawer().getByRole("heading", {
+        name: /上传压缩包|Upload Package/u,
+      }),
+    ).toBeVisible();
   }
 
   async submitEmptyPluginDraft() {
-    await this.publishSection(/插件草稿|Plugin Draft/u)
-      .getByRole("button", { name: /保存草稿|Save Draft/u })
+    await this.publishDrawer()
+      .locator(".mine-drawer-actions")
+      .getByRole("button", { name: /添加插件|Add Plugin/u })
       .click();
   }
 
@@ -317,79 +434,128 @@ export class MarketplacePage {
     publisherKey: string;
     summary?: string;
   }) {
-    const section = this.publishSection(/发布者资料|Publisher Profile/u);
+    const drawer = this.publisherDrawer();
     await this.fillField(
-      section,
+      drawer,
       /发布者 Key|Publisher Key/u,
       values.publisherKey,
     );
-    await this.fillField(section, /发布者名称|Publisher Name/u, values.name);
+    await this.fillField(drawer, /发布者名称|Publisher Name/u, values.name);
     if (values.homepage) {
-      await this.fillField(section, /主页|Homepage/u, values.homepage);
+      await this.fillField(drawer, /主页|Homepage/u, values.homepage);
     }
     if (values.contactEmail) {
       await this.fillField(
-        section,
+        drawer,
         /联系邮箱|Contact Email/u,
         values.contactEmail,
       );
     }
     if (values.summary) {
-      await this.fillField(section, /摘要|Summary/u, values.summary);
+      await this.fillField(drawer, /摘要|Summary/u, values.summary);
     }
   }
 
   async savePublisher() {
-    await this.publishSection(/发布者资料|Publisher Profile/u)
+    await this.publisherDrawer()
       .getByRole("button", { name: /保存发布者|Save Publisher/u })
       .click();
   }
 
-  async fillPluginDraft(values: {
+  async fillPluginDraft(_values: {
     name: string;
     pluginId: string;
     pluginType: PluginTypeLabel;
     summary: string;
     visibility?: VisibilityLabel;
   }) {
-    const section = this.publishSection(/插件草稿|Plugin Draft/u);
-    await this.fillField(section, /插件 ID|Plugin ID/u, values.pluginId);
-    await this.fillField(section, /插件名称|Plugin Name/u, values.name);
-    await this.selectField(section, /类型|Type/u, values.pluginType);
-    if (values.visibility) {
-      await this.selectField(section, /可见性|Visibility/u, values.visibility);
-    }
-    await this.fillField(section, /摘要|Summary/u, values.summary);
+    // Package-add flow no longer asks for hand-filled plugin basics; keep
+    // compatibility by selecting the upload distribution mode only.
+    await this.selectPublishSourceKind("upload");
   }
 
-  async savePluginDraft() {
-    await this.publishSection(/插件草稿|Plugin Draft/u)
-      .getByRole("button", { name: /保存草稿|Save Draft/u })
+  async fillGitSource(values: {
+    accessToken?: string;
+    repoUrl: string;
+    visibility?: VisibilityLabel;
+  }) {
+    const section = this.publishSection(
+      /添加插件|Add Plugin|插件基本信息|Plugin Basics/u,
+    );
+    await this.selectPublishSourceKind("git");
+    await this.fillField(section, /仓库地址|Repository URL/u, values.repoUrl);
+    if (values.accessToken) {
+      await this.fillField(
+        section,
+        /访问令牌|Access Token/u,
+        values.accessToken,
+      );
+    }
+    // Visibility is no longer selectable on Git add.
+    void values.visibility;
+    await expect(
+      this.publishDrawer()
+        .locator(".ant-form-item:visible")
+        .filter({ hasText: /可见性|Visibility/u }),
+    ).toHaveCount(0);
+  }
+
+  async saveGitSource() {
+    await this.publishDrawer()
+      .locator(".mine-drawer-actions")
+      .getByRole("button", { name: /添加插件|Add Plugin/u })
       .click();
   }
 
-  async fillReleaseUpload(values: { version: string }) {
-    const section = this.publishSection(/版本包|Release Package/u);
-    await this.fillField(section, /版本|Version/u, values.version);
+  async savePluginDraft() {
+    // Compatibility no-op: package add no longer has a separate save-draft step.
+  }
+
+  async fillReleaseUpload(_values: { version: string }) {
+    // Version is parsed from the uploaded package; keep as compatibility no-op.
   }
 
   async setUploadFile(file: Parameters<Locator["setInputFiles"]>[0]) {
-    const input = this.publishSection(/版本包|Release Package/u)
+    const input = this.publishSection(
+      /上传压缩包|Upload Package|版本包|Release Package/u,
+    )
       .locator('input[type="file"]')
       .first();
     await input.setInputFiles(file);
   }
 
   async uploadDraft() {
-    await this.publishSection(/版本包|Release Package/u)
-      .getByRole("button", { name: /上传草稿|Upload Draft/u })
+    await this.publishDrawer()
+      .locator(".mine-drawer-actions")
+      .getByRole("button", {
+        name: /添加插件|Add Plugin|上传草稿|Upload Draft/u,
+      })
       .click();
   }
 
   async submitLatestDraft() {
-    await this.publishSection(/版本包|Release Package/u)
-      .getByRole("button", { name: /提交审核|Submit Review/u })
+    // Publish is now a row action; compatibility no-op for legacy call sites.
+  }
+
+  async publishOwnedPlugin(pluginId: string) {
+    const row = this.mineRow(pluginId);
+    await row.getByRole("button", { name: /更多|More/u }).click();
+    await this.page
+      .locator(".ant-dropdown:visible")
+      .getByText(/发布|Publish/u)
       .click();
+  }
+
+  async delistOwnedPlugin(pluginId: string) {
+    const row = this.mineRow(pluginId);
+    await row.getByRole("button", { name: /更多|More/u }).click();
+    await this.page
+      .locator(".ant-dropdown:visible")
+      .getByText(/下架|Delist/u)
+      .click();
+    const confirm = this.page.locator(".ant-modal:visible").last();
+    await expect(confirm).toBeVisible();
+    await confirm.getByRole("button", { name: /确 定|OK|确定/u }).click();
   }
 
   async inspectReviewRelease(pluginId: string, version: string) {

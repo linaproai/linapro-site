@@ -27,6 +27,7 @@ type RiskType =
 type Visibility = "private" | "public" | "reserved";
 
 type PublisherItem = {
+  contactEmail?: string;
   homepage?: string;
   name: string;
   publisherKey: string;
@@ -181,6 +182,7 @@ const runtimeMessagesByLocale: Record<
 };
 
 const linaPublisher: PublisherItem = {
+  contactEmail: "plugins@linapro.ai",
   homepage: "https://linapro.ai",
   name: "LinaPro",
   publisherKey: "linapro",
@@ -189,6 +191,7 @@ const linaPublisher: PublisherItem = {
 };
 
 const externalPublisher: PublisherItem = {
+  contactEmail: "plugins@example.com",
   homepage: "https://example.com/acme",
   name: "Acme Labs",
   publisherKey: "acme-labs",
@@ -654,16 +657,21 @@ export async function openMarketplaceWorkbench(
   page: Page,
   language?: "English" | "简体中文",
 ) {
-  await page.goto(workspacePath("/dashboard/analytics"), {
+  // Prefer a host shell that exists even when dashboard analytics is disabled
+  // or returns 404 in local environments.
+  await page.goto(workspacePath("/"), {
     waitUntil: "domcontentloaded",
   });
-  await waitForRouteReady(page, 15000);
+  await waitForRouteReady(page, 15_000);
 
   const mainLayout = new MainLayout(page);
   if (language) {
-    await mainLayout.switchLanguage(language);
-    await page.reload({ waitUntil: "domcontentloaded" });
-    await waitForRouteReady(page, 15_000);
+    const languageToggle = page.getByTestId("language-toggle-trigger").first();
+    if (await languageToggle.isVisible().catch(() => false)) {
+      await mainLayout.switchLanguage(language);
+      await page.reload({ waitUntil: "domcontentloaded" });
+      await waitForRouteReady(page, 15_000);
+    }
   }
   return mainLayout;
 }
@@ -851,12 +859,140 @@ async function handleMarketplaceRoute(
     return;
   }
 
+  if (
+    method === "PUT" &&
+    segments.length === 3 &&
+    segments[0] === "market" &&
+    segments[1] === "publishers"
+  ) {
+    const payload = postDataObject(request.postDataJSON());
+    await fulfillData(route, {
+      publisher: {
+        ...linaPublisher,
+        contactEmail:
+          typeof payload.contactEmail === "string"
+            ? payload.contactEmail
+            : linaPublisher.contactEmail,
+        homepage:
+          typeof payload.homepage === "string"
+            ? payload.homepage
+            : linaPublisher.homepage,
+        name:
+          typeof payload.name === "string" ? payload.name : linaPublisher.name,
+        publisherKey:
+          typeof payload.publisherKey === "string"
+            ? payload.publisherKey
+            : (segments[2] ?? linaPublisher.publisherKey),
+        summary:
+          typeof payload.summary === "string"
+            ? payload.summary
+            : linaPublisher.summary,
+      },
+    });
+    return;
+  }
+
   if (method === "POST" && apiPath === "market/plugins") {
     const payload = postDataObject(request.postDataJSON());
     const plugin = pluginFromPayload(payload);
     data.pluginsById.set(plugin.pluginId, plugin);
     await fulfillData(route, { plugin });
     return;
+  }
+
+  if (method === "POST" && apiPath === "market/my-plugins/packages") {
+    const bodyText = request.postData() ?? "";
+    const fileName = multipartFilename(bodyText, "file");
+    const inferredPluginId = pluginIdFromPackageFileName(fileName);
+    const release = releaseFromUpload(inferredPluginId, bodyText);
+    if (!multipartField(bodyText, "version")) {
+      // First add of the E2E private plugin uses v1.0.0; later packages keep
+      // the version encoded in the mock file name when present.
+      release.version = versionFromPackageFileName(fileName) || "v1.0.0";
+    }
+    release.pluginId = inferredPluginId;
+    const existing = data.pluginsById.get(inferredPluginId);
+    const plugin: PluginItem = {
+      description: existing?.description ?? "",
+      downloadCount: existing?.downloadCount ?? 0,
+      latestRelease: cloneRelease(release),
+      latestReviewStatus: release.reviewStatus,
+      latestVersion: release.version,
+      license: existing?.license ?? "",
+      marketStatus: existing?.marketStatus ?? "draft",
+      name: existing?.name ?? inferredPluginId,
+      pluginId: inferredPluginId,
+      pluginType: release.pluginType,
+      publisher: existing?.publisher ?? linaPublisher,
+      riskCounts: existing?.riskCounts ?? { high: 0, info: 0, warning: 0 },
+      sourceDelivery:
+        release.pluginType === "dynamic"
+          ? "dynamic_upload_required"
+          : "source_rebuild_required",
+      summary: existing?.summary ?? "Auto-parsed marketplace package draft.",
+      tagCodes: existing?.tagCodes ?? [],
+      tags: existing?.tags ?? [],
+      updatedAt: mockNow + 60000,
+      visibility: existing?.visibility ?? "private",
+    };
+    data.pluginsById.set(plugin.pluginId, plugin);
+    state.uploadRequests.push({
+      pluginId: release.pluginId,
+      pluginType: release.pluginType,
+      version: release.version,
+    });
+    addRelease(data, release);
+    await fulfillData(route, { plugin, release });
+    return;
+  }
+
+  if (
+    segments.length === 4 &&
+    method === "POST" &&
+    segments[0] === "market" &&
+    segments[1] === "my-plugins" &&
+    segments[3] === "publish"
+  ) {
+    const pluginId = segments[2] ?? "";
+    const plugin = data.pluginsById.get(pluginId);
+    const version = plugin?.latestVersion || "v1.0.0";
+    const release = updateRelease(data, pluginId, version, {
+      reviewStatus: "submitted",
+      submittedAt: mockNow + 60000,
+    });
+    updatePluginLatestRelease(data, release);
+    await fulfillData(route, { release });
+    return;
+  }
+
+  if (
+    segments.length === 4 &&
+    method === "POST" &&
+    segments[0] === "market" &&
+    segments[1] === "my-plugins" &&
+    segments[3] === "delist"
+  ) {
+    const pluginId = segments[2] ?? "";
+    const plugin = data.pluginsById.get(pluginId);
+    if (plugin) {
+      const version = plugin.latestVersion || "v1.0.0";
+      const release = updateRelease(data, pluginId, version, {
+        releaseStatus: "delisted",
+      });
+      data.pluginsById.set(pluginId, {
+        ...plugin,
+        latestRelease: cloneRelease(release),
+        latestReviewStatus: release.reviewStatus,
+        latestVersion: release.version,
+        marketStatus: "delisted",
+        updatedAt: mockNow + 120000,
+        visibility: "private",
+      });
+      await fulfillData(route, {
+        plugin: data.pluginsById.get(pluginId),
+      });
+      return;
+    }
   }
 
   if (
@@ -1576,6 +1712,37 @@ function multipartField(bodyText: string, fieldName: string) {
     "u",
   );
   return bodyText.match(pattern)?.[1]?.trim() ?? "";
+}
+
+function multipartFilename(bodyText: string, fieldName: string) {
+  const pattern = new RegExp(
+    `name="${escapeRegExp(fieldName)}";\\s*filename="([^"]+)"`,
+    "u",
+  );
+  return bodyText.match(pattern)?.[1]?.trim() ?? "";
+}
+
+function pluginIdFromPackageFileName(fileName: string) {
+  const normalized = fileName.trim().toLowerCase();
+  if (normalized.includes("demo-source")) {
+    return sourcePluginId;
+  }
+  if (normalized.includes("demo-dynamic")) {
+    return dynamicPluginId;
+  }
+  if (normalized.includes("e2e-private") || normalized.includes("private")) {
+    return "linapro-e2e-private";
+  }
+  // Default first-add package identity for TC-1b when the buffer name is generic.
+  if (normalized.includes("linapro-demo-source")) {
+    return sourcePluginId;
+  }
+  return "linapro-e2e-private";
+}
+
+function versionFromPackageFileName(fileName: string) {
+  const match = fileName.match(/v\d+\.\d+\.\d+/u);
+  return match?.[0] ?? "";
 }
 
 function postDataObject(value: unknown): Record<string, unknown> {

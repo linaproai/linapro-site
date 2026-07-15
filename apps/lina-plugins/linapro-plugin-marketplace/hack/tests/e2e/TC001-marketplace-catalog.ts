@@ -24,13 +24,13 @@ test.describe("TC-1 marketplace publisher workspace", () => {
     });
     await openMarketplaceWorkbench(page, "简体中文");
 
-    await page.getByText("插件市场", { exact: true }).click();
-    await expect(page.getByText("我的插件", { exact: true })).toBeVisible();
-    await expect(page.getByText("插件列表", { exact: true })).toHaveCount(0);
-    await expect(page.getByText("插件审核", { exact: true })).toHaveCount(0);
-
     const marketplace = new MarketplacePage(page);
     await marketplace.gotoMine();
+    await expect(
+      page.getByText("我的插件", { exact: true }).first(),
+    ).toBeVisible();
+    await expect(page.getByText("插件列表", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("插件审核", { exact: true })).toHaveCount(0);
 
     await expect(
       page.getByText("我的插件", { exact: true }).last(),
@@ -50,6 +50,12 @@ test.describe("TC-1 marketplace publisher workspace", () => {
     await expect(
       marketplace.mineRow(marketplaceExternalPluginId()),
     ).toHaveCount(0);
+    await marketplace.expectNoMineSearchForm();
+    await marketplace.expectNoRegisterGitToolbarAction();
+    await expect(
+      page.getByRole("button", { name: "登记发布者" }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "添加插件" })).toBeVisible();
     await captureMarketplaceScreenshot(page, "mine-first-load");
 
     await page.setViewportSize({ height: 768, width: 1024 });
@@ -109,27 +115,82 @@ test.describe("TC-1 marketplace publisher workspace", () => {
     ).toEqual(pendingBeforeDeniedReview);
     expect(mockState.reviewRequests).toEqual([]);
 
-    await marketplace.filterMineByKeyword("private");
+    await marketplace.openPublisherDrawer();
     await expect(
-      marketplace.mineRow(marketplacePrivatePluginId()),
+      marketplace.publisherDrawer().getByText("发布者 Key"),
     ).toBeVisible();
-    await expect(marketplace.mineRow(marketplaceSourcePluginId())).toHaveCount(
-      0,
-    );
-    await captureMarketplaceScreenshot(page, "mine-visibility-filtered");
+    await marketplace.expectPublisherFormValues({
+      contactEmail: "plugins@linapro.ai",
+      homepage: "https://linapro.ai",
+      name: "LinaPro",
+      publisherKey: "linapro",
+      summary: "Official LinaPro publisher",
+    });
+    await marketplace.expectPublisherKeyEditable();
+    await expect(marketplace.publisherDrawer()).toContainText("编辑发布者");
+    await captureMarketplaceScreenshot(page, "mine-publisher-drawer");
+    await marketplace.closePublisherDrawer();
 
     await marketplace.openPublishDrawer();
-    await marketplace.expectExistingPublisher("LinaPro (linapro)");
-    await marketplace.fillPluginDraft({
-      name: "Reset Probe",
-      pluginId: "linapro-reset-probe",
-      pluginType: "源码插件",
-      summary: "This value must not survive closing the drawer.",
-    });
+    await expect(
+      marketplace.publishDrawer().locator("h2").filter({ hasText: "添加插件" }),
+    ).toBeVisible();
+    await expect(
+      marketplace.publishDrawer().getByText("分发方式"),
+    ).toBeVisible();
+    await expect(
+      marketplace
+        .publishDrawer()
+        .locator("label.ant-radio-button-wrapper")
+        .filter({ hasText: "上传包" }),
+    ).toBeVisible();
+    await expect(
+      marketplace
+        .publishDrawer()
+        .locator("label.ant-radio-button-wrapper")
+        .filter({ hasText: "Git 仓库" }),
+    ).toBeVisible();
+    await expect(
+      marketplace.publishDrawer().getByText("发布者资料"),
+    ).toHaveCount(0);
+    await expect(marketplace.publishDrawer().getByText("可见性")).toHaveCount(
+      0,
+    );
+    await marketplace.expectAddPluginDrawerLayout();
+    await marketplace.setUploadFile(sourceMarketplaceZipUpload());
     await marketplace.closePublishDrawer();
     await marketplace.openPublishDrawer();
-    await marketplace.expectExistingPublisher("LinaPro (linapro)");
     await marketplace.expectPluginDraftReset();
+
+    await marketplace.selectPublishSourceKind("git");
+    await expect(
+      marketplace
+        .publishDrawer()
+        .locator("label")
+        .filter({ hasText: "仓库地址" }),
+    ).toBeVisible();
+    await expect(
+      marketplace
+        .publishDrawer()
+        .locator(".ant-form-item:visible")
+        .filter({ hasText: "插件 ID" }),
+    ).toHaveCount(0);
+    await expect(
+      marketplace
+        .publishDrawer()
+        .locator(".ant-form-item:visible")
+        .filter({ hasText: "可见性" }),
+    ).toHaveCount(0);
+    await expect(
+      marketplace
+        .publishDrawer()
+        .locator(".mine-drawer-actions")
+        .getByRole("button", { name: "添加插件" }),
+    ).toBeVisible();
+    await marketplace.expectAddPluginDrawerLayout();
+    await captureMarketplaceScreenshot(page, "mine-publish-git-mode");
+    await marketplace.selectPublishSourceKind("upload");
+    await marketplace.expectAddPluginDrawerLayout();
 
     const pageErrors: string[] = [];
     const consoleErrors: string[] = [];
@@ -140,14 +201,14 @@ test.describe("TC-1 marketplace publisher workspace", () => {
       }
     });
     await marketplace.submitEmptyPluginDraft();
-    await expect(marketplace.validationErrors()).toHaveCount(4);
+    await expect(page.locator(".ant-message-notice").last()).toContainText(
+      /请先选择|ZIP|file/i,
+    );
     expect(pageErrors).toEqual([]);
-    expect(consoleErrors).toHaveLength(1);
-    expect(consoleErrors[0]).toContain("validate error");
     await captureMarketplaceScreenshot(page, "mine-required-validation");
   });
 
-  test("TC-1b: publishers submit new plugins and versions from Mine", async ({
+  test("TC-1b: publishers add packages then publish versions from Mine", async ({
     authenticatedPage,
   }) => {
     const page = authenticatedPage;
@@ -171,33 +232,24 @@ test.describe("TC-1 marketplace publisher workspace", () => {
     });
 
     const pluginId = "linapro-e2e-private";
-    await marketplace.fillPluginDraft({
-      name: "LinaPro E2E Private",
-      pluginId,
-      pluginType: "源码插件",
-      summary: "用于验证发布流程与私有可见性的 E2E 插件。",
-      visibility: "私有",
+    await marketplace.setUploadFile({
+      buffer: Buffer.from("e2e private marketplace zip placeholder"),
+      mimeType: "application/zip",
+      name: "linapro-e2e-private-v1.0.0.zip",
     });
-    await marketplace.savePluginDraft();
-    await expect(page.locator(".ant-message-notice").last()).toContainText(
-      "插件草稿已保存",
-    );
-
-    await marketplace.fillReleaseUpload({ version: "v1.0.0" });
-    await marketplace.setUploadFile(sourceMarketplaceZipUpload());
     await marketplace.uploadDraft();
     await expect(page.locator(".ant-message-notice").last()).toContainText(
-      "版本包已上传",
-    );
-    await marketplace.submitLatestDraft();
-    await expect(page.locator(".ant-message-notice").last()).toContainText(
-      "版本已提交审核",
+      "插件已添加",
     );
     expect(mockState.uploadRequests).toEqual([
       { pluginId, pluginType: "source", version: "v1.0.0" },
     ]);
-    await marketplace.closePublishDrawer();
     await expect(marketplace.mineRow(pluginId)).toContainText("v1.0.0");
+    await expect(marketplace.mineRow(pluginId)).toContainText("草稿");
+    await marketplace.publishOwnedPlugin(pluginId);
+    await expect(page.locator(".ant-message-notice").last()).toContainText(
+      "已提交发布审核",
+    );
     await expect(marketplace.mineRow(pluginId)).toContainText("已提交");
     await captureMarketplaceScreenshot(page, "mine-private-submitted");
 
@@ -206,23 +258,17 @@ test.describe("TC-1 marketplace publisher workspace", () => {
       marketplaceSourcePluginId(),
       "源码插件",
     );
-    await marketplace.fillReleaseUpload({ version: "v1.1.0" });
-    await marketplace.setUploadFile(sourceMarketplaceZipUpload());
+    await marketplace.setUploadFile({
+      ...sourceMarketplaceZipUpload(),
+      name: "linapro-demo-source-v1.1.0.zip",
+    });
     await marketplace.uploadDraft();
     await expect(page.locator(".ant-message-notice").last()).toContainText(
-      "版本包已上传",
+      "插件已添加",
     );
-    await marketplace.submitLatestDraft();
-    await expect(page.locator(".ant-message-notice").last()).toContainText(
-      "版本已提交审核",
-    );
-    await marketplace.closePublishDrawer();
     await expect(
       marketplace.mineRow(marketplaceSourcePluginId()),
     ).toContainText("v1.1.0");
-    await expect(
-      marketplace.mineRow(marketplaceSourcePluginId()),
-    ).toContainText("已提交");
     expect(mockState.uploadRequests).toEqual([
       { pluginId, pluginType: "source", version: "v1.0.0" },
       {

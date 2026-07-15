@@ -234,6 +234,10 @@ func (s *serviceImpl) listPluginsFromIdentityTable(
 	if err != nil {
 		return nil, err
 	}
+	draftReviews, err := s.batchNewestDraftReviewByPluginID(ctx, pluginIDsFromPlugins(rows))
+	if err != nil {
+		return nil, err
+	}
 	tagCodesByPlugin, err := s.batchTagCodesForPluginRecords(ctx, pluginRecordIDsFromPlugins(rows))
 	if err != nil {
 		return nil, err
@@ -276,6 +280,12 @@ func (s *serviceImpl) listPluginsFromIdentityTable(
 			if item.LatestVersion == "" {
 				item.LatestVersion = release.ReleaseVersion
 			}
+		}
+		// Prefer the newest mutable draft/rejected review state for the workbench
+		// so owners can publish new versions without overwriting the published latest.
+		if draft := draftReviews[row.PluginId]; draft != nil {
+			item.LatestReviewStatus = marketv1.MarketplaceReviewStatus(draft.ReviewStatus)
+			item.LatestVersion = draft.ReleaseVersion
 		}
 		items = append(items, item)
 	}
@@ -407,6 +417,74 @@ func latestReleaseIDsFromPlugins(rows []*entity.PluginMarketplacePlugin) []int {
 		ids = append(ids, row.LatestReleaseId)
 	}
 	return ids
+}
+
+func pluginIDsFromPlugins(rows []*entity.PluginMarketplacePlugin) []string {
+	seen := map[string]struct{}{}
+	ids := make([]string, 0, len(rows))
+	for _, row := range rows {
+		if row == nil {
+			continue
+		}
+		pluginID := normalizeKey(row.PluginId)
+		if pluginID == "" {
+			continue
+		}
+		if _, ok := seen[pluginID]; ok {
+			continue
+		}
+		seen[pluginID] = struct{}{}
+		ids = append(ids, pluginID)
+	}
+	return ids
+}
+
+// batchNewestDraftReviewByPluginID loads the newest draft/rejected release for
+// each plugin so My Plugins can surface publishable workbench state.
+func (s *serviceImpl) batchNewestDraftReviewByPluginID(
+	ctx context.Context,
+	pluginIDs []string,
+) (map[string]*entity.PluginMarketplaceRelease, error) {
+	out := make(map[string]*entity.PluginMarketplaceRelease, len(pluginIDs))
+	if len(pluginIDs) == 0 {
+		return out, nil
+	}
+	var rows []*entity.PluginMarketplaceRelease
+	cols := dao.PluginMarketplaceRelease.Columns()
+	if err := dao.PluginMarketplaceRelease.Ctx(ctx).
+		Fields(
+			cols.Id,
+			cols.PluginId,
+			cols.ReleaseVersion,
+			cols.ReleaseStatus,
+			cols.ReviewStatus,
+			cols.UpdatedAt,
+		).
+		WhereIn(cols.PluginId, pluginIDs).
+		Where(cols.ReleaseStatus, marketv1.MarketplaceStatusDraft.String()).
+		WhereIn(cols.ReviewStatus, []string{
+			marketv1.MarketplaceReviewStatusDraft.String(),
+			marketv1.MarketplaceReviewStatusRejected.String(),
+		}).
+		OrderDesc(cols.UpdatedAt).
+		OrderDesc(cols.Id).
+		Scan(&rows); err != nil {
+		return nil, bizerr.WrapCode(err, CodeMarketplaceStorageFailed)
+	}
+	for _, row := range rows {
+		if row == nil {
+			continue
+		}
+		pluginID := normalizeKey(row.PluginId)
+		if pluginID == "" {
+			continue
+		}
+		if _, exists := out[pluginID]; exists {
+			continue
+		}
+		out[pluginID] = row
+	}
+	return out, nil
 }
 
 func pluginRecordIDsFromPlugins(rows []*entity.PluginMarketplacePlugin) []int {

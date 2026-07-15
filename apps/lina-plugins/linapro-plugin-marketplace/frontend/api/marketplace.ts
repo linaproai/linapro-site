@@ -20,6 +20,7 @@ import type {
   MarketplacePublisherCreatePayload,
   MarketplacePublisherItem,
   MarketplacePublisherListParams,
+  MarketplacePublisherUpdatePayload,
   MarketplaceMyPluginListParams,
   MarketplaceReleaseItem,
   MarketplaceReleaseListParams,
@@ -117,6 +118,16 @@ export function marketplacePublisherCreate(
   );
 }
 
+export function marketplacePublisherUpdate(
+  publisherKey: string,
+  data: MarketplacePublisherUpdatePayload,
+) {
+  return requestClient.put<{ publisher: MarketplacePublisherItem }>(
+    marketplacePath(`market/publishers/${encodePathSegment(publisherKey)}`),
+    data,
+  );
+}
+
 export async function marketplacePluginList(
   params?: MarketplacePluginListParams,
 ) {
@@ -176,7 +187,6 @@ export type MarketplaceGitSourceRegisterPayload = {
   license?: string;
   publisherKey: string;
   repoUrl: string;
-  visibility?: string;
 };
 
 export function marketplaceGitSourceRegister(
@@ -185,6 +195,51 @@ export function marketplaceGitSourceRegister(
   return requestClient.post<{ plugin: MarketplacePluginDetailItem }>(
     marketplacePath("market/plugins/git-sources"),
     data,
+  );
+}
+
+export type MarketplacePackageAddParams = {
+  file: File;
+  publisherKey?: string;
+  replaceDraft?: boolean;
+};
+
+export function marketplacePackageAdd(params: MarketplacePackageAddParams) {
+  const formData = new FormData();
+  formData.append("file", params.file, params.file.name);
+  appendString(formData, "publisherKey", params.publisherKey);
+  appendBoolean(formData, "replaceDraft", params.replaceDraft ?? true);
+
+  return requestClient.post<{
+    plugin: MarketplacePluginDetailItem;
+    release: MarketplaceReleaseItem;
+  }>(marketplacePath("market/my-plugins/packages"), formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+    timeout: marketplaceUploadTimeout,
+  });
+}
+
+export function marketplacePluginPublish(
+  pluginId: string,
+  data?: { message?: string; version?: string },
+) {
+  return requestClient.post<{ release: MarketplaceReleaseItem }>(
+    marketplacePath(
+      `market/my-plugins/${encodePathSegment(pluginId)}/publish`,
+    ),
+    data ?? {},
+  );
+}
+
+export function marketplacePluginDelist(
+  pluginId: string,
+  data?: { message?: string },
+) {
+  return requestClient.post<{ plugin: MarketplacePluginDetailItem }>(
+    marketplacePath(`market/my-plugins/${encodePathSegment(pluginId)}/delist`),
+    data ?? {},
   );
 }
 

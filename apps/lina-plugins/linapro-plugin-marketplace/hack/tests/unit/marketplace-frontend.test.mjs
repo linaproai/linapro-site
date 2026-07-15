@@ -104,13 +104,21 @@ describe("marketplace frontend API adapter", () => {
 });
 
 describe("marketplace frontend composition logic", () => {
-  it("builds my-plugin grid params from Vben pagination and trimmed filters", () => {
+  it("builds my-plugin grid with pagination and no default search form", () => {
     const source = readPluginFile("frontend/pages/mine/index.vue");
     assert.match(source, /useVbenVxeGrid<MarketplacePluginListItem>/);
+    assert.match(source, /showSearchForm:\s*false/);
     assert.match(source, /pageNum:\s*page\.currentPage/);
     assert.match(source, /pageSize:\s*page\.pageSize/);
-    assert.match(source, /keyword:\s*trimOptional\(formValues\.keyword\)/);
-    assert.match(source, /return normalized \|\| undefined/);
+    assert.doesNotMatch(
+      source,
+      /keyword:\s*trimOptional\(formValues\.keyword\)/,
+    );
+    assert.match(source, /mine\.actions\.registerPublisher/);
+    assert.doesNotMatch(
+      source,
+      /openGitPublishDrawer|mine\.actions\.registerGit/,
+    );
   });
 
   it("keeps publish workflow on my-plugins and review workflow on review page", () => {
@@ -118,8 +126,21 @@ describe("marketplace frontend composition logic", () => {
     const review = readPluginFile("frontend/pages/review/index.vue");
     assert.match(mine, /useVbenForm/);
     assert.match(mine, /const UploadDragger = Upload\.Dragger/);
-    assert.match(mine, /marketplaceReleaseUpload/);
-    assert.match(mine, /marketplaceReleaseSubmitReview/);
+    assert.match(mine, /marketplacePackageAdd/);
+    assert.match(mine, /marketplacePluginPublish/);
+    assert.match(mine, /marketplacePluginDelist/);
+    assert.match(mine, /marketplaceGitSourceRegister/);
+    assert.match(mine, /publishSourceKind/);
+    assert.match(mine, /PublisherDrawer/);
+    assert.match(mine, /handleAddPackage/);
+    assert.match(mine, /handlePublishDrawerPrimaryAction/);
+    assert.match(mine, /class="mine-drawer-actions"/);
+    assert.match(mine, /marketplacePublisherUpdate/);
+    assert.match(mine, /boundPublisher/);
+    assert.match(mine, /buildPublisherSchema\(\)/);
+    assert.match(mine, /mine\.actions\.add/);
+    assert.doesNotMatch(mine, /mine\.actions\.saveGitSource/);
+    assert.doesNotMatch(mine, /fieldName:\s*"visibility"/);
     assert.match(review, /marketplaceReviewQueueList/);
     assert.match(review, /marketplaceReleaseReview/);
     assert.match(review, /class="marketplace-review-risk-list"/);

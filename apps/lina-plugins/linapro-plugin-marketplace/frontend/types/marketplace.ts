@@ -65,6 +65,7 @@ export interface MarketplaceGridResult<T> {
 }
 
 export interface MarketplacePublisherItem {
+  contactEmail?: string;
   homepage?: string;
   name: string;
   publisherKey: string;
@@ -77,6 +78,14 @@ export interface MarketplacePublisherListParams extends MarketplacePageParams {
 }
 
 export interface MarketplacePublisherCreatePayload {
+  contactEmail?: string;
+  homepage?: string;
+  name: string;
+  publisherKey: string;
+  summary?: string;
+}
+
+export interface MarketplacePublisherUpdatePayload {
   contactEmail?: string;
   homepage?: string;
   name: string;

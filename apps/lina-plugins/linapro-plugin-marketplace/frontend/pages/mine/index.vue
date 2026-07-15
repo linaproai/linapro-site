@@ -9,8 +9,6 @@ export const pluginPageMeta = {
 </script>
 
 <script setup lang="ts">
-import type { VbenFormProps } from "@vben/common-ui";
-
 import type { VbenFormSchema } from "#/adapter/form";
 import type { VxeGridProps } from "#/adapter/vxe-table";
 import type { UploadFile } from "ant-design-vue/es/upload/interface";
@@ -19,7 +17,6 @@ import type {
   MarketplacePluginListItem,
   MarketplacePluginType,
   MarketplacePublisherItem,
-  MarketplaceReleaseItem,
   MarketplaceStatus,
   MarketplaceVisibility,
 } from "../../types/marketplace";
@@ -32,9 +29,11 @@ import { IconifyIcon } from "@vben/icons";
 import { breakpointsTailwind, useBreakpoints } from "@vueuse/core";
 
 import {
+  Alert,
   Dropdown,
   Menu,
   MenuItem,
+  Modal,
   Space,
   Tag,
   Upload,
@@ -50,11 +49,12 @@ import {
   marketplaceGitSourceRegister,
   marketplaceGitSourceSync,
   marketplaceMyPluginList,
-  marketplacePluginCreate,
+  marketplacePackageAdd,
+  marketplacePluginDelist,
+  marketplacePluginPublish,
   marketplacePublisherCreate,
   marketplacePublisherList,
-  marketplaceReleaseSubmitReview,
-  marketplaceReleaseUpload,
+  marketplacePublisherUpdate,
 } from "../../api/marketplace";
 import { marketplaceDetailPath } from "../../utils/routes";
 import MarketplaceDetail from "../detail/index.vue";
@@ -64,15 +64,12 @@ type GridPageInfo = {
   pageSize: number;
 };
 
-type MineFormValues = {
-  keyword?: string;
-  pluginType?: MarketplacePluginType;
-  status?: MarketplaceStatus;
-};
-
 type MineGridOptions = NonNullable<
   VxeGridProps<MarketplacePluginListItem>["gridOptions"]
 >;
+
+type PublishSourceKind = "git" | "upload";
+type PublishMode = "plugin" | "version";
 
 const UploadDragger = Upload.Dragger;
 const route = useRoute();
@@ -84,40 +81,36 @@ const showEmbeddedDetail = computed(
   () =>
     route.query.view === "detail" && typeof route.query.pluginId === "string",
 );
-const publishMode = ref<"plugin" | "version" | "git">("plugin");
+const publishMode = ref<PublishMode>("plugin");
+const publishSourceKind = ref<PublishSourceKind>("upload");
 const publishers = ref<MarketplacePublisherItem[]>([]);
-const pluginDraftReady = ref(false);
+const boundPublisher = ref<MarketplacePublisherItem | null>(null);
 const uploadFileList = ref<UploadFile[]>([]);
-const latestDraftRelease = ref<MarketplaceReleaseItem | null>(null);
-const gitRepoUrl = ref("");
-const gitAccessToken = ref("");
+const versionTarget = ref<MarketplacePluginListItem | null>(null);
 const drawerTitle = computed(() => {
   if (publishMode.value === "version") {
     return t("plugin.linapro-plugin-marketplace.mine.actions.newVersion");
   }
-  if (publishMode.value === "git") {
-    return t("plugin.linapro-plugin-marketplace.mine.actions.registerGit");
-  }
-  return t("plugin.linapro-plugin-marketplace.mine.actions.publish");
+  return t("plugin.linapro-plugin-marketplace.mine.actions.add");
 });
-const hasPublishers = computed(() => publishers.value.length > 0);
-const canSubmitLatestDraft = computed(
-  () => latestDraftRelease.value?.reviewStatus === "draft",
+const publishPrimaryActionLabel = computed(() =>
+  publishMode.value === "version"
+    ? t("plugin.linapro-plugin-marketplace.console.actions.uploadDraft")
+    : t("plugin.linapro-plugin-marketplace.mine.actions.add"),
 );
+const publisherDrawerTitle = computed(() =>
+  boundPublisher.value
+    ? t("plugin.linapro-plugin-marketplace.mine.actions.editPublisher")
+    : t("plugin.linapro-plugin-marketplace.mine.actions.registerPublisher"),
+);
+const hasPublishers = computed(() => publishers.value.length > 0);
 
 function buildCellConfig() {
   return { height: isCompactTable.value ? 84 : 48 };
 }
 
 const [Grid, gridApi] = useVbenVxeGrid<MarketplacePluginListItem>({
-  formOptions: {
-    commonConfig: {
-      componentProps: { allowClear: true },
-      labelWidth: 100,
-    },
-    schema: [],
-    wrapperClass: "grid-cols-1 md:grid-cols-2 lg:grid-cols-3",
-  },
+  showSearchForm: false,
   gridOptions: {
     cellConfig: buildCellConfig(),
     columns: [],
@@ -127,16 +120,10 @@ const [Grid, gridApi] = useVbenVxeGrid<MarketplacePluginListItem>({
     proxyConfig: {
       autoLoad: false,
       ajax: {
-        query: async (
-          { page }: { page: GridPageInfo },
-          formValues: MineFormValues = {},
-        ) => {
+        query: async ({ page }: { page: GridPageInfo }) => {
           return await marketplaceMyPluginList({
-            keyword: trimOptional(formValues.keyword),
             pageNum: page.currentPage,
             pageSize: page.pageSize,
-            pluginType: formValues.pluginType,
-            status: formValues.status,
           });
         },
       },
@@ -156,16 +143,56 @@ const [PublisherForm, publisherFormApi] = useVbenForm({
 
 const [PluginForm, pluginFormApi] = useVbenForm({
   commonConfig: { componentProps: { class: "w-full" }, labelWidth: 132 },
+  handleValuesChange(values) {
+    const nextKind =
+      values.sourceKind === "git" ? "git" : ("upload" as PublishSourceKind);
+    if (publishSourceKind.value !== nextKind) {
+      publishSourceKind.value = nextKind;
+      uploadFileList.value = [];
+    }
+  },
   schema: [],
   showDefaultActions: false,
-  wrapperClass: "grid-cols-1 md:grid-cols-2",
+  wrapperClass: "grid-cols-1",
 });
 
-const [UploadForm, uploadFormApi] = useVbenForm({
-  commonConfig: { componentProps: { class: "w-full" }, labelWidth: 132 },
-  schema: [],
-  showDefaultActions: false,
-  wrapperClass: "grid-cols-1 md:grid-cols-2",
+const [PublisherDrawer, publisherDrawerApi] = useVbenDrawer({
+  destroyOnClose: true,
+  footer: false,
+  async onClosed() {
+    boundPublisher.value = null;
+    await publisherFormApi.resetForm();
+  },
+  async onOpenChange(open) {
+    if (!open) {
+      return;
+    }
+
+    publisherDrawerApi.setState({ loading: true });
+    try {
+      const result = await marketplacePublisherList({
+        pageNum: 1,
+        pageSize: 1,
+      });
+      const existing = result.items[0] ?? null;
+      boundPublisher.value = existing;
+      publisherFormApi.setState({
+        schema: buildPublisherSchema(),
+      });
+      await publisherFormApi.resetForm();
+      if (existing) {
+        await publisherFormApi.setValues({
+          contactEmail: existing.contactEmail || "",
+          homepage: existing.homepage || "",
+          name: existing.name,
+          publisherKey: existing.publisherKey,
+          summary: existing.summary || "",
+        });
+      }
+    } finally {
+      publisherDrawerApi.setState({ loading: false });
+    }
+  },
 });
 
 const [PublishDrawer, publishDrawerApi] = useVbenDrawer({
@@ -181,7 +208,6 @@ const [PublishDrawer, publishDrawerApi] = useVbenDrawer({
 
     publishDrawerApi.setState({ loading: true });
     try {
-      const requestedMode = publishMode.value;
       await resetPublishWorkflow();
       const { row } = publishDrawerApi.getData() as {
         row?: MarketplacePluginListItem;
@@ -189,26 +215,24 @@ const [PublishDrawer, publishDrawerApi] = useVbenDrawer({
 
       if (row) {
         publishMode.value = "version";
-        pluginDraftReady.value = true;
-        uploadFormApi.setState({ schema: buildUploadSchema(true) });
-        await uploadFormApi.setValues({
-          pluginId: row.pluginId,
-          pluginType: row.pluginType,
-        });
+        versionTarget.value = row;
+        publishSourceKind.value = "upload";
         return;
       }
 
-      publishMode.value = requestedMode === "git" ? "git" : "plugin";
+      publishMode.value = "plugin";
+      publishSourceKind.value = "upload";
       const result = await marketplacePublisherList({
         pageNum: 1,
         pageSize: 100,
       });
       publishers.value = result.items;
-      publisherFormApi.setState({
-        schema: buildPublisherSchema(publishers.value),
+      pluginFormApi.setState({
+        schema: buildPluginSchema(publishers.value),
       });
+      await pluginFormApi.setValues({ sourceKind: "upload" });
       if (publishers.value[0]) {
-        await publisherFormApi.setFieldValue(
+        await pluginFormApi.setFieldValue(
           "publisherKey",
           publishers.value[0].publisherKey,
         );
@@ -221,11 +245,6 @@ const [PublishDrawer, publishDrawerApi] = useVbenDrawer({
 
 function t(key: string, params?: Record<string, number | string>) {
   return $t(key, params);
-}
-
-function trimOptional(value?: string) {
-  const normalized = value?.trim();
-  return normalized || undefined;
 }
 
 function requiredString(value: unknown) {
@@ -241,97 +260,6 @@ function requiredString(value: unknown) {
 
 function stringValue(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
-}
-
-function pluginTypeValue(value: unknown): MarketplacePluginType {
-  return value === "dynamic" ? "dynamic" : "source";
-}
-
-function visibilityValue(value: unknown): MarketplaceVisibility {
-  if (value === "private" || value === "reserved") {
-    return value;
-  }
-  return "public";
-}
-
-function booleanValue(value: unknown) {
-  return value === true || value === 1 || value === "1";
-}
-
-function tagCodesValue(value: unknown) {
-  return stringValue(value)
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function buildFormOptions(): VbenFormProps {
-  return {
-    commonConfig: {
-      componentProps: { allowClear: true },
-      labelWidth: 100,
-    },
-    schema: [
-      {
-        component: "Input",
-        fieldName: "keyword",
-        label: t("plugin.linapro-plugin-marketplace.catalog.fields.keyword"),
-      },
-      {
-        component: "Select",
-        componentProps: {
-          options: [
-            {
-              label: t(
-                "plugin.linapro-plugin-marketplace.catalog.pluginType.source",
-              ),
-              value: "source",
-            },
-            {
-              label: t(
-                "plugin.linapro-plugin-marketplace.catalog.pluginType.dynamic",
-              ),
-              value: "dynamic",
-            },
-          ],
-        },
-        fieldName: "pluginType",
-        label: t("plugin.linapro-plugin-marketplace.catalog.fields.pluginType"),
-      },
-      {
-        component: "Select",
-        componentProps: {
-          options: [
-            {
-              label: t("plugin.linapro-plugin-marketplace.detail.status.draft"),
-              value: "draft",
-            },
-            {
-              label: t(
-                "plugin.linapro-plugin-marketplace.detail.status.published",
-              ),
-              value: "published",
-            },
-            {
-              label: t(
-                "plugin.linapro-plugin-marketplace.detail.status.delisted",
-              ),
-              value: "delisted",
-            },
-            {
-              label: t(
-                "plugin.linapro-plugin-marketplace.detail.status.deprecated",
-              ),
-              value: "deprecated",
-            },
-          ],
-        },
-        fieldName: "status",
-        label: t("plugin.linapro-plugin-marketplace.mine.fields.status"),
-      },
-    ],
-    wrapperClass: "grid-cols-1 md:grid-cols-2 lg:grid-cols-3",
-  };
 }
 
 function buildColumns(): MineGridOptions["columns"] {
@@ -370,7 +298,7 @@ function buildColumns(): MineGridOptions["columns"] {
           ? t("plugin.linapro-plugin-marketplace.mine.sourceKind.git")
           : t("plugin.linapro-plugin-marketplace.mine.sourceKind.upload"),
       title: t("plugin.linapro-plugin-marketplace.mine.columns.sourceKind"),
-      width: compact ? 80 : 90,
+      width: compact ? 90 : 100,
     },
     {
       field: "visibility",
@@ -413,28 +341,7 @@ function buildColumns(): MineGridOptions["columns"] {
   ];
 }
 
-function buildPublisherSchema(
-  availablePublishers: MarketplacePublisherItem[],
-): VbenFormSchema[] {
-  if (availablePublishers.length > 0) {
-    return [
-      {
-        component: "Select",
-        componentProps: {
-          optionFilterProp: "label",
-          options: availablePublishers.map((publisher) => ({
-            label: `${publisher.name} (${publisher.publisherKey})`,
-            value: publisher.publisherKey,
-          })),
-          showSearch: true,
-        },
-        fieldName: "publisherKey",
-        label: t("plugin.linapro-plugin-marketplace.catalog.fields.publisher"),
-        rules: "required",
-      },
-    ];
-  }
-
+function buildPublisherSchema(): VbenFormSchema[] {
   return [
     {
       component: "Input",
@@ -468,136 +375,146 @@ function buildPublisherSchema(
   ];
 }
 
-function buildPluginSchema(): VbenFormSchema[] {
+function buildPublisherSelectField(
+  availablePublishers: MarketplacePublisherItem[],
+): VbenFormSchema | null {
+  if (availablePublishers.length <= 1) {
+    return null;
+  }
+  return {
+    component: "Select",
+    componentProps: {
+      optionFilterProp: "label",
+      options: availablePublishers.map((publisher) => ({
+        label: `${publisher.name} (${publisher.publisherKey})`,
+        value: publisher.publisherKey,
+      })),
+      showSearch: true,
+    },
+    fieldName: "publisherKey",
+    formItemClass: "md:col-span-2",
+    label: t("plugin.linapro-plugin-marketplace.catalog.fields.publisher"),
+    rules: "required",
+  };
+}
+
+function buildSourceKindOptions() {
   return [
     {
-      component: "Input",
-      fieldName: "pluginId",
-      label: t("plugin.linapro-plugin-marketplace.detail.fields.pluginId"),
-      rules: "required",
+      label: t("plugin.linapro-plugin-marketplace.mine.sourceKind.upload"),
+      value: "upload",
     },
     {
-      component: "Input",
-      fieldName: "name",
-      label: t("plugin.linapro-plugin-marketplace.console.fields.pluginName"),
-      rules: "required",
-    },
-    {
-      component: "Select",
-      componentProps: {
-        options: [
-          {
-            label: t(
-              "plugin.linapro-plugin-marketplace.catalog.pluginType.source",
-            ),
-            value: "source",
-          },
-          {
-            label: t(
-              "plugin.linapro-plugin-marketplace.catalog.pluginType.dynamic",
-            ),
-            value: "dynamic",
-          },
-        ],
-      },
-      fieldName: "pluginType",
-      label: t("plugin.linapro-plugin-marketplace.catalog.fields.pluginType"),
-      rules: "required",
-    },
-    {
-      component: "Select",
-      componentProps: {
-        options: [
-          {
-            label: t(
-              "plugin.linapro-plugin-marketplace.detail.visibility.public",
-            ),
-            value: "public",
-          },
-          {
-            label: t(
-              "plugin.linapro-plugin-marketplace.detail.visibility.private",
-            ),
-            value: "private",
-          },
-          {
-            label: t(
-              "plugin.linapro-plugin-marketplace.detail.visibility.reserved",
-            ),
-            value: "reserved",
-          },
-        ],
-      },
-      defaultValue: "public",
-      fieldName: "visibility",
-      label: t("plugin.linapro-plugin-marketplace.console.fields.visibility"),
-    },
-    {
-      component: "Textarea",
-      fieldName: "summary",
-      formItemClass: "md:col-span-2",
-      label: t("plugin.linapro-plugin-marketplace.console.fields.summary"),
-      rules: "required",
+      label: t("plugin.linapro-plugin-marketplace.mine.sourceKind.git"),
+      value: "git",
     },
   ];
 }
 
-function buildUploadSchema(lockPluginIdentity = false): VbenFormSchema[] {
+function buildPluginSchema(
+  availablePublishers: MarketplacePublisherItem[],
+): VbenFormSchema[] {
+  const publisherField = buildPublisherSelectField(availablePublishers);
   return [
     {
-      component: "Input",
-      componentProps: { disabled: lockPluginIdentity },
-      fieldName: "pluginId",
-      label: t("plugin.linapro-plugin-marketplace.detail.fields.pluginId"),
-      rules: "required",
-    },
-    {
-      component: "Input",
-      fieldName: "version",
-      label: t("plugin.linapro-plugin-marketplace.detail.columns.version"),
-      rules: "required",
-    },
-    {
-      component: "Select",
+      component: "RadioGroup",
       componentProps: {
-        disabled: lockPluginIdentity,
-        options: [
-          {
-            label: t(
-              "plugin.linapro-plugin-marketplace.catalog.pluginType.source",
-            ),
-            value: "source",
-          },
-          {
-            label: t(
-              "plugin.linapro-plugin-marketplace.catalog.pluginType.dynamic",
-            ),
-            value: "dynamic",
-          },
-        ],
+        buttonStyle: "solid",
+        options: buildSourceKindOptions(),
+        optionType: "button",
       },
-      fieldName: "pluginType",
-      label: t("plugin.linapro-plugin-marketplace.catalog.fields.pluginType"),
+      defaultValue: "upload",
+      fieldName: "sourceKind",
+      formItemClass: "md:col-span-2",
+      label: t("plugin.linapro-plugin-marketplace.mine.fields.sourceKind"),
+      rules: "required",
+    },
+    ...(publisherField ? [publisherField] : []),
+    {
+      component: "Input",
+      componentProps: {
+        placeholder: t(
+          "plugin.linapro-plugin-marketplace.mine.placeholders.repoUrl",
+        ),
+      },
+      dependencies: {
+        show: (values: Record<string, unknown>) => values.sourceKind === "git",
+        triggerFields: ["sourceKind"],
+      },
+      fieldName: "repoUrl",
+      formItemClass: "md:col-span-2",
+      label: t("plugin.linapro-plugin-marketplace.mine.fields.repoUrl"),
       rules: "required",
     },
     {
-      component: "Switch",
-      defaultValue: false,
-      fieldName: "replaceDraft",
-      label: t("plugin.linapro-plugin-marketplace.console.fields.replaceDraft"),
+      component: "Input",
+      componentProps: {
+        autocomplete: "off",
+        placeholder: t(
+          "plugin.linapro-plugin-marketplace.mine.placeholders.accessToken",
+        ),
+        type: "password",
+      },
+      dependencies: {
+        show: (values: Record<string, unknown>) => values.sourceKind === "git",
+        triggerFields: ["sourceKind"],
+      },
+      fieldName: "accessToken",
+      formItemClass: "md:col-span-2",
+      help: t("plugin.linapro-plugin-marketplace.mine.hints.gitDiscover"),
+      label: t("plugin.linapro-plugin-marketplace.mine.fields.accessToken"),
     },
   ];
+}
+
+function canPublishRow(row: MarketplacePluginListItem) {
+  if (
+    row.latestReviewStatus === "submitted" ||
+    row.latestReviewStatus === "reviewing"
+  ) {
+    return false;
+  }
+  if (row.marketStatus === "delisted") {
+    return true;
+  }
+  if (row.marketStatus === "draft") {
+    return Boolean(row.latestVersion);
+  }
+  // Published plugins can publish again when a draft/rejected version is ready.
+  return (
+    row.latestReviewStatus === "draft" || row.latestReviewStatus === "rejected"
+  );
+}
+
+function canDelistRow(row: MarketplacePluginListItem) {
+  return row.marketStatus === "published";
+}
+
+function resolvePublisherKey(
+  values: Record<string, unknown>,
+  availablePublishers: MarketplacePublisherItem[],
+) {
+  const fromForm = stringValue(values.publisherKey);
+  if (fromForm) {
+    return fromForm;
+  }
+  const first = availablePublishers[0]?.publisherKey;
+  if (first) {
+    return first;
+  }
+  message.warning(
+    t("plugin.linapro-plugin-marketplace.mine.messages.publisherRequired"),
+  );
+  throw new Error("validation");
 }
 
 onMounted(async () => {
-  gridApi.setState({ formOptions: buildFormOptions() });
   gridApi.setGridOptions({
     cellConfig: buildCellConfig(),
     columns: buildColumns(),
   });
-  publisherFormApi.setState({ schema: buildPublisherSchema([]) });
-  pluginFormApi.setState({ schema: buildPluginSchema() });
-  uploadFormApi.setState({ schema: buildUploadSchema() });
+  publisherFormApi.setState({ schema: buildPublisherSchema() });
+  pluginFormApi.setState({ schema: buildPluginSchema([]) });
   if (!showEmbeddedDetail.value) {
     await gridApi.reload();
   }
@@ -692,117 +609,96 @@ function handleOpenDetail(row: MarketplacePluginListItem) {
   router.push(marketplaceDetailPath(row.pluginId, "mine"));
 }
 
+function openPublisherDrawer() {
+  publisherDrawerApi.open();
+}
+
 function openPublishDrawer(row?: MarketplacePluginListItem) {
-  if (!row && publishMode.value !== "git") {
-    publishMode.value = "plugin";
-  }
+  publishMode.value = row ? "version" : "plugin";
   publishDrawerApi.setData(row ? { row } : {});
   publishDrawerApi.open();
 }
 
 async function resetPublishWorkflow() {
-  await Promise.all([
-    publisherFormApi.resetForm(),
-    pluginFormApi.resetForm(),
-    uploadFormApi.resetForm(),
-  ]);
+  await pluginFormApi.resetForm();
   publishMode.value = "plugin";
+  publishSourceKind.value = "upload";
   publishers.value = [];
-  pluginDraftReady.value = false;
-  latestDraftRelease.value = null;
+  versionTarget.value = null;
   uploadFileList.value = [];
-  publisherFormApi.setState({ schema: buildPublisherSchema([]) });
-  uploadFormApi.setState({ schema: buildUploadSchema() });
+  pluginFormApi.setState({ schema: buildPluginSchema([]) });
 }
 
-async function handleCreatePublisher() {
-  publishDrawerApi.lock(true);
+async function handleSavePublisher() {
+  publisherDrawerApi.lock(true);
   try {
     const { valid } = await publisherFormApi.validate();
     if (!valid) {
       return;
     }
     const values = await publisherFormApi.getValues();
-    const result = await marketplacePublisherCreate({
+    const publisherKey = requiredString(values.publisherKey);
+    const payload = {
       contactEmail: stringValue(values.contactEmail),
       homepage: stringValue(values.homepage),
       name: requiredString(values.name),
-      publisherKey: requiredString(values.publisherKey),
+      publisherKey,
       summary: stringValue(values.summary),
-    });
+    };
+    const existing = boundPublisher.value;
+    if (existing) {
+      // Path uses the previously bound key; body may rename via publisherKey.
+      await marketplacePublisherUpdate(existing.publisherKey, payload);
+    } else {
+      await marketplacePublisherCreate(payload);
+    }
     message.success({
       content: t(
         "plugin.linapro-plugin-marketplace.console.messages.publisherSaved",
       ),
       key: workflowMessageKey,
     });
-    publishers.value = [result.publisher];
-    publisherFormApi.setState({
-      schema: buildPublisherSchema(publishers.value),
-    });
-    await publisherFormApi.setFieldValue(
-      "publisherKey",
-      result.publisher.publisherKey,
-    );
+    publisherDrawerApi.close();
   } catch {
     // Validation or API errors are shown by form/message handlers.
   } finally {
-    publishDrawerApi.lock(false);
+    publisherDrawerApi.lock(false);
   }
 }
 
-async function handleCreatePluginDraft() {
+async function handleSubmitPluginBasics() {
+  if (!hasPublishers.value) {
+    message.warning(
+      t("plugin.linapro-plugin-marketplace.mine.messages.publisherRequired"),
+    );
+    return;
+  }
+
+  const values = await pluginFormApi.getValues();
+  if (values.sourceKind === "git") {
+    await handleRegisterGitSource();
+    return;
+  }
+  await handleAddPackage();
+}
+
+async function handlePublishDrawerPrimaryAction() {
+  if (publishMode.value === "version") {
+    await handleAddPackage();
+    return;
+  }
+  await handleSubmitPluginBasics();
+}
+
+async function handleAddPackage() {
   publishDrawerApi.lock(true);
   try {
-    const [{ valid: publisherValid }, { valid: pluginValid }] =
-      await Promise.all([
-        publisherFormApi.validate(),
-        pluginFormApi.validate(),
-      ]);
-    if (!publisherValid || !pluginValid) {
+    if (publishMode.value === "plugin" && !hasPublishers.value) {
+      message.warning(
+        t("plugin.linapro-plugin-marketplace.mine.messages.publisherRequired"),
+      );
       return;
     }
-    const [publisherValues, values] = await Promise.all([
-      publisherFormApi.getValues(),
-      pluginFormApi.getValues(),
-    ]);
-    const plugin = await marketplacePluginCreate({
-      description: stringValue(values.description),
-      homepage: stringValue(values.homepage),
-      icon: "",
-      license: stringValue(values.license),
-      name: requiredString(values.name),
-      pluginId: requiredString(values.pluginId),
-      pluginType: pluginTypeValue(values.pluginType),
-      publisherKey: requiredString(publisherValues.publisherKey),
-      repository: stringValue(values.repository),
-      summary: requiredString(values.summary),
-      tagCodes: tagCodesValue(values.tagCodes),
-      visibility: visibilityValue(values.visibility),
-    });
-    message.success({
-      content: t(
-        "plugin.linapro-plugin-marketplace.console.messages.pluginSaved",
-      ),
-      key: workflowMessageKey,
-    });
-    uploadFormApi.setState({ schema: buildUploadSchema(true) });
-    await uploadFormApi.setValues({
-      pluginId: plugin.plugin.pluginId,
-      pluginType: plugin.plugin.pluginType,
-    });
-    pluginDraftReady.value = true;
-    await gridApi.reload();
-  } catch {
-    // Validation or API errors are shown by form/message handlers.
-  } finally {
-    publishDrawerApi.lock(false);
-  }
-}
-
-async function handleUploadDraft() {
-  publishDrawerApi.lock(true);
-  try {
     const uploadFile = uploadFileList.value[0]?.originFileObj as
       | File
       | undefined;
@@ -812,49 +708,26 @@ async function handleUploadDraft() {
       );
       return;
     }
-    const { valid } = await uploadFormApi.validate();
-    if (!valid) {
-      return;
-    }
-    const values = await uploadFormApi.getValues();
-    const result = await marketplaceReleaseUpload({
-      file: uploadFile,
-      pluginId: requiredString(values.pluginId),
-      pluginType: pluginTypeValue(values.pluginType),
-      replaceDraft: booleanValue(values.replaceDraft),
-      version: requiredString(values.version),
-      visibility: "public",
-    });
-    latestDraftRelease.value = result.release;
-    message.success({
-      content: t(
-        "plugin.linapro-plugin-marketplace.console.messages.releaseUploaded",
-      ),
-      key: workflowMessageKey,
-    });
-  } catch {
-    // Validation or API errors are shown by form/message handlers.
-  } finally {
-    publishDrawerApi.lock(false);
-  }
-}
 
-async function handleSubmitLatestDraft() {
-  publishDrawerApi.lock(true);
-  try {
-    const release = latestDraftRelease.value;
-    const values = await uploadFormApi.getValues();
-    const pluginId = release?.pluginId || requiredString(values.pluginId);
-    const version = release?.version || requiredString(values.version);
-    const result = await marketplaceReleaseSubmitReview(pluginId, version, {});
-    latestDraftRelease.value = result.release;
+    let publisherKey = "";
+    if (publishMode.value === "plugin") {
+      const values = await pluginFormApi.getValues();
+      publisherKey = resolvePublisherKey(values, publishers.value);
+    }
+
+    await marketplacePackageAdd({
+      file: uploadFile,
+      publisherKey: publisherKey || undefined,
+      replaceDraft: true,
+    });
     message.success({
       content: t(
-        "plugin.linapro-plugin-marketplace.console.messages.reviewSubmitted",
+        "plugin.linapro-plugin-marketplace.mine.messages.packageAdded",
       ),
       key: workflowMessageKey,
     });
     await gridApi.reload();
+    publishDrawerApi.close();
   } catch {
     // Validation or API errors are shown by form/message handlers.
   } finally {
@@ -865,22 +738,15 @@ async function handleSubmitLatestDraft() {
 async function handleRegisterGitSource() {
   publishDrawerApi.lock(true);
   try {
-    const { valid } = await publisherFormApi.validate();
+    const { valid } = await pluginFormApi.validate();
     if (!valid) {
       return;
     }
-    if (!gitRepoUrl.value.trim()) {
-      message.warning(
-        t("plugin.linapro-plugin-marketplace.console.messages.fieldRequired"),
-      );
-      return;
-    }
-    const publisherValues = await publisherFormApi.getValues();
+    const values = await pluginFormApi.getValues();
     await marketplaceGitSourceRegister({
-      accessToken: gitAccessToken.value.trim() || undefined,
-      publisherKey: requiredString(publisherValues.publisherKey),
-      repoUrl: gitRepoUrl.value.trim(),
-      visibility: "public",
+      accessToken: stringValue(values.accessToken) || undefined,
+      publisherKey: resolvePublisherKey(values, publishers.value),
+      repoUrl: requiredString(values.repoUrl),
     });
     message.success({
       content: t(
@@ -888,8 +754,6 @@ async function handleRegisterGitSource() {
       ),
       key: workflowMessageKey,
     });
-    gitRepoUrl.value = "";
-    gitAccessToken.value = "";
     await gridApi.reload();
     publishDrawerApi.close();
   } catch {
@@ -897,6 +761,34 @@ async function handleRegisterGitSource() {
   } finally {
     publishDrawerApi.lock(false);
   }
+}
+
+async function handlePublishPlugin(row: MarketplacePluginListItem) {
+  try {
+    await marketplacePluginPublish(row.pluginId, {
+      version: row.latestVersion || undefined,
+    });
+    message.success(
+      t("plugin.linapro-plugin-marketplace.mine.messages.publishSubmitted"),
+    );
+    await gridApi.reload();
+  } catch {
+    // API errors are shown by request client handlers.
+  }
+}
+
+async function handleDelistPlugin(row: MarketplacePluginListItem) {
+  Modal.confirm({
+    title: t("plugin.linapro-plugin-marketplace.mine.actions.delist"),
+    content: t("plugin.linapro-plugin-marketplace.mine.confirm.delist"),
+    async onOk() {
+      await marketplacePluginDelist(row.pluginId);
+      message.success(
+        t("plugin.linapro-plugin-marketplace.mine.messages.delisted"),
+      );
+      await gridApi.reload();
+    },
+  });
 }
 
 async function handleSyncGitSource(row: MarketplacePluginListItem) {
@@ -912,11 +804,6 @@ async function handleSyncGitSource(row: MarketplacePluginListItem) {
     // API errors are shown by request client handlers.
   }
 }
-
-function openGitPublishDrawer() {
-  publishMode.value = "git";
-  openPublishDrawer();
-}
 </script>
 
 <template>
@@ -928,11 +815,15 @@ function openGitPublishDrawer() {
     >
       <template #toolbar-tools>
         <Space>
-          <a-button @click="openGitPublishDrawer()">
-            {{ $t("plugin.linapro-plugin-marketplace.mine.actions.registerGit") }}
+          <a-button @click="openPublisherDrawer()">
+            {{
+              $t(
+                "plugin.linapro-plugin-marketplace.mine.actions.registerPublisher",
+              )
+            }}
           </a-button>
           <a-button type="primary" @click="openPublishDrawer()">
-            {{ $t("plugin.linapro-plugin-marketplace.mine.actions.publish") }}
+            {{ $t("plugin.linapro-plugin-marketplace.mine.actions.add") }}
           </a-button>
         </Space>
       </template>
@@ -993,6 +884,24 @@ function openGitPublishDrawer() {
           <Dropdown placement="bottomRight">
             <template #overlay>
               <Menu>
+                <MenuItem
+                  v-if="canPublishRow(row)"
+                  key="publish"
+                  @click="handlePublishPlugin(row)"
+                >
+                  {{
+                    $t("plugin.linapro-plugin-marketplace.mine.actions.publish")
+                  }}
+                </MenuItem>
+                <MenuItem
+                  v-if="canDelistRow(row)"
+                  key="delist"
+                  @click="handleDelistPlugin(row)"
+                >
+                  {{
+                    $t("plugin.linapro-plugin-marketplace.mine.actions.delist")
+                  }}
+                </MenuItem>
                 <MenuItem key="new-version" @click="openPublishDrawer(row)">
                   {{
                     $t(
@@ -1006,9 +915,7 @@ function openGitPublishDrawer() {
                   @click="handleSyncGitSource(row)"
                 >
                   {{
-                    $t(
-                      "plugin.linapro-plugin-marketplace.mine.actions.syncGit",
-                    )
+                    $t("plugin.linapro-plugin-marketplace.mine.actions.syncGit")
                   }}
                 </MenuItem>
               </Menu>
@@ -1021,12 +928,12 @@ function openGitPublishDrawer() {
       </template>
     </Grid>
 
-    <PublishDrawer
-      :title="drawerTitle"
-      class="w-[760px] max-w-[calc(100vw-32px)]"
+    <PublisherDrawer
+      :title="publisherDrawerTitle"
+      class="w-[560px] max-w-[calc(100vw-32px)]"
     >
       <div class="mine-publish-sections">
-        <section v-show="publishMode === 'plugin'">
+        <section>
           <div class="mine-section-header">
             <h3>
               {{
@@ -1035,11 +942,7 @@ function openGitPublishDrawer() {
                 )
               }}
             </h3>
-            <a-button
-              v-if="!hasPublishers"
-              type="primary"
-              @click="handleCreatePublisher"
-            >
+            <a-button type="primary" @click="handleSavePublisher">
               {{
                 $t(
                   "plugin.linapro-plugin-marketplace.console.actions.savePublisher",
@@ -1049,63 +952,133 @@ function openGitPublishDrawer() {
           </div>
           <PublisherForm />
         </section>
+      </div>
+    </PublisherDrawer>
 
-        <section
-          v-show="publishMode === 'plugin' && hasPublishers"
-          class="mine-section-divider"
+    <PublishDrawer
+      :title="drawerTitle"
+      class="w-[760px] max-w-[calc(100vw-32px)]"
+    >
+      <div class="mine-publish-sections">
+        <Alert
+          v-if="publishMode === 'plugin' && !hasPublishers"
+          type="warning"
+          show-icon
+          class="mine-publisher-alert"
+          :message="
+            $t(
+              'plugin.linapro-plugin-marketplace.mine.messages.publisherRequired',
+            )
+          "
         >
-          <div class="mine-section-header">
-            <h3>
+          <template #action>
+            <a-button size="small" type="primary" @click="openPublisherDrawer">
               {{
                 $t(
-                  "plugin.linapro-plugin-marketplace.console.sections.pluginDraft",
-                )
-              }}
-            </h3>
-            <a-button type="primary" @click="handleCreatePluginDraft">
-              {{
-                $t(
-                  "plugin.linapro-plugin-marketplace.console.actions.savePlugin",
+                  "plugin.linapro-plugin-marketplace.mine.actions.registerPublisher",
                 )
               }}
             </a-button>
-          </div>
-          <PluginForm />
-        </section>
+          </template>
+        </Alert>
 
-        <section
-          v-show="publishMode === 'version' || pluginDraftReady"
-          :class="{ 'mine-section-divider': publishMode === 'plugin' }"
-        >
+        <section v-show="publishMode === 'plugin' && hasPublishers">
           <div class="mine-section-header">
             <h3>
               {{
                 $t(
-                  "plugin.linapro-plugin-marketplace.console.sections.releaseUpload",
+                  "plugin.linapro-plugin-marketplace.mine.sections.pluginBasic",
                 )
               }}
             </h3>
-            <Space>
-              <a-button
-                :disabled="!canSubmitLatestDraft"
-                @click="handleSubmitLatestDraft"
-              >
-                {{
-                  $t(
-                    "plugin.linapro-plugin-marketplace.console.actions.submitReview",
-                  )
-                }}
-              </a-button>
-              <a-button type="primary" @click="handleUploadDraft">
-                {{
-                  $t(
-                    "plugin.linapro-plugin-marketplace.console.actions.uploadDraft",
-                  )
-                }}
-              </a-button>
-            </Space>
           </div>
-          <UploadForm />
+          <div class="mine-add-layout">
+            <div class="mine-add-form">
+              <PluginForm />
+            </div>
+            <div class="mine-add-aside">
+              <template v-if="publishSourceKind === 'upload'">
+                <h4 class="mine-add-aside-title">
+                  {{
+                    $t(
+                      "plugin.linapro-plugin-marketplace.mine.sections.packageUpload",
+                    )
+                  }}
+                </h4>
+                <Alert
+                  type="info"
+                  show-icon
+                  class="mine-package-hint"
+                  :message="
+                    $t(
+                      'plugin.linapro-plugin-marketplace.mine.hints.packageAutoParse',
+                    )
+                  "
+                />
+                <UploadDragger
+                  v-model:file-list="uploadFileList"
+                  accept=".zip,.tar.gz,.tgz"
+                  :before-upload="() => false"
+                  :max-count="1"
+                  class="mine-upload"
+                >
+                  <p
+                    class="ant-upload-drag-icon flex items-center justify-center"
+                  >
+                    <IconifyIcon
+                      class="text-primary text-5xl"
+                      icon="ant-design:inbox-outlined"
+                    />
+                  </p>
+                  <p class="ant-upload-text">
+                    {{
+                      $t(
+                        "plugin.linapro-plugin-marketplace.console.upload.dragText",
+                      )
+                    }}
+                  </p>
+                  <p class="ant-upload-hint">
+                    {{
+                      $t(
+                        "plugin.linapro-plugin-marketplace.console.upload.hint",
+                      )
+                    }}
+                  </p>
+                </UploadDragger>
+              </template>
+              <Alert
+                v-else
+                type="info"
+                show-icon
+                class="mine-git-hint"
+                :message="
+                  $t('plugin.linapro-plugin-marketplace.mine.hints.gitDiscover')
+                "
+              />
+            </div>
+          </div>
+        </section>
+
+        <section v-show="publishMode === 'version'">
+          <div class="mine-section-header">
+            <h3>
+              {{
+                $t(
+                  "plugin.linapro-plugin-marketplace.mine.sections.packageUpload",
+                )
+              }}
+            </h3>
+          </div>
+          <Alert
+            type="info"
+            show-icon
+            class="mine-package-hint"
+            :message="
+              $t(
+                'plugin.linapro-plugin-marketplace.mine.hints.packageAutoParse',
+              )
+            "
+          />
           <UploadDragger
             v-model:file-list="uploadFileList"
             accept=".zip,.tar.gz,.tgz"
@@ -1128,107 +1101,25 @@ function openGitPublishDrawer() {
               {{ $t("plugin.linapro-plugin-marketplace.console.upload.hint") }}
             </p>
           </UploadDragger>
-          <div v-if="latestDraftRelease" class="mine-draft-result">
-            <Tag color="processing">
-              {{ latestDraftRelease.version }} /
-              {{ formatReviewStatus(latestDraftRelease.reviewStatus) }}
-            </Tag>
-          </div>
         </section>
 
-        <section
-          v-show="publishMode === 'git'"
-          class="mine-section-divider"
+        <div
+          v-if="
+            publishMode === 'version' ||
+            (publishMode === 'plugin' && hasPublishers)
+          "
+          class="mine-drawer-actions"
         >
-          <div class="mine-section-header">
-            <h3>
-              {{
-                $t(
-                  "plugin.linapro-plugin-marketplace.console.sections.publisher",
-                )
-              }}
-            </h3>
-            <a-button
-              v-if="!hasPublishers"
-              type="primary"
-              @click="handleCreatePublisher"
-            >
-              {{
-                $t(
-                  "plugin.linapro-plugin-marketplace.console.actions.savePublisher",
-                )
-              }}
-            </a-button>
-          </div>
-          <PublisherForm />
-          <div v-if="hasPublishers" class="mine-section-header">
-            <h3>
-              {{
-                $t("plugin.linapro-plugin-marketplace.mine.sections.gitSource")
-              }}
-            </h3>
-            <a-button type="primary" @click="handleRegisterGitSource">
-              {{
-                $t(
-                  "plugin.linapro-plugin-marketplace.mine.actions.saveGitSource",
-                )
-              }}
-            </a-button>
-          </div>
-          <div v-if="hasPublishers" class="mine-git-fields">
-            <label>
-              {{ $t("plugin.linapro-plugin-marketplace.mine.fields.repoUrl") }}
-              <input
-                v-model="gitRepoUrl"
-                class="mine-git-input"
-                type="url"
-                :placeholder="
-                  $t(
-                    'plugin.linapro-plugin-marketplace.mine.placeholders.repoUrl',
-                  )
-                "
-              />
-            </label>
-            <label>
-              {{
-                $t("plugin.linapro-plugin-marketplace.mine.fields.accessToken")
-              }}
-              <input
-                v-model="gitAccessToken"
-                class="mine-git-input"
-                type="password"
-                autocomplete="off"
-                :placeholder="
-                  $t(
-                    'plugin.linapro-plugin-marketplace.mine.placeholders.accessToken',
-                  )
-                "
-              />
-            </label>
-          </div>
-        </section>
+          <a-button type="primary" @click="handlePublishDrawerPrimaryAction">
+            {{ publishPrimaryActionLabel }}
+          </a-button>
+        </div>
       </div>
     </PublishDrawer>
   </Page>
 </template>
 
 <style scoped>
-.mine-git-fields {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.mine-git-input {
-  display: block;
-  width: 100%;
-  margin-top: 4px;
-  padding: 6px 10px;
-  border: 1px solid hsl(var(--border));
-  border-radius: 6px;
-  background: transparent;
-}
-
 .mine-plugin-cell {
   display: flex;
   flex-direction: column;
@@ -1270,9 +1161,12 @@ function openGitPublishDrawer() {
   gap: 20px;
 }
 
-.mine-section-divider {
-  padding-top: 20px;
-  border-top: 1px solid var(--ant-color-border-secondary);
+.mine-package-hint {
+  margin-bottom: 12px;
+}
+
+.mine-git-hint {
+  margin-bottom: 0;
 }
 
 .mine-section-header {
@@ -1288,6 +1182,47 @@ function openGitPublishDrawer() {
   margin: 0;
   font-size: 15px;
   font-weight: 600;
+}
+
+.mine-add-layout {
+  display: grid;
+  gap: 16px;
+}
+
+@media (min-width: 768px) {
+  .mine-add-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 0.9fr);
+    align-items: start;
+  }
+}
+
+.mine-add-form,
+.mine-add-aside {
+  min-width: 0;
+}
+
+.mine-add-aside {
+  padding: 12px;
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: 6px;
+  background: var(--ant-color-fill-quaternary);
+}
+
+.mine-add-aside-title {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.mine-drawer-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 16px;
+  border-top: 1px solid var(--ant-color-border-secondary);
+}
+
+.mine-publisher-alert {
+  margin-bottom: 0;
 }
 
 .mine-upload {

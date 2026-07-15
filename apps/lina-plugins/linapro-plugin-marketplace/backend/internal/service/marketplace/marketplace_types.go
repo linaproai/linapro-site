@@ -35,6 +35,17 @@ type CreatePublisherInput struct {
 	OwnerOrgID   int64  // OwnerOrgID is the owning organization, or 0 when absent.
 }
 
+// UpdatePublisherInput carries mutable publisher profile fields for an owned publisher.
+type UpdatePublisherInput struct {
+	CurrentPublisherKey string // CurrentPublisherKey locates the owned publisher profile before update.
+	PublisherKey        string // PublisherKey is the desired key after update; may rename when unique.
+	Name                string // Name is the publisher display name.
+	Summary             string // Summary is the short marketplace publisher summary.
+	Homepage            string // Homepage is the optional publisher homepage URL.
+	ContactEmail        string // ContactEmail is the optional reviewer contact address.
+	OwnerUserID         int64  // OwnerUserID is the user who must own this publisher profile.
+}
+
 // ListPublishersInput carries publisher list filters for the current operator.
 type ListPublishersInput struct {
 	PageNum     int    // PageNum is the 1-based page number.
@@ -117,6 +128,7 @@ type UploadSourcePackageInput struct {
 	MinHostVersion string                         // MinHostVersion overrides the lower host compatibility bound.
 	MaxHostVersion string                         // MaxHostVersion overrides the upper host compatibility bound.
 	ReplaceDraft   bool                           // ReplaceDraft allows replacing an existing mutable draft.
+	AutoCreate     bool                           // AutoCreate creates a private draft plugin from plugin.yaml when missing.
 }
 
 // UploadDynamicPackageInput carries one uploaded dynamic runtime marketplace package.
@@ -134,6 +146,7 @@ type UploadDynamicPackageInput struct {
 	MinHostVersion string                         // MinHostVersion overrides the lower host compatibility bound.
 	MaxHostVersion string                         // MaxHostVersion overrides the upper host compatibility bound.
 	ReplaceDraft   bool                           // ReplaceDraft allows replacing an existing mutable draft.
+	AutoCreate     bool                           // AutoCreate creates a private draft plugin from plugin.yaml when missing.
 }
 
 // VisibilitySubject carries the current caller identity used to inject

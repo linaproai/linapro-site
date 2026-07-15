@@ -24,6 +24,18 @@ func TestCreatePublisherRequiresOwnerUserID(t *testing.T) {
 	}
 }
 
+func TestUpdatePublisherRequiresOwnerUserID(t *testing.T) {
+	service := &serviceImpl{}
+	_, err := service.UpdatePublisher(context.Background(), UpdatePublisherInput{
+		CurrentPublisherKey: "publisher-a",
+		PublisherKey:        "publisher-a",
+		Name:                "Publisher A",
+	})
+	if !bizerr.Is(err, CodeMarketplaceInvalidInput) {
+		t.Fatalf("expected invalid owner error, got %v", err)
+	}
+}
+
 func TestPublisherOwnerFilterAddsOwnerToDatabaseQuery(t *testing.T) {
 	captured := []capturedSelect{}
 	db := newSelectCaptureDB(t)

@@ -17,8 +17,17 @@ type Service interface {
 	// owner. Input zero values are rejected for required identity fields; the
 	// returned record is the persisted publisher projection. It returns
 	// CodeMarketplacePublisherAlreadyExists when the publisher key is already
-	// owned and wraps storage failures with CodeMarketplaceStorageFailed.
+	// owned, CodeMarketplacePublisherOwnerAlreadyBound when the owner already
+	// has one publisher profile, and wraps storage failures with
+	// CodeMarketplaceStorageFailed.
 	CreatePublisher(ctx context.Context, in CreatePublisherInput) (*PublisherRecord, error)
+
+	// UpdatePublisher updates key, display, and contact fields of a publisher owned
+	// by OwnerUserID. CurrentPublisherKey locates the profile; PublisherKey is the
+	// desired key after update and may rename when the new key is unique. It returns
+	// CodeMarketplacePublisherNotFound when the owned profile does not exist and
+	// CodeMarketplacePublisherAlreadyExists when the new key is already taken.
+	UpdatePublisher(ctx context.Context, in UpdatePublisherInput) (*PublisherRecord, error)
 
 	// ListPublishers returns publisher profiles available to the current operator.
 	// When OwnerUserID is positive, only publishers owned by that user are returned.
@@ -146,6 +155,21 @@ type Service interface {
 	// deprecate, or relist actions and mirrors the status to the latest release
 	// when one exists. The returned record is the updated plugin projection.
 	UpdatePluginStatus(ctx context.Context, in UpdatePluginStatusInput) (*PluginRecord, error)
+
+	// AddPluginPackage unpacks one uploaded plugin package, validates directory
+	// structure, parses plugin.yaml identity fields, creates or updates a private
+	// draft plugin owned by OwnerUserID, and stores a draft release without
+	// submitting marketplace review.
+	AddPluginPackage(ctx context.Context, in PackageAddInput) (*PackageAddResult, error)
+
+	// RequestPluginPublish submits one owner-visible plugin release for
+	// marketplace review. Each publish attempt requires administrator approval.
+	// Delisted plugins may re-enter review and remain invisible until approved.
+	RequestPluginPublish(ctx context.Context, in RequestPluginPublishInput) (*ReleaseRecord, error)
+
+	// OwnerDelistPlugin withdraws one owned published plugin from the public
+	// marketplace catalog while keeping it visible in the owner's My Plugins list.
+	OwnerDelistPlugin(ctx context.Context, in OwnerDelistPluginInput) (*PluginRecord, error)
 
 	// RegisterGitSource registers one GitHub/Gitee repository as a marketplace
 	// plugin, stores optional encrypted credentials, and immediately discovers

@@ -402,6 +402,34 @@ func (c *ControllerV1) PublisherCreate(
 	return &marketv1.PublisherCreateRes{Publisher: publisherItemFromRecord(record)}, nil
 }
 
+// PublisherUpdate updates one marketplace publisher profile owned by the current operator.
+func (c *ControllerV1) PublisherUpdate(
+	ctx context.Context,
+	req *marketv1.PublisherUpdateReq,
+) (*marketv1.PublisherUpdateRes, error) {
+	userID, err := c.requireUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	currentKey := req.PathPublisherKey
+	if currentKey == "" {
+		currentKey = req.PublisherKey
+	}
+	record, err := c.marketSvc.UpdatePublisher(ctx, marketplacesvc.UpdatePublisherInput{
+		CurrentPublisherKey: currentKey,
+		PublisherKey:        req.PublisherKey,
+		Name:                req.Name,
+		Summary:             req.Summary,
+		Homepage:            req.Homepage,
+		ContactEmail:        req.ContactEmail,
+		OwnerUserID:         userID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &marketv1.PublisherUpdateRes{Publisher: publisherItemFromRecord(record)}, nil
+}
+
 // PluginCreate creates or updates one marketplace plugin identity draft.
 func (c *ControllerV1) PluginCreate(
 	ctx context.Context,
@@ -557,6 +585,92 @@ func (c *ControllerV1) PluginStatusUpdate(
 	return &marketv1.PluginStatusUpdateRes{Plugin: pluginDetailFromRecord(record)}, nil
 }
 
+// PackageAdd uploads one plugin package and creates a private draft identity.
+func (c *ControllerV1) PackageAdd(
+	ctx context.Context,
+	req *marketv1.PackageAddReq,
+) (*marketv1.PackageAddRes, error) {
+	userID, err := c.requireUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	publisherKey := ""
+	if request := g.RequestFromCtx(ctx); request != nil {
+		publisherKey = strings.TrimSpace(request.GetForm("publisherKey").String())
+		if req.PublisherKey == "" {
+			req.PublisherKey = publisherKey
+		}
+		if request.GetForm("replaceDraft").String() != "" {
+			req.ReplaceDraft = request.GetForm("replaceDraft").Bool()
+		}
+	}
+	if publisherKey == "" {
+		publisherKey = strings.TrimSpace(req.PublisherKey)
+	}
+	localPath, fileName, contentType, cleanup, err := saveUploadToTempFile(ctx, "file")
+	if err != nil {
+		return nil, err
+	}
+	defer cleanup()
+
+	result, err := c.marketSvc.AddPluginPackage(ctx, marketplacesvc.PackageAddInput{
+		PublisherKey: publisherKey,
+		OwnerUserID:  userID,
+		PackagePath:  localPath,
+		FileName:     fileName,
+		ContentType:  contentType,
+		ReplaceDraft: req.ReplaceDraft,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &marketv1.PackageAddRes{
+		Plugin:  pluginDetailFromRecord(result.Plugin),
+		Release: releaseItemFromRecords(result.Release, nil),
+	}, nil
+}
+
+// PluginPublish submits one owned plugin for marketplace review.
+func (c *ControllerV1) PluginPublish(
+	ctx context.Context,
+	req *marketv1.PluginPublishReq,
+) (*marketv1.PluginPublishRes, error) {
+	userID, err := c.requireUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	release, err := c.marketSvc.RequestPluginPublish(ctx, marketplacesvc.RequestPluginPublishInput{
+		OwnerUserID: userID,
+		PluginID:    req.PluginId,
+		Version:     req.Version,
+		Message:     req.Message,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &marketv1.PluginPublishRes{Release: releaseItemFromRecords(release, nil)}, nil
+}
+
+// PluginDelist withdraws one owned published plugin from the public catalog.
+func (c *ControllerV1) PluginDelist(
+	ctx context.Context,
+	req *marketv1.PluginDelistReq,
+) (*marketv1.PluginDelistRes, error) {
+	userID, err := c.requireUserID(ctx)
+	if err != nil {
+		return nil, err
+	}
+	record, err := c.marketSvc.OwnerDelistPlugin(ctx, marketplacesvc.OwnerDelistPluginInput{
+		OwnerUserID: userID,
+		PluginID:    req.PluginId,
+		Message:     req.Message,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &marketv1.PluginDelistRes{Plugin: pluginDetailFromRecord(record)}, nil
+}
+
 // GitSourceRegister registers one Git-backed marketplace plugin and discovers tags.
 func (c *ControllerV1) GitSourceRegister(
 	ctx context.Context,
@@ -571,7 +685,7 @@ func (c *ControllerV1) GitSourceRegister(
 		OwnerUserID:  userID,
 		RepoURL:      req.RepoUrl,
 		AccessToken:  req.AccessToken,
-		Visibility:   req.Visibility,
+		Visibility:   marketv1.MarketplaceVisibilityPrivate,
 		Homepage:     req.Homepage,
 		License:      req.License,
 	})

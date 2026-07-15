@@ -155,6 +155,7 @@ func publisherItemFromRecord(record *marketplacesvc.PublisherRecord) *marketv1.M
 		Summary:      record.Summary,
 		Verified:     record.Verified,
 		Homepage:     record.Homepage,
+		ContactEmail: record.ContactEmail,
 	}
 }
 

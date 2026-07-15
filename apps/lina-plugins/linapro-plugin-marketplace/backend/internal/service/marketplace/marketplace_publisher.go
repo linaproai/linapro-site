@@ -52,10 +52,22 @@ func (s *serviceImpl) ListPublishers(ctx context.Context, in ListPublishersInput
 }
 
 // CreatePublisher creates a marketplace publisher profile for a publishing owner.
+// Each owner user may bind at most one publisher profile.
 func (s *serviceImpl) CreatePublisher(ctx context.Context, in CreatePublisherInput) (*PublisherRecord, error) {
 	normalizedKey := normalizeKey(in.PublisherKey)
 	if normalizedKey == "" || normalizeKey(in.Name) == "" || in.OwnerUserID <= 0 {
 		return nil, bizerr.NewCode(CodeMarketplaceInvalidInput)
+	}
+
+	ownedCount, err := applyPublisherOwnerFilter(
+		dao.PluginMarketplacePublisher.Ctx(ctx),
+		in.OwnerUserID,
+	).Count()
+	if err != nil {
+		return nil, bizerr.WrapCode(err, CodeMarketplaceStorageFailed)
+	}
+	if ownedCount > 0 {
+		return nil, bizerr.NewCode(CodeMarketplacePublisherOwnerAlreadyBound)
 	}
 
 	existing, err := s.getPublisherByKey(ctx, normalizedKey)
@@ -81,6 +93,43 @@ func (s *serviceImpl) CreatePublisher(ctx context.Context, in CreatePublisherInp
 		return nil, bizerr.WrapCode(err, CodeMarketplaceStorageFailed)
 	}
 	return s.getPublisherByID(ctx, intID(id))
+}
+
+// UpdatePublisher updates key and mutable fields of a publisher profile owned by the operator.
+func (s *serviceImpl) UpdatePublisher(ctx context.Context, in UpdatePublisherInput) (*PublisherRecord, error) {
+	currentKey := normalizeKey(in.CurrentPublisherKey)
+	nextKey := normalizeKey(in.PublisherKey)
+	if currentKey == "" || nextKey == "" || normalizeKey(in.Name) == "" || in.OwnerUserID <= 0 {
+		return nil, bizerr.NewCode(CodeMarketplaceInvalidInput)
+	}
+	publisher, err := s.requirePublisherOwnedByUser(ctx, currentKey, in.OwnerUserID)
+	if err != nil {
+		return nil, err
+	}
+
+	if nextKey != publisher.PublisherKey {
+		existing, lookupErr := s.getPublisherByKey(ctx, nextKey)
+		if lookupErr != nil {
+			return nil, lookupErr
+		}
+		if existing != nil && existing.Id != publisher.Id {
+			return nil, bizerr.NewCode(CodeMarketplacePublisherAlreadyExists)
+		}
+	}
+
+	if _, err = dao.PluginMarketplacePublisher.Ctx(ctx).
+		Where(dao.PluginMarketplacePublisher.Columns().Id, publisher.Id).
+		Data(do.PluginMarketplacePublisher{
+			PublisherKey: nextKey,
+			Name:         normalizeKey(in.Name),
+			Summary:      normalizeKey(in.Summary),
+			Homepage:     normalizeKey(in.Homepage),
+			ContactEmail: normalizeKey(in.ContactEmail),
+		}).
+		Update(); err != nil {
+		return nil, bizerr.WrapCode(err, CodeMarketplaceStorageFailed)
+	}
+	return s.getPublisherByID(ctx, publisher.Id)
 }
 
 // requirePublisherOwnedByUser returns an active publisher owned by one user.

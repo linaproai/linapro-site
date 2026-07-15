@@ -1192,6 +1192,7 @@ func publisherItemFromEntity(
 		Summary:      row.Summary,
 		Verified:     row.Verified,
 		Homepage:     row.Homepage,
+		ContactEmail: row.ContactEmail,
 	}
 }
 
