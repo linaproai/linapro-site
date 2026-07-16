@@ -185,7 +185,6 @@ const [PublisherDrawer, publisherDrawerApi] = useVbenDrawer({
           contactEmail: existing.contactEmail || "",
           homepage: existing.homepage || "",
           name: existing.name,
-          publisherKey: existing.publisherKey,
           summary: existing.summary || "",
         });
       }
@@ -342,13 +341,8 @@ function buildColumns(): MineGridOptions["columns"] {
 }
 
 function buildPublisherSchema(): VbenFormSchema[] {
+  // publisherKey is an internal stable ID: generated on create, never edited here.
   return [
-    {
-      component: "Input",
-      fieldName: "publisherKey",
-      label: t("plugin.linapro-plugin-marketplace.console.fields.publisherKey"),
-      rules: "required",
-    },
     {
       component: "Input",
       fieldName: "name",
@@ -373,6 +367,14 @@ function buildPublisherSchema(): VbenFormSchema[] {
       label: t("plugin.linapro-plugin-marketplace.console.fields.summary"),
     },
   ];
+}
+
+function generatePublisherKey() {
+  const random =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID().replaceAll("-", "")
+      : `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+  return `pub-${random}`.slice(0, 64);
 }
 
 function buildPublisherSelectField(
@@ -430,6 +432,23 @@ function buildPluginSchema(
       rules: "required",
     },
     ...(publisherField ? [publisherField] : []),
+    // Slot-rendered upload control; keep as form item so the label shares the
+    // same left column as sourceKind instead of sitting in a right-side aside.
+    {
+      component: "Input",
+      dependencies: {
+        show: (values: Record<string, unknown>) =>
+          values.sourceKind === "upload",
+        triggerFields: ["sourceKind"],
+      },
+      fieldName: "packageFile",
+      formItemClass: "mine-package-form-item md:col-span-2",
+      // Tall control stack (hint + dragger): keep label top-aligned with sourceKind.
+      labelClass: "self-start pt-1",
+      label: t(
+        "plugin.linapro-plugin-marketplace.mine.sections.packageUpload",
+      ),
+    },
     {
       component: "Input",
       componentProps: {
@@ -637,7 +656,9 @@ async function handleSavePublisher() {
       return;
     }
     const values = await publisherFormApi.getValues();
-    const publisherKey = requiredString(values.publisherKey);
+    const existing = boundPublisher.value;
+    // Key is not user-editable: create allocates one, update keeps the bound key.
+    const publisherKey = existing?.publisherKey || generatePublisherKey();
     const payload = {
       contactEmail: stringValue(values.contactEmail),
       homepage: stringValue(values.homepage),
@@ -645,12 +666,22 @@ async function handleSavePublisher() {
       publisherKey,
       summary: stringValue(values.summary),
     };
-    const existing = boundPublisher.value;
-    if (existing) {
-      // Path uses the previously bound key; body may rename via publisherKey.
-      await marketplacePublisherUpdate(existing.publisherKey, payload);
-    } else {
-      await marketplacePublisherCreate(payload);
+    const result = existing
+      ? await marketplacePublisherUpdate(existing.publisherKey, payload)
+      : await marketplacePublisherCreate(payload);
+    // Keep the drawer open so the operator can continue editing; sync local
+    // binding so the next save uses update and the title switches to edit.
+    if (result?.publisher) {
+      boundPublisher.value = result.publisher;
+    } else if (!existing) {
+      boundPublisher.value = {
+        contactEmail: payload.contactEmail || "",
+        homepage: payload.homepage || "",
+        name: payload.name,
+        publisherKey: payload.publisherKey,
+        summary: payload.summary || "",
+        verified: false,
+      };
     }
     message.success({
       content: t(
@@ -658,7 +689,6 @@ async function handleSavePublisher() {
       ),
       key: workflowMessageKey,
     });
-    publisherDrawerApi.close();
   } catch {
     // Validation or API errors are shown by form/message handlers.
   } finally {
@@ -992,19 +1022,9 @@ async function handleSyncGitSource(row: MarketplacePluginListItem) {
               }}
             </h3>
           </div>
-          <div class="mine-add-layout">
-            <div class="mine-add-form">
-              <PluginForm />
-            </div>
-            <div class="mine-add-aside">
-              <template v-if="publishSourceKind === 'upload'">
-                <h4 class="mine-add-aside-title">
-                  {{
-                    $t(
-                      "plugin.linapro-plugin-marketplace.mine.sections.packageUpload",
-                    )
-                  }}
-                </h4>
+          <PluginForm>
+            <template #packageFile>
+              <div class="mine-package-field" data-testid="mine-package-field">
                 <Alert
                   type="info"
                   show-icon
@@ -1045,18 +1065,9 @@ async function handleSyncGitSource(row: MarketplacePluginListItem) {
                     }}
                   </p>
                 </UploadDragger>
-              </template>
-              <Alert
-                v-else
-                type="info"
-                show-icon
-                class="mine-git-hint"
-                :message="
-                  $t('plugin.linapro-plugin-marketplace.mine.hints.gitDiscover')
-                "
-              />
-            </div>
-          </div>
+              </div>
+            </template>
+          </PluginForm>
         </section>
 
         <section v-show="publishMode === 'version'">
@@ -1162,10 +1173,6 @@ async function handleSyncGitSource(row: MarketplacePluginListItem) {
 }
 
 .mine-package-hint {
-  margin-bottom: 12px;
-}
-
-.mine-git-hint {
   margin-bottom: 0;
 }
 
@@ -1184,34 +1191,12 @@ async function handleSyncGitSource(row: MarketplacePluginListItem) {
   font-weight: 600;
 }
 
-.mine-add-layout {
-  display: grid;
-  gap: 16px;
-}
-
-@media (min-width: 768px) {
-  .mine-add-layout {
-    grid-template-columns: minmax(0, 1fr) minmax(280px, 0.9fr);
-    align-items: start;
-  }
-}
-
-.mine-add-form,
-.mine-add-aside {
+.mine-package-field {
+  display: flex;
+  width: 100%;
   min-width: 0;
-}
-
-.mine-add-aside {
-  padding: 12px;
-  border: 1px solid var(--ant-color-border-secondary);
-  border-radius: 6px;
-  background: var(--ant-color-fill-quaternary);
-}
-
-.mine-add-aside-title {
-  margin: 0 0 12px;
-  font-size: 14px;
-  font-weight: 600;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .mine-drawer-actions {
@@ -1226,7 +1211,7 @@ async function handleSyncGitSource(row: MarketplacePluginListItem) {
 }
 
 .mine-upload {
-  margin-top: 12px;
+  width: 100%;
 }
 
 .mine-draft-result {

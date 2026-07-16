@@ -269,15 +269,11 @@ export class MarketplacePage {
     contactEmail?: string;
     homepage?: string;
     name: string;
-    publisherKey: string;
     summary?: string;
   }) {
     const drawer = this.publisherDrawer();
-    await expect(
-      this.formItem(drawer, /发布者 Key|Publisher Key/u)
-        .locator("input")
-        .first(),
-    ).toHaveValue(values.publisherKey);
+    // Publisher Key is an internal identifier and must not appear in the profile form.
+    await expect(drawer.getByText(/发布者 Key|Publisher Key/u)).toHaveCount(0);
     await expect(
       this.formItem(drawer, /发布者名称|Publisher Name/u)
         .locator("input")
@@ -306,12 +302,10 @@ export class MarketplacePage {
     }
   }
 
-  async expectPublisherKeyEditable() {
+  async expectPublisherKeyHidden() {
     await expect(
-      this.formItem(this.publisherDrawer(), /发布者 Key|Publisher Key/u)
-        .locator("input")
-        .first(),
-    ).toBeEnabled();
+      this.publisherDrawer().getByText(/发布者 Key|Publisher Key/u),
+    ).toHaveCount(0);
   }
 
   async openNewVersionDrawer(pluginId: string) {
@@ -390,22 +384,39 @@ export class MarketplacePage {
   }
 
   async expectAddPluginDrawerLayout() {
+    const drawer = this.publishDrawer();
     await expect(
-      this.publishDrawer().locator(".mine-add-layout"),
+      drawer.getByText(/分发方式|Distribution/u, { exact: true }),
     ).toBeVisible();
-    await expect(this.publishDrawer().locator(".mine-add-aside")).toBeVisible();
     await expect(
-      this.publishDrawer()
+      drawer
         .locator(".mine-drawer-actions")
         .getByRole("button", { name: /添加插件|Add Plugin/u }),
     ).toBeVisible();
     await expect(
-      this.publishDrawer()
-        .locator(".mine-section-header")
-        .getByRole("button", {
-          name: /添加插件|Add Plugin|保存并发现版本|Save and Discover|上传草稿|Upload Draft/u,
-        }),
+      drawer.locator(".mine-section-header").getByRole("button", {
+        name: /添加插件|Add Plugin|保存并发现版本|Save and Discover|上传草稿|Upload Draft/u,
+      }),
     ).toHaveCount(0);
+
+    // Upload mode: package field is a form item aligned with sourceKind, not a
+    // right-side aside panel. Dependencies use v-show, so assert visibility.
+    const uploadChecked = drawer
+      .locator("label.ant-radio-button-wrapper-checked")
+      .filter({ hasText: /上传包|Upload Package/u });
+    const packageField = drawer.getByTestId("mine-package-field");
+    if (await uploadChecked.isVisible().catch(() => false)) {
+      await expect(
+        drawer
+          .locator("label")
+          .filter({ hasText: /上传压缩包|Upload Package/u }),
+      ).toBeVisible();
+      await expect(packageField).toBeVisible();
+      await expect(packageField.locator('input[type="file"]')).toBeAttached();
+      await expect(drawer.locator(".mine-add-aside")).toHaveCount(0);
+    } else {
+      await expect(packageField).toBeHidden();
+    }
   }
 
   async expectReleaseTarget(_pluginId: string, _pluginType: PluginTypeLabel) {
@@ -431,15 +442,9 @@ export class MarketplacePage {
     contactEmail?: string;
     homepage?: string;
     name: string;
-    publisherKey: string;
     summary?: string;
   }) {
     const drawer = this.publisherDrawer();
-    await this.fillField(
-      drawer,
-      /发布者 Key|Publisher Key/u,
-      values.publisherKey,
-    );
     await this.fillField(drawer, /发布者名称|Publisher Name/u, values.name);
     if (values.homepage) {
       await this.fillField(drawer, /主页|Homepage/u, values.homepage);
@@ -516,12 +521,27 @@ export class MarketplacePage {
   }
 
   async setUploadFile(file: Parameters<Locator["setInputFiles"]>[0]) {
-    const input = this.publishSection(
+    const drawer = this.publishDrawer();
+    // Prefer the form-aligned package field (add-plugin), then section heading
+    // (new-version), then any file input in the drawer.
+    const packageFieldInput = drawer
+      .getByTestId("mine-package-field")
+      .locator('input[type="file"]')
+      .first();
+    if ((await packageFieldInput.count()) > 0) {
+      await packageFieldInput.setInputFiles(file);
+      return;
+    }
+    const sectionInput = this.publishSection(
       /上传压缩包|Upload Package|版本包|Release Package/u,
     )
       .locator('input[type="file"]')
       .first();
-    await input.setInputFiles(file);
+    if ((await sectionInput.count()) > 0) {
+      await sectionInput.setInputFiles(file);
+      return;
+    }
+    await drawer.locator('input[type="file"]').first().setInputFiles(file);
   }
 
   async uploadDraft() {

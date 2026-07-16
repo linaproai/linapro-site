@@ -116,17 +116,13 @@ test.describe("TC-1 marketplace publisher workspace", () => {
     expect(mockState.reviewRequests).toEqual([]);
 
     await marketplace.openPublisherDrawer();
-    await expect(
-      marketplace.publisherDrawer().getByText("发布者 Key"),
-    ).toBeVisible();
+    await marketplace.expectPublisherKeyHidden();
     await marketplace.expectPublisherFormValues({
       contactEmail: "plugins@linapro.ai",
       homepage: "https://linapro.ai",
       name: "LinaPro",
-      publisherKey: "linapro",
       summary: "Official LinaPro publisher",
     });
-    await marketplace.expectPublisherKeyEditable();
     await expect(marketplace.publisherDrawer()).toContainText("编辑发布者");
     await captureMarketplaceScreenshot(page, "mine-publisher-drawer");
     await marketplace.closePublisherDrawer();
@@ -157,6 +153,16 @@ test.describe("TC-1 marketplace publisher workspace", () => {
       0,
     );
     await marketplace.expectAddPluginDrawerLayout();
+    // Package upload sits in the same form label column as distribution mode.
+    await expect(
+      marketplace
+        .publishDrawer()
+        .locator("label")
+        .filter({ hasText: "上传压缩包" }),
+    ).toBeVisible();
+    await expect(
+      marketplace.publishDrawer().getByTestId("mine-package-field"),
+    ).toBeVisible();
     await marketplace.setUploadFile(sourceMarketplaceZipUpload());
     await marketplace.closePublishDrawer();
     await marketplace.openPublishDrawer();
@@ -182,6 +188,9 @@ test.describe("TC-1 marketplace publisher workspace", () => {
         .filter({ hasText: "可见性" }),
     ).toHaveCount(0);
     await expect(
+      marketplace.publishDrawer().getByTestId("mine-package-field"),
+    ).toBeHidden();
+    await expect(
       marketplace
         .publishDrawer()
         .locator(".mine-drawer-actions")
@@ -191,6 +200,9 @@ test.describe("TC-1 marketplace publisher workspace", () => {
     await captureMarketplaceScreenshot(page, "mine-publish-git-mode");
     await marketplace.selectPublishSourceKind("upload");
     await marketplace.expectAddPluginDrawerLayout();
+    await expect(
+      marketplace.publishDrawer().getByTestId("mine-package-field"),
+    ).toBeVisible();
 
     const pageErrors: string[] = [];
     const consoleErrors: string[] = [];
