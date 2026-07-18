@@ -140,11 +140,12 @@ func (s *serviceImpl) ListReviewQueue(ctx context.Context, in ListReviewQueueInp
 }
 
 type pluginIdentityListFilter struct {
-	PageNum            int
-	PageSize           int
-	Keyword            string
-	PluginType         marketv1.MarketplacePluginType
-	Status             marketv1.MarketplaceStatus
+	PageNum    int
+	PageSize   int
+	Keyword    string
+	PluginType marketv1.MarketplacePluginType
+	// Status accepts marketplace lifecycle values or process pipeline values.
+	Status             string
 	OwnerUserID        int64
 	PublisherIDs       []int
 	MatchPublisherName bool
@@ -168,8 +169,8 @@ func (s *serviceImpl) listPluginsFromIdentityTable(
 	if pluginType := normalizeKey(in.PluginType.String()); pluginType != "" {
 		model = model.Where(do.PluginMarketplacePlugin{PluginType: pluginType})
 	}
-	if status := normalizeKey(in.Status.String()); status != "" {
-		model = model.Where(do.PluginMarketplacePlugin{MarketStatus: status})
+	if status := normalizeKey(in.Status); status != "" {
+		model = applyPluginListStatusFilter(model, status)
 	}
 	if keyword := normalizeKey(in.Keyword); keyword != "" {
 		like := "%" + keyword + "%"
@@ -205,6 +206,7 @@ func (s *serviceImpl) listPluginsFromIdentityTable(
 			cols.Summary,
 			cols.PluginType,
 			cols.MarketStatus,
+			cols.ProcessStatus,
 			cols.Visibility,
 			cols.LatestReleaseId,
 			cols.LatestVersion,
@@ -257,6 +259,7 @@ func (s *serviceImpl) listPluginsFromIdentityTable(
 			Publisher:       publisherItemFromEntity(publishers[row.PublisherId], "", false),
 			PluginType:      marketv1.MarketplacePluginType(row.PluginType),
 			MarketStatus:    marketv1.MarketplaceStatus(row.MarketStatus),
+			ProcessStatus:   marketv1.MarketplaceProcessStatus(normalizeProcessStatus(row.ProcessStatus)),
 			Visibility:      marketv1.MarketplaceVisibility(row.Visibility),
 			LatestVersion:   row.LatestVersion,
 			TagCodes:        tagCodes,
@@ -310,6 +313,44 @@ func reviewQueueStatuses(requested marketv1.MarketplaceReviewStatus) []string {
 	return []string{
 		marketv1.MarketplaceReviewStatusSubmitted.String(),
 		marketv1.MarketplaceReviewStatusReviewing.String(),
+	}
+}
+
+// classifyPluginListStatusFilter maps a publisher-facing status option to the
+// identity-table column it filters. Process pipeline values filter
+// process_status; marketplace lifecycle values filter market_status.
+func classifyPluginListStatusFilter(status string) (column string, value string, ok bool) {
+	status = normalizeKey(status)
+	switch status {
+	case marketv1.MarketplaceProcessStatusPendingVerify.String(),
+		marketv1.MarketplaceProcessStatusPendingReview.String(),
+		marketv1.MarketplaceProcessStatusCompleted.String(),
+		marketv1.MarketplaceProcessStatusFailed.String():
+		return "process_status", status, true
+	case marketv1.MarketplaceStatusDraft.String(),
+		marketv1.MarketplaceStatusPublished.String(),
+		marketv1.MarketplaceStatusDelisted.String(),
+		marketv1.MarketplaceStatusDeprecated.String():
+		return "market_status", status, true
+	default:
+		return "", "", false
+	}
+}
+
+// applyPluginListStatusFilter applies either marketplace lifecycle status or
+// process pipeline status filters so publisher UI options match list tags.
+func applyPluginListStatusFilter(model *gdb.Model, status string) *gdb.Model {
+	column, value, ok := classifyPluginListStatusFilter(status)
+	if !ok {
+		return model
+	}
+	switch column {
+	case "process_status":
+		return model.Where(do.PluginMarketplacePlugin{ProcessStatus: value})
+	case "market_status":
+		return model.Where(do.PluginMarketplacePlugin{MarketStatus: value})
+	default:
+		return model
 	}
 }
 

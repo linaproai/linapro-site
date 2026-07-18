@@ -65,9 +65,10 @@ func (s *serviceImpl) AddPluginPackage(
 		return nil, err
 	}
 
+	var result *PackageAddResult
 	switch pluginType {
 	case marketv1.MarketplacePluginTypeDynamic:
-		result, uploadErr := s.UploadDynamicPackage(ctx, UploadDynamicPackageInput{
+		uploadResult, uploadErr := s.UploadDynamicPackage(ctx, UploadDynamicPackageInput{
 			PublisherKey: in.PublisherKey,
 			OwnerUserID:  in.OwnerUserID,
 			PackagePath:  in.PackagePath,
@@ -80,13 +81,13 @@ func (s *serviceImpl) AddPluginPackage(
 		if uploadErr != nil {
 			return nil, uploadErr
 		}
-		plugin, getErr := s.getPluginRecordByPluginID(ctx, result.Release.PluginID)
+		plugin, getErr := s.getPluginRecordByPluginID(ctx, uploadResult.Release.PluginID)
 		if getErr != nil {
 			return nil, getErr
 		}
-		return &PackageAddResult{Plugin: plugin, Release: result.Release}, nil
+		result = &PackageAddResult{Plugin: plugin, Release: uploadResult.Release}
 	default:
-		result, uploadErr := s.UploadSourcePackage(ctx, UploadSourcePackageInput{
+		uploadResult, uploadErr := s.UploadSourcePackage(ctx, UploadSourcePackageInput{
 			PublisherKey: in.PublisherKey,
 			OwnerUserID:  in.OwnerUserID,
 			PackagePath:  in.PackagePath,
@@ -99,12 +100,49 @@ func (s *serviceImpl) AddPluginPackage(
 		if uploadErr != nil {
 			return nil, uploadErr
 		}
-		plugin, getErr := s.getPluginRecordByPluginID(ctx, result.Release.PluginID)
+		plugin, getErr := s.getPluginRecordByPluginID(ctx, uploadResult.Release.PluginID)
 		if getErr != nil {
 			return nil, getErr
 		}
-		return &PackageAddResult{Plugin: plugin, Release: result.Release}, nil
+		result = &PackageAddResult{Plugin: plugin, Release: uploadResult.Release}
 	}
+
+	// Package bytes are already on the platform; enter pending_verify for async
+	// validation finalization and automatic review submission.
+	if result != nil && result.Plugin != nil {
+		pluginEntity, getErr := s.getPluginByID(ctx, result.Plugin.PluginID)
+		if getErr != nil {
+			return nil, getErr
+		}
+		var releaseEntity *entity.PluginMarketplaceRelease
+		if result.Release != nil {
+			releaseEntity, getErr = s.getReleaseByPluginVersion(ctx, result.Release.PluginID, result.Release.Version)
+			if getErr != nil {
+				return nil, getErr
+			}
+		}
+		if applyErr := s.applyProcessStatusAfterAdd(
+			ctx,
+			pluginEntity,
+			releaseEntity,
+			marketv1.MarketplaceProcessStatusPendingVerify,
+		); applyErr != nil {
+			return nil, applyErr
+		}
+		refreshed, getErr := s.getPluginRecordByPluginID(ctx, result.Plugin.PluginID)
+		if getErr != nil {
+			return nil, getErr
+		}
+		result.Plugin = refreshed
+		if result.Release != nil {
+			refreshedRelease, releaseErr := s.getReleaseRecordByID(ctx, result.Release.ID)
+			if releaseErr != nil {
+				return nil, releaseErr
+			}
+			result.Release = refreshedRelease
+		}
+	}
+	return result, nil
 }
 
 // RequestPluginPublish submits an owned plugin release for marketplace review.
@@ -157,8 +195,8 @@ func (s *serviceImpl) OwnerDelistPlugin(
 		if _, updateErr := dao.PluginMarketplacePlugin.Ctx(ctx).
 			Where(do.PluginMarketplacePlugin{Id: plugin.Id}).
 			Data(do.PluginMarketplacePlugin{
-				MarketStatus:  marketv1.MarketplaceStatusDelisted.String(),
-				Visibility:    marketv1.MarketplaceVisibilityPrivate.String(),
+				MarketStatus: marketv1.MarketplaceStatusDelisted.String(),
+				Visibility:   marketv1.MarketplaceVisibilityPrivate.String(),
 			}).
 			Update(); updateErr != nil {
 			return bizerr.WrapCode(updateErr, CodeMarketplaceStorageFailed)

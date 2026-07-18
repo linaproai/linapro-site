@@ -14,19 +14,20 @@ import type { VxeGridProps } from "#/adapter/vxe-table";
 import type { UploadFile } from "ant-design-vue/es/upload/interface";
 
 import type {
+  MarketplaceListStatusFilter,
   MarketplacePluginListItem,
   MarketplacePluginType,
+  MarketplaceProcessStatus,
   MarketplacePublisherItem,
   MarketplaceStatus,
   MarketplaceVisibility,
 } from "../../types/marketplace";
 
-import { computed, nextTick, onMounted, ref, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { computed, defineAsyncComponent, onMounted, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 
-import { Page, useVbenDrawer } from "@vben/common-ui";
+import { Page, useVbenDrawer, useVbenModal } from "@vben/common-ui";
 import { IconifyIcon } from "@vben/icons";
-import { breakpointsTailwind, useBreakpoints } from "@vueuse/core";
 
 import {
   Alert,
@@ -36,6 +37,7 @@ import {
   Modal,
   Space,
   Tag,
+  Tooltip,
   Upload,
   message,
 } from "ant-design-vue";
@@ -56,12 +58,16 @@ import {
   marketplacePublisherList,
   marketplacePublisherUpdate,
 } from "../../api/marketplace";
-import { marketplaceDetailPath } from "../../utils/routes";
-import MarketplaceDetail from "../detail/index.vue";
 
 type GridPageInfo = {
   currentPage: number;
   pageSize: number;
+};
+
+type MineFormValues = {
+  keyword?: string;
+  pluginType?: MarketplacePluginType;
+  status?: MarketplaceListStatusFilter;
 };
 
 type MineGridOptions = NonNullable<
@@ -73,14 +79,14 @@ type PublishMode = "plugin" | "version";
 
 const UploadDragger = Upload.Dragger;
 const route = useRoute();
-const router = useRouter();
-const breakpoints = useBreakpoints(breakpointsTailwind);
-const isCompactTable = breakpoints.smaller("xl");
 const workflowMessageKey = "plugin-marketplace-publish-workflow";
-const showEmbeddedDetail = computed(
-  () =>
-    route.query.view === "detail" && typeof route.query.pluginId === "string",
-);
+const mineRowClickIgnoredFields = new Set(["action"]);
+
+const [DetailModal, detailModalApi] = useVbenModal({
+  connectedComponent: defineAsyncComponent(
+    () => import("../detail/detail-modal.vue"),
+  ),
+});
 const publishMode = ref<PublishMode>("plugin");
 const publishSourceKind = ref<PublishSourceKind>("upload");
 const publishers = ref<MarketplacePublisherItem[]>([]);
@@ -105,14 +111,16 @@ const publisherDrawerTitle = computed(() =>
 );
 const hasPublishers = computed(() => publishers.value.length > 0);
 
-function buildCellConfig() {
-  return { height: isCompactTable.value ? 84 : 48 };
-}
-
 const [Grid, gridApi] = useVbenVxeGrid<MarketplacePluginListItem>({
-  showSearchForm: false,
+  formOptions: {
+    commonConfig: {
+      componentProps: { allowClear: true },
+      labelWidth: 80,
+    },
+    schema: [],
+    wrapperClass: "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
+  },
   gridOptions: {
-    cellConfig: buildCellConfig(),
     columns: [],
     height: "auto",
     keepSource: true,
@@ -120,17 +128,40 @@ const [Grid, gridApi] = useVbenVxeGrid<MarketplacePluginListItem>({
     proxyConfig: {
       autoLoad: false,
       ajax: {
-        query: async ({ page }: { page: GridPageInfo }) => {
+        query: async (
+          { page }: { page: GridPageInfo },
+          formValues: MineFormValues = {},
+        ) => {
           return await marketplaceMyPluginList({
+            keyword: trimOptional(formValues.keyword),
             pageNum: page.currentPage,
             pageSize: page.pageSize,
+            pluginType: formValues.pluginType,
+            status: formValues.status,
           });
         },
       },
     },
     rowConfig: { keyField: "pluginId" },
-    showOverflow: "tooltip",
+    rowClassName: "cursor-pointer",
+    showOverflow: "ellipsis",
     id: "plugin-marketplace-mine",
+  },
+  gridEvents: {
+    cellClick: ({
+      $event,
+      column,
+      row,
+    }: {
+      $event?: Event;
+      column?: { field?: string };
+      row: MarketplacePluginListItem;
+    }) => {
+      if (shouldIgnoreMineRowClick(column?.field, $event)) {
+        return;
+      }
+      handleOpenDetail(row);
+    },
   },
 });
 
@@ -261,83 +292,194 @@ function stringValue(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function trimOptional(value?: string) {
+  const normalized = value?.trim();
+  return normalized || undefined;
+}
+
+function buildFormOptions() {
+  return {
+    commonConfig: {
+      componentProps: { allowClear: true },
+      labelWidth: 80,
+    },
+    schema: [
+      {
+        component: "Input",
+        fieldName: "keyword",
+        label: t("plugin.linapro-plugin-marketplace.catalog.fields.keyword"),
+      },
+      {
+        component: "Select",
+        componentProps: {
+          options: [
+            {
+              label: t(
+                "plugin.linapro-plugin-marketplace.catalog.pluginType.source",
+              ),
+              value: "source",
+            },
+            {
+              label: t(
+                "plugin.linapro-plugin-marketplace.catalog.pluginType.dynamic",
+              ),
+              value: "dynamic",
+            },
+          ],
+        },
+        fieldName: "pluginType",
+        label: t("plugin.linapro-plugin-marketplace.catalog.fields.pluginType"),
+      },
+      {
+        component: "Select",
+        componentProps: {
+          // Options match formatMarketStatus() tags: process pipeline first,
+          // then terminal marketplace lifecycle states operators filter by.
+          options: [
+            {
+              label: t(
+                "plugin.linapro-plugin-marketplace.detail.processStatus.pendingVerify",
+              ),
+              value: "pending_verify",
+            },
+            {
+              label: t(
+                "plugin.linapro-plugin-marketplace.detail.processStatus.pendingReview",
+              ),
+              value: "pending_review",
+            },
+            {
+              label: t(
+                "plugin.linapro-plugin-marketplace.detail.status.published",
+              ),
+              value: "published",
+            },
+            {
+              label: t(
+                "plugin.linapro-plugin-marketplace.detail.processStatus.failed",
+              ),
+              value: "failed",
+            },
+            {
+              label: t(
+                "plugin.linapro-plugin-marketplace.detail.status.delisted",
+              ),
+              value: "delisted",
+            },
+            {
+              label: t(
+                "plugin.linapro-plugin-marketplace.detail.status.deprecated",
+              ),
+              value: "deprecated",
+            },
+          ],
+        },
+        fieldName: "status",
+        label: t("plugin.linapro-plugin-marketplace.mine.fields.status"),
+      },
+    ],
+    wrapperClass: "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
+  };
+}
+
 function buildColumns(): MineGridOptions["columns"] {
-  const compact = isCompactTable.value;
+  // Layout mirrors system plugin management: id, name, description, version,
+  // type, status, then operational metadata and a compact action column.
   return [
     {
       align: "left",
       field: "pluginId",
       headerAlign: "center",
-      minWidth: compact ? 175 : 240,
-      slots: { default: "plugin" },
-      title: t("plugin.linapro-plugin-marketplace.catalog.columns.plugin"),
+      minWidth: 200,
+      title: t("plugin.linapro-plugin-marketplace.mine.columns.pluginId"),
     },
-    ...(compact
-      ? []
-      : [
-          {
-            field: "pluginType",
-            slots: { default: "pluginType" },
-            title: t("plugin.linapro-plugin-marketplace.catalog.columns.type"),
-            width: 100,
-          },
-          {
-            field: "marketStatus",
-            slots: { default: "marketStatus" },
-            title: t(
-              "plugin.linapro-plugin-marketplace.mine.columns.marketStatus",
-            ),
-            width: 105,
-          },
-        ]),
     {
-      field: "sourceKind",
-      formatter: ({ cellValue }: { cellValue?: null | string }) =>
-        cellValue === "git"
-          ? t("plugin.linapro-plugin-marketplace.mine.sourceKind.git")
-          : t("plugin.linapro-plugin-marketplace.mine.sourceKind.upload"),
-      title: t("plugin.linapro-plugin-marketplace.mine.columns.sourceKind"),
-      width: compact ? 90 : 100,
+      align: "left",
+      className: "mine-name-column",
+      field: "name",
+      headerAlign: "center",
+      // Wider than the system plugin name column so source-kind tags stay
+      // readable without squeezing long display names.
+      minWidth: 260,
+      showOverflow: false,
+      slots: { default: "name" },
+      title: t("plugin.linapro-plugin-marketplace.mine.columns.name"),
+    },
+    {
+      align: "left",
+      className: "mine-summary-column",
+      field: "summary",
+      headerAlign: "center",
+      minWidth: 220,
+      showOverflow: false,
+      slots: { default: "summary" },
+      title: t("plugin.linapro-plugin-marketplace.mine.columns.summary"),
+    },
+    {
+      field: "latestVersion",
+      showOverflow: false,
+      slots: { default: "latestVersion" },
+      title: t("plugin.linapro-plugin-marketplace.detail.fields.latestVersion"),
+      width: 148,
+    },
+    {
+      field: "downloadCount",
+      formatter: ({ cellValue }: { cellValue?: null | number }) =>
+        String(cellValue ?? 0),
+      title: t("plugin.linapro-plugin-marketplace.catalog.columns.downloads"),
+      width: 100,
+    },
+    {
+      field: "pluginType",
+      slots: { default: "pluginType" },
+      title: t("plugin.linapro-plugin-marketplace.catalog.columns.type"),
+      width: 108,
+    },
+    {
+      field: "marketStatus",
+      slots: { default: "marketStatus" },
+      title: t("plugin.linapro-plugin-marketplace.mine.fields.status"),
+      width: 120,
     },
     {
       field: "visibility",
       slots: { default: "visibility" },
       title: t("plugin.linapro-plugin-marketplace.console.fields.visibility"),
-      width: compact ? 75 : 90,
+      width: 96,
     },
-    {
-      field: "latestVersion",
-      minWidth: compact ? 110 : 105,
-      slots: { default: "latestVersion" },
-      title: t("plugin.linapro-plugin-marketplace.detail.fields.latestVersion"),
-    },
-    ...(compact
-      ? []
-      : [
-          {
-            field: "latestReviewStatus",
-            slots: { default: "reviewStatus" },
-            title: t(
-              "plugin.linapro-plugin-marketplace.detail.columns.reviewStatus",
-            ),
-            width: 105,
-          },
-        ]),
     {
       field: "updatedAt",
       formatter: ({ cellValue }: { cellValue?: null | number | string }) =>
         formatTimestamp(cellValue),
       title: t("plugin.linapro-plugin-marketplace.catalog.columns.updatedAt"),
-      width: compact ? 170 : 180,
+      width: 180,
     },
     {
       field: "action",
       fixed: "right",
       slots: { default: "action" },
       title: t("plugin.linapro-plugin-marketplace.catalog.columns.actions"),
-      width: compact ? 120 : 130,
+      width: 200,
     },
   ];
+}
+
+function shouldIgnoreMineRowClick(
+  columnField?: string,
+  event?: Event,
+): boolean {
+  if (columnField && mineRowClickIgnoredFields.has(columnField)) {
+    return true;
+  }
+  const target = event?.target;
+  if (!(target instanceof Element)) {
+    return false;
+  }
+  return Boolean(
+    target.closest(
+      'button, a, input, textarea, select, .ant-dropdown, .ant-dropdown-menu, [role="button"], [role="menuitem"]',
+    ),
+  );
 }
 
 function buildPublisherSchema(): VbenFormSchema[] {
@@ -487,7 +629,11 @@ function buildPluginSchema(
 }
 
 function canPublishRow(row: MarketplacePluginListItem) {
+  // Async pipeline owns first-time verify/review; manual publish is for
+  // re-submit after failure/rejection or re-listing after delist.
   if (
+    row.processStatus === "pending_verify" ||
+    row.processStatus === "pending_review" ||
     row.latestReviewStatus === "submitted" ||
     row.latestReviewStatus === "reviewing"
   ) {
@@ -495,6 +641,9 @@ function canPublishRow(row: MarketplacePluginListItem) {
   }
   if (row.marketStatus === "delisted") {
     return true;
+  }
+  if (row.processStatus === "failed") {
+    return Boolean(row.latestVersion);
   }
   if (row.marketStatus === "draft") {
     return Boolean(row.latestVersion);
@@ -528,30 +677,20 @@ function resolvePublisherKey(
 }
 
 onMounted(async () => {
-  gridApi.setGridOptions({
-    cellConfig: buildCellConfig(),
-    columns: buildColumns(),
-  });
+  gridApi.setState({ formOptions: buildFormOptions() });
+  gridApi.setGridOptions({ columns: buildColumns() });
   publisherFormApi.setState({ schema: buildPublisherSchema() });
   pluginFormApi.setState({ schema: buildPluginSchema([]) });
-  if (!showEmbeddedDetail.value) {
-    await gridApi.reload();
-  }
+  await gridApi.reload();
+  openDetailFromRouteQuery();
 });
 
-watch(showEmbeddedDetail, async (detailMode) => {
-  if (!detailMode) {
-    await nextTick();
-    await gridApi.reload();
-  }
-});
-
-watch(isCompactTable, () => {
-  gridApi.setGridOptions({
-    cellConfig: buildCellConfig(),
-    columns: buildColumns(),
-  });
-});
+watch(
+  () => [route.query.view, route.query.pluginId] as const,
+  () => {
+    openDetailFromRouteQuery();
+  },
+);
 
 function formatPluginType(type: MarketplacePluginType) {
   return type === "source"
@@ -559,24 +698,101 @@ function formatPluginType(type: MarketplacePluginType) {
     : t("plugin.linapro-plugin-marketplace.catalog.pluginType.dynamic");
 }
 
-function formatMarketStatus(status: MarketplaceStatus) {
-  switch (status) {
-    case "delisted": {
-      return t("plugin.linapro-plugin-marketplace.detail.status.delisted");
+function getPluginTypeColor(type: MarketplacePluginType) {
+  return type === "source" ? "blue" : "green";
+}
+
+function formatSourceKind(sourceKind?: string) {
+  if (sourceKind === "git") {
+    return t("plugin.linapro-plugin-marketplace.mine.sourceKind.git");
+  }
+  if (sourceKind === "upload") {
+    return t("plugin.linapro-plugin-marketplace.mine.sourceKind.upload");
+  }
+  // Avoid treating missing projections as upload packages.
+  return sourceKind?.trim() || "-";
+}
+
+function getSourceKindColor(sourceKind?: string) {
+  return sourceKind === "git" ? "geekblue" : "default";
+}
+
+function formatMarketStatus(
+  status: MarketplaceStatus,
+  processStatus?: MarketplaceProcessStatus,
+) {
+  if (status === "published") {
+    return t("plugin.linapro-plugin-marketplace.detail.status.published");
+  }
+  if (status === "delisted") {
+    return t("plugin.linapro-plugin-marketplace.detail.status.delisted");
+  }
+  if (status === "deprecated") {
+    return t("plugin.linapro-plugin-marketplace.detail.status.deprecated");
+  }
+  switch (processStatus) {
+    case "pending_verify": {
+      return t(
+        "plugin.linapro-plugin-marketplace.detail.processStatus.pendingVerify",
+      );
     }
-    case "deprecated": {
-      return t("plugin.linapro-plugin-marketplace.detail.status.deprecated");
+    case "pending_review": {
+      return t(
+        "plugin.linapro-plugin-marketplace.detail.processStatus.pendingReview",
+      );
     }
-    case "draft": {
-      return t("plugin.linapro-plugin-marketplace.detail.status.draft");
+    case "failed": {
+      return t("plugin.linapro-plugin-marketplace.detail.processStatus.failed");
     }
-    case "published": {
-      return t("plugin.linapro-plugin-marketplace.detail.status.published");
+    case "completed": {
+      return t(
+        "plugin.linapro-plugin-marketplace.detail.processStatus.completed",
+      );
     }
     default: {
-      return status || "-";
+      return t("plugin.linapro-plugin-marketplace.detail.status.draft");
     }
   }
+}
+
+function getMarketStatusColor(
+  status: MarketplaceStatus,
+  processStatus?: MarketplaceProcessStatus,
+) {
+  if (status === "published") {
+    return "success";
+  }
+  if (status === "delisted") {
+    return "default";
+  }
+  if (status === "deprecated") {
+    return "warning";
+  }
+  switch (processStatus) {
+    case "pending_verify": {
+      return "processing";
+    }
+    case "pending_review": {
+      return "gold";
+    }
+    case "failed": {
+      return "error";
+    }
+    default: {
+      return "processing";
+    }
+  }
+}
+
+function buildStatusTooltip(row: MarketplacePluginListItem) {
+  const parts = [
+    formatMarketStatus(row.marketStatus, row.processStatus),
+    row.latestReviewStatus
+      ? `${t("plugin.linapro-plugin-marketplace.detail.columns.reviewStatus")}: ${formatReviewStatus(row.latestReviewStatus)}`
+      : "",
+    row.lastSyncMessage || "",
+  ].filter(Boolean);
+  return parts.join(" · ");
 }
 
 function formatVisibility(visibility: MarketplaceVisibility) {
@@ -625,7 +841,21 @@ function formatReviewStatus(status?: string) {
 }
 
 function handleOpenDetail(row: MarketplacePluginListItem) {
-  router.push(marketplaceDetailPath(row.pluginId, "mine"));
+  detailModalApi.setData({ from: "mine", pluginId: row.pluginId });
+  detailModalApi.open();
+}
+
+function openDetailFromRouteQuery() {
+  if (route.query.view !== "detail") {
+    return;
+  }
+  const pluginId =
+    typeof route.query.pluginId === "string" ? route.query.pluginId.trim() : "";
+  if (!pluginId) {
+    return;
+  }
+  detailModalApi.setData({ from: "mine", pluginId });
+  detailModalApi.open();
 }
 
 function openPublisherDrawer() {
@@ -837,8 +1067,8 @@ async function handleSyncGitSource(row: MarketplacePluginListItem) {
 </script>
 
 <template>
-  <MarketplaceDetail v-if="showEmbeddedDetail" />
-  <Page v-else :auto-content-height="true">
+  <Page :auto-content-height="true">
+    <DetailModal />
     <Grid
       class="plugin-marketplace-mine"
       :table-title="$t('plugin.linapro-plugin-marketplace.mine.tableTitle')"
@@ -858,71 +1088,71 @@ async function handleSyncGitSource(row: MarketplacePluginListItem) {
         </Space>
       </template>
 
-      <template #plugin="{ row }">
-        <div class="mine-plugin-cell">
-          <span class="mine-plugin-name" :title="row.name">{{ row.name }}</span>
-          <span class="mine-plugin-id" :title="row.pluginId">
-            {{ row.pluginId }}
+      <template #name="{ row }">
+        <div
+          class="flex w-full min-w-0 max-w-full items-center gap-1.5 overflow-hidden whitespace-nowrap"
+        >
+          <span class="min-w-0 truncate font-medium" :title="row.name">
+            {{ row.name }}
           </span>
-          <div v-if="isCompactTable" class="mine-plugin-meta">
-            <Tag :color="row.pluginType === 'source' ? 'blue' : 'green'">
-              {{ formatPluginType(row.pluginType) }}
-            </Tag>
-            <Tag>{{ formatMarketStatus(row.marketStatus) }}</Tag>
-          </div>
+          <Tag
+            class="m-0 shrink-0 whitespace-nowrap leading-5"
+            :color="getSourceKindColor(row.sourceKind)"
+          >
+            {{ formatSourceKind(row.sourceKind) }}
+          </Tag>
         </div>
       </template>
 
+      <template #summary="{ row }">
+        <div class="max-w-full truncate" :title="row.summary || '-'">
+          {{ row.summary || "-" }}
+        </div>
+      </template>
+
+      <template #latestVersion="{ row }">
+        <span
+          class="inline-flex max-w-full items-center gap-1 whitespace-nowrap font-mono text-xs tabular-nums"
+          :title="row.latestVersion || '-'"
+        >
+          <span class="shrink-0">{{ row.latestVersion || "-" }}</span>
+        </span>
+      </template>
+
       <template #pluginType="{ row }">
-        <Tag :color="row.pluginType === 'source' ? 'blue' : 'green'">
+        <Tag :color="getPluginTypeColor(row.pluginType)">
           {{ formatPluginType(row.pluginType) }}
         </Tag>
       </template>
 
       <template #marketStatus="{ row }">
-        <Tag>{{ formatMarketStatus(row.marketStatus) }}</Tag>
+        <Tooltip :title="buildStatusTooltip(row)">
+          <Tag :color="getMarketStatusColor(row.marketStatus, row.processStatus)">
+            {{ formatMarketStatus(row.marketStatus, row.processStatus) }}
+          </Tag>
+        </Tooltip>
       </template>
 
       <template #visibility="{ row }">
-        <Tag :color="row.visibility === 'public' ? 'green' : undefined">
+        <Tag :color="row.visibility === 'public' ? 'green' : 'default'">
           {{ formatVisibility(row.visibility) }}
         </Tag>
       </template>
 
-      <template #latestVersion="{ row }">
-        <Space v-if="isCompactTable" direction="vertical" :size="2">
-          <span>{{ row.latestVersion || "-" }}</span>
-          <Tag v-if="row.latestReviewStatus">
-            {{ formatReviewStatus(row.latestReviewStatus) }}
-          </Tag>
-        </Space>
-        <span v-else>{{ row.latestVersion || "-" }}</span>
-      </template>
-
-      <template #reviewStatus="{ row }">
-        <Tag v-if="row.latestReviewStatus">
-          {{ formatReviewStatus(row.latestReviewStatus) }}
-        </Tag>
-        <span v-else class="mine-muted">-</span>
-      </template>
-
       <template #action="{ row }">
-        <Space>
+        <Space :size="4" :wrap="false">
           <ghost-button @click.stop="handleOpenDetail(row)">
             {{ $t("plugin.linapro-plugin-marketplace.catalog.actions.detail") }}
+          </ghost-button>
+          <ghost-button
+            v-if="canPublishRow(row)"
+            @click.stop="handlePublishPlugin(row)"
+          >
+            {{ $t("plugin.linapro-plugin-marketplace.mine.actions.publish") }}
           </ghost-button>
           <Dropdown placement="bottomRight">
             <template #overlay>
               <Menu>
-                <MenuItem
-                  v-if="canPublishRow(row)"
-                  key="publish"
-                  @click="handlePublishPlugin(row)"
-                >
-                  {{
-                    $t("plugin.linapro-plugin-marketplace.mine.actions.publish")
-                  }}
-                </MenuItem>
                 <MenuItem
                   v-if="canDelistRow(row)"
                   key="delist"
@@ -950,7 +1180,7 @@ async function handleSyncGitSource(row: MarketplacePluginListItem) {
                 </MenuItem>
               </Menu>
             </template>
-            <a-button size="small" type="link">
+            <a-button size="small" type="link" @click.stop>
               {{ $t("pages.common.more") }}
             </a-button>
           </Dropdown>
@@ -1013,15 +1243,6 @@ async function handleSyncGitSource(row: MarketplacePluginListItem) {
         </Alert>
 
         <section v-show="publishMode === 'plugin' && hasPublishers">
-          <div class="mine-section-header">
-            <h3>
-              {{
-                $t(
-                  "plugin.linapro-plugin-marketplace.mine.sections.pluginBasic",
-                )
-              }}
-            </h3>
-          </div>
           <PluginForm>
             <template #packageFile>
               <div class="mine-package-field" data-testid="mine-package-field">
@@ -1131,40 +1352,9 @@ async function handleSyncGitSource(row: MarketplacePluginListItem) {
 </template>
 
 <style scoped>
-.mine-plugin-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  text-align: left;
-}
-
-.mine-plugin-name {
-  max-width: 100%;
+:deep(.mine-name-column .vxe-cell),
+:deep(.mine-summary-column .vxe-cell) {
   overflow: hidden;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mine-plugin-id {
-  max-width: 100%;
-  overflow: hidden;
-  color: var(--ant-color-text-tertiary);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mine-plugin-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 2px;
-}
-
-.mine-muted {
-  color: var(--ant-color-text-secondary);
 }
 
 .mine-publish-sections {

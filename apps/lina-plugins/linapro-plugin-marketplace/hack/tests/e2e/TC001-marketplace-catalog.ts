@@ -36,6 +36,7 @@ test.describe("TC-1 marketplace publisher workspace", () => {
       page.getByText("我的插件", { exact: true }).last(),
     ).toBeVisible();
     await marketplace.expectColumn("mine", "可见性");
+    await marketplace.expectColumn("mine", "下载量");
     await marketplace.expectNoHorizontalPageOverflow();
     await marketplace.expectNoHorizontalMineTableOverflow();
     await expect(
@@ -50,7 +51,7 @@ test.describe("TC-1 marketplace publisher workspace", () => {
     await expect(
       marketplace.mineRow(marketplaceExternalPluginId()),
     ).toHaveCount(0);
-    await marketplace.expectNoMineSearchForm();
+    await marketplace.expectMineSearchFormStatusOptions();
     await marketplace.expectNoRegisterGitToolbarAction();
     await expect(
       page.getByRole("button", { name: "登记发布者" }),
@@ -67,7 +68,9 @@ test.describe("TC-1 marketplace publisher workspace", () => {
     await expect(compactSourceRow).toContainText("已发布");
     await expect(compactSourceRow).toContainText("公开");
     await expect(compactSourceRow).toContainText("v1.0.0");
-    await expect(compactSourceRow).toContainText("已通过");
+    // Download count is projected next to latest version; review status is no
+    // longer a dedicated mine-table column.
+    await expect(compactSourceRow).toContainText("128");
     await expect(compactSourceRow).toContainText("2026-07-10 16:00:00");
     await captureMarketplaceScreenshot(page, "mine-table-1024");
     await page.setViewportSize({ height: 960, width: 1440 });
@@ -131,6 +134,13 @@ test.describe("TC-1 marketplace publisher workspace", () => {
     await expect(
       marketplace.publishDrawer().locator("h2").filter({ hasText: "添加插件" }),
     ).toBeVisible();
+    // Drawer body must not repeat the same title under the chrome header.
+    await expect(
+      marketplace
+        .publishDrawer()
+        .locator("h3")
+        .filter({ hasText: "添加插件" }),
+    ).toHaveCount(0);
     await expect(
       marketplace.publishDrawer().getByText("分发方式"),
     ).toBeVisible();
@@ -257,13 +267,14 @@ test.describe("TC-1 marketplace publisher workspace", () => {
       { pluginId, pluginType: "source", version: "v1.0.0" },
     ]);
     await expect(marketplace.mineRow(pluginId)).toContainText("v1.0.0");
-    await expect(marketplace.mineRow(pluginId)).toContainText("草稿");
-    await marketplace.publishOwnedPlugin(pluginId);
-    await expect(page.locator(".ant-message-notice").last()).toContainText(
-      "已提交发布审核",
-    );
-    await expect(marketplace.mineRow(pluginId)).toContainText("已提交");
-    await captureMarketplaceScreenshot(page, "mine-private-submitted");
+    // Add-plugin lands in pending_verify; UI shows 待验证 instead of raw 草稿.
+    // First-time verify/review is owned by the async process pipeline, so the
+    // manual publish row action stays hidden while pending_verify.
+    await expect(marketplace.mineRow(pluginId)).toContainText("待验证");
+    await expect(
+      marketplace.mineRow(pluginId).getByRole("button", { name: /发布|Publish/u }),
+    ).toHaveCount(0);
+    await captureMarketplaceScreenshot(page, "mine-private-pending-verify");
 
     await marketplace.openNewVersionDrawer(marketplaceSourcePluginId());
     await marketplace.expectReleaseTarget(

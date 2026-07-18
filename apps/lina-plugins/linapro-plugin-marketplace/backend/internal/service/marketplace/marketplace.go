@@ -7,6 +7,7 @@ package marketplace
 import (
 	"context"
 
+	"lina-core/pkg/plugin/capability/plugincap"
 	marketv1 "linapro-plugin-marketplace/backend/api/market/v1"
 )
 
@@ -171,10 +172,11 @@ type Service interface {
 	// marketplace catalog while keeping it visible in the owner's My Plugins list.
 	OwnerDelistPlugin(ctx context.Context, in OwnerDelistPluginInput) (*PluginRecord, error)
 
-	// RegisterGitSource registers one GitHub/Gitee repository as a marketplace
-	// plugin, stores optional encrypted credentials, and immediately discovers
-	// version tags as metadata without cloning full source trees.
-	RegisterGitSource(ctx context.Context, in RegisterGitSourceInput) (*PluginRecord, error)
+	// RegisterGitSource registers one GitHub/Gitee repository as one or more
+	// marketplace plugins, auto-detects single-plugin or multi-plugin layouts,
+	// stores optional encrypted credentials, and immediately discovers version
+	// tags or falls back to the main branch without cloning full source trees.
+	RegisterGitSource(ctx context.Context, in RegisterGitSourceInput) (*RegisterGitSourceResult, error)
 
 	// DiscoverGitMetadata refreshes remote tags and draft releases for one
 	// Git-backed marketplace plugin.
@@ -182,6 +184,10 @@ type Service interface {
 
 	// DiscoverAllGitSources scans every Git-backed marketplace plugin for new tags.
 	DiscoverAllGitSources(ctx context.Context) (int, error)
+
+	// ProcessMarketplacePipeline advances pending_verify plugins toward
+	// pending_review via the async discovery and verification path.
+	ProcessMarketplacePipeline(ctx context.Context) (int, error)
 
 	// GetDistribution returns CLI install metadata for one visible release.
 	GetDistribution(ctx context.Context, in GetDistributionInput) (*marketv1.MarketplaceDistributionItem, error)
@@ -191,15 +197,20 @@ var _ Service = (*serviceImpl)(nil)
 
 // serviceImpl is the default marketplace domain service implementation.
 type serviceImpl struct {
-	artifacts ArtifactStore
-	gitRemote gitRemoteClient
+	artifacts    ArtifactStore
+	pluginConfig plugincap.ConfigService
+	gitRemote    gitRemoteClient
 }
 
 // New creates a marketplace domain service. artifacts is required for package
 // upload persistence, document body reads, and controlled download streaming.
 // When artifacts is nil, New creates a local filesystem store under the default
 // marketplace artifact root so builtin deployments remain self-contained.
-func New(artifacts ArtifactStore) (Service, error) {
+// pluginConfig is the current plugin's static configuration reader from
+// Plugins().Config(); it may be nil in unit tests. When present, Git metadata
+// discovery falls back to github.accessToken / gitee.accessToken when a
+// publisher does not supply a per-registration token.
+func New(artifacts ArtifactStore, pluginConfig plugincap.ConfigService) (Service, error) {
 	if artifacts == nil {
 		store, err := NewLocalArtifactStore("")
 		if err != nil {
@@ -207,5 +218,8 @@ func New(artifacts ArtifactStore) (Service, error) {
 		}
 		artifacts = store
 	}
-	return &serviceImpl{artifacts: artifacts}, nil
+	return &serviceImpl{
+		artifacts:    artifacts,
+		pluginConfig: pluginConfig,
+	}, nil
 }

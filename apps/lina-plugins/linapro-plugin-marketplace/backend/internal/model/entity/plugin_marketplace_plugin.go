@@ -18,6 +18,7 @@ type PluginMarketplacePlugin struct {
 	Description     string     `json:"description"     orm:"description"       description:"Long marketplace description"`
 	PluginType      string     `json:"pluginType"      orm:"plugin_type"       description:"Plugin type: source/dynamic"`
 	MarketStatus    string     `json:"marketStatus"    orm:"market_status"     description:"Marketplace status: draft/published/delisted/deprecated"`
+	ProcessStatus   string     `json:"processStatus"   orm:"process_status"    description:"Async process status: pending_verify/pending_review/completed/failed"`
 	Visibility      string     `json:"visibility"      orm:"visibility"        description:"Visibility policy: public/private/reserved"`
 	LatestReleaseId int        `json:"latestReleaseId" orm:"latest_release_id" description:"Latest published release ID"`
 	LatestVersion   string     `json:"latestVersion"   orm:"latest_version"    description:"Latest published version"`
@@ -29,6 +30,7 @@ type PluginMarketplacePlugin struct {
 	SourceKind      string     `json:"sourceKind"      orm:"source_kind"        description:"Publish source kind: git/upload"`
 	RepoUrl         string     `json:"repoUrl"         orm:"repo_url"           description:"Git repository URL when source_kind is git"`
 	RepoProvider    string     `json:"repoProvider"    orm:"repo_provider"      description:"Git provider: github/gitee, empty for upload"`
+	RepoPath        string     `json:"repoPath"        orm:"repo_path"          description:"Plugin root path relative to repository root; empty when repository root is the plugin root"`
 	CredentialRef   string     `json:"credentialRef"   orm:"credential_ref"     description:"Opaque credential reference for private Git access, empty when public"`
 	LastSyncAt      *time.Time `json:"lastSyncAt"      orm:"last_sync_at"       description:"Last Git metadata discovery time"`
 	LastSyncStatus  string     `json:"lastSyncStatus"  orm:"last_sync_status"   description:"Last Git sync status"`

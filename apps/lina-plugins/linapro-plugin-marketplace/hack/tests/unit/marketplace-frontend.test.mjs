@@ -104,17 +104,25 @@ describe("marketplace frontend API adapter", () => {
 });
 
 describe("marketplace frontend composition logic", () => {
-  it("builds my-plugin grid with pagination and no default search form", () => {
+  it("builds my-plugin grid with pagination and management-style search form", () => {
     const source = readPluginFile("frontend/pages/mine/index.vue");
     assert.match(source, /useVbenVxeGrid<MarketplacePluginListItem>/);
-    assert.match(source, /showSearchForm:\s*false/);
     assert.match(source, /pageNum:\s*page\.currentPage/);
     assert.match(source, /pageSize:\s*page\.pageSize/);
-    assert.doesNotMatch(
-      source,
-      /keyword:\s*trimOptional\(formValues\.keyword\)/,
-    );
+    assert.match(source, /keyword:\s*trimOptional\(formValues\.keyword\)/);
+    assert.match(source, /formOptions:/);
+    assert.match(source, /rowClassName:\s*["']cursor-pointer["']/);
+    assert.match(source, /mine\.columns\.pluginId/);
+    assert.match(source, /mine\.columns\.name/);
+    assert.match(source, /mine\.columns\.summary/);
     assert.match(source, /mine\.actions\.registerPublisher/);
+    // Status filter options must match publisher-visible process tags.
+    assert.match(source, /value:\s*["']pending_verify["']/);
+    assert.match(source, /value:\s*["']pending_review["']/);
+    assert.match(source, /value:\s*["']published["']/);
+    assert.match(source, /value:\s*["']failed["']/);
+    assert.match(source, /field:\s*["']downloadCount["']/);
+    assert.match(source, /minWidth:\s*260/);
     assert.doesNotMatch(
       source,
       /openGitPublishDrawer|mine\.actions\.registerGit/,
@@ -141,6 +149,17 @@ describe("marketplace frontend composition logic", () => {
     assert.match(mine, /mine\.actions\.add/);
     assert.doesNotMatch(mine, /mine\.actions\.saveGitSource/);
     assert.doesNotMatch(mine, /fieldName:\s*"visibility"/);
+    // Drawer chrome keeps “添加插件”; body must not repeat pluginBasic heading.
+    assert.doesNotMatch(mine, /mine\.sections\.pluginBasic/);
+    // Process pipeline no longer exposes pending_fetch to the UI.
+    assert.doesNotMatch(mine, /pending_fetch|pendingFetch/);
+    const detail = readPluginFile("frontend/pages/detail/index.vue");
+    const admin = readPluginFile("frontend/pages/admin-list/index.vue");
+    const types = readPluginFile("frontend/types/marketplace.ts");
+    assert.doesNotMatch(detail, /pending_fetch|pendingFetch/);
+    assert.doesNotMatch(admin, /pending_fetch|pendingFetch/);
+    assert.doesNotMatch(types, /pending_fetch/);
+    assert.match(types, /pending_verify/);
     assert.match(review, /marketplaceReviewQueueList/);
     assert.match(review, /marketplaceReleaseReview/);
     assert.match(review, /class="marketplace-review-risk-list"/);
@@ -155,6 +174,27 @@ describe("marketplace frontend composition logic", () => {
       /hasAccessByCodes\(\[\s*["']market:plugin:download["'],\s*["']\*:\*:\*["']\s*\]\)/,
     );
     assert.match(source, /v-if="canDownloadMarketplacePlugin\(\)"/);
+  });
+
+  it("surfaces historical git source pins on the version table", () => {
+    const detail = readPluginFile("frontend/pages/detail/index.vue");
+    const types = readPluginFile("frontend/types/marketplace.ts");
+    assert.match(detail, /formatReleaseSourcePin/);
+    assert.match(detail, /marketplace-source-pin/);
+    assert.match(
+      detail,
+      /plugin\.linapro-plugin-marketplace\.detail\.sourcePin\.refAndCommit/,
+    );
+    assert.match(
+      detail,
+      /plugin\.linapro-plugin-marketplace\.detail\.sourcePin\.commitOnly/,
+    );
+    assert.match(
+      detail,
+      /plugin\.linapro-plugin-marketplace\.detail\.sourcePin\.refOnly/,
+    );
+    assert.match(types, /sourceCommit\?:/);
+    assert.match(types, /sourceRef\?:/);
   });
 
   it("returns unscoped public details to an accessible host page", () => {

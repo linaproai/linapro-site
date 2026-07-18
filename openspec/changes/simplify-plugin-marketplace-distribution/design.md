@@ -8,13 +8,16 @@
 |------|------|
 | Git 存储 | 只存坐标 + 元数据 |
 | 服务端是否拉全量代码 | 否，只做元数据发现 |
-| 同步时机 | 登记后立即发现 + 定时轮询 tags |
+| 同步时机 | 登记后入列待验证；异步任务在待验证内完成元数据发现 + 校验，并定时轮询 tags |
+| 处理状态机 | 待验证 → 待审核 → 已完成（失败可观测）；不暴露「待拉取」 |
 | 插件类型 | 源码 + 动态（动态以上传包为主） |
-| 审核 | 保持人工审核 |
+| 审核 | 保持人工审核；验证成功后自动进审 |
 | 消费执行方 | CLI / `linactl` |
 | 私有仓 | 支持平台代持 token |
-| monorepo | MVP 不做 |
-| Tag 与 yaml version | 必须一致 |
+| monorepo / 多插件仓库 | 自动识别：根级单插件或子目录多插件 |
+| Tag 与 yaml version | tag 发现时必须一致；无 tag 回退 main 时以 yaml version 为准 |
+| Git 安装引用 | 发现时解析并持久化 `source_commit`；`distribution.ref` 优先钉死 commit，禁止对已落库版本仅用浮动 `main` |
+| 历史版本 | 多版本 release 并存；消费者可按版本查询/安装历史版本回退 |
 
 ## Goals / Non-Goals
 
@@ -29,7 +32,7 @@
 
 **Non-Goals:**
 
-- 不实现 monorepo `subdir`。
+- 不要求发布者在 API 中手工指定插件子目录（由发现逻辑自动识别）。
 - 不通过 Git 源自动发布动态 `plugin.wasm`（动态包走上传）。
 - 不引入 webhook（可后续增强）。
 - 不取消人工审核、不取消发布者归属。
@@ -61,23 +64,36 @@
         ▼
 List tags（GitHub/Gitee REST）
         │
-        ▼
-对每个候选 tag：
-  GET raw plugin.yaml @ tag
-  解析 id/name/version/type/deps/...
-  校验 tag 与 version 一致、type=source、目录约定的远程可读文件（至少 plugin.yaml）
+        ├─ 存在 semver tag → 使用这些 tag（新到旧）
+        └─ 无 semver tag → 校验 main 存在；否则失败
         │
         ▼
-写入/更新 release 草稿 + manifest_snapshot
+在解析出的主引用（最新 tag 或 main）上自动识别插件根：
+  - 仓库根 plugin.yaml 合法 → 单插件，repo_path=""
+  - 否则递归树扫描子目录 plugin.yaml → 多插件，各记 repo_path
+        │
+        ▼
+对每个插件根 × 每个候选 ref：
+  GET raw <repo_path>/plugin.yaml @ ref
+  解析 id/name/version/type/deps/...
+  解析 ref 对应的 commit SHA（source_commit）
+  tag 模式：校验 tag 与 version 一致；main 回退：以 yaml version 为草稿版本
+  type=source、目录约定的远程可读文件（plugin.yaml、backend/plugin.go、plugin_embed.go）
+        │
+        ▼
+写入/更新 release 草稿 + manifest_snapshot + source_ref + source_commit
 （不下载 backend/frontend 全树，不落 git working tree）
 ```
 
 说明：
 
-- 「目录规范」在 Git 模式下以**可远程验证的最小集合**为准：至少根级 `plugin.yaml`；能通过 Contents/Raw API 抽样检查 `backend/plugin.go`、`plugin_embed.go`、`manifest/` 是否存在则做存在性校验。完整源码结构的最终权威仍在 CLI `git checkout` 后由本地治理/构建暴露。
+- 「目录规范」在 Git 模式下以**可远程验证的最小集合**为准：插件根下 `plugin.yaml`；能通过 Contents/Raw API 抽样检查 `backend/plugin.go`、`plugin_embed.go` 是否存在则做存在性校验。完整源码结构的最终权威仍在 CLI `git checkout` 后由本地治理/构建暴露。
+- 多插件仓库：同一 `repo_url` 可对应多条市场插件记录；`distribution` 增加插件根相对路径字段，CLI 安装时 clone 后只取该路径内容落到 `apps/lina-plugins/<plugin-id>/`。
 - 动态插件 tag 若 `type=dynamic` 或仅含 wasm 线索：MVP **跳过或标为不支持**，提示改用上传包。
-- 定时任务：可配置间隔（默认建议 15–30 分钟），扫描所有 `source_kind=git` 且未删除的插件；增量以「已知 tag 集合」去重；已发布 tag 不覆盖；新 tag 生成新草稿。
-- 首次登记：同步路径与定时任务共用同一 `DiscoverGitMetadata` 服务方法。
+- 定时任务：可配置间隔（默认建议 15–30 分钟），扫描所有 `source_kind=git` 且未删除的插件；增量以「已知 tag/ref 集合」去重；已发布版本不覆盖；新 tag 生成新草稿；无 tag 时仅刷新**未发布**可变草稿（含更新 `source_commit`），不得改写已发布版本的 ref/commit。
+- **Commit 钉扎（强制）**：无 tag 回退 `main` 时，MUST 在 release 行写入发现当时的 commit SHA。`distribution.ref` MUST 优先返回该 commit，而不是浮动分支名 `main`，避免市场展示版本 x、实际安装却拉到 main 最新 y 的不一致。tag 发现同样应解析并持久化 commit，以抵御 force-push。
+- **历史版本**：同一 `pluginId` 下可并存多条已发布 release（不同 `release_version`）。查询与安装接口 MUST 按版本定位，允许消费者选择历史版本回退；新版本上架 MUST NOT 自动删除或覆盖既有已发布历史版本。
+- 首次登记：同步路径与定时任务共用同一 `DiscoverGitMetadata` 服务方法（登记阶段先做仓库级插件根识别再按插件发现）。
 
 替代方案：shallow clone 到 temp 再扫 → 违背「不同步完整代码到服务端」；拒绝。
 
@@ -102,12 +118,15 @@ List tags（GitHub/Gitee REST）
   "distribution": {
     "mode": "git",
     "repoUrl": "https://github.com/org/example-plugin.git",
-    "ref": "v1.0.0",
+    "ref": "a1b2c3d4e5f6789012345678901234567890abcd",
+    "path": "apps/lina-plugins/example-plugin",
     "provider": "github",
     "requiresAuth": true
   }
 }
 ```
+
+`path` 在仓库根即插件根时可省略或为空字符串。`ref` 优先为发现时钉扎的 commit SHA；逻辑 tag/分支名保留在 release 的 `source_ref` 供展示。
 
 或：
 
@@ -163,11 +182,13 @@ Git：登记仓库 → 自动发现版本草稿 → 发布者提交审核 → �
 
 - `source_kind`：`git` | `upload`
 - `repo_url`、`repo_provider`（`github`|`gitee`）
+- `repo_path`：插件根相对仓库根路径，单插件根为空，多插件子目录非空
 - `credential_ref`、`last_sync_at`、`last_sync_status`、`last_sync_message`
 
 **release**
 
-- `source_ref`（git tag/ref；upload 可为空）
+- `source_ref`（git 逻辑 tag/分支名，如 `v1.0.0` 或 `main`；upload 可为空）
+- `source_commit`（git 发现时解析的完整 commit SHA；upload 可为空；安装 `distribution.ref` 优先使用）
 - `distribution_mode` 冗余或运行时由 `source_kind` 推导
 
 **artifact**
@@ -193,7 +214,7 @@ Git：登记仓库 → 自动发现版本草稿 → 发布者提交审核 → �
 |------|------|
 | Git 模式无法在服务端做完整源码树扫描 | 远程存在性抽样 + 审核人工抽查；完整校验在 CLI 拉取后/构建时 |
 | 平台 API 限流 | 轮询退避、按插件错峰、缓存 ETag/条件请求 |
-| Tag 被 force-push | 已发布版本不可变；新发现若 sha 变化仅影响未发布草稿或记录警告 |
+| Tag / main 被 force-push 或前进 | 已发布版本不可变且 `source_commit` 钉死；`distribution.ref` 用 commit；新发现若 sha 变化仅影响未发布草稿 |
 | Token 泄露 | 加密存储、权限隔离、审计、禁止响应回显 |
 | 双通道增加前端复杂度 | 「我的插件」用两个清晰动作：登记仓库 / 上传包 |
 | 与未归档 `add-plugin-marketplace` / 菜单重构变更并行 | 本变更基于当前插件代码演进；归档顺序由维护者协调，增量 SQL 序号接续 |

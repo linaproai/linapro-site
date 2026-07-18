@@ -31,7 +31,7 @@ type MyPluginListReq struct {
 	PageSize   int                   `json:"pageSize" d:"20" v:"min:1|max:100" dc:"Page size, default 20 and maximum 100" eg:"20"`
 	Keyword    string                `json:"keyword" dc:"Optional fuzzy search against plugin ID, name, and summary; match all owned plugins when empty" eg:"workflow"`
 	PluginType MarketplacePluginType `json:"pluginType" dc:"Optional plugin type filter: source=source-code plugin or dynamic=WASM runtime plugin; include all plugin types when empty" eg:"source"`
-	Status     MarketplaceStatus     `json:"status" dc:"Optional marketplace status filter: draft=unpublished draft, published=market-visible, delisted=removed from listings, or deprecated=discouraged; include all lifecycle statuses when empty" eg:"draft"`
+	Status     string                `json:"status" dc:"Optional list status filter. Accepts marketplace lifecycle values (draft, published, delisted, deprecated) or process pipeline values shown in publisher UI (pending_verify, pending_review, completed, failed); include all statuses when empty" eg:"pending_verify"`
 }
 
 // MyPluginListRes is the response for listing marketplace plugins owned by the current publisher.
@@ -47,7 +47,7 @@ type ManagedPluginListReq struct {
 	PageSize   int                   `json:"pageSize" d:"20" v:"min:1|max:100" dc:"Page size, default 20 and maximum 100" eg:"20"`
 	Keyword    string                `json:"keyword" dc:"Optional fuzzy search against plugin ID, name, summary, and publisher; match all managed plugins when empty" eg:"workflow"`
 	PluginType MarketplacePluginType `json:"pluginType" dc:"Optional plugin type filter: source=source-code plugin or dynamic=WASM runtime plugin; include all plugin types when empty" eg:"source"`
-	Status     MarketplaceStatus     `json:"status" dc:"Optional marketplace status filter: draft=unpublished draft, published=market-visible, delisted=removed from listings, or deprecated=discouraged; include all lifecycle statuses when empty" eg:"published"`
+	Status     string                `json:"status" dc:"Optional list status filter. Accepts marketplace lifecycle values (draft, published, delisted, deprecated) or process pipeline values (pending_verify, pending_review, completed, failed); include all statuses when empty" eg:"published"`
 	Publisher  string                `json:"publisher" dc:"Optional publisher key filter; include all publishers when empty" eg:"linapro"`
 }
 
@@ -178,6 +178,7 @@ type MarketplacePluginListItem struct {
 	Publisher          *MarketplacePublisherItem `json:"publisher" dc:"Publisher snapshot displayed with the catalog item" eg:"{}"`
 	PluginType         MarketplacePluginType     `json:"pluginType" dc:"Plugin type: source=source plugin dynamic=dynamic plugin" eg:"source"`
 	MarketStatus       MarketplaceStatus         `json:"marketStatus" dc:"Marketplace status: draft, published, delisted, or deprecated" eg:"published"`
+	ProcessStatus      MarketplaceProcessStatus  `json:"processStatus,omitempty" dc:"Async process status: pending_verify, pending_review, completed, or failed" eg:"pending_verify"`
 	Visibility         MarketplaceVisibility     `json:"visibility" dc:"Visibility policy: public, private, or reserved" eg:"public"`
 	LatestVersion      string                    `json:"latestVersion" dc:"Latest version associated with the plugin, including drafts for managed lists" eg:"v0.1.0"`
 	LatestReviewStatus MarketplaceReviewStatus   `json:"latestReviewStatus,omitempty" dc:"Review status of the latest release when available" eg:"submitted"`
@@ -199,32 +200,34 @@ type MarketplacePluginListItem struct {
 
 // MarketplacePluginDetailItem is the detail projection used by marketplace detail pages.
 type MarketplacePluginDetailItem struct {
-	PluginId       string                    `json:"pluginId" dc:"Stable plugin ID shown in marketplace detail and used for release routing" eg:"linapro-demo-source"`
-	Name           string                    `json:"name" dc:"Marketplace plugin display name" eg:"Source Plugin Demo"`
-	Summary        string                    `json:"summary" dc:"Short marketplace summary" eg:"Source plugin that provides workflow automation examples"`
-	Description    string                    `json:"description" dc:"Long marketplace description displayed on the detail page" eg:"Provides workflow automation pages, backend APIs, and plugin resource examples."`
-	Publisher      *MarketplacePublisherItem `json:"publisher" dc:"Publisher profile snapshot for this marketplace plugin" eg:"{}"`
-	PluginType     MarketplacePluginType     `json:"pluginType" dc:"Plugin type: source=source plugin dynamic=dynamic plugin" eg:"source"`
-	MarketStatus   MarketplaceStatus         `json:"marketStatus" dc:"Marketplace status: draft, published, delisted, or deprecated" eg:"published"`
-	Visibility     MarketplaceVisibility     `json:"visibility" dc:"Visibility policy: public, private, or reserved" eg:"public"`
-	LatestVersion  string                    `json:"latestVersion" dc:"Latest visible published version in the marketplace" eg:"v0.1.0"`
-	Icon           string                    `json:"icon" dc:"Marketplace icon URL or plugin-managed asset path, empty when no icon is available" eg:"/assets/marketplace/source-demo.png"`
-	Homepage       string                    `json:"homepage" dc:"Plugin homepage URL, empty when no homepage is available" eg:"https://linapro.ai/plugins/source-demo"`
-	Repository     string                    `json:"repository" dc:"Plugin source repository URL, empty when no repository is available" eg:"https://github.com/linaproai/linapro-demo-source"`
-	License        string                    `json:"license" dc:"Plugin license identifier displayed before download" eg:"Apache-2.0"`
-	Tags           []*MarketplaceTagItem     `json:"tags" dc:"Marketplace categories and tags associated with this plugin" eg:"[]"`
-	LatestRelease  *MarketplaceReleaseItem   `json:"latestRelease" dc:"Latest visible release summary for compatibility, risk, and download decisions" eg:"{}"`
-	RiskCounts     MarketplaceRiskCounts     `json:"riskCounts" dc:"Risk finding count snapshot grouped by severity for the latest visible release" eg:"{}"`
-	DownloadCount  int64                     `json:"downloadCount" dc:"Aggregated marketplace download count snapshot" eg:"1200"`
-	SourceDelivery string                    `json:"sourceDelivery" dc:"Source plugin delivery guidance; source plugins require placement under apps/lina-plugins and host rebuild, while dynamic plugins continue through local dynamic upload governance" eg:"source_rebuild_required"`
-	SourceKind     MarketplaceSourceKind     `json:"sourceKind,omitempty" dc:"Publish source kind: git or upload" eg:"git"`
-	RepoUrl        string                    `json:"repoUrl,omitempty" dc:"Git repository URL when sourceKind is git" eg:"https://github.com/org/plugin.git"`
-	RepoProvider   MarketplaceRepoProvider   `json:"repoProvider,omitempty" dc:"Git provider when sourceKind is git" eg:"github"`
-	RequiresAuth   bool                      `json:"requiresAuth,omitempty" dc:"Whether the Git source is private; platform tokens are never returned" eg:"true"`
-	LastSyncStatus string                    `json:"lastSyncStatus,omitempty" dc:"Last Git metadata sync status for git sources" eg:"success"`
-	LastSyncMessage string                   `json:"lastSyncMessage,omitempty" dc:"Last Git metadata sync diagnostic without secrets" eg:"discovered 2 draft releases"`
-	LastSyncAt     *int64                    `json:"lastSyncAt,omitempty" dc:"Last Git metadata sync time as Unix timestamp in milliseconds" eg:"1767247200000"`
-	Distribution   *MarketplaceDistributionItem `json:"distribution,omitempty" dc:"Latest release distribution projection when available" eg:"{}"`
-	PublishedAt    *int64                    `json:"publishedAt,omitempty" dc:"First marketplace publish time as Unix timestamp in milliseconds" eg:"1767247200000"`
-	UpdatedAt      *int64                    `json:"updatedAt,omitempty" dc:"Marketplace plugin last updated time as Unix timestamp in milliseconds" eg:"1767247200000"`
+	PluginId        string                       `json:"pluginId" dc:"Stable plugin ID shown in marketplace detail and used for release routing" eg:"linapro-demo-source"`
+	Name            string                       `json:"name" dc:"Marketplace plugin display name" eg:"Source Plugin Demo"`
+	Summary         string                       `json:"summary" dc:"Short marketplace summary" eg:"Source plugin that provides workflow automation examples"`
+	Description     string                       `json:"description" dc:"Long marketplace description displayed on the detail page" eg:"Provides workflow automation pages, backend APIs, and plugin resource examples."`
+	Publisher       *MarketplacePublisherItem    `json:"publisher" dc:"Publisher profile snapshot for this marketplace plugin" eg:"{}"`
+	PluginType      MarketplacePluginType        `json:"pluginType" dc:"Plugin type: source=source plugin dynamic=dynamic plugin" eg:"source"`
+	MarketStatus    MarketplaceStatus            `json:"marketStatus" dc:"Marketplace status: draft, published, delisted, or deprecated" eg:"published"`
+	ProcessStatus   MarketplaceProcessStatus     `json:"processStatus,omitempty" dc:"Async process status: pending_verify, pending_review, completed, or failed" eg:"pending_review"`
+	Visibility      MarketplaceVisibility        `json:"visibility" dc:"Visibility policy: public, private, or reserved" eg:"public"`
+	LatestVersion   string                       `json:"latestVersion" dc:"Latest visible published version in the marketplace" eg:"v0.1.0"`
+	Icon            string                       `json:"icon" dc:"Marketplace icon URL or plugin-managed asset path, empty when no icon is available" eg:"/assets/marketplace/source-demo.png"`
+	Homepage        string                       `json:"homepage" dc:"Plugin homepage URL, empty when no homepage is available" eg:"https://linapro.ai/plugins/source-demo"`
+	Repository      string                       `json:"repository" dc:"Plugin source repository URL, empty when no repository is available" eg:"https://github.com/linaproai/linapro-demo-source"`
+	License         string                       `json:"license" dc:"Plugin license identifier displayed before download" eg:"Apache-2.0"`
+	Tags            []*MarketplaceTagItem        `json:"tags" dc:"Marketplace categories and tags associated with this plugin" eg:"[]"`
+	LatestRelease   *MarketplaceReleaseItem      `json:"latestRelease" dc:"Latest visible release summary for compatibility, risk, and download decisions" eg:"{}"`
+	RiskCounts      MarketplaceRiskCounts        `json:"riskCounts" dc:"Risk finding count snapshot grouped by severity for the latest visible release" eg:"{}"`
+	DownloadCount   int64                        `json:"downloadCount" dc:"Aggregated marketplace download count snapshot" eg:"1200"`
+	SourceDelivery  string                       `json:"sourceDelivery" dc:"Source plugin delivery guidance; source plugins require placement under apps/lina-plugins and host rebuild, while dynamic plugins continue through local dynamic upload governance" eg:"source_rebuild_required"`
+	SourceKind      MarketplaceSourceKind        `json:"sourceKind,omitempty" dc:"Publish source kind: git or upload" eg:"git"`
+	RepoUrl         string                       `json:"repoUrl,omitempty" dc:"Git repository URL when sourceKind is git" eg:"https://github.com/org/plugin.git"`
+	RepoProvider    MarketplaceRepoProvider      `json:"repoProvider,omitempty" dc:"Git provider when sourceKind is git" eg:"github"`
+	RepoPath        string                       `json:"repoPath,omitempty" dc:"Plugin root path relative to the repository root when sourceKind is git; empty when the repository root is the plugin root" eg:"apps/lina-plugins/linapro-demo-source"`
+	RequiresAuth    bool                         `json:"requiresAuth,omitempty" dc:"Whether the Git source is private; platform tokens are never returned" eg:"true"`
+	LastSyncStatus  string                       `json:"lastSyncStatus,omitempty" dc:"Last Git metadata sync status for git sources" eg:"success"`
+	LastSyncMessage string                       `json:"lastSyncMessage,omitempty" dc:"Last Git metadata sync diagnostic without secrets" eg:"discovered 2 draft releases"`
+	LastSyncAt      *int64                       `json:"lastSyncAt,omitempty" dc:"Last Git metadata sync time as Unix timestamp in milliseconds" eg:"1767247200000"`
+	Distribution    *MarketplaceDistributionItem `json:"distribution,omitempty" dc:"Latest release distribution projection when available" eg:"{}"`
+	PublishedAt     *int64                       `json:"publishedAt,omitempty" dc:"First marketplace publish time as Unix timestamp in milliseconds" eg:"1767247200000"`
+	UpdatedAt       *int64                       `json:"updatedAt,omitempty" dc:"Marketplace plugin last updated time as Unix timestamp in milliseconds" eg:"1767247200000"`
 }

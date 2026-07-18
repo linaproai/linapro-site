@@ -671,7 +671,7 @@ func (c *ControllerV1) PluginDelist(
 	return &marketv1.PluginDelistRes{Plugin: pluginDetailFromRecord(record)}, nil
 }
 
-// GitSourceRegister registers one Git-backed marketplace plugin and discovers tags.
+// GitSourceRegister registers one Git-backed repository and discovers plugins.
 func (c *ControllerV1) GitSourceRegister(
 	ctx context.Context,
 	req *marketv1.GitSourceRegisterReq,
@@ -680,7 +680,7 @@ func (c *ControllerV1) GitSourceRegister(
 	if err != nil {
 		return nil, err
 	}
-	record, err := c.marketSvc.RegisterGitSource(ctx, marketplacesvc.RegisterGitSourceInput{
+	result, err := c.marketSvc.RegisterGitSource(ctx, marketplacesvc.RegisterGitSourceInput{
 		PublisherKey: req.PublisherKey,
 		OwnerUserID:  userID,
 		RepoURL:      req.RepoUrl,
@@ -692,7 +692,19 @@ func (c *ControllerV1) GitSourceRegister(
 	if err != nil {
 		return nil, err
 	}
-	return &marketv1.GitSourceRegisterRes{Plugin: pluginDetailFromRecord(record)}, nil
+	plugins := make([]*marketv1.MarketplacePluginDetailItem, 0)
+	if result != nil {
+		for _, record := range result.Plugins {
+			if item := pluginDetailFromRecord(record); item != nil {
+				plugins = append(plugins, item)
+			}
+		}
+	}
+	var primary *marketv1.MarketplacePluginDetailItem
+	if len(plugins) > 0 {
+		primary = plugins[0]
+	}
+	return &marketv1.GitSourceRegisterRes{Plugin: primary, Plugins: plugins}, nil
 }
 
 // GitSourceSync refreshes metadata for one owned Git marketplace plugin.

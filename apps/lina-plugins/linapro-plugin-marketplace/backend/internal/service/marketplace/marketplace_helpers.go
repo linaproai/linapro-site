@@ -40,6 +40,15 @@ func normalizePluginType(value marketv1.MarketplacePluginType) marketv1.Marketpl
 	return value
 }
 
+// normalizeProcessStatus returns pending_verify when callers pass a blank status.
+func normalizeProcessStatus(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return marketv1.MarketplaceProcessStatusPendingVerify.String()
+	}
+	return trimmed
+}
+
 // defaultJSONString returns fallback when value is blank after trimming.
 func defaultJSONString(value string, fallback string) string {
 	trimmed := strings.TrimSpace(value)
@@ -136,6 +145,7 @@ func pluginRecordFromEntity(row *entity.PluginMarketplacePlugin) *PluginRecord {
 		Description:     row.Description,
 		PluginType:      marketv1.MarketplacePluginType(row.PluginType),
 		MarketStatus:    marketv1.MarketplaceStatus(row.MarketStatus),
+		ProcessStatus:   marketv1.MarketplaceProcessStatus(normalizeProcessStatus(row.ProcessStatus)),
 		Visibility:      marketv1.MarketplaceVisibility(row.Visibility),
 		LatestReleaseID: row.LatestReleaseId,
 		LatestVersion:   row.LatestVersion,
@@ -147,6 +157,7 @@ func pluginRecordFromEntity(row *entity.PluginMarketplacePlugin) *PluginRecord {
 		SourceKind:      sourceKind,
 		RepoURL:         row.RepoUrl,
 		RepoProvider:    marketv1.MarketplaceRepoProvider(row.RepoProvider),
+		RepoPath:        row.RepoPath,
 		CredentialRef:   row.CredentialRef,
 		LastSyncAt:      cloneTime(row.LastSyncAt),
 		LastSyncStatus:  row.LastSyncStatus,
@@ -168,9 +179,11 @@ func releaseRecordFromEntity(row *entity.PluginMarketplaceRelease) *ReleaseRecor
 		PluginID:       row.PluginId,
 		Version:        row.ReleaseVersion,
 		SourceRef:      row.SourceRef,
+		SourceCommit:   row.SourceCommit,
 		PluginType:     marketv1.MarketplacePluginType(row.PluginType),
 		ReleaseStatus:  marketv1.MarketplaceStatus(row.ReleaseStatus),
 		ReviewStatus:   marketv1.MarketplaceReviewStatus(row.ReviewStatus),
+		ProcessStatus:  marketv1.MarketplaceProcessStatus(normalizeProcessStatus(row.ProcessStatus)),
 		Visibility:     marketv1.MarketplaceVisibility(row.Visibility),
 		MinHostVersion: row.MinHostVersion,
 		MaxHostVersion: row.MaxHostVersion,

@@ -15,10 +15,12 @@ type PluginMarketplaceRelease struct {
 	PublisherId        int        `json:"publisherId"        orm:"publisher_id"         description:"Owning publisher ID"`
 	PluginId           string     `json:"pluginId"           orm:"plugin_id"            description:"Stable plugin ID"`
 	ReleaseVersion     string     `json:"releaseVersion"     orm:"release_version"      description:"Plugin release version"`
-	SourceRef          string     `json:"sourceRef"        orm:"source_ref"         description:"Git tag or ref for git-sourced releases, empty for upload packages"`
+	SourceRef          string     `json:"sourceRef"        orm:"source_ref"         description:"Git logical tag or branch name for git-sourced releases, empty for upload packages"`
+	SourceCommit       string     `json:"sourceCommit"       orm:"source_commit"       description:"Pinned full commit SHA resolved during Git discovery, empty for upload packages"`
 	PluginType         string     `json:"pluginType"         orm:"plugin_type"          description:"Plugin type: source/dynamic"`
 	ReleaseStatus      string     `json:"releaseStatus"      orm:"release_status"       description:"Release status: draft/published/delisted/deprecated"`
 	ReviewStatus       string     `json:"reviewStatus"       orm:"review_status"        description:"Review status: draft/submitted/reviewing/approved/rejected"`
+	ProcessStatus      string     `json:"processStatus"      orm:"process_status"       description:"Async process status: pending_verify/pending_review/completed/failed"`
 	Visibility         string     `json:"visibility"         orm:"visibility"           description:"Release visibility policy"`
 	MinHostVersion     string     `json:"minHostVersion"     orm:"min_host_version"     description:"Minimum compatible LinaPro host version"`
 	MaxHostVersion     string     `json:"maxHostVersion"     orm:"max_host_version"     description:"Maximum compatible LinaPro host version"`

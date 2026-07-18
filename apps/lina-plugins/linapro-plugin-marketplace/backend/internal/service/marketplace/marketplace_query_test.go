@@ -147,6 +147,93 @@ func TestPluginListItemFromReadModelDecodesSnapshots(t *testing.T) {
 	}
 }
 
+func TestPluginDetailItemFromEntitiesProjectsSourceFields(t *testing.T) {
+	now := time.UnixMilli(1767247200000)
+	detail := pluginDetailItemFromEntities(
+		&entity.PluginMarketplacePlugin{
+			PluginId:        "linapro-demo-source",
+			Name:            "Demo Source",
+			Summary:         "Demo summary",
+			Description:     "Long description",
+			PluginType:      marketv1.MarketplacePluginTypeSource.String(),
+			MarketStatus:    marketv1.MarketplaceStatusPublished.String(),
+			ProcessStatus:   marketv1.MarketplaceProcessStatusCompleted.String(),
+			Visibility:      marketv1.MarketplaceVisibilityPublic.String(),
+			LatestVersion:   "v0.2.0",
+			Repository:      "https://github.com/example/demo-source",
+			License:         "Apache-2.0",
+			DownloadCount:   3,
+			SourceKind:      gitSourceKind,
+			RepoUrl:         "https://github.com/example/demo-source.git",
+			RepoProvider:    marketv1.MarketplaceRepoProviderGitHub.String(),
+			RepoPath:        "apps/lina-plugins/linapro-demo-source",
+			CredentialRef:   "cred-ref-1",
+			LastSyncStatus:  "success",
+			LastSyncMessage: "discovered 2 draft releases",
+			LastSyncAt:      &now,
+			PublishedAt:     &now,
+			UpdatedAt:       &now,
+		},
+		&entity.PluginMarketplacePublisher{
+			PublisherKey: "linapro",
+			Name:         "LinaPro",
+			Verified:     true,
+		},
+		nil,
+		nil,
+		nil,
+	)
+	if detail == nil {
+		t.Fatal("expected detail projection")
+	}
+	if detail.SourceKind != marketv1.MarketplaceSourceKindGit {
+		t.Fatalf("expected git source kind, got %#v", detail.SourceKind)
+	}
+	if detail.RepoUrl != "https://github.com/example/demo-source.git" {
+		t.Fatalf("unexpected repo url: %#v", detail.RepoUrl)
+	}
+	if detail.RepoProvider != marketv1.MarketplaceRepoProviderGitHub {
+		t.Fatalf("unexpected repo provider: %#v", detail.RepoProvider)
+	}
+	if detail.RepoPath != "apps/lina-plugins/linapro-demo-source" {
+		t.Fatalf("unexpected repo path: %#v", detail.RepoPath)
+	}
+	if !detail.RequiresAuth {
+		t.Fatal("expected RequiresAuth when credential ref is present")
+	}
+	if detail.LastSyncStatus != "success" || detail.LastSyncMessage != "discovered 2 draft releases" {
+		t.Fatalf("unexpected last sync fields: status=%q message=%q", detail.LastSyncStatus, detail.LastSyncMessage)
+	}
+	if detail.LastSyncAt == nil || *detail.LastSyncAt != now.UnixMilli() {
+		t.Fatalf("unexpected lastSyncAt: %#v", detail.LastSyncAt)
+	}
+
+	uploadDetail := pluginDetailItemFromEntities(
+		&entity.PluginMarketplacePlugin{
+			PluginId:     "linapro-demo-upload",
+			Name:         "Demo Upload",
+			PluginType:   marketv1.MarketplacePluginTypeDynamic.String(),
+			MarketStatus: marketv1.MarketplaceStatusDraft.String(),
+			Visibility:   marketv1.MarketplaceVisibilityPrivate.String(),
+			// Empty source kind must normalize to upload, matching list projection.
+			SourceKind: "",
+		},
+		nil,
+		nil,
+		nil,
+		nil,
+	)
+	if uploadDetail == nil {
+		t.Fatal("expected upload detail projection")
+	}
+	if uploadDetail.SourceKind != marketv1.MarketplaceSourceKindUpload {
+		t.Fatalf("expected empty source kind to normalize to upload, got %#v", uploadDetail.SourceKind)
+	}
+	if uploadDetail.RequiresAuth {
+		t.Fatal("expected RequiresAuth false without credential ref")
+	}
+}
+
 func TestArtifactPriorityPrefersPrimaryPackage(t *testing.T) {
 	dynamicZip := &entity.PluginMarketplaceArtifact{ArtifactType: marketv1.MarketplaceArtifactTypeDynamicZip.String()}
 	pluginWasm := &entity.PluginMarketplaceArtifact{ArtifactType: marketv1.MarketplaceArtifactTypePluginWasm.String()}

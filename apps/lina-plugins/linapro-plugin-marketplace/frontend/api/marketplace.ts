@@ -41,6 +41,8 @@ export type MarketplaceReadScope = "managed" | "mine" | "public";
 
 const marketplaceUploadTimeout = 120_000;
 const marketplaceDownloadTimeout = 120_000;
+// Git monorepo registration can touch many remote roots; keep above browser default 10s.
+const marketplaceGitTimeout = 120_000;
 
 function marketplacePath(pathName: string) {
   return pluginApiPath(marketplacePluginId, pathName);
@@ -195,6 +197,7 @@ export function marketplaceGitSourceRegister(
   return requestClient.post<{ plugin: MarketplacePluginDetailItem }>(
     marketplacePath("market/plugins/git-sources"),
     data,
+    { timeout: marketplaceGitTimeout },
   );
 }
 
@@ -247,7 +250,11 @@ export function marketplaceGitSourceSync(pluginId: string) {
   return requestClient.post<{
     plugin: MarketplacePluginDetailItem;
     synced: number;
-  }>(marketplacePath(`market/plugins/${encodePathSegment(pluginId)}/git-sync`));
+  }>(
+    marketplacePath(`market/plugins/${encodePathSegment(pluginId)}/git-sync`),
+    {},
+    { timeout: marketplaceGitTimeout },
+  );
 }
 
 export async function marketplaceReleaseDistribution(

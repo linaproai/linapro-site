@@ -66,15 +66,29 @@ func (s *serviceImpl) SubmitReleaseReview(ctx context.Context, in SubmitReleaseR
 	}
 
 	now := time.Now()
-	if _, err = dao.PluginMarketplaceRelease.Ctx(ctx).
-		Where(do.PluginMarketplaceRelease{Id: release.Id}).
-		Data(do.PluginMarketplaceRelease{
-			ReviewStatus:  marketv1.MarketplaceReviewStatusSubmitted.String(),
-			ReviewMessage: normalizeKey(in.Message),
-			SubmittedAt:   &now,
-		}).
-		Update(); err != nil {
-		return nil, bizerr.WrapCode(err, CodeMarketplaceStorageFailed)
+	if err = dao.PluginMarketplaceRelease.Transaction(ctx, func(ctx context.Context, _ gdb.TX) error {
+		if _, updateErr := dao.PluginMarketplaceRelease.Ctx(ctx).
+			Where(do.PluginMarketplaceRelease{Id: release.Id}).
+			Data(do.PluginMarketplaceRelease{
+				ReviewStatus:  marketv1.MarketplaceReviewStatusSubmitted.String(),
+				ProcessStatus: marketv1.MarketplaceProcessStatusPendingReview.String(),
+				ReviewMessage: normalizeKey(in.Message),
+				SubmittedAt:   &now,
+			}).
+			Update(); updateErr != nil {
+			return bizerr.WrapCode(updateErr, CodeMarketplaceStorageFailed)
+		}
+		if setErr := s.setPluginProcessStatus(
+			ctx,
+			plugin.Id,
+			marketv1.MarketplaceProcessStatusPendingReview,
+			"",
+		); setErr != nil {
+			return setErr
+		}
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 	return s.getReleaseRecordByID(ctx, release.Id)
 }
@@ -182,16 +196,30 @@ func (s *serviceImpl) rejectRelease(
 	message string,
 ) (*ReleaseRecord, error) {
 	now := time.Now()
-	if _, err := dao.PluginMarketplaceRelease.Ctx(ctx).
-		Where(do.PluginMarketplaceRelease{Id: release.Id}).
-		Data(do.PluginMarketplaceRelease{
-			ReleaseStatus: marketv1.MarketplaceStatusDraft.String(),
-			ReviewStatus:  marketv1.MarketplaceReviewStatusRejected.String(),
-			ReviewMessage: normalizeKey(message),
-			ReviewedAt:    &now,
-		}).
-		Update(); err != nil {
-		return nil, bizerr.WrapCode(err, CodeMarketplaceStorageFailed)
+	if err := dao.PluginMarketplaceRelease.Transaction(ctx, func(ctx context.Context, _ gdb.TX) error {
+		if _, updateErr := dao.PluginMarketplaceRelease.Ctx(ctx).
+			Where(do.PluginMarketplaceRelease{Id: release.Id}).
+			Data(do.PluginMarketplaceRelease{
+				ReleaseStatus: marketv1.MarketplaceStatusDraft.String(),
+				ReviewStatus:  marketv1.MarketplaceReviewStatusRejected.String(),
+				ProcessStatus: marketv1.MarketplaceProcessStatusFailed.String(),
+				ReviewMessage: normalizeKey(message),
+				ReviewedAt:    &now,
+			}).
+			Update(); updateErr != nil {
+			return bizerr.WrapCode(updateErr, CodeMarketplaceStorageFailed)
+		}
+		if setErr := s.setPluginProcessStatus(
+			ctx,
+			release.PluginRecordId,
+			marketv1.MarketplaceProcessStatusFailed,
+			normalizeKey(message),
+		); setErr != nil {
+			return setErr
+		}
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 	return s.getReleaseRecordByID(ctx, release.Id)
 }
@@ -210,6 +238,7 @@ func (s *serviceImpl) approveRelease(
 			Data(do.PluginMarketplaceRelease{
 				ReleaseStatus: marketv1.MarketplaceStatusPublished.String(),
 				ReviewStatus:  marketv1.MarketplaceReviewStatusApproved.String(),
+				ProcessStatus: marketv1.MarketplaceProcessStatusCompleted.String(),
 				ReviewMessage: normalizeKey(message),
 				ReviewedAt:    &now,
 				PublishedAt:   &now,
@@ -220,6 +249,7 @@ func (s *serviceImpl) approveRelease(
 
 		pluginData := do.PluginMarketplacePlugin{
 			MarketStatus:    marketv1.MarketplaceStatusPublished.String(),
+			ProcessStatus:   marketv1.MarketplaceProcessStatusCompleted.String(),
 			LatestReleaseId: release.Id,
 			LatestVersion:   release.ReleaseVersion,
 		}
@@ -245,15 +275,18 @@ func (s *serviceImpl) releaseDraftData(
 	in SaveReleaseDraftInput,
 ) do.PluginMarketplaceRelease {
 	pluginType := normalizePluginType(in.PluginType)
+	processStatus := ensureProcessStatusOnDraft(plugin.SourceKind)
 	return do.PluginMarketplaceRelease{
 		PluginRecordId:     plugin.Id,
 		PublisherId:        plugin.PublisherId,
 		PluginId:           plugin.PluginId,
 		ReleaseVersion:     normalizeKey(in.Version),
 		SourceRef:          normalizeKey(in.SourceRef),
+		SourceCommit:       normalizeKey(in.SourceCommit),
 		PluginType:         pluginType.String(),
 		ReleaseStatus:      marketv1.MarketplaceStatusDraft.String(),
 		ReviewStatus:       marketv1.MarketplaceReviewStatusDraft.String(),
+		ProcessStatus:      processStatus.String(),
 		Visibility:         normalizeVisibility(in.Visibility).String(),
 		MinHostVersion:     normalizeKey(in.MinHostVersion),
 		MaxHostVersion:     normalizeKey(in.MaxHostVersion),

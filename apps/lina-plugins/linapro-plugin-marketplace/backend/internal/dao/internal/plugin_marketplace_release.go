@@ -26,10 +26,12 @@ type PluginMarketplaceReleaseColumns struct {
 	PublisherId        string // Owning publisher ID
 	PluginId           string // Stable plugin ID
 	ReleaseVersion     string // Plugin release version
-	SourceRef          string // Git tag or ref for git-sourced releases, empty for upload packages
+	SourceRef          string // Git logical tag or branch name for git-sourced releases, empty for upload packages
+	SourceCommit       string // Pinned full commit SHA resolved during Git discovery, empty for upload packages
 	PluginType         string // Plugin type: source/dynamic
 	ReleaseStatus      string // Release status: draft/published/delisted/deprecated
 	ReviewStatus       string // Review status: draft/submitted/reviewing/approved/rejected
+	ProcessStatus      string // Async process status: pending_verify/pending_review/completed/failed
 	Visibility         string // Release visibility policy
 	MinHostVersion     string // Minimum compatible LinaPro host version
 	MaxHostVersion     string // Maximum compatible LinaPro host version
@@ -58,9 +60,11 @@ var pluginMarketplaceReleaseColumns = PluginMarketplaceReleaseColumns{
 	PluginId:           "plugin_id",
 	ReleaseVersion:     "release_version",
 	SourceRef:          "source_ref",
+	SourceCommit:       "source_commit",
 	PluginType:         "plugin_type",
 	ReleaseStatus:      "release_status",
 	ReviewStatus:       "review_status",
+	ProcessStatus:      "process_status",
 	Visibility:         "visibility",
 	MinHostVersion:     "min_host_version",
 	MaxHostVersion:     "max_host_version",

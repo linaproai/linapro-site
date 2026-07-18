@@ -21,6 +21,7 @@ type PluginMarketplacePlugin struct {
 	Description     any        // Long marketplace description
 	PluginType      any        // Plugin type: source/dynamic
 	MarketStatus    any        // Marketplace status: draft/published/delisted/deprecated
+	ProcessStatus   any        // Async process status: pending_verify/pending_review/completed/failed
 	Visibility      any        // Visibility policy: public/private/reserved
 	LatestReleaseId any        // Latest published release ID
 	LatestVersion   any        // Latest published version
@@ -32,6 +33,7 @@ type PluginMarketplacePlugin struct {
 	SourceKind      any        // Publish source kind: git/upload
 	RepoUrl         any        // Git repository URL when source_kind is git
 	RepoProvider    any        // Git provider: github/gitee, empty for upload
+	RepoPath        any        // Plugin root path relative to repository root; empty when repository root is the plugin root
 	CredentialRef   any        // Opaque credential reference for private Git access, empty when public
 	LastSyncAt      *time.Time // Last Git metadata discovery time
 	LastSyncStatus  any        // Last Git sync status

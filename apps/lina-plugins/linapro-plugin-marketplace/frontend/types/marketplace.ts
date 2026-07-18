@@ -47,6 +47,12 @@ export type MarketplaceStatus =
   | 'draft'
   | 'published';
 
+export type MarketplaceProcessStatus =
+  | 'completed'
+  | 'failed'
+  | 'pending_review'
+  | 'pending_verify';
+
 export type MarketplaceVisibility = 'private' | 'public' | 'reserved';
 
 export interface MarketplacePageParams {
@@ -117,15 +123,19 @@ export interface MarketplaceArtifactItem {
 
 export interface MarketplaceReleaseItem {
   artifact?: MarketplaceArtifactItem;
+  distribution?: MarketplaceDistributionItem;
   maxHostVersion?: string;
   minHostVersion?: string;
   pluginId: string;
   pluginType: MarketplacePluginType;
+  processStatus?: MarketplaceProcessStatus;
   publishedAt?: null | number;
   releaseStatus: MarketplaceStatus;
   reviewMessage?: string;
   reviewStatus: MarketplaceReviewStatus;
   reviewedAt?: null | number;
+  sourceCommit?: string;
+  sourceRef?: string;
   submittedAt?: null | number;
   updatedAt?: null | number;
   version: string;
@@ -140,6 +150,7 @@ export interface MarketplaceDistributionItem {
   artifactType?: MarketplaceArtifactType;
   downloadSessionRequired?: boolean;
   mode: MarketplaceDistributionMode;
+  path?: string;
   pluginId: string;
   pluginType: MarketplacePluginType;
   provider?: MarketplaceRepoProvider;
@@ -164,8 +175,10 @@ export interface MarketplacePluginListItem {
   pluginId: string;
   pluginType: MarketplacePluginType;
   primaryTag?: string;
+  processStatus?: MarketplaceProcessStatus;
   publishedAt?: null | number;
   publisher?: MarketplacePublisherItem;
+  repoPath?: string;
   repoProvider?: MarketplaceRepoProvider;
   repoUrl?: string;
   riskCounts: MarketplaceRiskCounts;
@@ -177,17 +190,21 @@ export interface MarketplacePluginListItem {
   name: string;
 }
 
+export type MarketplaceListStatusFilter =
+  | MarketplaceProcessStatus
+  | MarketplaceStatus;
+
 export interface MarketplaceManagedPluginListParams extends MarketplacePageParams {
   keyword?: string;
   pluginType?: MarketplacePluginType;
   publisher?: string;
-  status?: MarketplaceStatus;
+  status?: MarketplaceListStatusFilter;
 }
 
 export interface MarketplaceMyPluginListParams extends MarketplacePageParams {
   keyword?: string;
   pluginType?: MarketplacePluginType;
-  status?: MarketplaceStatus;
+  status?: MarketplaceListStatusFilter;
 }
 
 export interface MarketplaceReviewQueueItem {
@@ -227,8 +244,10 @@ export interface MarketplacePluginDetailItem {
   name: string;
   pluginId: string;
   pluginType: MarketplacePluginType;
+  processStatus?: MarketplaceProcessStatus;
   publishedAt?: null | number;
   publisher?: MarketplacePublisherItem;
+  repoPath?: string;
   repoProvider?: MarketplaceRepoProvider;
   repoUrl?: string;
   repository?: string;

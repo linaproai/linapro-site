@@ -26,14 +26,38 @@
 
 ### Requirement: Git 源只做元数据发现且登记后立即同步并定时轮询
 
-系统 SHALL 对`source_kind=git`的插件通过 GitHub/Gitee 平台 API 发现版本标签并读取远程`plugin.yaml`等元数据。系统 MUST NOT 为发现流程执行完整`git clone`或将仓库全量文件镜像到服务端对象存储。系统 MUST 在登记成功后立即执行一次发现，并 MUST 以可配置间隔定时轮询已登记 Git 源的 tags。新发现的 tag MUST 生成或刷新**未发布**草稿；已发布版本 MUST 保持不可变。
+系统 SHALL 对`source_kind=git`的插件通过 GitHub/Gitee 平台 API 发现版本标签或分支引用，并读取远程`plugin.yaml`等元数据。系统 MUST NOT 为发现流程执行完整`git clone`或将仓库全量文件镜像到服务端对象存储。系统 MUST 在登记成功后将插件置为待验证（`pending_verify`）并纳入异步处理流水线（登记请求可为识别插件根而做最小远程探测，但完整版本发现与验证 MUST 由异步定时任务在待验证阶段内推进），并 MUST 以可配置间隔定时轮询已登记 Git 源。新发现的引用 MUST 生成或刷新**未发布**草稿；已发布版本 MUST 保持不可变。系统 MUST NOT 再将「待拉取」（`pending_fetch`）作为用户可见或可写入的处理状态。
 
-#### Scenario: 登记后立即发现 tags
+版本引用解析 MUST 遵守：
+
+1. 当远程存在一个或多个符合 semver 规则的版本 tag 时，系统 MUST 使用这些 tag（按提供商返回顺序或等价的新到旧顺序）进行发现，且 MUST NOT 因存在 tag 而回退到分支。
+2. 当远程不存在任何符合规则的版本 tag 时，系统 MUST 回退读取`main`分支最新内容并据此生成草稿。
+3. 当既无符合规则的版本 tag、且`main`分支也不存在或不可读时，系统 MUST 以明确诊断失败，且 MUST NOT 使用其他分支名作为隐式回退。
+
+#### Scenario: 登记后入列并由异步任务发现 tags
 
 - **WHEN** 发布者成功登记可访问的 Git 源
 - **AND** 远程存在符合规则的版本标签
-- **THEN** 系统在登记响应完成前后完成至少一次发现
+- **THEN** 系统在登记后将插件置为待验证（`pending_verify`）
+- **AND** 异步定时任务在待验证阶段完成至少一次版本发现与校验
 - **AND** 为每个新 tag 生成对应版本草稿或更新既有可变草稿
+
+#### Scenario: 无版本 tag 时回退 main 分支
+
+- **WHEN** 发布者登记可访问的 Git 源
+- **AND** 远程不存在符合规则的版本标签
+- **AND** `main`分支存在且可读
+- **THEN** 系统以`main`为`source_ref`读取`plugin.yaml`并生成或刷新草稿
+- **AND** 同时解析并持久化该`main`分支当时的`source_commit`（完整 commit SHA）
+- **AND** 不报「repository has no version tags」类阻断错误
+
+#### Scenario: 无 tag 且无 main 时失败
+
+- **WHEN** 发布者登记 Git 源或触发元数据同步
+- **AND** 远程不存在符合规则的版本标签
+- **AND** `main`分支不存在或不可读
+- **THEN** 系统返回元数据发现失败
+- **AND** 诊断信息说明缺少版本标签且`main`分支不可用
 
 #### Scenario: 定时轮询发现新 tag
 
@@ -44,31 +68,101 @@
 #### Scenario: 服务端不落全量源码
 
 - **WHEN** 系统对 Git 源执行元数据发现
-- **THEN** 服务端仅持久化仓库坐标、tag/ref、清单快照与同步状态等元数据
+- **THEN** 服务端仅持久化仓库坐标、插件根相对路径、tag/ref、commit SHA、清单快照与同步状态等元数据
 - **AND** 不得将完整 backend/frontend 源码树作为市场 artifact 存储
 
 ### Requirement: Git 版本标签必须与 plugin.yaml version 一致
 
-系统 SHALL 在 Git 元数据发现时校验版本标签与远程根级`plugin.yaml`的`version`字段语义一致（允许 tag 带或不带`v`前缀的规范化比较）。不一致时，系统 MUST NOT 允许该版本进入可提交审核的合格草稿，或 MUST 将草稿标记为不可提交并给出明确错误。
+系统 SHALL 在基于**版本 tag**的 Git 元数据发现时，校验该 tag 与对应插件根目录`plugin.yaml`的`version`字段语义一致（允许 tag 带或不带`v`前缀的规范化比较）。不一致时，系统 MUST NOT 允许该版本进入可提交审核的合格草稿，或 MUST 将草稿标记为不可提交并给出明确错误。当发现引用为回退的`main`分支时，系统 MUST 使用`plugin.yaml`的`version`作为草稿版本，且 MUST NOT 要求存在与版本同名的 tag。
 
 #### Scenario: tag 与清单版本一致
 
-- **WHEN** 远程 tag 为`v1.2.0`且`plugin.yaml`的`version`规范化后同为`1.2.0`或`v1.2.0`
+- **WHEN** 远程 tag 为`v1.2.0`且对应插件根`plugin.yaml`的`version`规范化后同为`1.2.0`或`v1.2.0`
 - **THEN** 系统可保存该版本草稿供后续提交审核
 
 #### Scenario: tag 与清单版本不一致
 
-- **WHEN** 远程 tag 为`v1.2.0`且`plugin.yaml`的`version`为`1.0.0`
+- **WHEN** 远程 tag 为`v1.2.0`且对应插件根`plugin.yaml`的`version`为`1.0.0`
 - **THEN** 系统拒绝将该版本视为可提交审核的合格草稿
 - **AND** 同步状态或诊断信息说明版本不一致
 
-### Requirement: Git 源 MVP 仅服务源码插件且仓库根为插件根
+#### Scenario: main 回退使用清单版本
 
-系统 SHALL 将 Git 发布通道的 MVP 范围限定为源码插件：远程`plugin.yaml`的`type` MUST 为`source`。系统 MUST 将仓库根目录视为插件根目录，MUST NOT 在 MVP 中支持 monorepo 子目录配置。动态插件 MUST 通过上传包通道发布。
+- **WHEN** 系统因无有效 tag 而从`main`分支发现元数据
+- **AND** 对应插件根`plugin.yaml`声明`version: 0.2.0`
+- **THEN** 系统保存版本草稿`v0.2.0`（或规范化等价形式）
+- **AND** `source_ref`为`main`
+- **AND** `source_commit`为发现时`main`指向的 commit SHA
+
+### Requirement: Git 来源版本必须钉扎 source_commit 且安装引用不可浮动
+
+系统 SHALL 在 Git 元数据发现写入或刷新**可变** release 草稿时，解析候选 ref（semver tag 或回退的`main`）对应的完整 commit SHA，并持久化为`source_commit`。`source_ref` MAY 保留逻辑引用名（如`v1.0.0`或`main`）供展示。对已发布或不可变 release，系统 MUST NOT 因后续 main 前进、tag force-push 或再次同步而改写其`source_ref`/`source_commit`。
+
+当返回`distribution.mode=git`时，`distribution.ref` MUST 优先使用该版本的`source_commit`；仅当`source_commit`缺失且无法解析时，才可回退到`source_ref`。系统 MUST NOT 让已登记/已发布版本的安装路径仅依赖浮动分支名`main`，以避免市场展示版本与实际检出内容不一致。
+
+#### Scenario: main 回退版本钉扎 commit 用于安装
+
+- **WHEN** 系统因无有效 tag 从`main`发现版本草稿并完成入库
+- **AND** 发现时`main`指向 commit`abc123…`
+- **THEN** 该 release 的`source_ref`为`main`
+- **AND** `source_commit`为`abc123…`
+- **AND** 查询该版本`distribution`时`ref`为`abc123…`（或与之等价的完整 SHA）
+- **AND** MUST NOT 仅返回未钉扎的`main`作为安装引用
+
+#### Scenario: 已发布版本不因 main 前进而改变安装引用
+
+- **WHEN** 某 Git 来源版本已发布且`source_commit`为`abc123…`
+- **AND** 远程`main`随后前进到新的 commit
+- **AND** 定时同步再次运行
+- **THEN** 该已发布版本的`source_commit`与`distribution.ref`保持`abc123…`
+- **AND** 系统不得覆盖该已发布版本的安装坐标
+
+#### Scenario: tag 发现同样持久化 commit
+
+- **WHEN** 系统基于 semver tag`v1.0.0`发现元数据
+- **AND** 该 tag 当时指向 commit`def456…`
+- **THEN** release 保存`source_ref=v1.0.0`与`source_commit=def456…`
+- **AND** `distribution.ref`优先为`def456…`
+
+### Requirement: 插件必须保留历史版本记录并支持选择安装
+
+系统 SHALL 为同一`pluginId`保留多条版本 release 历史（不同`release_version`）。新版本上架、Git 发现新 tag 或上传新包 MUST NOT 自动删除、覆盖或不可查询既有**已发布**历史版本。系统 MUST 提供按插件列出可见版本的查询能力，并 MUST 允许有权限的消费者按指定版本获取`distribution`或下载会话，以便在兼容性问题时安装历史版本进行回退。
+
+#### Scenario: 多版本并存可查询
+
+- **WHEN** 同一插件存在多个已发布版本（例如`v1.0.0`与`v1.1.0`）
+- **AND** 有权限用户查询该插件的版本列表
+- **THEN** 响应包含上述历史版本条目
+- **AND** 不因存在更新的`v1.1.0`而隐藏`v1.0.0`
+
+#### Scenario: 消费者安装指定历史版本
+
+- **WHEN** 有权限用户请求某已发布历史版本（非最新）的分发信息或下载
+- **THEN** 系统返回该指定版本的`distribution`或下载会话
+- **AND** 安装/下载内容对应该历史版本（Git 源使用其钉扎的`source_commit`；上传包使用其 artifact）
+- **AND** 不静默替换为最新版本
+
+#### Scenario: 新版本发布不抹除历史
+
+- **WHEN** 审核通过并发布新版本`v1.2.0`
+- **AND** 同插件先前已发布`v1.1.0`
+- **THEN** `v1.1.0`仍可作为历史版本被查询与安装
+- **AND** 其`source_commit`或产物校验和保持不变
+
+### Requirement: Git 源仅服务源码插件并自动识别单插件与多插件仓库
+
+系统 SHALL 将 Git 发布通道限定为源码插件：远程`plugin.yaml`的`type` MUST 为`source`（空类型按源码处理时仍须通过源码最小结构检查）。动态插件 MUST 通过上传包通道发布。
+
+系统 MUST 在元数据发现时自动识别仓库布局，而无需发布者手工填写子目录：
+
+1. **单插件仓库**：若仓库根目录存在合法源码插件`plugin.yaml`且通过最小结构检查，则插件根为仓库根，`repo_path`为空。
+2. **多插件仓库**：若仓库根不是合法源码插件根，系统 MUST 通过远程目录树发现子目录中的合法源码插件根（例如`apps/lina-plugins/<plugin-id>/`或一级子目录插件），并为每个合法插件根创建或更新独立的市场插件记录，记录各自的`repo_path`（相对仓库根的插件根路径）。
+
+登记同一仓库 URL 时，系统 MUST 为识别到的每个合法源码插件根各维护一条`source_kind=git`记录（同一发布者归属、同一`repo_url`/凭证），且 MUST 在分发投影中暴露插件根相对路径，供 CLI 从 monorepo 检出后落到正确本地路径。系统 MUST NOT 要求调用方在登记 API 中传入插件子目录参数。
 
 #### Scenario: 源码插件 Git 草稿可创建
 
-- **WHEN** 远程`plugin.yaml`声明`type: source`且通过版本一致性与最小结构检查
+- **WHEN** 远程某插件根`plugin.yaml`声明`type: source`且通过版本一致性与最小结构检查
 - **THEN** 系统允许创建 Git 来源的源码插件版本草稿
 
 #### Scenario: 动态类型不走 Git 源
@@ -77,11 +171,20 @@
 - **THEN** 系统不生成可发布的 Git 动态版本
 - **AND** 诊断信息提示动态插件应使用上传包通道
 
-#### Scenario: 不支持 monorepo 子目录
+#### Scenario: 自动识别单插件仓库
 
-- **WHEN** 发布者尝试登记带插件子目录参数的 Git 源
-- **THEN** 系统拒绝该参数或忽略并文档化不支持
-- **AND** 仅按仓库根目录解释插件内容
+- **WHEN** 发布者登记仓库根即为合法源码插件的 Git 源
+- **THEN** 系统创建一条市场插件记录
+- **AND** `repo_path`为空
+- **AND** 按仓库根读取`plugin.yaml`与结构文件
+
+#### Scenario: 自动识别多插件仓库
+
+- **WHEN** 发布者登记一个在子目录中包含多个合法源码插件根的仓库
+- **AND** 仓库根本身不是合法源码插件根
+- **THEN** 系统为每个合法插件根创建或更新对应市场插件记录
+- **AND** 各记录保存各自的`repo_path`
+- **AND** 元数据发现分别读取各插件根下的`plugin.yaml`
 
 ### Requirement: 上传通道必须支持 zip 与 tar.gz 并强制目录规范
 
@@ -107,13 +210,14 @@
 
 ### Requirement: 已发布版本查询必须返回 distribution 分发投影
 
-系统 SHALL 在版本详情或专用分发查询接口中返回`distribution`对象，供 CLI 安装使用。当版本来自 Git 源时，`distribution.mode` MUST 为`git`，并 MUST 包含`repoUrl`与`ref`，MUST NOT 包含平台代持的明文访问令牌。当版本来自上传包时，`distribution.mode` MUST 为`https`，并 MUST 提供创建下载会话所需的产物类型与`sha256`（或等价校验信息）。对调用方不可见或未发布且无发布/审核特权的版本，系统 MUST NOT 泄露完整分发坐标。
+系统 SHALL 在版本详情或专用分发查询接口中返回`distribution`对象，供 CLI 安装使用。当版本来自 Git 源时，`distribution.mode` MUST 为`git`，并 MUST 包含`repoUrl`与`ref`（`ref`优先为钉扎的`source_commit`），MUST NOT 包含平台代持的明文访问令牌。当版本来自上传包时，`distribution.mode` MUST 为`https`，并 MUST 提供创建下载会话所需的产物类型与`sha256`（或等价校验信息）。对调用方不可见或未发布且无发布/审核特权的版本，系统 MUST NOT 泄露完整分发坐标。分发查询 MUST 按请求路径中的版本定位到对应 release，不得默认改写为最新版本。
 
 #### Scenario: Git 版本返回 git 分发信息
 
 - **WHEN** 有权限用户查询已发布 Git 来源版本的分发信息
 - **THEN** 响应`distribution.mode`为`git`
 - **AND** 包含可克隆的`repoUrl`与对应`ref`
+- **AND** 当该版本存在`source_commit`时，`ref`为该 commit SHA
 - **AND** 不包含服务端保存的 token 明文
 
 #### Scenario: 上传版本返回 https 分发信息
@@ -122,6 +226,13 @@
 - **THEN** 响应`distribution.mode`为`https`
 - **AND** 包含产物类型与`sha256`等校验字段
 - **AND** 客户端仍须通过既有下载会话获取包体（除非设计明确的等价受控 URL）
+
+#### Scenario: 指定历史版本分发不漂移到最新
+
+- **WHEN** 有权限用户查询版本`v1.0.0`的分发信息
+- **AND** 同插件另有更新的已发布版本`v1.1.0`
+- **THEN** 返回的`distribution.version`为`v1.0.0`
+- **AND** Git 源时`ref`对应该`v1.0.0`记录的钉扎 commit，而非`v1.1.0`或当前`main` tip
 
 #### Scenario: 无权用户不能读取私有版本分发信息
 
@@ -177,14 +288,54 @@
 #### Scenario: 发布者登记 Git 源
 
 - **WHEN** 发布者在“我的插件”选择登记仓库并提交合法表单
-- **THEN** 系统创建 Git 来源插件并触发元数据发现
-- **AND** 列表可展示同步状态或已发现版本摘要
+- **THEN** 系统创建 Git 来源插件并立即出现在“我的插件”列表
+- **AND** 插件处理状态为待验证（`pending_verify`）
+- **AND** 完整元数据发现、验证与进审由异步定时任务在待验证阶段推进，而非阻塞登记请求完成全部流水线
 
 #### Scenario: 发布者上传压缩包版本
 
 - **WHEN** 发布者在“我的插件”为上传型插件选择合法`zip`或`tar.gz`并上传
-- **THEN** 系统保存版本草稿
-- **AND** 发布者可继续提交审核
+- **THEN** 系统保存版本草稿并立即出现在“我的插件”列表
+- **AND** 插件处理状态进入待验证（`pending_verify`）
+- **AND** 验证成功后由异步任务进入待审核，而不是要求发布者在验证前手工点“提交审核”
+
+### Requirement: 添加插件后必须进入异步处理状态机
+
+系统 SHALL 在插件添加（Git 登记或包上传）成功后，立即将插件纳入发布者“我的插件”列表，并通过异步定时任务推进处理流水线。处理状态 MUST 覆盖并按序切换：
+
+1. **待验证**（`pending_verify`）：添加成功后的统一入列状态。对 Git 源，本阶段内由异步任务完成元数据发现与结构/清单校验；对上传包，本阶段内校验已入库的包体与清单。
+2. **待审核**（`pending_review`）：验证成功，进入人工审核队列
+3. **已完成**（`completed`）：审核通过后对具备权限的消费者可见（可与`market_status=published`并存）
+4. **处理失败**（`failed`）：验证或发现失败，保留诊断信息
+
+系统 MUST NOT 再暴露或写入「待拉取」（`pending_fetch`）处理状态。系统 MUST 将上述状态投影到“我的插件”列表与详情。验证失败时 MUST 进入可观测失败状态并保留诊断信息，且 MUST NOT 静默进入已发布。审核拒绝 MUST NOT 将插件标记为已发布。公开目录仍仅展示审核通过后的已发布版本。
+
+#### Scenario: 添加后立即可见且为待验证
+
+- **WHEN** 发布者成功添加一个 Git 来源或上传包插件
+- **THEN** “我的插件”列表立即包含该插件
+- **AND** 展示状态为待验证（`pending_verify`）
+- **AND** 公开市场目录尚不可见该未发布插件
+
+#### Scenario: 待验证阶段完成发现与校验后进入待审核
+
+- **WHEN** 异步定时任务处理一条`pending_verify`插件
+- **AND**（Git 源）元数据发现成功且（两种来源）验证通过
+- **THEN** 插件处理状态变为待审核（`pending_review`）
+- **AND** 对应版本进入人工审核队列（`review_status=submitted` 或等价）
+
+#### Scenario: 审核通过后已发布
+
+- **WHEN** 审核人员批准处于待审核的版本
+- **THEN** 插件/版本市场状态变为已发布（`published`）
+- **AND** 处理状态标记为完成（`completed` 或等价）
+- **AND** 具备权限的消费者可在公开目录看到该版本
+
+#### Scenario: 上传包与 Git 源共享同一入列状态
+
+- **WHEN** 发布者通过上传包或 Git 登记添加插件
+- **THEN** 初始处理状态均为待验证（`pending_verify`）
+- **AND** 验证成功后进入待审核，审核通过后才已发布
 
 ## MODIFIED Requirements
 

@@ -14,15 +14,16 @@ import type { VbenFormProps } from "@vben/common-ui";
 import type { VxeGridProps } from "#/adapter/vxe-table";
 
 import type {
+  MarketplaceListStatusFilter,
   MarketplacePluginListItem,
   MarketplacePluginType,
   MarketplaceStatus,
 } from "../../types/marketplace";
 
-import { computed, nextTick, onMounted, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { defineAsyncComponent, onMounted, watch } from "vue";
+import { useRoute } from "vue-router";
 
-import { Page } from "@vben/common-ui";
+import { Page, useVbenModal } from "@vben/common-ui";
 
 import { Tag } from "ant-design-vue";
 
@@ -31,8 +32,6 @@ import { $t } from "#/locales";
 import { formatTimestamp } from "#/utils/time";
 
 import { marketplaceManagedPluginList } from "../../api/marketplace";
-import { marketplaceDetailPath } from "../../utils/routes";
-import MarketplaceDetail from "../detail/index.vue";
 
 type GridPageInfo = {
   currentPage: number;
@@ -43,7 +42,7 @@ type AdminFormValues = {
   keyword?: string;
   pluginType?: MarketplacePluginType;
   publisher?: string;
-  status?: MarketplaceStatus;
+  status?: MarketplaceListStatusFilter;
 };
 
 type AdminGridOptions = NonNullable<
@@ -51,11 +50,12 @@ type AdminGridOptions = NonNullable<
 >;
 
 const route = useRoute();
-const router = useRouter();
-const showEmbeddedDetail = computed(
-  () =>
-    route.query.view === "detail" && typeof route.query.pluginId === "string",
-);
+
+const [DetailModal, detailModalApi] = useVbenModal({
+  connectedComponent: defineAsyncComponent(
+    () => import("../detail/detail-modal.vue"),
+  ),
+});
 
 const [Grid, gridApi] = useVbenVxeGrid<MarketplacePluginListItem>({
   formOptions: {
@@ -147,14 +147,28 @@ function buildFormOptions(): VbenFormProps {
         componentProps: {
           options: [
             {
-              label: t("plugin.linapro-plugin-marketplace.detail.status.draft"),
-              value: "draft",
+              label: t(
+                "plugin.linapro-plugin-marketplace.detail.processStatus.pendingVerify",
+              ),
+              value: "pending_verify",
+            },
+            {
+              label: t(
+                "plugin.linapro-plugin-marketplace.detail.processStatus.pendingReview",
+              ),
+              value: "pending_review",
             },
             {
               label: t(
                 "plugin.linapro-plugin-marketplace.detail.status.published",
               ),
               value: "published",
+            },
+            {
+              label: t(
+                "plugin.linapro-plugin-marketplace.detail.processStatus.failed",
+              ),
+              value: "failed",
             },
             {
               label: t(
@@ -212,6 +226,13 @@ function buildColumns(): AdminGridOptions["columns"] {
       title: t("plugin.linapro-plugin-marketplace.detail.fields.latestVersion"),
     },
     {
+      field: "downloadCount",
+      formatter: ({ cellValue }: { cellValue?: null | number }) =>
+        String(cellValue ?? 0),
+      title: t("plugin.linapro-plugin-marketplace.catalog.columns.downloads"),
+      width: 100,
+    },
+    {
       field: "latestReviewStatus",
       slots: { default: "reviewStatus" },
       title: t("plugin.linapro-plugin-marketplace.detail.columns.reviewStatus"),
@@ -237,17 +258,16 @@ function buildColumns(): AdminGridOptions["columns"] {
 onMounted(async () => {
   gridApi.setState({ formOptions: buildFormOptions() });
   gridApi.setGridOptions({ columns: buildColumns() });
-  if (!showEmbeddedDetail.value) {
-    await gridApi.reload();
-  }
+  await gridApi.reload();
+  openDetailFromRouteQuery();
 });
 
-watch(showEmbeddedDetail, async (detailMode) => {
-  if (!detailMode) {
-    await nextTick();
-    await gridApi.reload();
-  }
-});
+watch(
+  () => [route.query.view, route.query.pluginId] as const,
+  () => {
+    openDetailFromRouteQuery();
+  },
+);
 
 function formatPluginType(type: MarketplacePluginType) {
   return type === "source"
@@ -255,22 +275,40 @@ function formatPluginType(type: MarketplacePluginType) {
     : t("plugin.linapro-plugin-marketplace.catalog.pluginType.dynamic");
 }
 
-function formatMarketStatus(status: MarketplaceStatus) {
-  switch (status) {
-    case "delisted": {
-      return t("plugin.linapro-plugin-marketplace.detail.status.delisted");
+function formatMarketStatus(
+  status: MarketplaceStatus,
+  processStatus?: string,
+) {
+  if (status === "published") {
+    return t("plugin.linapro-plugin-marketplace.detail.status.published");
+  }
+  if (status === "delisted") {
+    return t("plugin.linapro-plugin-marketplace.detail.status.delisted");
+  }
+  if (status === "deprecated") {
+    return t("plugin.linapro-plugin-marketplace.detail.status.deprecated");
+  }
+  switch (processStatus) {
+    case "pending_verify": {
+      return t(
+        "plugin.linapro-plugin-marketplace.detail.processStatus.pendingVerify",
+      );
     }
-    case "deprecated": {
-      return t("plugin.linapro-plugin-marketplace.detail.status.deprecated");
+    case "pending_review": {
+      return t(
+        "plugin.linapro-plugin-marketplace.detail.processStatus.pendingReview",
+      );
     }
-    case "draft": {
-      return t("plugin.linapro-plugin-marketplace.detail.status.draft");
+    case "failed": {
+      return t("plugin.linapro-plugin-marketplace.detail.processStatus.failed");
     }
-    case "published": {
-      return t("plugin.linapro-plugin-marketplace.detail.status.published");
+    case "completed": {
+      return t(
+        "plugin.linapro-plugin-marketplace.detail.processStatus.completed",
+      );
     }
     default: {
-      return status || "-";
+      return t("plugin.linapro-plugin-marketplace.detail.status.draft");
     }
   }
 }
@@ -344,13 +382,27 @@ function getReviewStatusColor(status?: string) {
 }
 
 function handleOpenDetail(row: MarketplacePluginListItem) {
-  router.push(marketplaceDetailPath(row.pluginId, "admin-list"));
+  detailModalApi.setData({ from: "admin-list", pluginId: row.pluginId });
+  detailModalApi.open();
+}
+
+function openDetailFromRouteQuery() {
+  if (route.query.view !== "detail") {
+    return;
+  }
+  const pluginId =
+    typeof route.query.pluginId === "string" ? route.query.pluginId.trim() : "";
+  if (!pluginId) {
+    return;
+  }
+  detailModalApi.setData({ from: "admin-list", pluginId });
+  detailModalApi.open();
 }
 </script>
 
 <template>
-  <MarketplaceDetail v-if="showEmbeddedDetail" />
-  <Page v-else :auto-content-height="true">
+  <Page :auto-content-height="true">
+    <DetailModal />
     <Grid
       class="plugin-marketplace-admin-list"
       :table-title="
@@ -376,7 +428,7 @@ function handleOpenDetail(row: MarketplacePluginListItem) {
 
       <template #marketStatus="{ row }">
         <Tag :color="getMarketStatusColor(row.marketStatus)">
-          {{ formatMarketStatus(row.marketStatus) }}
+          {{ formatMarketStatus(row.marketStatus, row.processStatus) }}
         </Tag>
       </template>
 

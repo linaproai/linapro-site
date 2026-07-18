@@ -1,19 +1,29 @@
 // This file implements GitHub/Gitee metadata discovery for marketplace Git
 // sources. It stores repository coordinates and version drafts only; full
 // source trees are never cloned onto the marketplace server.
+//
+// Discovery rules:
+//   - Prefer semver version tags when present.
+//   - When no semver tags exist, fall back to the main branch.
+//   - Fail only when neither semver tags nor main are available.
+//   - Auto-detect single-plugin (repo root) vs multi-plugin (nested plugin roots).
 
 package marketplace
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"path"
 	"regexp"
+	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gogf/gf/v2/database/gdb"
@@ -27,23 +37,50 @@ import (
 )
 
 const (
-	gitSourceKind              = "git"
-	uploadSourceKind           = "upload"
-	gitSyncStatusSuccess       = "success"
-	gitSyncStatusFailed        = "failed"
-	gitSyncStatusAuthFailed    = "auth_failed"
-	gitSyncStatusPartial       = "partial"
-	defaultGitHTTPTimeout      = 20 * time.Second
-	maxGitTagsPerDiscovery     = 100
-	gitMetadataUserAgent       = "LinaPro-Plugin-Marketplace/1.0"
-	gitRequiredPathPluginYAML  = "plugin.yaml"
-	gitRequiredPathBackendGo   = "backend/plugin.go"
-	gitRequiredPathEmbedGo     = "plugin_embed.go"
+	gitSourceKind           = "git"
+	uploadSourceKind        = "upload"
+	gitSyncStatusSuccess    = "success"
+	gitSyncStatusFailed     = "failed"
+	gitSyncStatusAuthFailed = "auth_failed"
+	gitSyncStatusPartial    = "partial"
+	defaultGitHTTPTimeout   = 20 * time.Second
+	maxGitTagsPerDiscovery  = 100
+	maxGitPluginsPerRepo    = 50
+	maxGitPluginPathDepth   = 6
+	// gitManifestFetchWorkers bounds concurrent plugin.yaml reads for monorepos.
+	// official-plugins has dozens of roots; sequential reads exceed browser timeouts.
+	gitManifestFetchWorkers = 8
+	// maxGitDocsIndexed caps remote documentation reads during Git discovery.
+	maxGitDocsIndexed = 20
+	// maxGitDocBytes rejects oversized remote markdown files during indexing.
+	maxGitDocBytes            = 256 * 1024
+	gitMetadataUserAgent      = "LinaPro-Plugin-Marketplace/1.0"
+	gitRequiredPathPluginYAML = "plugin.yaml"
+	gitRequiredPathBackendGo  = "backend/plugin.go"
+	gitRequiredPathEmbedGo    = "plugin_embed.go"
+	gitFallbackBranchMain     = "main"
+	gitDiscoveryRefKindTag    = "tag"
+	gitDiscoveryRefKindBranch = "branch"
+	// configKeyGitHubAccessToken is the plugin-scoped config key for a platform
+	// GitHub personal access token used when registration omits accessToken.
+	configKeyGitHubAccessToken = "github.accessToken"
+	// configKeyGiteeAccessToken is the plugin-scoped config key for a platform
+	// Gitee personal access token used when registration omits accessToken.
+	configKeyGiteeAccessToken = "gitee.accessToken"
 )
 
 var (
 	gitSemverTagPattern = regexp.MustCompile(`^v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$`)
 	gitPluginIDPattern  = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
+	gitIgnoredPathRoots = map[string]struct{}{
+		".git":         {},
+		"node_modules": {},
+		"vendor":       {},
+		"dist":         {},
+		"build":        {},
+		"temp":         {},
+		"tmp":          {},
+	}
 )
 
 // gitRepoRef is a normalized GitHub/Gitee repository coordinate.
@@ -55,9 +92,25 @@ type gitRepoRef struct {
 	APIHost  string
 }
 
-// gitRemoteClient reads tags and raw files from Git hosting APIs.
+// gitDiscoveryRef is one candidate tag or branch used for metadata discovery.
+type gitDiscoveryRef struct {
+	Name string
+	Kind string
+}
+
+// gitPluginRoot is one discovered source-plugin root inside a repository.
+type gitPluginRoot struct {
+	Path     string
+	Manifest *gitPluginManifest
+}
+
+// gitRemoteClient reads tags, trees, and raw files from Git hosting APIs.
 type gitRemoteClient interface {
 	ListTags(ctx context.Context, repo gitRepoRef, token string) ([]string, error)
+	RefExists(ctx context.Context, repo gitRepoRef, ref string, token string) (bool, error)
+	// ResolveCommitSHA resolves a branch, tag, or other ref to a full commit SHA.
+	ResolveCommitSHA(ctx context.Context, repo gitRepoRef, ref string, token string) (string, error)
+	ListTreePaths(ctx context.Context, repo gitRepoRef, ref string, token string) ([]string, error)
 	ReadFile(ctx context.Context, repo gitRepoRef, ref string, filePath string, token string) ([]byte, error)
 	PathExists(ctx context.Context, repo gitRepoRef, ref string, filePath string, token string) (bool, error)
 }
@@ -97,8 +150,11 @@ type GetDistributionInput struct {
 	Visibility VisibilitySubject
 }
 
-// RegisterGitSource registers a Git repository and immediately discovers tags.
-func (s *serviceImpl) RegisterGitSource(ctx context.Context, in RegisterGitSourceInput) (*PluginRecord, error) {
+// RegisterGitSource registers a Git repository, auto-detects plugin roots, and
+// enqueues plugins in pending_verify for async discovery/verify/review processing.
+// Version discovery is intentionally not completed on the request path so the
+// plugin appears in My Plugins immediately with a clear pipeline status.
+func (s *serviceImpl) RegisterGitSource(ctx context.Context, in RegisterGitSourceInput) (*RegisterGitSourceResult, error) {
 	if in.OwnerUserID <= 0 {
 		return nil, bizerr.NewCode(CodeMarketplaceInvalidInput)
 	}
@@ -110,134 +166,64 @@ func (s *serviceImpl) RegisterGitSource(ctx context.Context, in RegisterGitSourc
 	if err != nil {
 		return nil, err
 	}
-	token := strings.TrimSpace(in.AccessToken)
+	// Only publisher-supplied tokens are encrypted into credential rows.
+	// Platform config tokens are shared fallbacks and must not be stored per user.
+	userToken := strings.TrimSpace(in.AccessToken)
+	token, err := s.resolveGitAccessToken(ctx, repo.Provider, userToken)
+	if err != nil {
+		return nil, err
+	}
 	client := s.gitClient()
-	// Probe plugin.yaml at default branch HEAD via tags list first later; probe main/master files.
-	tags, err := client.ListTags(ctx, repo, token)
-	if err != nil {
-		return nil, mapGitClientError(err)
-	}
-	if len(tags) == 0 {
-		return nil, bizerr.NewCode(CodeMarketplaceGitDiscoveryFailed, bizerr.P("diagnostic", "repository has no version tags"))
-	}
 
-	// Bootstrap identity from the newest tag's plugin.yaml.
-	newest := tags[0]
-	manifestBytes, err := client.ReadFile(ctx, repo, newest, gitRequiredPathPluginYAML, token)
-	if err != nil {
-		return nil, mapGitClientError(err)
-	}
-	manifest, err := parseGitPluginManifest(manifestBytes)
+	// Minimal bootstrap discovery only: identify plugin roots so each plugin can
+	// enter My Plugins as pending_verify. Full tag/version import runs async.
+	discoveryRefs, err := s.resolveGitDiscoveryRefs(ctx, client, repo, token)
 	if err != nil {
 		return nil, err
 	}
-	if err = validateGitSourceManifest(manifest); err != nil {
-		return nil, err
-	}
-
-	existing, err := s.getPluginByID(ctx, manifest.ID)
+	bootstrapRef := discoveryRefs[0]
+	roots, err := s.discoverSourcePluginRoots(ctx, client, repo, bootstrapRef.Name, token)
 	if err != nil {
 		return nil, err
 	}
-	if existing != nil {
-		if existing.PublisherId != publisher.Id {
-			return nil, bizerr.NewCode(CodeMarketplacePluginIDOwned)
-		}
-		if normalizeSourceKind(existing.SourceKind) != gitSourceKind {
-			return nil, bizerr.NewCode(CodeMarketplaceSourceKindConflict)
-		}
+	if len(roots) == 0 {
+		return nil, bizerr.NewCode(CodeMarketplaceGitDiscoveryFailed, bizerr.P("diagnostic", "repository contains no valid source plugin roots"))
 	}
 
 	credentialRef := ""
-	if token != "" {
-		credentialRef, err = s.saveGitCredential(ctx, in.OwnerUserID, repo.Provider.String(), token)
+	if userToken != "" {
+		credentialRef, err = s.saveGitCredential(ctx, in.OwnerUserID, repo.Provider.String(), userToken)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	name := normalizeKey(manifest.Name)
-	if name == "" {
-		name = manifest.ID
-	}
-	summary := normalizeKey(manifest.Description)
-	if summary == "" {
-		summary = name
-	}
-	if len(summary) > 512 {
-		summary = summary[:512]
-	}
-
-	// Git add keeps plugins private/draft until an explicit publish review passes.
-	gitVisibility := marketv1.MarketplaceVisibilityPrivate
-	if existing == nil {
-		id, insertErr := dao.PluginMarketplacePlugin.Ctx(ctx).Data(do.PluginMarketplacePlugin{
-			PublisherId:     publisher.Id,
-			PluginId:        manifest.ID,
-			Name:            name,
-			Summary:         summary,
-			Description:     normalizeKey(manifest.Description),
-			PluginType:      marketv1.MarketplacePluginTypeSource.String(),
-			MarketStatus:    marketv1.MarketplaceStatusDraft.String(),
-			Visibility:      gitVisibility.String(),
-			LatestReleaseId: 0,
-			LatestVersion:   "",
-			Homepage:        firstNonEmpty(in.Homepage, manifest.Homepage),
-			Repository:      repo.CloneURL,
-			License:         firstNonEmpty(in.License, manifest.License),
-			DownloadCount:   0,
-			SourceKind:      gitSourceKind,
-			RepoUrl:         repo.CloneURL,
-			RepoProvider:    repo.Provider.String(),
-			CredentialRef:   credentialRef,
-		}).InsertAndGetId()
-		if insertErr != nil {
-			return nil, bizerr.WrapCode(insertErr, CodeMarketplaceStorageFailed)
+	records := make([]*PluginRecord, 0, len(roots))
+	for _, root := range roots {
+		plugin, upsertErr := s.upsertGitPluginFromRoot(ctx, publisher, repo, root, credentialRef, in)
+		if upsertErr != nil {
+			return nil, upsertErr
 		}
-		existing, err = s.getPluginEntityByRecordID(ctx, intID(id))
-		if err != nil {
-			return nil, err
+		if setErr := s.setPluginProcessStatus(
+			ctx,
+			plugin.Id,
+			marketv1.MarketplaceProcessStatusPendingVerify,
+			"queued for async verification",
+		); setErr != nil {
+			return nil, setErr
 		}
-	} else {
-		update := do.PluginMarketplacePlugin{
-			Name:         name,
-			Summary:      summary,
-			Description:  normalizeKey(manifest.Description),
-			Homepage:     firstNonEmpty(in.Homepage, manifest.Homepage, existing.Homepage),
-			Repository:   repo.CloneURL,
-			License:      firstNonEmpty(in.License, manifest.License, existing.License),
-			SourceKind:   gitSourceKind,
-			RepoUrl:      repo.CloneURL,
-			RepoProvider: repo.Provider.String(),
+		record, getErr := s.getPluginRecordByID(ctx, plugin.Id)
+		if getErr != nil {
+			return nil, getErr
 		}
-		// Preserve marketplace visibility for already-published plugins; only
-		// force private while the plugin is still a draft add.
-		if marketv1.MarketplaceStatus(existing.MarketStatus) == marketv1.MarketplaceStatusDraft {
-			update.Visibility = gitVisibility.String()
-		}
-		if credentialRef != "" {
-			update.CredentialRef = credentialRef
-		}
-		if _, updateErr := dao.PluginMarketplacePlugin.Ctx(ctx).
-			Where(do.PluginMarketplacePlugin{Id: existing.Id}).
-			Data(update).
-			Update(); updateErr != nil {
-			return nil, bizerr.WrapCode(updateErr, CodeMarketplaceStorageFailed)
-		}
-		existing, err = s.getPluginEntityByRecordID(ctx, existing.Id)
-		if err != nil {
-			return nil, err
+		if record != nil {
+			records = append(records, record)
 		}
 	}
-
-	result, err := s.discoverGitMetadataForPlugin(ctx, existing, token, client)
-	if err != nil {
-		return nil, err
-	}
-	return result.Plugin, nil
+	return &RegisterGitSourceResult{Plugins: records}, nil
 }
 
-// DiscoverGitMetadata refreshes tags for one Git-backed marketplace plugin.
+// DiscoverGitMetadata refreshes tags or the main-branch fallback for one Git-backed plugin.
 func (s *serviceImpl) DiscoverGitMetadata(ctx context.Context, in DiscoverGitMetadataInput) (*DiscoverGitMetadataResult, error) {
 	plugin, err := s.getPluginByID(ctx, in.PluginID)
 	if err != nil {
@@ -254,14 +240,22 @@ func (s *serviceImpl) DiscoverGitMetadata(ctx context.Context, in DiscoverGitMet
 			return nil, err
 		}
 	}
-	token, err := s.loadGitCredentialToken(ctx, plugin.CredentialRef)
+	storedToken, err := s.loadGitCredentialToken(ctx, plugin.CredentialRef)
+	if err != nil {
+		return nil, err
+	}
+	repo, err := parseGitRepoURL(plugin.RepoUrl)
+	if err != nil {
+		return nil, err
+	}
+	token, err := s.resolveGitAccessToken(ctx, repo.Provider, storedToken)
 	if err != nil {
 		return nil, err
 	}
 	return s.discoverGitMetadataForPlugin(ctx, plugin, token, s.gitClient())
 }
 
-// DiscoverAllGitSources scans every Git-backed plugin for new tags.
+// DiscoverAllGitSources scans every Git-backed plugin for new tags or main updates.
 func (s *serviceImpl) DiscoverAllGitSources(ctx context.Context) (int, error) {
 	var rows []*entity.PluginMarketplacePlugin
 	if err := dao.PluginMarketplacePlugin.Ctx(ctx).
@@ -277,9 +271,19 @@ func (s *serviceImpl) DiscoverAllGitSources(ctx context.Context) (int, error) {
 		if row == nil {
 			continue
 		}
-		token, err := s.loadGitCredentialToken(ctx, row.CredentialRef)
+		storedToken, err := s.loadGitCredentialToken(ctx, row.CredentialRef)
 		if err != nil {
 			_ = s.updateGitSyncStatus(ctx, row.Id, gitSyncStatusFailed, "credential load failed")
+			continue
+		}
+		repo, parseErr := parseGitRepoURL(row.RepoUrl)
+		if parseErr != nil {
+			_ = s.updateGitSyncStatus(ctx, row.Id, gitSyncStatusFailed, "repository url is invalid")
+			continue
+		}
+		token, tokenErr := s.resolveGitAccessToken(ctx, repo.Provider, storedToken)
+		if tokenErr != nil {
+			_ = s.updateGitSyncStatus(ctx, row.Id, gitSyncStatusFailed, "platform git token config failed")
 			continue
 		}
 		result, err := s.discoverGitMetadataForPlugin(ctx, row, token, client)
@@ -289,6 +293,43 @@ func (s *serviceImpl) DiscoverAllGitSources(ctx context.Context) (int, error) {
 		synced += result.Synced
 	}
 	return synced, nil
+}
+
+// resolveGitAccessToken prefers a publisher-supplied or stored credential, then
+// falls back to the plugin-scoped platform token for the hosting provider.
+func (s *serviceImpl) resolveGitAccessToken(
+	ctx context.Context,
+	provider marketv1.MarketplaceRepoProvider,
+	preferred string,
+) (string, error) {
+	preferred = strings.TrimSpace(preferred)
+	if preferred != "" {
+		return preferred, nil
+	}
+	if s == nil || s.pluginConfig == nil {
+		return "", nil
+	}
+	key := platformGitAccessTokenConfigKey(provider)
+	if key == "" {
+		return "", nil
+	}
+	token, err := s.pluginConfig.String(ctx, key, "")
+	if err != nil {
+		return "", bizerr.WrapCode(err, CodeMarketplaceGitDiscoveryFailed, bizerr.P("diagnostic", "read platform git access token config failed"))
+	}
+	return strings.TrimSpace(token), nil
+}
+
+// platformGitAccessTokenConfigKey returns the plugin config key for one host.
+func platformGitAccessTokenConfigKey(provider marketv1.MarketplaceRepoProvider) string {
+	switch provider {
+	case marketv1.MarketplaceRepoProviderGitHub:
+		return configKeyGitHubAccessToken
+	case marketv1.MarketplaceRepoProviderGitee:
+		return configKeyGiteeAccessToken
+	default:
+		return ""
+	}
 }
 
 // GetDistribution returns the CLI install projection for one visible release.
@@ -310,6 +351,304 @@ func (s *serviceImpl) GetDistribution(ctx context.Context, in GetDistributionInp
 	return s.distributionFromEntities(ctx, plugin, release)
 }
 
+func (s *serviceImpl) resolveGitDiscoveryRefs(
+	ctx context.Context,
+	client gitRemoteClient,
+	repo gitRepoRef,
+	token string,
+) ([]gitDiscoveryRef, error) {
+	tags, err := client.ListTags(ctx, repo, token)
+	if err != nil {
+		return nil, mapGitClientError(err)
+	}
+	semverTags := filterSemverTags(tags)
+	if len(semverTags) > 0 {
+		refs := make([]gitDiscoveryRef, 0, len(semverTags))
+		for _, tag := range semverTags {
+			refs = append(refs, gitDiscoveryRef{Name: tag, Kind: gitDiscoveryRefKindTag})
+		}
+		return refs, nil
+	}
+	exists, err := client.RefExists(ctx, repo, gitFallbackBranchMain, token)
+	if err != nil {
+		return nil, mapGitClientError(err)
+	}
+	if !exists {
+		return nil, bizerr.NewCode(
+			CodeMarketplaceGitDiscoveryFailed,
+			bizerr.P("diagnostic", "repository has no version tags and main branch does not exist"),
+		)
+	}
+	return []gitDiscoveryRef{{Name: gitFallbackBranchMain, Kind: gitDiscoveryRefKindBranch}}, nil
+}
+
+func (s *serviceImpl) discoverSourcePluginRoots(
+	ctx context.Context,
+	client gitRemoteClient,
+	repo gitRepoRef,
+	ref string,
+	token string,
+) ([]gitPluginRoot, error) {
+	// Always list the remote tree first so monorepos can validate structure from the
+	// path set without N extra PathExists round-trips (each ~1s against GitHub).
+	paths, err := client.ListTreePaths(ctx, repo, ref, token)
+	if err != nil {
+		return nil, mapGitClientError(err)
+	}
+	pathSet := buildGitPathSet(paths)
+
+	// Single-plugin: repository root is a valid source plugin root.
+	if gitPathSetHasSourceStructure(pathSet, "") {
+		root, ok, rootErr := s.trySourcePluginRoot(ctx, client, repo, ref, "", token, true)
+		if rootErr != nil {
+			return nil, rootErr
+		}
+		if ok {
+			return []gitPluginRoot{root}, nil
+		}
+	}
+
+	// Multi-plugin: filter nested candidates with the tree path set, then read
+	// plugin.yaml concurrently so large official monorepos finish within the
+	// browser request timeout budget.
+	candidates := candidatePluginRootsFromTree(paths)
+	filtered := make([]string, 0, len(candidates))
+	for _, candidate := range candidates {
+		if gitPathSetHasSourceStructure(pathSet, candidate) {
+			filtered = append(filtered, candidate)
+		}
+	}
+	if len(filtered) > maxGitPluginsPerRepo {
+		filtered = filtered[:maxGitPluginsPerRepo]
+	}
+	roots, loadErr := s.loadSourcePluginRootsParallel(ctx, client, repo, ref, token, filtered)
+	if loadErr != nil {
+		return nil, loadErr
+	}
+	sort.Slice(roots, func(i, j int) bool {
+		return roots[i].Path < roots[j].Path
+	})
+	return roots, nil
+}
+
+// loadSourcePluginRootsParallel reads plugin.yaml for candidate roots concurrently.
+func (s *serviceImpl) loadSourcePluginRootsParallel(
+	ctx context.Context,
+	client gitRemoteClient,
+	repo gitRepoRef,
+	ref string,
+	token string,
+	candidates []string,
+) ([]gitPluginRoot, error) {
+	if len(candidates) == 0 {
+		return nil, nil
+	}
+	workerCount := gitManifestFetchWorkers
+	if workerCount > len(candidates) {
+		workerCount = len(candidates)
+	}
+
+	type loadResult struct {
+		root gitPluginRoot
+		ok   bool
+		err  error
+	}
+	jobs := make(chan string)
+	results := make(chan loadResult, len(candidates))
+	var workers sync.WaitGroup
+	for i := 0; i < workerCount; i++ {
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			for candidate := range jobs {
+				if ctx.Err() != nil {
+					results <- loadResult{err: ctx.Err()}
+					return
+				}
+				root, ok, rootErr := s.trySourcePluginRoot(ctx, client, repo, ref, candidate, token, true)
+				results <- loadResult{root: root, ok: ok, err: rootErr}
+			}
+		}()
+	}
+
+	go func() {
+		for _, candidate := range candidates {
+			select {
+			case <-ctx.Done():
+				close(jobs)
+				return
+			case jobs <- candidate:
+			}
+		}
+		close(jobs)
+	}()
+
+	go func() {
+		workers.Wait()
+		close(results)
+	}()
+
+	roots := make([]gitPluginRoot, 0, len(candidates))
+	seenIDs := make(map[string]struct{}, len(candidates))
+	var firstErr error
+	for result := range results {
+		if result.err != nil {
+			if firstErr == nil {
+				firstErr = result.err
+			}
+			continue
+		}
+		if !result.ok || result.root.Manifest == nil {
+			continue
+		}
+		if _, exists := seenIDs[result.root.Manifest.ID]; exists {
+			continue
+		}
+		seenIDs[result.root.Manifest.ID] = struct{}{}
+		roots = append(roots, result.root)
+	}
+	if firstErr != nil && len(roots) == 0 {
+		return nil, firstErr
+	}
+	return roots, nil
+}
+
+func (s *serviceImpl) trySourcePluginRoot(
+	ctx context.Context,
+	client gitRemoteClient,
+	repo gitRepoRef,
+	ref string,
+	repoPath string,
+	token string,
+	structureAlreadyChecked bool,
+) (gitPluginRoot, bool, error) {
+	manifestBytes, err := client.ReadFile(ctx, repo, ref, gitPathJoin(repoPath, gitRequiredPathPluginYAML), token)
+	if err != nil {
+		if isMarketplaceStructureMissing(err) {
+			return gitPluginRoot{}, false, nil
+		}
+		return gitPluginRoot{}, false, mapGitClientError(err)
+	}
+	manifest, err := parseGitPluginManifest(manifestBytes)
+	if err != nil {
+		return gitPluginRoot{}, false, nil
+	}
+	if err = validateGitSourceManifest(manifest); err != nil {
+		// Dynamic plugins and invalid manifests are skipped during multi-root scan.
+		return gitPluginRoot{}, false, nil
+	}
+	if !structureAlreadyChecked {
+		if err = validateGitRemoteStructure(ctx, client, repo, ref, repoPath, token); err != nil {
+			return gitPluginRoot{}, false, nil
+		}
+	}
+	return gitPluginRoot{Path: normalizeGitRepoPath(repoPath), Manifest: manifest}, true, nil
+}
+
+func (s *serviceImpl) upsertGitPluginFromRoot(
+	ctx context.Context,
+	publisher *entity.PluginMarketplacePublisher,
+	repo gitRepoRef,
+	root gitPluginRoot,
+	credentialRef string,
+	in RegisterGitSourceInput,
+) (*entity.PluginMarketplacePlugin, error) {
+	if root.Manifest == nil {
+		return nil, bizerr.NewCode(CodeMarketplacePackageInvalid)
+	}
+	manifest := root.Manifest
+	existing, err := s.getPluginByID(ctx, manifest.ID)
+	if err != nil {
+		return nil, err
+	}
+	if existing != nil {
+		if existing.PublisherId != publisher.Id {
+			return nil, bizerr.NewCode(CodeMarketplacePluginIDOwned)
+		}
+		if normalizeSourceKind(existing.SourceKind) != gitSourceKind {
+			return nil, bizerr.NewCode(CodeMarketplaceSourceKindConflict)
+		}
+	}
+
+	name := normalizeKey(manifest.Name)
+	if name == "" {
+		name = manifest.ID
+	}
+	summary := normalizeKey(manifest.Description)
+	if summary == "" {
+		summary = name
+	}
+	if len(summary) > 512 {
+		summary = summary[:512]
+	}
+	repoPath := normalizeGitRepoPath(root.Path)
+	gitVisibility := marketv1.MarketplaceVisibilityPrivate
+	// plugin.yaml already carries version at bootstrap. Persist it on the plugin
+	// row so My Plugins can show a version immediately, without waiting for the
+	// async release-draft discovery job.
+	discoveredVersion := normalizeVersionLabel(manifest.Version)
+
+	if existing == nil {
+		id, insertErr := dao.PluginMarketplacePlugin.Ctx(ctx).Data(do.PluginMarketplacePlugin{
+			PublisherId:     publisher.Id,
+			PluginId:        manifest.ID,
+			Name:            name,
+			Summary:         summary,
+			Description:     normalizeKey(manifest.Description),
+			PluginType:      marketv1.MarketplacePluginTypeSource.String(),
+			MarketStatus:    marketv1.MarketplaceStatusDraft.String(),
+			ProcessStatus:   marketv1.MarketplaceProcessStatusPendingVerify.String(),
+			Visibility:      gitVisibility.String(),
+			LatestReleaseId: 0,
+			LatestVersion:   discoveredVersion,
+			Homepage:        firstNonEmpty(in.Homepage, manifest.Homepage),
+			Repository:      repo.CloneURL,
+			License:         firstNonEmpty(in.License, manifest.License),
+			DownloadCount:   0,
+			SourceKind:      gitSourceKind,
+			RepoUrl:         repo.CloneURL,
+			RepoProvider:    repo.Provider.String(),
+			RepoPath:        repoPath,
+			CredentialRef:   credentialRef,
+		}).InsertAndGetId()
+		if insertErr != nil {
+			return nil, bizerr.WrapCode(insertErr, CodeMarketplaceStorageFailed)
+		}
+		return s.getPluginEntityByRecordID(ctx, intID(id))
+	}
+
+	update := do.PluginMarketplacePlugin{
+		Name:         name,
+		Summary:      summary,
+		Description:  normalizeKey(manifest.Description),
+		Homepage:     firstNonEmpty(in.Homepage, manifest.Homepage, existing.Homepage),
+		Repository:   repo.CloneURL,
+		License:      firstNonEmpty(in.License, manifest.License, existing.License),
+		SourceKind:   gitSourceKind,
+		RepoUrl:      repo.CloneURL,
+		RepoProvider: repo.Provider.String(),
+		RepoPath:     repoPath,
+	}
+	if marketv1.MarketplaceStatus(existing.MarketStatus) == marketv1.MarketplaceStatusDraft {
+		update.Visibility = gitVisibility.String()
+		if discoveredVersion != "" {
+			update.LatestVersion = discoveredVersion
+		}
+	} else if normalizeKey(existing.LatestVersion) == "" && discoveredVersion != "" {
+		update.LatestVersion = discoveredVersion
+	}
+	if credentialRef != "" {
+		update.CredentialRef = credentialRef
+	}
+	if _, updateErr := dao.PluginMarketplacePlugin.Ctx(ctx).
+		Where(do.PluginMarketplacePlugin{Id: existing.Id}).
+		Data(update).
+		Update(); updateErr != nil {
+		return nil, bizerr.WrapCode(updateErr, CodeMarketplaceStorageFailed)
+	}
+	return s.getPluginEntityByRecordID(ctx, existing.Id)
+}
+
 func (s *serviceImpl) discoverGitMetadataForPlugin(
 	ctx context.Context,
 	plugin *entity.PluginMarketplacePlugin,
@@ -324,23 +663,31 @@ func (s *serviceImpl) discoverGitMetadataForPlugin(
 		_ = s.updateGitSyncStatus(ctx, plugin.Id, gitSyncStatusFailed, err.Error())
 		return nil, err
 	}
-	tags, err := client.ListTags(ctx, repo, token)
+	refs, err := s.resolveGitDiscoveryRefs(ctx, client, repo, token)
 	if err != nil {
 		status := gitSyncStatusFailed
 		if isGitAuthError(err) {
 			status = gitSyncStatusAuthFailed
 		}
 		_ = s.updateGitSyncStatus(ctx, plugin.Id, status, gitPublicErrorMessage(err))
-		return nil, mapGitClientError(err)
+		return nil, err
+	}
+
+	// Load remote tree once for resource/docs enrichment across version refs.
+	// Structure is stable enough across tags for path discovery; file content is
+	// still read per ref when indexing documentation.
+	treePaths, treeErr := client.ListTreePaths(ctx, repo, refs[0].Name, token)
+	if treeErr != nil {
+		// Tree failure should not block plugin.yaml-only version import.
+		treePaths = nil
 	}
 
 	synced := 0
 	failures := 0
-	for _, tag := range tags {
-		if !gitSemverTagPattern.MatchString(tag) {
-			continue
-		}
-		created, discoverErr := s.discoverOneGitTag(ctx, plugin, repo, tag, token, client)
+	for index, ref := range refs {
+		// Full docs/sql/i18n enrichment is applied to every discovered ref, but
+		// remote doc body reads are bounded inside enrichGitReleaseMetadata.
+		created, discoverErr := s.discoverOneGitRef(ctx, plugin, repo, ref, token, client, treePaths, index == 0)
 		if discoverErr != nil {
 			failures++
 			continue
@@ -354,13 +701,34 @@ func (s *serviceImpl) discoverGitMetadataForPlugin(
 	message := fmt.Sprintf("discovered %d draft releases", synced)
 	if failures > 0 && synced == 0 {
 		status = gitSyncStatusFailed
-		message = fmt.Sprintf("failed to import %d tags", failures)
+		message = fmt.Sprintf("failed to import %d refs", failures)
 	} else if failures > 0 {
 		status = gitSyncStatusPartial
-		message = fmt.Sprintf("discovered %d drafts with %d tag failures", synced, failures)
+		message = fmt.Sprintf("discovered %d drafts with %d ref failures", synced, failures)
 	}
 	if err = s.updateGitSyncStatus(ctx, plugin.Id, status, message); err != nil {
 		return nil, err
+	}
+	// New drafts re-enter the async verify path so they can auto-submit for review.
+	if synced > 0 {
+		processStatus := marketv1.MarketplaceProcessStatus(normalizeProcessStatus(plugin.ProcessStatus))
+		if processStatus == marketv1.MarketplaceProcessStatusCompleted ||
+			processStatus == marketv1.MarketplaceProcessStatusFailed ||
+			processStatus == marketv1.MarketplaceProcessStatusPendingReview {
+			if setErr := s.setPluginProcessStatus(
+				ctx,
+				plugin.Id,
+				marketv1.MarketplaceProcessStatusPendingVerify,
+				"new git draft queued for verification",
+			); setErr != nil {
+				return nil, setErr
+			}
+			_ = s.setLatestMutableReleaseProcessStatus(
+				ctx,
+				plugin.PluginId,
+				marketv1.MarketplaceProcessStatusPendingVerify,
+			)
+		}
 	}
 	record, err := s.getPluginRecordByID(ctx, plugin.Id)
 	if err != nil {
@@ -369,15 +737,18 @@ func (s *serviceImpl) discoverGitMetadataForPlugin(
 	return &DiscoverGitMetadataResult{Plugin: record, Synced: synced}, nil
 }
 
-func (s *serviceImpl) discoverOneGitTag(
+func (s *serviceImpl) discoverOneGitRef(
 	ctx context.Context,
 	plugin *entity.PluginMarketplacePlugin,
 	repo gitRepoRef,
-	tag string,
+	ref gitDiscoveryRef,
 	token string,
 	client gitRemoteClient,
+	treePaths []string,
+	enrichDocs bool,
 ) (createdOrUpdated bool, err error) {
-	manifestBytes, err := client.ReadFile(ctx, repo, tag, gitRequiredPathPluginYAML, token)
+	repoPath := normalizeGitRepoPath(plugin.RepoPath)
+	manifestBytes, err := client.ReadFile(ctx, repo, ref.Name, gitPathJoin(repoPath, gitRequiredPathPluginYAML), token)
 	if err != nil {
 		return false, err
 	}
@@ -391,14 +762,39 @@ func (s *serviceImpl) discoverOneGitTag(
 	if normalizeKey(manifest.ID) != normalizeKey(plugin.PluginId) {
 		return false, packageDiagnosticError(CodeMarketplacePackageManifestMismatch, "plugin.yaml id does not match marketplace plugin id")
 	}
-	if !versionsSemanticallyEqual(tag, manifest.Version) {
-		return false, bizerr.NewCode(CodeMarketplaceGitVersionMismatch, bizerr.P("diagnostic", "tag "+tag+" does not match plugin.yaml version "+manifest.Version))
+	if ref.Kind == gitDiscoveryRefKindTag && !versionsSemanticallyEqual(ref.Name, manifest.Version) {
+		return false, bizerr.NewCode(
+			CodeMarketplaceGitVersionMismatch,
+			bizerr.P("diagnostic", "tag "+ref.Name+" does not match plugin.yaml version "+manifest.Version),
+		)
 	}
-	if err = validateGitRemoteStructure(ctx, client, repo, tag, token); err != nil {
+	// Prefer tree path set when available to avoid extra PathExists round-trips.
+	if len(treePaths) > 0 {
+		if !gitPathSetHasSourceStructure(buildGitPathSet(treePaths), repoPath) {
+			return false, packageDiagnosticError(
+				CodeMarketplacePackageStructureInvalid,
+				"remote repository is missing required source plugin files",
+			)
+		}
+	} else if err = validateGitRemoteStructure(ctx, client, repo, ref.Name, repoPath, token); err != nil {
 		return false, err
 	}
 
-	existing, err := s.getReleaseByPluginVersion(ctx, plugin.PluginId, manifest.Version)
+	// Pin the resolved commit so installs do not float with branch tips.
+	sourceCommit, err := client.ResolveCommitSHA(ctx, repo, ref.Name, token)
+	if err != nil {
+		return false, err
+	}
+	sourceCommit = normalizeKey(sourceCommit)
+	if sourceCommit == "" {
+		return false, packageDiagnosticError(
+			CodeMarketplaceGitDiscoveryFailed,
+			"failed to resolve commit SHA for ref "+ref.Name,
+		)
+	}
+
+	versionLabel := normalizeVersionLabel(manifest.Version)
+	existing, err := s.getReleaseByPluginVersion(ctx, plugin.PluginId, versionLabel)
 	if err != nil {
 		return false, err
 	}
@@ -414,32 +810,69 @@ func (s *serviceImpl) discoverOneGitTag(
 	if err != nil {
 		return false, err
 	}
+	sqlSummary, i18nSummary, docsSummary := buildGitResourceSummariesFromTree(treePaths, repoPath)
+	sqlJSON, err := packageJSONString(sqlSummary)
+	if err != nil {
+		return false, err
+	}
+	i18nJSON, err := packageJSONString(i18nSummary)
+	if err != nil {
+		return false, err
+	}
+	docsJSON, err := packageJSONString(docsSummary)
+	if err != nil {
+		return false, err
+	}
+	diagnostics := sourcePackageDiagnostics(manifestAsSource(manifest), sqlSummary, i18nSummary, docsSummary)
+	riskJSON, err := packageJSONString(buildSourceRiskSummary(diagnostics))
+	if err != nil {
+		return false, err
+	}
+
+	reviewMessage := "Imported from Git tag " + ref.Name
+	if ref.Kind == gitDiscoveryRefKindBranch {
+		reviewMessage = "Imported from Git branch " + ref.Name
+	}
 	in := SaveReleaseDraftInput{
-		PublisherKey:      "", // filled via requirePluginForPublisher path below
+		PublisherKey:      "",
 		OwnerUserID:       0,
 		PluginID:          plugin.PluginId,
-		Version:           normalizeVersionLabel(manifest.Version),
+		Version:           versionLabel,
 		PluginType:        marketv1.MarketplacePluginTypeSource,
 		Visibility:        marketv1.MarketplaceVisibility(plugin.Visibility),
 		MinHostVersion:    sourcePackageHostBoundsFromManifest(manifest),
 		ManifestSnapshot:  snapshot,
 		DependencySummary: deps,
-		SQLSummary:        "[]",
-		I18NSummary:       "[]",
-		DocsSummary:       "[]",
-		RiskSummary:       `{"info":0,"warning":0,"high":0}`,
-		ReviewMessage:     "Imported from Git tag " + tag,
+		SQLSummary:        sqlJSON,
+		I18NSummary:       i18nJSON,
+		DocsSummary:       docsJSON,
+		RiskSummary:       riskJSON,
+		ReviewMessage:     reviewMessage,
 		ReplaceDraft:      true,
-		SourceRef:         tag,
+		SourceRef:         ref.Name,
+		SourceCommit:      sourceCommit,
 	}
 
-	// Save release draft with source_ref without full publisher ownership re-check
-	// because discovery runs as a trusted system/owner path after plugin load.
 	release, err := s.saveGitReleaseDraft(ctx, plugin, in)
 	if err != nil {
 		return false, err
 	}
-	return release != nil, nil
+	if release == nil {
+		return false, nil
+	}
+
+	// Keep publisher-facing plugin identity aligned with the discovered plugin.yaml.
+	if applyErr := s.applyGitManifestToPlugin(ctx, plugin, manifest, versionLabel, release.ID); applyErr != nil {
+		return false, applyErr
+	}
+
+	if enrichDocs {
+		if docsErr := s.indexGitReleaseDocuments(ctx, client, repo, ref.Name, token, repoPath, release, treePaths); docsErr != nil {
+			// Documentation enrichment is best-effort; release metadata still stands.
+			_ = s.updateGitSyncStatus(ctx, plugin.Id, gitSyncStatusPartial, "release imported; documentation indexing incomplete: "+gitPublicErrorMessage(docsErr))
+		}
+	}
+	return true, nil
 }
 
 // saveGitReleaseDraft persists a mutable Git-sourced release draft.
@@ -457,6 +890,7 @@ func (s *serviceImpl) saveGitReleaseDraft(
 	}
 	data := s.releaseDraftData(plugin, in)
 	data.SourceRef = normalizeKey(in.SourceRef)
+	data.SourceCommit = normalizeKey(in.SourceCommit)
 	if existing != nil {
 		if immutableRelease(existing) {
 			return nil, bizerr.NewCode(CodeMarketplaceReleaseImmutable)
@@ -488,6 +922,267 @@ func (s *serviceImpl) saveGitReleaseDraft(
 	return s.getReleaseRecordByID(ctx, intID(id))
 }
 
+// applyGitManifestToPlugin updates owner-visible plugin identity fields and draft
+// latest-version anchors from the discovered plugin.yaml.
+func (s *serviceImpl) applyGitManifestToPlugin(
+	ctx context.Context,
+	plugin *entity.PluginMarketplacePlugin,
+	manifest *gitPluginManifest,
+	versionLabel string,
+	releaseID int,
+) error {
+	if plugin == nil || manifest == nil {
+		return nil
+	}
+	name := normalizeKey(manifest.Name)
+	if name == "" {
+		name = manifest.ID
+	}
+	summary := normalizeKey(manifest.Description)
+	if summary == "" {
+		summary = name
+	}
+	if len(summary) > 512 {
+		summary = summary[:512]
+	}
+	data := do.PluginMarketplacePlugin{
+		Name:        name,
+		Summary:     summary,
+		Description: normalizeKey(manifest.Description),
+		Homepage:    firstNonEmpty(manifest.Homepage, plugin.Homepage),
+		License:     firstNonEmpty(manifest.License, plugin.License),
+	}
+	// For unpublished plugins, keep list/detail version anchors on the draft.
+	if marketv1.MarketplaceStatus(plugin.MarketStatus) == marketv1.MarketplaceStatusDraft {
+		data.LatestVersion = normalizeKey(versionLabel)
+		if releaseID > 0 {
+			data.LatestReleaseId = releaseID
+		}
+	} else if normalizeKey(plugin.LatestVersion) == "" {
+		data.LatestVersion = normalizeKey(versionLabel)
+	}
+	if _, err := dao.PluginMarketplacePlugin.Ctx(ctx).
+		Where(do.PluginMarketplacePlugin{Id: plugin.Id}).
+		Data(data).
+		Update(); err != nil {
+		return bizerr.WrapCode(err, CodeMarketplaceStorageFailed)
+	}
+	// Keep the in-memory plugin projection current for subsequent refs.
+	plugin.Name = name
+	plugin.Summary = summary
+	plugin.Description = normalizeKey(manifest.Description)
+	if marketv1.MarketplaceStatus(plugin.MarketStatus) == marketv1.MarketplaceStatusDraft {
+		plugin.LatestVersion = normalizeKey(versionLabel)
+		if releaseID > 0 {
+			plugin.LatestReleaseId = releaseID
+		}
+	}
+	return nil
+}
+
+// buildGitResourceSummariesFromTree derives SQL/i18n/docs path summaries from one
+// remote tree listing without downloading file bodies.
+func buildGitResourceSummariesFromTree(
+	treePaths []string,
+	repoPath string,
+) (
+	sqlItems []*sourcePackageResourceSummary,
+	i18nItems []*sourcePackageI18NSummary,
+	docsItems []*sourcePackageResourceSummary,
+) {
+	repoPath = normalizeGitRepoPath(repoPath)
+	sqlItems = make([]*sourcePackageResourceSummary, 0)
+	docsItems = make([]*sourcePackageResourceSummary, 0)
+	i18nByLocale := make(map[string]*sourcePackageI18NSummary)
+
+	for _, raw := range treePaths {
+		rel, ok := gitRelativePluginPath(raw, repoPath)
+		if !ok {
+			continue
+		}
+		lower := strings.ToLower(rel)
+		switch {
+		case strings.HasPrefix(lower, "manifest/sql/") && strings.HasSuffix(lower, ".sql"):
+			sqlItems = append(sqlItems, &sourcePackageResourceSummary{
+				Kind: "sql",
+				Path: rel,
+			})
+		case strings.HasPrefix(lower, "manifest/docs/") && strings.HasSuffix(lower, ".md"):
+			docsItems = append(docsItems, &sourcePackageResourceSummary{
+				Kind: "marketplace_doc",
+				Path: rel,
+			})
+		case strings.HasPrefix(lower, "manifest/i18n/"):
+			locale, kind := classifyGitI18NPath(rel)
+			if locale == "" {
+				continue
+			}
+			item := i18nByLocale[locale]
+			if item == nil {
+				item = &sourcePackageI18NSummary{Locale: locale}
+				i18nByLocale[locale] = item
+			}
+			switch kind {
+			case "apidoc":
+				item.APIDocFiles = append(item.APIDocFiles, rel)
+			default:
+				item.RuntimeFiles = append(item.RuntimeFiles, rel)
+			}
+		case lower == "readme.md" || lower == "readme.zh-cn.md":
+			docsItems = append(docsItems, &sourcePackageResourceSummary{
+				Kind: "readme",
+				Path: rel,
+			})
+		}
+	}
+
+	i18nItems = make([]*sourcePackageI18NSummary, 0, len(i18nByLocale))
+	for _, item := range i18nByLocale {
+		i18nItems = append(i18nItems, item)
+	}
+	sort.Slice(sqlItems, func(i, j int) bool { return sqlItems[i].Path < sqlItems[j].Path })
+	sort.Slice(docsItems, func(i, j int) bool { return docsItems[i].Path < docsItems[j].Path })
+	sort.Slice(i18nItems, func(i, j int) bool { return i18nItems[i].Locale < i18nItems[j].Locale })
+	return sqlItems, i18nItems, docsItems
+}
+
+func gitRelativePluginPath(treePath string, repoPath string) (string, bool) {
+	normalized := strings.Trim(strings.ReplaceAll(treePath, "\\", "/"), "/")
+	if normalized == "" {
+		return "", false
+	}
+	if repoPath == "" {
+		return normalized, true
+	}
+	prefix := repoPath + "/"
+	if !strings.HasPrefix(normalized, prefix) {
+		return "", false
+	}
+	return strings.TrimPrefix(normalized, prefix), true
+}
+
+func classifyGitI18NPath(relPath string) (locale string, kind string) {
+	// Expected shapes:
+	//   manifest/i18n/<locale>/plugin.json
+	//   manifest/i18n/<locale>/apidoc/*.json
+	parts := strings.Split(strings.Trim(relPath, "/"), "/")
+	if len(parts) < 4 || parts[0] != "manifest" || parts[1] != "i18n" {
+		return "", ""
+	}
+	locale = parts[2]
+	if locale == "" {
+		return "", ""
+	}
+	if len(parts) >= 5 && parts[3] == "apidoc" {
+		return locale, "apidoc"
+	}
+	return locale, "runtime"
+}
+
+// indexGitReleaseDocuments reads remote Markdown docs under the plugin root and
+// writes marketplace document index rows for the release.
+func (s *serviceImpl) indexGitReleaseDocuments(
+	ctx context.Context,
+	client gitRemoteClient,
+	repo gitRepoRef,
+	ref string,
+	token string,
+	repoPath string,
+	release *ReleaseRecord,
+	treePaths []string,
+) error {
+	if release == nil {
+		return bizerr.NewCode(CodeMarketplaceInvalidInput)
+	}
+	candidates := selectGitDocPathsForIndexing(treePaths, repoPath)
+	if len(candidates) == 0 {
+		return nil
+	}
+	items := make([]*marketplaceDocumentIndexItem, 0, len(candidates))
+	for _, relPath := range candidates {
+		body, readErr := client.ReadFile(ctx, repo, ref, gitPathJoin(repoPath, relPath), token)
+		if readErr != nil {
+			continue
+		}
+		if len(body) == 0 || len(body) > maxGitDocBytes {
+			continue
+		}
+		sourceKind := documentSourceKindManifestDocs
+		locale := defaultDocumentLocale
+		docPath := relPath
+		switch strings.ToLower(relPath) {
+		case readmeDocumentPath:
+			sourceKind = documentSourceKindReadme
+			docPath = readmeDocumentPath
+		case readmeCNDocumentPath, "readme.zh-cn.md":
+			sourceKind = documentSourceKindReadme
+			locale = fallbackZhCNLocale
+			docPath = readmeCNDocumentPath
+		default:
+			// manifest/docs/<locale>/... or manifest/docs/*.md
+			if strings.HasPrefix(relPath, marketplaceDocsPrefix) {
+				docPath = strings.TrimPrefix(relPath, marketplaceDocsPrefix)
+				parts := strings.Split(docPath, "/")
+				if len(parts) >= 2 {
+					// Prefer first directory segment as locale when it looks like zh-CN/en-US.
+					if strings.Contains(parts[0], "-") || parts[0] == "zh" || parts[0] == "en" {
+						locale = parts[0]
+						docPath = strings.Join(parts[1:], "/")
+					}
+				}
+			}
+		}
+		item, indexErr := indexMarketplaceDocument(locale, docPath, sourceKind, string(body))
+		if indexErr != nil {
+			continue
+		}
+		items = append(items, item)
+	}
+	if len(items) == 0 {
+		return nil
+	}
+	return s.replaceReleaseDocuments(ctx, release, items)
+}
+
+func selectGitDocPathsForIndexing(treePaths []string, repoPath string) []string {
+	_, _, docs := buildGitResourceSummariesFromTree(treePaths, repoPath)
+	if len(docs) == 0 {
+		return nil
+	}
+	// Prefer README + manifest/docs index files first.
+	priority := func(pathValue string) int {
+		lower := strings.ToLower(pathValue)
+		switch {
+		case lower == "readme.zh-cn.md":
+			return 0
+		case lower == "readme.md":
+			return 1
+		case strings.HasSuffix(lower, "/index.md") || lower == "manifest/docs/index.md":
+			return 2
+		case strings.Contains(lower, "readme"):
+			return 3
+		default:
+			return 4
+		}
+	}
+	sort.SliceStable(docs, func(i, j int) bool {
+		pi, pj := priority(docs[i].Path), priority(docs[j].Path)
+		if pi != pj {
+			return pi < pj
+		}
+		return docs[i].Path < docs[j].Path
+	})
+	limit := maxGitDocsIndexed
+	if limit > len(docs) {
+		limit = len(docs)
+	}
+	out := make([]string, 0, limit)
+	for i := 0; i < limit; i++ {
+		out = append(out, docs[i].Path)
+	}
+	return out
+}
+
 func (s *serviceImpl) distributionFromEntities(
 	ctx context.Context,
 	plugin *entity.PluginMarketplacePlugin,
@@ -501,7 +1196,10 @@ func (s *serviceImpl) distributionFromEntities(
 	if normalizeSourceKind(plugin.SourceKind) == gitSourceKind {
 		item.Mode = marketv1.MarketplaceDistributionModeGit
 		item.RepoUrl = firstNonEmpty(plugin.RepoUrl, plugin.Repository)
-		item.Ref = firstNonEmpty(release.SourceRef, release.ReleaseVersion)
+		// Prefer the pinned commit so installs reproduce the discovered content
+		// even when source_ref is a floating branch such as main.
+		item.Ref = firstNonEmpty(release.SourceCommit, release.SourceRef, release.ReleaseVersion)
+		item.Path = normalizeGitRepoPath(plugin.RepoPath)
 		item.Provider = marketv1.MarketplaceRepoProvider(plugin.RepoProvider)
 		item.RequiresAuth = normalizeKey(plugin.CredentialRef) != ""
 		return item, nil
@@ -584,26 +1282,6 @@ func (s *serviceImpl) gitClient() gitRemoteClient {
 	return &httpGitRemoteClient{httpClient: &http.Client{Timeout: defaultGitHTTPTimeout}}
 }
 
-// requireUploadSourcePlugin ensures upload package mutations stay on upload plugins.
-func (s *serviceImpl) requireUploadSourcePlugin(
-	ctx context.Context,
-	pluginID string,
-	ownerUserID int64,
-) (*entity.PluginMarketplacePlugin, error) {
-	plugin, err := s.requirePluginForPublisher(ctx, "", pluginID, ownerUserID)
-	if err != nil {
-		return nil, err
-	}
-	kind := normalizeSourceKind(plugin.SourceKind)
-	if kind == "" {
-		kind = uploadSourceKind
-	}
-	if kind != uploadSourceKind {
-		return nil, bizerr.NewCode(CodeMarketplaceSourceKindConflict)
-	}
-	return plugin, nil
-}
-
 func parseGitRepoURL(raw string) (gitRepoRef, error) {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
@@ -617,8 +1295,10 @@ func parseGitRepoURL(raw string) (gitRepoRef, error) {
 		return gitRepoRef{}, bizerr.NewCode(CodeMarketplaceInvalidInput, bizerr.P("diagnostic", "repository URL is invalid"))
 	}
 	host := strings.ToLower(parsed.Hostname())
-	provider := marketv1.MarketplaceRepoProvider("")
-	apiHost := ""
+	var (
+		provider marketv1.MarketplaceRepoProvider
+		apiHost  string
+	)
 	switch host {
 	case "github.com", "www.github.com":
 		provider = marketv1.MarketplaceRepoProviderGitHub
@@ -686,21 +1366,20 @@ func validateGitRemoteStructure(
 	client gitRemoteClient,
 	repo gitRepoRef,
 	ref string,
+	repoPath string,
 	token string,
 ) error {
 	for _, required := range []string{gitRequiredPathBackendGo, gitRequiredPathEmbedGo} {
-		ok, err := client.PathExists(ctx, clientRepo(repo), ref, required, token)
+		ok, err := client.PathExists(ctx, repo, ref, gitPathJoin(repoPath, required), token)
 		if err != nil {
 			return err
 		}
 		if !ok {
-			return packageDiagnosticError(CodeMarketplacePackageStructureInvalid, "remote repository is missing "+required)
+			return packageDiagnosticError(CodeMarketplacePackageStructureInvalid, "remote repository is missing "+gitPathJoin(repoPath, required))
 		}
 	}
 	return nil
 }
-
-func clientRepo(repo gitRepoRef) gitRepoRef { return repo }
 
 func manifestAsSource(manifest *gitPluginManifest) *sourcePackageManifest {
 	if manifest == nil {
@@ -760,6 +1439,126 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
+func filterSemverTags(tags []string) []string {
+	out := make([]string, 0, len(tags))
+	for _, tag := range tags {
+		name := normalizeKey(tag)
+		if name == "" {
+			continue
+		}
+		if gitSemverTagPattern.MatchString(name) {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
+func normalizeGitRepoPath(value string) string {
+	trimmed := strings.TrimSpace(strings.ReplaceAll(value, "\\", "/"))
+	trimmed = strings.Trim(trimmed, "/")
+	if trimmed == "" || trimmed == "." {
+		return ""
+	}
+	cleaned := path.Clean(trimmed)
+	if cleaned == "." {
+		return ""
+	}
+	return cleaned
+}
+
+func gitPathJoin(repoPath string, filePath string) string {
+	repoPath = normalizeGitRepoPath(repoPath)
+	filePath = strings.Trim(strings.ReplaceAll(filePath, "\\", "/"), "/")
+	if repoPath == "" {
+		return filePath
+	}
+	if filePath == "" {
+		return repoPath
+	}
+	return path.Join(repoPath, filePath)
+}
+
+// buildGitPathSet indexes remote blob paths for O(1) structure checks.
+func buildGitPathSet(paths []string) map[string]struct{} {
+	pathSet := make(map[string]struct{}, len(paths))
+	for _, raw := range paths {
+		filePath := strings.Trim(strings.ReplaceAll(raw, "\\", "/"), "/")
+		if filePath == "" {
+			continue
+		}
+		pathSet[filePath] = struct{}{}
+	}
+	return pathSet
+}
+
+// gitPathSetHasSourceStructure reports whether the remote tree already contains
+// the minimal source-plugin files for one plugin root.
+func gitPathSetHasSourceStructure(pathSet map[string]struct{}, repoPath string) bool {
+	if pathSet == nil {
+		return false
+	}
+	for _, required := range []string{
+		gitRequiredPathPluginYAML,
+		gitRequiredPathBackendGo,
+		gitRequiredPathEmbedGo,
+	} {
+		if _, ok := pathSet[gitPathJoin(repoPath, required)]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+// candidatePluginRootsFromTree returns directories that contain plugin.yaml.
+// Root plugin.yaml is excluded because single-plugin roots are handled first.
+func candidatePluginRootsFromTree(paths []string) []string {
+	candidates := make([]string, 0)
+	seen := make(map[string]struct{})
+	for _, raw := range paths {
+		filePath := strings.Trim(strings.ReplaceAll(raw, "\\", "/"), "/")
+		if filePath == "" || filePath == gitRequiredPathPluginYAML {
+			continue
+		}
+		if !strings.HasSuffix(filePath, "/"+gitRequiredPathPluginYAML) {
+			continue
+		}
+		dir := strings.TrimSuffix(filePath, "/"+gitRequiredPathPluginYAML)
+		dir = normalizeGitRepoPath(dir)
+		if dir == "" {
+			continue
+		}
+		if !isAllowedGitPluginPath(dir) {
+			continue
+		}
+		if _, exists := seen[dir]; exists {
+			continue
+		}
+		seen[dir] = struct{}{}
+		candidates = append(candidates, dir)
+	}
+	sort.Strings(candidates)
+	return candidates
+}
+
+func isAllowedGitPluginPath(repoPath string) bool {
+	parts := strings.Split(normalizeGitRepoPath(repoPath), "/")
+	if len(parts) == 0 || parts[0] == "" {
+		return false
+	}
+	if len(parts) > maxGitPluginPathDepth {
+		return false
+	}
+	for _, part := range parts {
+		if part == ".." || part == "." {
+			return false
+		}
+		if _, ignored := gitIgnoredPathRoots[part]; ignored {
+			return false
+		}
+	}
+	return true
+}
+
 func releaseDistributionAllowed(
 	release *entity.PluginMarketplaceRelease,
 	owned bool,
@@ -788,11 +1587,8 @@ func (c *httpGitRemoteClient) ListTags(ctx context.Context, repo gitRepoRef, tok
 	if err != nil {
 		return nil, err
 	}
-	if status == http.StatusUnauthorized || status == http.StatusForbidden {
-		return nil, gitAuthError("repository authentication failed")
-	}
-	if status != http.StatusOK {
-		return nil, fmt.Errorf("list tags failed with status %d", status)
+	if err = gitHostingHTTPError(status, body, token, "list tags"); err != nil {
+		return nil, err
 	}
 	var payload []struct {
 		Name string `json:"name"`
@@ -809,16 +1605,184 @@ func (c *httpGitRemoteClient) ListTags(ctx context.Context, repo gitRepoRef, tok
 	return tags, nil
 }
 
+func (c *httpGitRemoteClient) RefExists(ctx context.Context, repo gitRepoRef, ref string, token string) (bool, error) {
+	ref = strings.TrimSpace(ref)
+	if ref == "" {
+		return false, nil
+	}
+	var endpoint string
+	switch repo.Provider {
+	case marketv1.MarketplaceRepoProviderGitHub:
+		endpoint = fmt.Sprintf("%s/repos/%s/%s/branches/%s", repo.APIHost, url.PathEscape(repo.Owner), url.PathEscape(repo.Name), url.PathEscape(ref))
+	case marketv1.MarketplaceRepoProviderGitee:
+		endpoint = fmt.Sprintf("%s/repos/%s/%s/branches/%s", repo.APIHost, url.PathEscape(repo.Owner), url.PathEscape(repo.Name), url.PathEscape(ref))
+	default:
+		return false, bizerr.NewCode(CodeMarketplaceInvalidInput)
+	}
+	body, status, err := c.doGET(ctx, endpoint, token, repo.Provider)
+	if err != nil {
+		return false, err
+	}
+	if status == http.StatusNotFound {
+		return false, nil
+	}
+	if err = gitHostingHTTPError(status, body, token, "check branch"); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// ResolveCommitSHA resolves a branch, tag, or other ref to a full commit SHA.
+func (c *httpGitRemoteClient) ResolveCommitSHA(ctx context.Context, repo gitRepoRef, ref string, token string) (string, error) {
+	ref = strings.TrimSpace(ref)
+	if ref == "" {
+		return "", fmt.Errorf("ref is required")
+	}
+	// Both GitHub and Gitee expose /commits/{ref} that accepts branch, tag, or SHA.
+	endpoint := fmt.Sprintf(
+		"%s/repos/%s/%s/commits/%s",
+		repo.APIHost,
+		url.PathEscape(repo.Owner),
+		url.PathEscape(repo.Name),
+		url.PathEscape(ref),
+	)
+	body, status, err := c.doGET(ctx, endpoint, token, repo.Provider)
+	if err != nil {
+		return "", err
+	}
+	if err = gitHostingHTTPError(status, body, token, "resolve commit"); err != nil {
+		return "", err
+	}
+	var payload struct {
+		SHA string `json:"sha"`
+	}
+	if err = json.Unmarshal(body, &payload); err != nil || strings.TrimSpace(payload.SHA) == "" {
+		return "", fmt.Errorf("commit response is invalid")
+	}
+	return strings.TrimSpace(payload.SHA), nil
+}
+
+func (c *httpGitRemoteClient) ListTreePaths(ctx context.Context, repo gitRepoRef, ref string, token string) ([]string, error) {
+	ref = strings.TrimSpace(ref)
+	if ref == "" {
+		return nil, fmt.Errorf("ref is required")
+	}
+	switch repo.Provider {
+	case marketv1.MarketplaceRepoProviderGitHub:
+		return c.listGitHubTreePaths(ctx, repo, ref, token)
+	case marketv1.MarketplaceRepoProviderGitee:
+		return c.listGiteeTreePaths(ctx, repo, ref, token)
+	default:
+		return nil, bizerr.NewCode(CodeMarketplaceInvalidInput)
+	}
+}
+
+func (c *httpGitRemoteClient) listGitHubTreePaths(ctx context.Context, repo gitRepoRef, ref string, token string) ([]string, error) {
+	commitEndpoint := fmt.Sprintf(
+		"%s/repos/%s/%s/commits/%s",
+		repo.APIHost,
+		url.PathEscape(repo.Owner),
+		url.PathEscape(repo.Name),
+		url.PathEscape(ref),
+	)
+	commitBody, status, err := c.doGET(ctx, commitEndpoint, token, repo.Provider)
+	if err != nil {
+		return nil, err
+	}
+	if err = gitHostingHTTPError(status, commitBody, token, "read commit"); err != nil {
+		return nil, err
+	}
+	var commit struct {
+		Commit struct {
+			Tree struct {
+				SHA string `json:"sha"`
+			} `json:"tree"`
+		} `json:"commit"`
+	}
+	if err = json.Unmarshal(commitBody, &commit); err != nil || commit.Commit.Tree.SHA == "" {
+		return nil, fmt.Errorf("commit response is invalid")
+	}
+	treeEndpoint := fmt.Sprintf(
+		"%s/repos/%s/%s/git/trees/%s?recursive=1",
+		repo.APIHost,
+		url.PathEscape(repo.Owner),
+		url.PathEscape(repo.Name),
+		url.PathEscape(commit.Commit.Tree.SHA),
+	)
+	treeBody, status, err := c.doGET(ctx, treeEndpoint, token, repo.Provider)
+	if err != nil {
+		return nil, err
+	}
+	if err = gitHostingHTTPError(status, treeBody, token, "list tree"); err != nil {
+		return nil, err
+	}
+	var tree struct {
+		Tree []struct {
+			Path string `json:"path"`
+			Type string `json:"type"`
+		} `json:"tree"`
+	}
+	if err = json.Unmarshal(treeBody, &tree); err != nil {
+		return nil, fmt.Errorf("tree response is invalid")
+	}
+	paths := make([]string, 0, len(tree.Tree))
+	for _, item := range tree.Tree {
+		if item.Type != "blob" || item.Path == "" {
+			continue
+		}
+		paths = append(paths, item.Path)
+	}
+	return paths, nil
+}
+
+func (c *httpGitRemoteClient) listGiteeTreePaths(ctx context.Context, repo gitRepoRef, ref string, token string) ([]string, error) {
+	// Gitee recursive tree API uses the git/trees endpoint with the branch/tag name.
+	endpoint := fmt.Sprintf(
+		"%s/repos/%s/%s/git/trees/%s?recursive=1",
+		repo.APIHost,
+		url.PathEscape(repo.Owner),
+		url.PathEscape(repo.Name),
+		url.PathEscape(ref),
+	)
+	body, status, err := c.doGET(ctx, endpoint, token, repo.Provider)
+	if err != nil {
+		return nil, err
+	}
+	if err = gitHostingHTTPError(status, body, token, "list tree"); err != nil {
+		return nil, err
+	}
+	var tree struct {
+		Tree []struct {
+			Path string `json:"path"`
+			Type string `json:"type"`
+		} `json:"tree"`
+	}
+	if err = json.Unmarshal(body, &tree); err != nil {
+		return nil, fmt.Errorf("tree response is invalid")
+	}
+	paths := make([]string, 0, len(tree.Tree))
+	for _, item := range tree.Tree {
+		if item.Type != "blob" || item.Path == "" {
+			continue
+		}
+		paths = append(paths, item.Path)
+	}
+	return paths, nil
+}
+
 func (c *httpGitRemoteClient) ReadFile(ctx context.Context, repo gitRepoRef, ref string, filePath string, token string) ([]byte, error) {
 	var endpoint string
 	switch repo.Provider {
 	case marketv1.MarketplaceRepoProviderGitHub:
+		// Prefer Contents API over raw.githubusercontent.com so Authorization
+		// tokens apply consistently for private repositories and rate limits.
 		endpoint = fmt.Sprintf(
-			"https://raw.githubusercontent.com/%s/%s/%s/%s",
+			"%s/repos/%s/%s/contents/%s?ref=%s",
+			repo.APIHost,
 			url.PathEscape(repo.Owner),
 			url.PathEscape(repo.Name),
-			url.PathEscape(ref),
-			path.Clean(filePath),
+			encodeGitContentPath(filePath),
+			url.QueryEscape(ref),
 		)
 	case marketv1.MarketplaceRepoProviderGitee:
 		endpoint = fmt.Sprintf(
@@ -835,16 +1799,71 @@ func (c *httpGitRemoteClient) ReadFile(ctx context.Context, repo gitRepoRef, ref
 	if err != nil {
 		return nil, err
 	}
-	if status == http.StatusUnauthorized || status == http.StatusForbidden {
-		return nil, gitAuthError("repository authentication failed")
-	}
 	if status == http.StatusNotFound {
 		return nil, packageDiagnosticError(CodeMarketplacePackageStructureInvalid, filePath+" not found at ref "+ref)
 	}
-	if status != http.StatusOK {
-		return nil, fmt.Errorf("read file failed with status %d", status)
+	if err = gitHostingHTTPError(status, body, token, "read file"); err != nil {
+		return nil, err
+	}
+	if repo.Provider == marketv1.MarketplaceRepoProviderGitHub {
+		return decodeGitHubContentsFile(body)
 	}
 	return body, nil
+}
+
+// encodeGitContentPath encodes each path segment for GitHub Contents API.
+func encodeGitContentPath(filePath string) string {
+	cleaned := path.Clean(strings.Trim(strings.ReplaceAll(filePath, "\\", "/"), "/"))
+	if cleaned == "." || cleaned == "" {
+		return ""
+	}
+	parts := strings.Split(cleaned, "/")
+	encoded := make([]string, 0, len(parts))
+	for _, part := range parts {
+		encoded = append(encoded, url.PathEscape(part))
+	}
+	return strings.Join(encoded, "/")
+}
+
+// decodeGitHubContentsFile extracts file bytes from a GitHub Contents API response.
+func decodeGitHubContentsFile(body []byte) ([]byte, error) {
+	var payload struct {
+		Encoding string `json:"encoding"`
+		Content  string `json:"content"`
+		Message  string `json:"message"`
+		Type     string `json:"type"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		// Some gateways may still proxy raw body; accept plain content.
+		if len(body) > 0 && body[0] != '{' {
+			return body, nil
+		}
+		return nil, fmt.Errorf("github contents response is invalid")
+	}
+	if payload.Type != "" && payload.Type != "file" {
+		return nil, fmt.Errorf("github contents path is not a file")
+	}
+	if strings.EqualFold(payload.Encoding, "base64") {
+		// GitHub inserts newlines in base64 payloads.
+		cleaned := strings.Map(func(r rune) rune {
+			if r == '\n' || r == '\r' || r == ' ' || r == '\t' {
+				return -1
+			}
+			return r
+		}, payload.Content)
+		decoded, err := decodeBase64Std(cleaned)
+		if err != nil {
+			return nil, fmt.Errorf("github contents base64 decode failed")
+		}
+		return decoded, nil
+	}
+	if payload.Content != "" {
+		return []byte(payload.Content), nil
+	}
+	if payload.Message != "" {
+		return nil, fmt.Errorf("github contents error: %s", payload.Message)
+	}
+	return nil, fmt.Errorf("github contents response is empty")
 }
 
 func (c *httpGitRemoteClient) PathExists(ctx context.Context, repo gitRepoRef, ref string, filePath string, token string) (bool, error) {
@@ -855,7 +1874,6 @@ func (c *httpGitRemoteClient) PathExists(ctx context.Context, repo gitRepoRef, r
 	if strings.Contains(err.Error(), "not found") {
 		return false, nil
 	}
-	// packageDiagnosticError wraps bizerr - check message
 	if isMarketplaceStructureMissing(err) {
 		return false, nil
 	}
@@ -873,13 +1891,19 @@ func (c *httpGitRemoteClient) doGET(
 		return nil, 0, err
 	}
 	req.Header.Set("User-Agent", gitMetadataUserAgent)
-	req.Header.Set("Accept", "application/json")
+	switch provider {
+	case marketv1.MarketplaceRepoProviderGitHub:
+		// GitHub recommends the versioned media type for REST API stability.
+		req.Header.Set("Accept", "application/vnd.github+json")
+		req.Header.Set("X-Github-Api-Version", "2022-11-28")
+	default:
+		req.Header.Set("Accept", "application/json")
+	}
 	if token = strings.TrimSpace(token); token != "" {
 		switch provider {
 		case marketv1.MarketplaceRepoProviderGitHub:
 			req.Header.Set("Authorization", "Bearer "+token)
 		case marketv1.MarketplaceRepoProviderGitee:
-			// Gitee commonly accepts access_token query; also send header for private raw.
 			q := req.URL.Query()
 			q.Set("access_token", token)
 			req.URL.RawQuery = q.Encode()
@@ -901,15 +1925,59 @@ func (c *httpGitRemoteClient) doGET(
 	return body, res.StatusCode, nil
 }
 
-type gitAuthErrorType struct{ message string }
+// gitHostingHTTPError maps hosting HTTP statuses to actionable errors.
+// Important: GitHub unauthenticated rate limits return HTTP 403, which must NOT
+// be reported as credential/authentication failure for public repositories.
+func gitHostingHTTPError(status int, body []byte, token string, operation string) error {
+	if status == http.StatusOK {
+		return nil
+	}
+	message := strings.ToLower(string(body))
+	switch status {
+	case http.StatusUnauthorized:
+		if strings.TrimSpace(token) == "" {
+			return fmt.Errorf("%s failed with HTTP 401; repository may be private and requires an access token", operation)
+		}
+		return newGitAuthError("repository authentication failed: invalid or expired access token")
+	case http.StatusForbidden:
+		if strings.Contains(message, "rate limit") ||
+			strings.Contains(message, "secondary rate limit") ||
+			strings.Contains(message, "api rate limit exceeded") {
+			if strings.TrimSpace(token) == "" {
+				return fmt.Errorf("%s failed: GitHub API rate limit exceeded for unauthenticated requests; provide a personal access token (public_repo or fine-grained contents:read) and retry", operation)
+			}
+			return fmt.Errorf("%s failed: GitHub API rate limit exceeded for the provided token; wait and retry", operation)
+		}
+		if strings.TrimSpace(token) == "" {
+			// Public repos usually do not 403 unless rate-limited or blocked by network policy.
+			return fmt.Errorf("%s denied with HTTP 403; if this is a public repository the host is often rate-limited or blocked—provide a personal access token or retry later", operation)
+		}
+		return newGitAuthError("repository authentication failed: token lacks access to this repository")
+	default:
+		if status >= 200 && status < 300 {
+			return nil
+		}
+		snippet := strings.TrimSpace(string(body))
+		if len(snippet) > 180 {
+			snippet = snippet[:180] + "..."
+		}
+		if snippet == "" {
+			return fmt.Errorf("%s failed with status %d", operation, status)
+		}
+		return fmt.Errorf("%s failed with status %d: %s", operation, status, snippet)
+	}
+}
 
-func (e gitAuthErrorType) Error() string { return e.message }
+// gitAuthError is a typed auth failure from Git hosting APIs.
+type gitAuthError struct{ message string }
 
-func gitAuthError(message string) error { return gitAuthErrorType{message: message} }
+func (e gitAuthError) Error() string { return e.message }
+
+func newGitAuthError(message string) error { return gitAuthError{message: message} }
 
 func isGitAuthError(err error) bool {
-	_, ok := err.(gitAuthErrorType)
-	return ok
+	var target gitAuthError
+	return errors.As(err, &target)
 }
 
 func mapGitClientError(err error) error {
@@ -925,6 +1993,16 @@ func mapGitClientError(err error) error {
 	return bizerr.NewCode(CodeMarketplaceGitDiscoveryFailed, bizerr.P("diagnostic", err.Error()))
 }
 
+// decodeBase64Std decodes standard base64 without padding edge cases.
+func decodeBase64Std(value string) ([]byte, error) {
+	// Prefer StdEncoding; fall back to RawStdEncoding for unpadded payloads.
+	decoded, err := base64.StdEncoding.DecodeString(value)
+	if err == nil {
+		return decoded, nil
+	}
+	return base64.RawStdEncoding.DecodeString(value)
+}
+
 func isMarketplaceStructureMissing(err error) bool {
 	if err == nil {
 		return false
@@ -938,7 +2016,6 @@ func isMarketplaceBusinessError(err error) bool {
 		return false
 	}
 	msg := err.Error()
-	// Business errors from this package carry stable codes in message or are package diagnostics.
 	for _, marker := range []string{
 		"PLUGIN_MARKETPLACE_",
 		"Marketplace package",

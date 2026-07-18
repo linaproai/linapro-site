@@ -189,7 +189,10 @@ func (s *serviceImpl) ListReleases(ctx context.Context, in ListReleasesInput) (*
 			cols.PluginType,
 			cols.ReleaseStatus,
 			cols.ReviewStatus,
+			cols.ProcessStatus,
 			cols.Visibility,
+			cols.SourceRef,
+			cols.SourceCommit,
 			cols.MinHostVersion,
 			cols.MaxHostVersion,
 			cols.ReviewMessage,
@@ -929,8 +932,10 @@ func pluginListItemFromReadModel(
 		TagCodes:       decodeStringArrayJSON(row.TagCodes),
 		RiskCounts:     decodeRiskCounts(row.RiskCounts),
 		DownloadCount:  row.DownloadCount,
-		PublishedAt:    unixMillisPtr(row.PublishedAt),
-		UpdatedAt:      unixMillisPtr(row.UpdatedAt),
+		// Public catalog rows are published; process status is completed.
+		ProcessStatus: marketv1.MarketplaceProcessStatusCompleted,
+		PublishedAt:   unixMillisPtr(row.PublishedAt),
+		UpdatedAt:     unixMillisPtr(row.UpdatedAt),
 	}
 }
 
@@ -959,6 +964,7 @@ func pluginDetailItemFromEntities(
 		Publisher:      publisherItemFromEntity(publisher, "", false),
 		PluginType:     marketv1.MarketplacePluginType(plugin.PluginType),
 		MarketStatus:   marketv1.MarketplaceStatus(plugin.MarketStatus),
+		ProcessStatus:  marketv1.MarketplaceProcessStatus(normalizeProcessStatus(plugin.ProcessStatus)),
 		Visibility:     marketv1.MarketplaceVisibility(plugin.Visibility),
 		LatestVersion:  plugin.LatestVersion,
 		Icon:           plugin.Icon,
@@ -970,8 +976,18 @@ func pluginDetailItemFromEntities(
 		RiskCounts:     riskCounts,
 		DownloadCount:  plugin.DownloadCount,
 		SourceDelivery: sourceDeliveryForPluginType(marketv1.MarketplacePluginType(plugin.PluginType)),
-		PublishedAt:    unixMillisPtr(plugin.PublishedAt),
-		UpdatedAt:      unixMillisPtr(plugin.UpdatedAt),
+		// Keep detail source fields aligned with list/admin projections so Git
+		// plugins do not fall through to the frontend upload-package default.
+		SourceKind:      marketv1.MarketplaceSourceKind(normalizeSourceKind(plugin.SourceKind)),
+		RepoUrl:         plugin.RepoUrl,
+		RepoProvider:    marketv1.MarketplaceRepoProvider(plugin.RepoProvider),
+		RepoPath:        plugin.RepoPath,
+		RequiresAuth:    strings.TrimSpace(plugin.CredentialRef) != "",
+		LastSyncStatus:  plugin.LastSyncStatus,
+		LastSyncMessage: plugin.LastSyncMessage,
+		LastSyncAt:      unixMillisPtr(plugin.LastSyncAt),
+		PublishedAt:     unixMillisPtr(plugin.PublishedAt),
+		UpdatedAt:       unixMillisPtr(plugin.UpdatedAt),
 	}
 }
 
@@ -989,7 +1005,10 @@ func releaseItemFromEntity(
 		PluginType:     marketv1.MarketplacePluginType(row.PluginType),
 		ReleaseStatus:  marketv1.MarketplaceStatus(row.ReleaseStatus),
 		ReviewStatus:   marketv1.MarketplaceReviewStatus(row.ReviewStatus),
+		ProcessStatus:  marketv1.MarketplaceProcessStatus(normalizeProcessStatus(row.ProcessStatus)),
 		Visibility:     marketv1.MarketplaceVisibility(row.Visibility),
+		SourceRef:      row.SourceRef,
+		SourceCommit:   row.SourceCommit,
 		MinHostVersion: row.MinHostVersion,
 		MaxHostVersion: row.MaxHostVersion,
 		ReviewMessage:  row.ReviewMessage,

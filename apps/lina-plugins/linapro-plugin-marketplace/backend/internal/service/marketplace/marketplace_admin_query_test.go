@@ -69,6 +69,74 @@ func TestListReviewQueueDefaultsToSubmittedAndReviewing(t *testing.T) {
 	}
 }
 
+func TestClassifyPluginListStatusFilter(t *testing.T) {
+	cases := []struct {
+		name       string
+		status     string
+		wantColumn string
+		wantValue  string
+		wantOK     bool
+	}{
+		{
+			name:       "pending verify",
+			status:     marketv1.MarketplaceProcessStatusPendingVerify.String(),
+			wantColumn: "process_status",
+			wantValue:  marketv1.MarketplaceProcessStatusPendingVerify.String(),
+			wantOK:     true,
+		},
+		{
+			name:       "pending review",
+			status:     marketv1.MarketplaceProcessStatusPendingReview.String(),
+			wantColumn: "process_status",
+			wantValue:  marketv1.MarketplaceProcessStatusPendingReview.String(),
+			wantOK:     true,
+		},
+		{
+			name:       "failed",
+			status:     marketv1.MarketplaceProcessStatusFailed.String(),
+			wantColumn: "process_status",
+			wantValue:  marketv1.MarketplaceProcessStatusFailed.String(),
+			wantOK:     true,
+		},
+		{
+			name:       "published",
+			status:     marketv1.MarketplaceStatusPublished.String(),
+			wantColumn: "market_status",
+			wantValue:  marketv1.MarketplaceStatusPublished.String(),
+			wantOK:     true,
+		},
+		{
+			name:       "delisted",
+			status:     marketv1.MarketplaceStatusDelisted.String(),
+			wantColumn: "market_status",
+			wantValue:  marketv1.MarketplaceStatusDelisted.String(),
+			wantOK:     true,
+		},
+		{
+			name:   "unknown ignored",
+			status: "not-a-status",
+			wantOK: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			column, value, ok := classifyPluginListStatusFilter(tc.status)
+			if ok != tc.wantOK || column != tc.wantColumn || value != tc.wantValue {
+				t.Fatalf(
+					"got column=%q value=%q ok=%t, want column=%q value=%q ok=%t",
+					column,
+					value,
+					ok,
+					tc.wantColumn,
+					tc.wantValue,
+					tc.wantOK,
+				)
+			}
+		})
+	}
+}
+
 func TestPublisherIDsFromPluginsDeduplicates(t *testing.T) {
 	ids := publisherIDsFromPlugins([]*entity.PluginMarketplacePlugin{
 		{PublisherId: 1},

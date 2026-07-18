@@ -203,10 +203,27 @@ export class MarketplacePage {
   async backFromDetail(
     expectedPath: "admin-list" | "dashboard/analytics" | "mine" | "review",
   ) {
-    await this.detailShell()
-      .getByRole("button", { name: /返\s*回|Back/u })
-      .click();
-    await waitForRouteReady(this.page, 15_000);
+    const detailDialog = this.page
+      .locator('[role="dialog"]:visible')
+      .filter({ has: this.detailShell() })
+      .last();
+    const isModal = (await detailDialog.count()) > 0;
+    if (isModal) {
+      const backButton = this.detailShell().getByRole("button", {
+        name: /返\s*回|Back/u,
+      });
+      if ((await backButton.count()) > 0) {
+        await backButton.click();
+      } else {
+        await detailDialog.locator(".ant-modal-close").click();
+      }
+      await expect(detailDialog).toBeHidden({ timeout: 15_000 });
+    } else {
+      await this.detailShell()
+        .getByRole("button", { name: /返\s*回|Back/u })
+        .click();
+      await waitForRouteReady(this.page, 15_000);
+    }
     await expect
       .poll(() => new URL(this.page.url()).pathname)
       .toContain(
@@ -334,13 +351,26 @@ export class MarketplacePage {
     await expect(this.publisherDrawer()).toBeHidden();
   }
 
-  async expectNoMineSearchForm() {
+  async expectMineSearchFormStatusOptions() {
+    const form = this.page.locator(".plugin-marketplace-mine").first();
     await expect(
-      this.page.getByRole("button", { name: /搜\s*索|Search/u }),
-    ).toHaveCount(0);
-    await expect(
-      this.page.getByText(/关键词|Keyword/u, { exact: true }),
-    ).toHaveCount(0);
+      form.getByText(/关键词|Keyword/u, { exact: true }).first(),
+    ).toBeVisible();
+    // Prefer accessible label association; form-item full text also includes the
+    // placeholder ("请选择"), so avoid exact full-item text matching.
+    const statusSelect = form.getByLabel(/状态|Status/u).first();
+    await expect(statusSelect).toBeVisible();
+    await statusSelect.click();
+    const dropdown = this.page.locator(".ant-select-dropdown:visible").last();
+    await expect(dropdown.getByText("待验证", { exact: true })).toBeVisible();
+    await expect(dropdown.getByText("待审核", { exact: true })).toBeVisible();
+    await expect(dropdown.getByText("已发布", { exact: true })).toBeVisible();
+    await expect(dropdown.getByText("处理失败", { exact: true })).toBeVisible();
+    await expect(dropdown.getByText("已下架", { exact: true })).toBeVisible();
+    await expect(dropdown.getByText("已废弃", { exact: true })).toBeVisible();
+    // Market-only "草稿" must not appear; list tags show process states instead.
+    await expect(dropdown.getByText("草稿", { exact: true })).toHaveCount(0);
+    await this.page.keyboard.press("Escape");
   }
 
   async expectNoRegisterGitToolbarAction() {
@@ -385,6 +415,15 @@ export class MarketplacePage {
 
   async expectAddPluginDrawerLayout() {
     const drawer = this.publishDrawer();
+    // Only the drawer chrome title; body must not repeat the same heading.
+    await expect(
+      drawer.locator("h2").filter({ hasText: /添加插件|Add Plugin/u }),
+    ).toBeVisible();
+    await expect(
+      drawer
+        .locator("h3")
+        .filter({ hasText: /添加插件|Add Plugin|插件基本信息|Plugin Basics/u }),
+    ).toHaveCount(0);
     await expect(
       drawer.getByText(/分发方式|Distribution/u, { exact: true }),
     ).toBeVisible();
@@ -484,14 +523,13 @@ export class MarketplacePage {
     repoUrl: string;
     visibility?: VisibilityLabel;
   }) {
-    const section = this.publishSection(
-      /添加插件|Add Plugin|插件基本信息|Plugin Basics/u,
-    );
+    // Add-plugin mode no longer has an inner section heading; scope to drawer.
+    const drawer = this.publishDrawer();
     await this.selectPublishSourceKind("git");
-    await this.fillField(section, /仓库地址|Repository URL/u, values.repoUrl);
+    await this.fillField(drawer, /仓库地址|Repository URL/u, values.repoUrl);
     if (values.accessToken) {
       await this.fillField(
-        section,
+        drawer,
         /访问令牌|Access Token/u,
         values.accessToken,
       );
@@ -499,7 +537,7 @@ export class MarketplacePage {
     // Visibility is no longer selectable on Git add.
     void values.visibility;
     await expect(
-      this.publishDrawer()
+      drawer
         .locator(".ant-form-item:visible")
         .filter({ hasText: /可见性|Visibility/u }),
     ).toHaveCount(0);
@@ -558,12 +596,9 @@ export class MarketplacePage {
   }
 
   async publishOwnedPlugin(pluginId: string) {
+    // Publish is a primary row action, not under the overflow menu.
     const row = this.mineRow(pluginId);
-    await row.getByRole("button", { name: /更多|More/u }).click();
-    await this.page
-      .locator(".ant-dropdown:visible")
-      .getByText(/发布|Publish/u)
-      .click();
+    await row.getByRole("button", { name: /发布|Publish/u }).click();
   }
 
   async delistOwnedPlugin(pluginId: string) {
@@ -626,6 +661,10 @@ export class MarketplacePage {
       .getByRole("button", { name: /提交结论|Submit Decision/u })
       .last()
       .click();
+  }
+
+  detailReleaseRow(version: string) {
+    return this.tableRow(detailReleaseTableSelector, version);
   }
 
   async openDocsForVersion(version: string) {
@@ -723,15 +762,16 @@ export class MarketplacePage {
     );
     const firstRow = rows.first();
     const secondRow = rows.nth(1);
-    const pluginCell = firstRow.locator(".mine-plugin-cell");
+    // Layout uses separate pluginId / name columns (no combined plugin cell).
+    const firstCell = firstRow.locator(".vxe-body--column").first();
     await expect(secondRow).toBeVisible();
-    await expect(pluginCell).toBeVisible();
+    await expect(firstCell).toBeVisible();
     await expect
       .poll(async () => {
         const [firstBox, secondBox, cellBox] = await Promise.all([
           firstRow.boundingBox(),
           secondRow.boundingBox(),
-          pluginCell.boundingBox(),
+          firstCell.boundingBox(),
         ]);
         if (!firstBox || !secondBox || !cellBox) {
           return false;

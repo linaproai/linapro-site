@@ -31,6 +31,22 @@ const (
 // String returns the serialized marketplace status value.
 func (value MarketplaceStatus) String() string { return string(value) }
 
+// MarketplaceProcessStatus identifies async verify/review pipeline state.
+type MarketplaceProcessStatus string
+
+// Marketplace async process pipeline states.
+// Plugins enter pending_verify after add; Git discovery and validation both run
+// in that stage before auto-submit to pending_review.
+const (
+	MarketplaceProcessStatusPendingVerify MarketplaceProcessStatus = "pending_verify"
+	MarketplaceProcessStatusPendingReview MarketplaceProcessStatus = "pending_review"
+	MarketplaceProcessStatusCompleted     MarketplaceProcessStatus = "completed"
+	MarketplaceProcessStatusFailed        MarketplaceProcessStatus = "failed"
+)
+
+// String returns the serialized marketplace process status value.
+func (value MarketplaceProcessStatus) String() string { return string(value) }
+
 // MarketplaceReviewStatus identifies the review state of one marketplace release.
 type MarketplaceReviewStatus string
 
@@ -51,11 +67,11 @@ type MarketplaceArtifactType string
 
 // Marketplace release artifact types.
 const (
-	MarketplaceArtifactTypeSourceZip     MarketplaceArtifactType = "source_zip"
-	MarketplaceArtifactTypeSourceTarGz   MarketplaceArtifactType = "source_tar_gz"
-	MarketplaceArtifactTypeDynamicZip    MarketplaceArtifactType = "dynamic_zip"
-	MarketplaceArtifactTypeDynamicTarGz  MarketplaceArtifactType = "dynamic_tar_gz"
-	MarketplaceArtifactTypePluginWasm    MarketplaceArtifactType = "plugin_wasm"
+	MarketplaceArtifactTypeSourceZip    MarketplaceArtifactType = "source_zip"
+	MarketplaceArtifactTypeSourceTarGz  MarketplaceArtifactType = "source_tar_gz"
+	MarketplaceArtifactTypeDynamicZip   MarketplaceArtifactType = "dynamic_zip"
+	MarketplaceArtifactTypeDynamicTarGz MarketplaceArtifactType = "dynamic_tar_gz"
+	MarketplaceArtifactTypePluginWasm   MarketplaceArtifactType = "plugin_wasm"
 )
 
 // MarketplaceSourceKind identifies how a marketplace plugin is published.
@@ -101,7 +117,8 @@ type MarketplaceDistributionItem struct {
 	Version                 string                      `json:"version" dc:"Release version bound to the distribution projection" eg:"v1.0.0"`
 	PluginType              MarketplacePluginType       `json:"pluginType" dc:"Plugin type: source or dynamic" eg:"source"`
 	RepoUrl                 string                      `json:"repoUrl,omitempty" dc:"Git repository URL when mode is git; empty for https packages" eg:"https://github.com/org/plugin.git"`
-	Ref                     string                      `json:"ref,omitempty" dc:"Git tag or ref when mode is git" eg:"v1.0.0"`
+	Ref                     string                      `json:"ref,omitempty" dc:"Git install ref when mode is git; prefer pinned full commit SHA resolved at discovery time, falling back to tag or branch name only when commit is unavailable" eg:"a1b2c3d4e5f6789012345678901234567890abcd"`
+	Path                    string                      `json:"path,omitempty" dc:"Plugin root path relative to the repository root when mode is git; empty when the repository root is the plugin root" eg:"apps/lina-plugins/linapro-demo-source"`
 	Provider                MarketplaceRepoProvider     `json:"provider,omitempty" dc:"Git provider when mode is git: github or gitee" eg:"github"`
 	RequiresAuth            bool                        `json:"requiresAuth,omitempty" dc:"Whether private Git access requires caller credentials; platform tokens are never returned" eg:"true"`
 	ArtifactType            MarketplaceArtifactType     `json:"artifactType,omitempty" dc:"Primary package artifact type when mode is https" eg:"source_zip"`
@@ -211,16 +228,18 @@ type MarketplaceArtifactItem struct {
 
 // MarketplaceReleaseItem is the release projection shared by catalog, review, and publish APIs.
 type MarketplaceReleaseItem struct {
-	PluginId       string                   `json:"pluginId" dc:"Stable plugin ID owned by the marketplace record" eg:"linapro-demo-source"`
-	Version        string                   `json:"version" dc:"Immutable release version; a published pluginId and version pair cannot be overwritten" eg:"v0.1.0"`
-	PluginType     MarketplacePluginType    `json:"pluginType" dc:"Plugin type: source=source plugin dynamic=dynamic plugin" eg:"source"`
-	ReleaseStatus  MarketplaceStatus        `json:"releaseStatus" dc:"Release lifecycle status: draft, published, delisted, or deprecated" eg:"published"`
-	ReviewStatus   MarketplaceReviewStatus  `json:"reviewStatus" dc:"Release review status: draft, submitted, reviewing, approved, or rejected" eg:"approved"`
-	Visibility     MarketplaceVisibility    `json:"visibility" dc:"Release visibility policy: public, private, or reserved" eg:"public"`
-	MinHostVersion string                   `json:"minHostVersion" dc:"Minimum compatible LinaPro host version declared or inferred for this release" eg:"v0.1.0"`
-	MaxHostVersion string                   `json:"maxHostVersion" dc:"Maximum compatible LinaPro host version, empty when no upper bound is declared" eg:"v1.0.0"`
+	PluginId       string                       `json:"pluginId" dc:"Stable plugin ID owned by the marketplace record" eg:"linapro-demo-source"`
+	Version        string                       `json:"version" dc:"Immutable release version; a published pluginId and version pair cannot be overwritten" eg:"v0.1.0"`
+	PluginType     MarketplacePluginType        `json:"pluginType" dc:"Plugin type: source=source plugin dynamic=dynamic plugin" eg:"source"`
+	ReleaseStatus  MarketplaceStatus            `json:"releaseStatus" dc:"Release lifecycle status: draft, published, delisted, or deprecated" eg:"published"`
+	ReviewStatus   MarketplaceReviewStatus      `json:"reviewStatus" dc:"Release review status: draft, submitted, reviewing, approved, or rejected" eg:"approved"`
+	ProcessStatus  MarketplaceProcessStatus     `json:"processStatus,omitempty" dc:"Async process status: pending_verify, pending_review, completed, or failed" eg:"pending_review"`
+	Visibility     MarketplaceVisibility        `json:"visibility" dc:"Release visibility policy: public, private, or reserved" eg:"public"`
+	MinHostVersion string                       `json:"minHostVersion" dc:"Minimum compatible LinaPro host version declared or inferred for this release" eg:"v0.1.0"`
+	MaxHostVersion string                       `json:"maxHostVersion" dc:"Maximum compatible LinaPro host version, empty when no upper bound is declared" eg:"v1.0.0"`
 	ReviewMessage  string                       `json:"reviewMessage" dc:"Latest reviewer message or scanner diagnostic summary, empty when no message exists" eg:"Approved for marketplace listing"`
-	SourceRef      string                       `json:"sourceRef,omitempty" dc:"Git tag or ref for git-sourced releases" eg:"v0.1.0"`
+	SourceRef      string                       `json:"sourceRef,omitempty" dc:"Git logical tag or branch name for git-sourced releases" eg:"v0.1.0"`
+	SourceCommit   string                       `json:"sourceCommit,omitempty" dc:"Pinned full commit SHA resolved during Git discovery for git-sourced releases" eg:"a1b2c3d4e5f6789012345678901234567890abcd"`
 	Distribution   *MarketplaceDistributionItem `json:"distribution,omitempty" dc:"CLI install distribution projection when available for this release" eg:"{}"`
 	Artifact       *MarketplaceArtifactItem     `json:"artifact,omitempty" dc:"Primary artifact checksum and size summary for this release" eg:"{}"`
 	SubmittedAt    *int64                       `json:"submittedAt,omitempty" dc:"Review submission time as Unix timestamp in milliseconds" eg:"1767240000000"`

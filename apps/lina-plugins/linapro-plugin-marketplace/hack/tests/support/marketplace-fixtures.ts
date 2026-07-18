@@ -56,11 +56,28 @@ type ReleaseItem = {
   reviewMessage?: string;
   reviewStatus: ReviewStatus;
   reviewedAt?: number;
+  /** Pinned full commit SHA for git-sourced releases (install distribution.ref). */
+  sourceCommit?: string;
+  /** Logical git tag/branch name for git-sourced releases. */
+  sourceRef?: string;
   submittedAt?: number;
   updatedAt?: number;
   version: string;
   visibility: Visibility;
 };
+
+/** Pinned commit used by the historical main-fallback release in E2E fixtures. */
+export const marketplaceHistoricalSourceCommit =
+  "abc123def4567890abc123def4567890abc123de";
+/** Pinned commit used by the latest git tag release in E2E fixtures. */
+export const marketplaceLatestSourceCommit =
+  "def456abc7890123def456abc7890123def456ab";
+
+type ProcessStatus =
+  | "completed"
+  | "failed"
+  | "pending_review"
+  | "pending_verify";
 
 type PluginItem = {
   description?: string;
@@ -70,13 +87,14 @@ type PluginItem = {
   latestReviewStatus?: ReviewStatus;
   latestVersion: string;
   license?: string;
-  marketStatus: "draft" | "published";
+  marketStatus: "delisted" | "deprecated" | "draft" | "published";
   maxHostVersion?: string;
   minHostVersion?: string;
   name: string;
   pluginId: string;
   pluginType: PluginType;
   primaryTag?: string;
+  processStatus?: ProcessStatus;
   publishedAt?: number;
   publisher?: PublisherItem;
   repository?: string;
@@ -217,9 +235,38 @@ const sourceRelease: ReleaseItem = {
   reviewMessage: "Approved by marketplace review.",
   reviewStatus: "approved",
   reviewedAt: mockNow,
+  sourceCommit: marketplaceLatestSourceCommit,
+  sourceRef: "v1.0.0",
   submittedAt: mockNow - 300000,
   updatedAt: mockNow,
   version: "v1.0.0",
+  visibility: "public",
+};
+
+// Older published history entry: main-fallback discovery pinned at discovery time.
+const sourceHistoricalRelease: ReleaseItem = {
+  artifact: {
+    artifactType: "source_zip",
+    contentType: "application/zip",
+    fileName: "linapro-demo-source-v0.9.0.zip",
+    manifestSha256: "source-history-manifest-sha256",
+    sha256: "source-history-package-sha256",
+    sizeBytes: 45056,
+  },
+  maxHostVersion: "v1.3.0",
+  minHostVersion: "v1.1.0",
+  pluginId: sourcePluginId,
+  pluginType: "source",
+  publishedAt: mockNow - 86_400_000,
+  releaseStatus: "published",
+  reviewMessage: "Historical approved release for rollback installs.",
+  reviewStatus: "approved",
+  reviewedAt: mockNow - 86_400_000,
+  sourceCommit: marketplaceHistoricalSourceCommit,
+  sourceRef: "main",
+  submittedAt: mockNow - 86_700_000,
+  updatedAt: mockNow - 86_400_000,
+  version: "v0.9.0",
   visibility: "public",
 };
 
@@ -317,6 +364,7 @@ const plugins: PluginItem[] = [
     pluginId: sourcePluginId,
     pluginType: "source",
     primaryTag: "official",
+    processStatus: "completed",
     publishedAt: mockNow,
     publisher: linaPublisher,
     repository: "https://github.com/linaproai/linapro",
@@ -349,6 +397,7 @@ const plugins: PluginItem[] = [
     pluginId: dynamicPluginId,
     pluginType: "dynamic",
     primaryTag: "runtime",
+    processStatus: "completed",
     publishedAt: mockNow,
     publisher: linaPublisher,
     riskCounts: {
@@ -376,6 +425,7 @@ const plugins: PluginItem[] = [
     name: "Private Report Automation",
     pluginId: privatePluginId,
     pluginType: "source",
+    processStatus: "completed",
     publisher: linaPublisher,
     riskCounts: {
       high: 0,
@@ -401,6 +451,7 @@ const plugins: PluginItem[] = [
     name: "Acme Observability",
     pluginId: externalPluginId,
     pluginType: "source",
+    processStatus: "pending_review",
     publisher: externalPublisher,
     riskCounts: {
       high: 1,
@@ -417,7 +468,7 @@ const plugins: PluginItem[] = [
 ];
 
 const baseReleasesByPlugin = new Map<string, ReleaseItem[]>([
-  [sourcePluginId, [sourceRelease]],
+  [sourcePluginId, [sourceRelease, sourceHistoricalRelease]],
   [dynamicPluginId, [dynamicPendingRelease, dynamicRelease]],
   [privatePluginId, [privateRelease]],
   [externalPluginId, [externalPendingRelease]],
@@ -440,6 +491,24 @@ const documents = new Map<string, DocumentItem>([
       title: "Source Demo Guide",
       updatedAt: mockNow,
       version: sourceRelease.version,
+    },
+  ],
+  [
+    releaseKey(sourcePluginId, sourceHistoricalRelease.version),
+    {
+      content:
+        "<h2>Source Demo History</h2><p>Historical release retained for compatibility rollback installs.</p>",
+      contentHash: "source-history-doc-hash",
+      fallbackUsed: false,
+      locale: "en-US",
+      path: "index.md",
+      pluginId: sourcePluginId,
+      resolvedLocale: "en-US",
+      sourceKind: "manifest_docs",
+      summary: "Historical source package documentation.",
+      title: "Source Demo History",
+      updatedAt: mockNow - 86_400_000,
+      version: sourceHistoricalRelease.version,
     },
   ],
   [
@@ -923,6 +992,7 @@ async function handleMarketplaceRoute(
       name: existing?.name ?? inferredPluginId,
       pluginId: inferredPluginId,
       pluginType: release.pluginType,
+      processStatus: existing?.processStatus ?? "pending_verify",
       publisher: existing?.publisher ?? linaPublisher,
       riskCounts: existing?.riskCounts ?? { high: 0, info: 0, warning: 0 },
       sourceDelivery:
@@ -1091,6 +1161,42 @@ async function handleMarketplaceRoute(
     segments[0] === "market" &&
     isMarketplaceReadCollection(segments[1]) &&
     segments[3] === "releases" &&
+    segments[5] === "distribution"
+  ) {
+    const pluginId = segments[2];
+    const version = segments[4];
+    const release = findRelease(data, pluginId, version);
+    const plugin = data.pluginsById.get(pluginId);
+    const pinnedRef =
+      release.sourceCommit?.trim() ||
+      release.sourceRef?.trim() ||
+      release.version;
+    await fulfillData(route, {
+      distribution: {
+        mode: release.sourceRef || release.sourceCommit ? "git" : "https",
+        pluginId,
+        version: release.version,
+        pluginType: release.pluginType,
+        repoUrl: plugin?.repository ?? "",
+        ref: pinnedRef,
+        path: "",
+        provider: "github",
+        requiresAuth: false,
+        artifactType: release.artifact?.artifactType,
+        sha256: release.artifact?.sha256,
+        sizeBytes: release.artifact?.sizeBytes,
+        downloadSessionRequired: !(release.sourceRef || release.sourceCommit),
+      },
+    });
+    return;
+  }
+
+  if (
+    segments.length === 6 &&
+    method === "GET" &&
+    segments[0] === "market" &&
+    isMarketplaceReadCollection(segments[1]) &&
+    segments[3] === "releases" &&
     segments[5] === "docs"
   ) {
     await waitForInspectionDelay(
@@ -1212,8 +1318,20 @@ function listPlugins(
     ) {
       return false;
     }
-    if (status && item.marketStatus !== status) {
-      return false;
+    if (status) {
+      const processStatuses = new Set([
+        "completed",
+        "failed",
+        "pending_review",
+        "pending_verify",
+      ]);
+      if (processStatuses.has(status)) {
+        if ((item.processStatus || "") !== status) {
+          return false;
+        }
+      } else if (item.marketStatus !== status) {
+        return false;
+      }
     }
     if (
       tagCode &&
@@ -1640,6 +1758,10 @@ function updatePluginLatestRelease(
     latestVersion: release.version,
     marketStatus:
       release.releaseStatus === "published" ? "published" : plugin.marketStatus,
+    processStatus:
+      release.releaseStatus === "published"
+        ? "completed"
+        : (plugin.processStatus ?? "pending_verify"),
     updatedAt: release.updatedAt,
   });
 }
@@ -1657,6 +1779,7 @@ function pluginFromPayload(payload: Record<string, unknown>): PluginItem {
     name: stringValue(payload.name) || pluginId,
     pluginId,
     pluginType,
+    processStatus: "pending_verify",
     publisher: linaPublisher,
     riskCounts: { high: 0, info: 0, warning: 0 },
     sourceDelivery:

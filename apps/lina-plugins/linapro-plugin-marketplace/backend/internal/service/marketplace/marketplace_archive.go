@@ -9,15 +9,14 @@ import (
 	"compress/gzip"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 
 	marketv1 "linapro-plugin-marketplace/backend/api/market/v1"
 )
 
 const (
-	archiveKindZip   = "zip"
-	archiveKindTarGz = "tar.gz"
+	archiveKindZip    = "zip"
+	archiveKindTarGz  = "tar.gz"
 	maxArchiveEntries = 20000
 	maxArchiveBytes   = 512 * 1024 * 1024 // 512 MiB uncompressed budget
 )
@@ -192,13 +191,4 @@ func ensurePackageArchiveSupported(fileName string) error {
 		return packageDiagnosticError(CodeMarketplacePackageInvalid, "package file name must end with .zip, .tar.gz, or .tgz")
 	}
 	return nil
-}
-
-// filepathBaseSafe returns filepath.Base for non-empty paths.
-func filepathBaseSafe(value string) string {
-	trimmed := strings.TrimSpace(value)
-	if trimmed == "" {
-		return ""
-	}
-	return filepath.Base(trimmed)
 }

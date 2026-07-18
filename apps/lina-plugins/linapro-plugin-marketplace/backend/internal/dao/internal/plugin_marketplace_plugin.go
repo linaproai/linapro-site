@@ -29,6 +29,7 @@ type PluginMarketplacePluginColumns struct {
 	Description     string // Long marketplace description
 	PluginType      string // Plugin type: source/dynamic
 	MarketStatus    string // Marketplace status: draft/published/delisted/deprecated
+	ProcessStatus   string // Async process status: pending_verify/pending_review/completed/failed
 	Visibility      string // Visibility policy: public/private/reserved
 	LatestReleaseId string // Latest published release ID
 	LatestVersion   string // Latest published version
@@ -40,6 +41,7 @@ type PluginMarketplacePluginColumns struct {
 	SourceKind      string // Publish source kind: git/upload
 	RepoUrl         string // Git repository URL when source_kind is git
 	RepoProvider    string // Git provider: github/gitee, empty for upload
+	RepoPath        string // Plugin root path relative to repository root; empty when repository root is the plugin root
 	CredentialRef   string // Opaque credential reference for private Git access, empty when public
 	LastSyncAt      string // Last Git metadata discovery time
 	LastSyncStatus  string // Last Git sync status
@@ -60,6 +62,7 @@ var pluginMarketplacePluginColumns = PluginMarketplacePluginColumns{
 	Description:     "description",
 	PluginType:      "plugin_type",
 	MarketStatus:    "market_status",
+	ProcessStatus:   "process_status",
 	Visibility:      "visibility",
 	LatestReleaseId: "latest_release_id",
 	LatestVersion:   "latest_version",
@@ -71,6 +74,7 @@ var pluginMarketplacePluginColumns = PluginMarketplacePluginColumns{
 	SourceKind:      "source_kind",
 	RepoUrl:         "repo_url",
 	RepoProvider:    "repo_provider",
+	RepoPath:        "repo_path",
 	CredentialRef:   "credential_ref",
 	LastSyncAt:      "last_sync_at",
 	LastSyncStatus:  "last_sync_status",

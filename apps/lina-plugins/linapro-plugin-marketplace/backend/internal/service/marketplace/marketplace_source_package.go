@@ -898,12 +898,14 @@ func sourcePackageDiagnostics(
 			Message:  "Source package contains SQL resources that require reviewer inspection.",
 		})
 	}
-	diagnostics = append(diagnostics, &PackageDiagnostic{
-		Code:     "source_docs_indexed",
-		Severity: marketv1.MarketplaceRiskSeverityInfo,
-		Source:   "manifest/docs",
-		Message:  "Marketplace documentation entries were detected.",
-	})
+	if len(docs) > 0 {
+		diagnostics = append(diagnostics, &PackageDiagnostic{
+			Code:     "source_docs_indexed",
+			Severity: marketv1.MarketplaceRiskSeverityInfo,
+			Source:   "manifest/docs",
+			Message:  "Marketplace documentation entries were detected.",
+		})
+	}
 	if manifest.Dependencies == nil || manifest.Dependencies.Framework == nil || manifest.Dependencies.Framework.Version == "" {
 		diagnostics = append(diagnostics, &PackageDiagnostic{
 			Code:     "framework_dependency_missing",

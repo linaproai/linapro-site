@@ -7,7 +7,7 @@ import "github.com/gogf/gf/v2/frame/g"
 
 // GitSourceRegisterReq is the request for registering one Git-backed marketplace plugin.
 type GitSourceRegisterReq struct {
-	g.Meta       `path:"/market/plugins/git-sources" method:"post" tags:"Plugin Marketplace" summary:"Register marketplace Git source" permission:"market:plugin:publish" dc:"Register a GitHub or Gitee repository as a marketplace plugin source owned by the current publisher. The service stores repository coordinates and optional encrypted credentials, discovers version tags as metadata only without cloning full source trees, and creates private draft releases that stay owner-visible until an explicit publish review is approved."`
+	g.Meta       `path:"/market/plugins/git-sources" method:"post" tags:"Plugin Marketplace" summary:"Register marketplace Git source" permission:"market:plugin:publish" dc:"Register a GitHub or Gitee repository as a marketplace plugin source owned by the current publisher. The service stores repository coordinates and optional encrypted credentials, auto-detects single-plugin or multi-plugin repository layouts with minimal remote probing, creates private owner-visible plugin identities in pending_verify, and leaves full version discovery, verification, and review submission to the async marketplace process pipeline."`
 	PublisherKey string `json:"publisherKey" v:"required|length:1,64" dc:"Stable publisher key that owns the marketplace plugin identity" eg:"linapro"`
 	RepoUrl      string `json:"repoUrl" v:"required|length:1,512" dc:"GitHub or Gitee HTTPS repository URL" eg:"https://github.com/linaproai/linapro-demo-source"`
 	AccessToken  string `json:"accessToken" v:"length:0,512" dc:"Optional private repository access token stored encrypted by the platform; never returned by later APIs" eg:""`
@@ -15,14 +15,15 @@ type GitSourceRegisterReq struct {
 	License      string `json:"license" v:"length:0,64" dc:"Optional license identifier when not discovered from plugin.yaml" eg:"Apache-2.0"`
 }
 
-// GitSourceRegisterRes is the response for registering one Git-backed marketplace plugin.
+// GitSourceRegisterRes is the response for registering one or more Git-backed marketplace plugins from one repository.
 type GitSourceRegisterRes struct {
-	Plugin *MarketplacePluginDetailItem `json:"plugin" dc:"Registered marketplace plugin identity after immediate metadata discovery" eg:"{}"`
+	Plugin  *MarketplacePluginDetailItem   `json:"plugin" dc:"Primary registered marketplace plugin identity after enqueue; equals plugins[0] when plugins is non-empty" eg:"{}"`
+	Plugins []*MarketplacePluginDetailItem `json:"plugins" dc:"All marketplace plugin identities discovered from the repository, including multi-plugin monorepos, initially pending_verify" eg:"[]"`
 }
 
 // GitSourceSyncReq is the request for manually triggering Git metadata discovery.
 type GitSourceSyncReq struct {
-	g.Meta   `path:"/market/plugins/{pluginId}/git-sync" method:"post" tags:"Plugin Marketplace" summary:"Sync marketplace Git source metadata" permission:"market:plugin:publish" dc:"Trigger metadata discovery for one Git-backed marketplace plugin owned by the current publisher. The service lists remote tags and reads remote plugin.yaml without cloning full source trees."`
+	g.Meta   `path:"/market/plugins/{pluginId}/git-sync" method:"post" tags:"Plugin Marketplace" summary:"Sync marketplace Git source metadata" permission:"market:plugin:publish" dc:"Trigger metadata discovery for one Git-backed marketplace plugin owned by the current publisher. The service lists remote tags or falls back to the main branch and reads remote plugin.yaml without cloning full source trees."`
 	PluginId string `json:"pluginId" v:"required|length:1,64" dc:"Stable plugin ID whose Git source metadata is refreshed" eg:"linapro-demo-source"`
 }
 

@@ -24,10 +24,10 @@ import type {
   MarketplaceRiskType,
 } from "../../types/marketplace";
 
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { defineAsyncComponent, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 
-import { Page, useVbenDrawer } from "@vben/common-ui";
+import { Page, useVbenDrawer, useVbenModal } from "@vben/common-ui";
 
 import {
   Alert,
@@ -49,7 +49,6 @@ import {
   marketplaceReleaseRisks,
   marketplaceReviewQueueList,
 } from "../../api/marketplace";
-import MarketplaceDetail from "../detail/index.vue";
 
 type GridPageInfo = {
   currentPage: number;
@@ -71,10 +70,13 @@ type ReviewQueueRow = MarketplaceReviewQueueItem & {
 };
 
 const route = useRoute();
-const showEmbeddedDetail = computed(
-  () =>
-    route.query.view === "detail" && typeof route.query.pluginId === "string",
-);
+
+const [DetailModal, detailModalApi] = useVbenModal({
+  connectedComponent: defineAsyncComponent(
+    () => import("../detail/detail-modal.vue"),
+  ),
+});
+
 const selectedRelease = ref<MarketplaceReviewQueueItem | null>(null);
 const reviewRisks = ref<MarketplaceRiskItem[]>([]);
 const reviewDocument = ref<MarketplaceDocumentItem | null>(null);
@@ -291,17 +293,29 @@ onMounted(async () => {
     emptyText: t("plugin.linapro-plugin-marketplace.console.empty.queue"),
   });
   decisionFormApi.setState({ schema: buildDecisionSchema() });
-  if (!showEmbeddedDetail.value) {
-    await gridApi.reload();
-  }
+  await gridApi.reload();
+  openDetailFromRouteQuery();
 });
 
-watch(showEmbeddedDetail, async (detailMode) => {
-  if (!detailMode) {
-    await nextTick();
-    await gridApi.reload();
+watch(
+  () => [route.query.view, route.query.pluginId] as const,
+  () => {
+    openDetailFromRouteQuery();
+  },
+);
+
+function openDetailFromRouteQuery() {
+  if (route.query.view !== "detail") {
+    return;
   }
-});
+  const pluginId =
+    typeof route.query.pluginId === "string" ? route.query.pluginId.trim() : "";
+  if (!pluginId) {
+    return;
+  }
+  detailModalApi.setData({ from: "review", pluginId });
+  detailModalApi.open();
+}
 
 function formatPluginType(type: string) {
   return type === "source"
@@ -570,8 +584,8 @@ function getReviewDrawerTitle() {
 </script>
 
 <template>
-  <MarketplaceDetail v-if="showEmbeddedDetail" />
-  <Page v-else :auto-content-height="true">
+  <Page :auto-content-height="true">
+    <DetailModal />
     <Grid
       :table-title="$t('plugin.linapro-plugin-marketplace.review.tableTitle')"
     >

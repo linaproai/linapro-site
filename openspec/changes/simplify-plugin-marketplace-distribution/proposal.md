@@ -7,9 +7,11 @@
 - 发布入口扩展为两种方式：
   - **Git 源**：登记 GitHub/Gitee 仓库地址（公开仓或平台代持 token 的私有仓）；服务端**只做元数据发现**（tags、`plugin.yaml` 等），**不**将完整源码 clone/mirror 到服务端。
   - **上传包**：支持 `zip` / `tar.gz`；解压后按插件目录规范识别并读取插件信息；源码包与动态运行时包均支持。
-- Git 同步策略：**登记后立即发现一次 + 后台定时轮询 tags**；发现的新版本进入草稿，仍须人工审核后上架。
-- 版本一致性：Git tag 与检出路径上的 `plugin.yaml` version **必须一致**，否则该版本不可提交审核。
-- **MVP 不做 monorepo 子目录**；仓库根目录即插件根目录。
+- Git 同步策略：**登记后立即发现一次 + 后台定时轮询**；优先使用 semver tags，无有效 tag 时回退 `main` 分支；发现的新版本进入草稿，仍须人工审核后上架。
+- 版本一致性：基于 tag 发现时，tag 与对应插件根 `plugin.yaml` version **必须一致**；无 tag 回退 `main` 时以 yaml version 为草稿版本。
+- Git 安装钉扎：发现时解析并持久化 `source_commit`；无 tag 回退 `main` 时不得仅以浮动分支名作为下载引用，`distribution.ref` 优先使用 commit SHA。
+- 历史版本：同一插件保留多条已发布版本记录，消费者可查询并选择安装历史版本以回退。
+- **自动识别单插件与多插件仓库**：根级合法源码插件为单插件；否则扫描子目录合法插件根并记录 `repo_path`，无需调用方传子目录参数。
 - **Git 源服务源码插件形态**；动态插件以上传包为主。
 - 查询/详情/版本 API 增加统一 `distribution` 投影，供 CLI 按模式安装：
   - `mode=git`：返回 `repoUrl` + `ref`（及必要鉴权提示，不回传明文 token）
@@ -35,7 +37,7 @@
 - **数据库**：插件或版本表增加来源类型、仓库 URL、凭证引用、最近同步状态等字段；token 不得明文落库日志。
 - **定时任务**：市场插件内（或宿主 job 能力）登记「Git 元数据轮询」任务，只打平台 API/元数据读取，不落全量源码树。
 - **开发工具**：`hack/tools/linactl` 扩展市场安装路径（可复用/衔接现有 `plugins.install` 思想）：根据市场 API 的 `distribution` 执行 git 或 HTTPS。
-- **不改**：`lina-core` 插件发现/安装/启用/禁用/升级主契约；`distribution=managed|builtin` 语义；支付/订单；monorepo subdir；Git 源上的动态 wasm 全量拉取。
+- **不改**：`lina-core` 插件发现/安装/启用/禁用/升级主契约；`distribution=managed|builtin` 语义；支付/订单；Git 源上的动态 wasm 全量拉取；不要求登记 API 手工传 monorepo 子目录。
 - **影响分析**：
   - `i18n`：有影响（新菜单/表单/错误码/apidoc）。
   - 缓存一致性：有影响（同步发现新版本、审核通过后读模型失效）。

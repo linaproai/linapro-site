@@ -111,7 +111,8 @@ type SaveReleaseDraftInput struct {
 	RiskSummary        string                         // RiskSummary is JSON produced by package scanning.
 	ReviewMessage      string                         // ReviewMessage stores a scanner or publisher note.
 	ReplaceDraft       bool                           // ReplaceDraft allows replacing an existing mutable draft.
-	SourceRef          string                         // SourceRef is the Git tag/ref for git-sourced drafts.
+	SourceRef          string                         // SourceRef is the Git logical tag/branch name for git-sourced drafts.
+	SourceCommit       string                         // SourceCommit is the pinned full commit SHA resolved during Git discovery.
 }
 
 // UploadSourcePackageInput carries one uploaded source plugin marketplace package.
@@ -186,12 +187,15 @@ type ListPluginsInput struct {
 
 // ListOwnedPluginsInput carries publisher-owned plugin list filters.
 type ListOwnedPluginsInput struct {
-	PageNum     int                            // PageNum is the one-based page number.
-	PageSize    int                            // PageSize is bounded by maxMarketplacePageSize.
-	Keyword     string                         // Keyword optionally matches plugin ID, name, and summary.
-	PluginType  marketv1.MarketplacePluginType // PluginType optionally narrows source or dynamic plugins.
-	Status      marketv1.MarketplaceStatus     // Status optionally narrows marketplace lifecycle status.
-	OwnerUserID int64                          // OwnerUserID is required and filters publishers owned by the user.
+	PageNum    int                            // PageNum is the one-based page number.
+	PageSize   int                            // PageSize is bounded by maxMarketplacePageSize.
+	Keyword    string                         // Keyword optionally matches plugin ID, name, and summary.
+	PluginType marketv1.MarketplacePluginType // PluginType optionally narrows source or dynamic plugins.
+	// Status optionally narrows by marketplace lifecycle status
+	// (draft/published/delisted/deprecated) or process pipeline status
+	// (pending_verify/pending_review/completed/failed).
+	Status      string
+	OwnerUserID int64 // OwnerUserID is required and filters publishers owned by the user.
 }
 
 // ListManagedPluginsInput carries reviewer-managed plugin list filters.
@@ -200,8 +204,11 @@ type ListManagedPluginsInput struct {
 	PageSize   int                            // PageSize is bounded by maxMarketplacePageSize.
 	Keyword    string                         // Keyword optionally matches plugin ID, name, summary, and publisher.
 	PluginType marketv1.MarketplacePluginType // PluginType optionally narrows source or dynamic plugins.
-	Status     marketv1.MarketplaceStatus     // Status optionally narrows marketplace lifecycle status.
-	Publisher  string                         // Publisher optionally narrows by publisher key.
+	// Status optionally narrows by marketplace lifecycle status
+	// (draft/published/delisted/deprecated) or process pipeline status
+	// (pending_verify/pending_review/completed/failed).
+	Status    string
+	Publisher string // Publisher optionally narrows by publisher key.
 }
 
 // ListReviewQueueInput carries cross-plugin review queue filters.
@@ -376,6 +383,7 @@ type PluginRecord struct {
 	Description     string
 	PluginType      marketv1.MarketplacePluginType
 	MarketStatus    marketv1.MarketplaceStatus
+	ProcessStatus   marketv1.MarketplaceProcessStatus
 	Visibility      marketv1.MarketplaceVisibility
 	LatestReleaseID int
 	LatestVersion   string
@@ -387,12 +395,18 @@ type PluginRecord struct {
 	SourceKind      marketv1.MarketplaceSourceKind
 	RepoURL         string
 	RepoProvider    marketv1.MarketplaceRepoProvider
+	RepoPath        string // relative plugin root inside the repository; empty for repository-root plugins
 	CredentialRef   string // never expose token; presence implies requiresAuth
 	LastSyncAt      *time.Time
 	LastSyncStatus  string
 	LastSyncMessage string
 	PublishedAt     *time.Time
 	UpdatedAt       *time.Time
+}
+
+// RegisterGitSourceResult carries one or more plugins discovered from a repository.
+type RegisterGitSourceResult struct {
+	Plugins []*PluginRecord
 }
 
 // ReleaseRecord is the service-owned marketplace release projection.
@@ -403,9 +417,11 @@ type ReleaseRecord struct {
 	PluginID       string
 	Version        string
 	SourceRef      string
+	SourceCommit   string
 	PluginType     marketv1.MarketplacePluginType
 	ReleaseStatus  marketv1.MarketplaceStatus
 	ReviewStatus   marketv1.MarketplaceReviewStatus
+	ProcessStatus  marketv1.MarketplaceProcessStatus
 	Visibility     marketv1.MarketplaceVisibility
 	MinHostVersion string
 	MaxHostVersion string

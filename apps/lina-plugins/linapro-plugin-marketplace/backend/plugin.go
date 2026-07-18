@@ -10,6 +10,7 @@ import (
 
 	"lina-core/pkg/plugin/capability"
 	"lina-core/pkg/plugin/capability/bizctxcap"
+	"lina-core/pkg/plugin/capability/plugincap"
 	"lina-core/pkg/plugin/pluginhost"
 	marketplace "linapro-plugin-marketplace"
 	marketctrl "linapro-plugin-marketplace/backend/internal/controller/market"
@@ -58,7 +59,7 @@ func registerMarketplaceRoutes(ctx context.Context, registrar pluginhost.HTTPReg
 		return gerror.New("marketplace HTTP registrar cannot be nil")
 	}
 	services := registrar.Services()
-	marketSvc, err := marketplacesvc.New(nil)
+	marketSvc, err := marketplacesvc.New(nil, resolvePluginConfig(services))
 	if err != nil {
 		return gerror.Wrap(err, "create marketplace service")
 	}
@@ -91,16 +92,40 @@ func resolveBizCtx(services capability.Services) bizctxcap.Service {
 	return services.BizCtx()
 }
 
-// registerMarketplaceJobs registers the Git metadata polling scheduled job.
+// resolvePluginConfig returns the current plugin's scoped config reader when
+// the host capability directory is bound. Nil is allowed for incomplete test
+// registrars; Git discovery then skips platform token fallback.
+func resolvePluginConfig(services capability.Services) plugincap.ConfigService {
+	if services == nil || services.Plugins() == nil {
+		return nil
+	}
+	return services.Plugins().Config()
+}
+
+// registerMarketplaceJobs registers async process pipeline and Git metadata jobs.
 func registerMarketplaceJobs(ctx context.Context, registrar pluginhost.JobsRegistrar) error {
 	if registrar == nil {
 		return gerror.New("marketplace jobs registrar cannot be nil")
 	}
-	marketSvc, err := marketplacesvc.New(nil)
+	marketSvc, err := marketplacesvc.New(nil, resolvePluginConfig(registrar.Services()))
 	if err != nil {
 		return gerror.Wrap(err, "create marketplace service for jobs")
 	}
-	// Every 20 minutes: immediate discovery still happens on Git source registration.
+	// Every minute: advance pending_verify plugins toward review.
+	if err = registrar.AddWithMetadata(
+		ctx,
+		"0 * * * * *",
+		"linapro-plugin-marketplace-process-pipeline",
+		"Marketplace process pipeline",
+		"Discover, verify, and auto-submit marketplace plugins waiting in the async process queue",
+		func(jobCtx context.Context) error {
+			_, processErr := marketSvc.ProcessMarketplacePipeline(jobCtx)
+			return processErr
+		},
+	); err != nil {
+		return err
+	}
+	// Every 20 minutes: poll already registered Git sources for new tags.
 	return registrar.AddWithMetadata(
 		ctx,
 		"0 */20 * * * *",

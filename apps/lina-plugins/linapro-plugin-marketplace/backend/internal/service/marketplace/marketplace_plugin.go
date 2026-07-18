@@ -43,6 +43,7 @@ func (s *serviceImpl) SavePluginDraft(ctx context.Context, in SavePluginDraftInp
 		Description:     normalizeKey(in.Description),
 		PluginType:      normalizePluginType(in.PluginType).String(),
 		MarketStatus:    marketv1.MarketplaceStatusDraft.String(),
+		ProcessStatus:   marketv1.MarketplaceProcessStatusPendingVerify.String(),
 		Visibility:      normalizeVisibility(in.Visibility).String(),
 		LatestReleaseId: 0,
 		LatestVersion:   "",

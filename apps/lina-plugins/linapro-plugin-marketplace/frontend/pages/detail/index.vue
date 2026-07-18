@@ -15,6 +15,7 @@ import type {
   MarketplaceArtifactType,
   MarketplaceDocumentItem,
   MarketplacePluginDetailItem,
+  MarketplaceProcessStatus,
   MarketplaceReleaseItem,
   MarketplaceReviewStatus,
   MarketplaceRiskCounts,
@@ -81,6 +82,26 @@ type LoadState = "empty" | "error" | "idle" | "loading" | "ready";
 
 type RuntimeErrorPayload = Record<string, unknown>;
 
+const props = withDefaults(
+  defineProps<{
+    /** When true, render as modal/drawer content without Page chrome. */
+    embedded?: boolean;
+    /** Preferred source list context for API scope and back navigation. */
+    from?: string;
+    /** Explicit plugin id when opened from a list modal instead of the route. */
+    pluginId?: string;
+  }>(),
+  {
+    embedded: false,
+    from: "",
+    pluginId: "",
+  },
+);
+
+const emit = defineEmits<{
+  close: [];
+}>();
+
 const riskEmptyCounts: MarketplaceRiskCounts = {
   high: 0,
   info: 0,
@@ -91,11 +112,20 @@ const route = useRoute();
 const router = useRouter();
 const breakpoints = useBreakpoints(breakpointsTailwind);
 const isMobile = breakpoints.smaller("md");
+const activeFrom = computed(() => {
+  if (props.from) {
+    return props.from;
+  }
+  return typeof route.query.from === "string" ? route.query.from : "";
+});
 const readScope = computed<MarketplaceReadScope>(() => {
-  if (route.query.from === "mine") {
+  if (activeFrom.value === "mine") {
     return "mine";
   }
-  if (route.query.from === "admin-list" || route.query.from === "review") {
+  if (
+    activeFrom.value === "admin-list" ||
+    activeFrom.value === "review"
+  ) {
     return "managed";
   }
   return "public";
@@ -128,7 +158,7 @@ const [VersionGrid, versionGridApi] = useVbenVxeGrid<MarketplaceReleaseItem>({
       autoLoad: false,
       ajax: {
         query: async ({ page }: { page: GridPageInfo }) => {
-          const pluginId = getRoutePluginId();
+          const pluginId = getActivePluginId();
           if (!pluginId) {
             versionLoadState.value = "empty";
             return { items: [], total: 0 };
@@ -144,7 +174,7 @@ const [VersionGrid, versionGridApi] = useVbenVxeGrid<MarketplaceReleaseItem>({
               },
               readScope.value,
             );
-            if (pluginId !== getRoutePluginId()) {
+            if (pluginId !== getActivePluginId()) {
               return result;
             }
             if (!selectedRelease.value && result.items[0]) {
@@ -153,7 +183,7 @@ const [VersionGrid, versionGridApi] = useVbenVxeGrid<MarketplaceReleaseItem>({
             versionLoadState.value = result.total > 0 ? "ready" : "empty";
             return result;
           } catch (error) {
-            if (pluginId === getRoutePluginId()) {
+            if (pluginId === getActivePluginId()) {
               versionLoadState.value = "error";
             }
             throw error;
@@ -173,7 +203,10 @@ function t(key: string, params?: Record<string, number | string>) {
   return params ? $t(key, params) : $t(key);
 }
 
-function getRoutePluginId() {
+function getActivePluginId() {
+  if (props.pluginId.trim()) {
+    return props.pluginId.trim();
+  }
   const value = route.query.pluginId;
   if (Array.isArray(value)) {
     return value[0] || "";
@@ -250,7 +283,7 @@ onMounted(async () => {
 });
 
 watch(
-  () => route.query.pluginId,
+  () => [props.pluginId, route.query.pluginId, props.from, route.query.from],
   () => {
     void initializePage();
   },
@@ -261,7 +294,7 @@ watch(isMobile, () => {
 });
 
 async function initializePage() {
-  const pluginId = getRoutePluginId();
+  const pluginId = getActivePluginId();
   const requestId = ++pageRequestId;
   releaseContextRequestId += 1;
   detail.value = null;
@@ -305,9 +338,11 @@ async function initializePage() {
 }
 
 function handleBack() {
-  const from =
-    typeof route.query.from === "string" ? route.query.from : undefined;
-  router.push(marketplaceBackPath(from));
+  if (props.embedded) {
+    emit("close");
+    return;
+  }
+  router.push(marketplaceBackPath(activeFrom.value || undefined));
 }
 
 async function handleSelectRelease(
@@ -686,38 +721,174 @@ function formatPluginType(type?: string) {
   return type || "-";
 }
 
-function formatStatus(status: MarketplaceStatus) {
-  switch (status) {
-    case "delisted": {
-      return t("plugin.linapro-plugin-marketplace.detail.status.delisted");
+/** Show pinned git coordinates so historical installs stay inspectable. */
+function formatReleaseSourcePin(row?: MarketplaceReleaseItem | null) {
+  if (!row) {
+    return "";
+  }
+  const commit = (row.sourceCommit || "").trim();
+  const ref = (row.sourceRef || "").trim();
+  if (!commit && !ref) {
+    return "";
+  }
+  const shortCommit =
+    commit.length > 12 ? `${commit.slice(0, 12)}…` : commit;
+  if (commit && ref) {
+    return t("plugin.linapro-plugin-marketplace.detail.sourcePin.refAndCommit", {
+      ref,
+      commit: shortCommit,
+    });
+  }
+  if (commit) {
+    return t("plugin.linapro-plugin-marketplace.detail.sourcePin.commitOnly", {
+      commit: shortCommit,
+    });
+  }
+  return t("plugin.linapro-plugin-marketplace.detail.sourcePin.refOnly", {
+    ref,
+  });
+}
+
+function formatStatus(
+  status: MarketplaceStatus,
+  processStatus?: MarketplaceProcessStatus | string,
+) {
+  if (status === "published") {
+    return t("plugin.linapro-plugin-marketplace.detail.status.published");
+  }
+  if (status === "delisted") {
+    return t("plugin.linapro-plugin-marketplace.detail.status.delisted");
+  }
+  if (status === "deprecated") {
+    return t("plugin.linapro-plugin-marketplace.detail.status.deprecated");
+  }
+  switch (processStatus) {
+    case "pending_verify": {
+      return t(
+        "plugin.linapro-plugin-marketplace.detail.processStatus.pendingVerify",
+      );
     }
-    case "deprecated": {
-      return t("plugin.linapro-plugin-marketplace.detail.status.deprecated");
+    case "pending_review": {
+      return t(
+        "plugin.linapro-plugin-marketplace.detail.processStatus.pendingReview",
+      );
     }
-    case "draft": {
+    case "failed": {
+      return t("plugin.linapro-plugin-marketplace.detail.processStatus.failed");
+    }
+    case "completed": {
+      return t(
+        "plugin.linapro-plugin-marketplace.detail.processStatus.completed",
+      );
+    }
+    default: {
       return t("plugin.linapro-plugin-marketplace.detail.status.draft");
-    }
-    case "published": {
-      return t("plugin.linapro-plugin-marketplace.detail.status.published");
     }
   }
 }
 
-function getStatusColor(status: MarketplaceStatus) {
-  switch (status) {
-    case "published": {
-      return "success";
+function getStatusColor(
+  status: MarketplaceStatus,
+  processStatus?: MarketplaceProcessStatus | string,
+) {
+  if (status === "published") {
+    return "success";
+  }
+  if (status === "deprecated") {
+    return "warning";
+  }
+  if (status === "delisted") {
+    return "default";
+  }
+  switch (processStatus) {
+    case "pending_verify": {
+      return "processing";
     }
-    case "deprecated": {
-      return "warning";
+    case "pending_review": {
+      return "gold";
     }
-    case "delisted": {
-      return "default";
+    case "failed": {
+      return "error";
     }
     default: {
       return "processing";
     }
   }
+}
+
+function formatSourceKind(sourceKind?: string) {
+  if (sourceKind === "git") {
+    return t("plugin.linapro-plugin-marketplace.mine.sourceKind.git");
+  }
+  if (sourceKind === "upload") {
+    return t("plugin.linapro-plugin-marketplace.mine.sourceKind.upload");
+  }
+  // Avoid treating missing projections as upload packages.
+  return sourceKind?.trim() || "-";
+}
+
+function getSourceKindColor(sourceKind?: string) {
+  return sourceKind === "git" ? "geekblue" : "default";
+}
+
+function processPipelineMessage() {
+  if (!detail.value || detail.value.marketStatus === "published") {
+    return "";
+  }
+  switch (detail.value.processStatus) {
+    case "pending_verify": {
+      return t(
+        "plugin.linapro-plugin-marketplace.detail.pipeline.pendingVerifyHint",
+      );
+    }
+    case "pending_review": {
+      return t(
+        "plugin.linapro-plugin-marketplace.detail.pipeline.pendingReviewHint",
+      );
+    }
+    case "failed": {
+      return (
+        detail.value.lastSyncMessage ||
+        t("plugin.linapro-plugin-marketplace.detail.pipeline.failedHint")
+      );
+    }
+    default: {
+      return "";
+    }
+  }
+}
+
+function versionsEmptyDescription() {
+  switch (detail.value?.processStatus) {
+    case "pending_verify": {
+      return t(
+        "plugin.linapro-plugin-marketplace.detail.empty.versionsPendingVerify",
+      );
+    }
+    case "pending_review": {
+      return t(
+        "plugin.linapro-plugin-marketplace.detail.empty.versionsPendingReview",
+      );
+    }
+    case "failed": {
+      return t(
+        "plugin.linapro-plugin-marketplace.detail.empty.versionsFailed",
+      );
+    }
+    default: {
+      return t("plugin.linapro-plugin-marketplace.detail.empty.versions");
+    }
+  }
+}
+
+function processPipelineAlertType() {
+  if (detail.value?.processStatus === "failed") {
+    return "error";
+  }
+  if (detail.value?.processStatus === "pending_review") {
+    return "warning";
+  }
+  return "info";
 }
 
 function formatReviewStatus(status: MarketplaceReviewStatus) {
@@ -899,9 +1070,23 @@ function formatBytes(value?: number) {
 </script>
 
 <template>
-  <Page :auto-content-height="true">
-    <div class="marketplace-detail-shell">
-      <div class="marketplace-detail-header">
+  <component
+    :is="embedded ? 'div' : Page"
+    v-bind="
+      embedded
+        ? {
+            class: 'marketplace-detail-modal-root',
+            'data-testid': 'marketplace-detail-modal',
+          }
+        : { autoContentHeight: true }
+    "
+  >
+    <div
+      class="marketplace-detail-shell"
+      :class="{ 'marketplace-detail-shell--embedded': embedded }"
+    >
+      <!-- Page mode keeps the full chrome; modal mode relies on dialog title/close. -->
+      <div v-if="!embedded" class="marketplace-detail-header">
         <a-button @click="handleBack">
           <template #icon>
             <IconifyIcon icon="ant-design:arrow-left-outlined" />
@@ -910,7 +1095,7 @@ function formatBytes(value?: number) {
         </a-button>
 
         <div class="marketplace-detail-heading">
-          <h2>{{ detail?.name || getRoutePluginId() || "-" }}</h2>
+          <h2>{{ detail?.name || getActivePluginId() || "-" }}</h2>
           <p>{{ detail?.summary || "-" }}</p>
         </div>
 
@@ -918,8 +1103,12 @@ function formatBytes(value?: number) {
           <Tag :color="detail.pluginType === 'source' ? 'blue' : 'green'">
             {{ formatPluginType(detail.pluginType) }}
           </Tag>
-          <Tag :color="getStatusColor(detail.marketStatus)">
-            {{ formatStatus(detail.marketStatus) }}
+          <Tag
+            :color="
+              getStatusColor(detail.marketStatus, detail.processStatus)
+            "
+          >
+            {{ formatStatus(detail.marketStatus, detail.processStatus) }}
           </Tag>
           <Tag>{{ formatVisibility(detail.visibility) }}</Tag>
         </Space>
@@ -927,102 +1116,204 @@ function formatBytes(value?: number) {
 
       <Spin :spinning="loading">
         <template v-if="detail">
-          <Descriptions
-            :column="{ xs: 1, sm: 2 }"
-            bordered
-            class="marketplace-detail-descriptions"
-            size="small"
-          >
-            <DescriptionsItem
-              :label="
-                $t('plugin.linapro-plugin-marketplace.detail.fields.pluginId')
-              "
+          <div class="marketplace-detail-body">
+            <div v-if="embedded" class="marketplace-detail-embedded-heading">
+              <div class="marketplace-detail-embedded-title-row">
+                <h3 class="marketplace-detail-embedded-title">
+                  {{ detail.name || getActivePluginId() || "-" }}
+                </h3>
+                <Space wrap :size="[6, 6]">
+                  <Tag :color="detail.pluginType === 'source' ? 'blue' : 'green'">
+                    {{ formatPluginType(detail.pluginType) }}
+                  </Tag>
+                  <Tag
+                    :color="
+                      getStatusColor(detail.marketStatus, detail.processStatus)
+                    "
+                  >
+                    {{ formatStatus(detail.marketStatus, detail.processStatus) }}
+                  </Tag>
+                  <Tag
+                    :color="detail.visibility === 'public' ? 'green' : 'default'"
+                  >
+                    {{ formatVisibility(detail.visibility) }}
+                  </Tag>
+                  <Tag
+                    v-if="detail.sourceKind"
+                    :color="getSourceKindColor(detail.sourceKind)"
+                  >
+                    {{ formatSourceKind(detail.sourceKind) }}
+                  </Tag>
+                </Space>
+              </div>
+              <p v-if="detail.summary" class="marketplace-detail-embedded-summary">
+                {{ detail.summary }}
+              </p>
+            </div>
+
+            <Alert
+              v-if="embedded && processPipelineMessage()"
+              show-icon
+              class="marketplace-detail-pipeline-alert"
+              :type="processPipelineAlertType()"
+              :message="processPipelineMessage()"
+            />
+
+            <Descriptions
+              :column="{ xs: 1, sm: 2 }"
+              bordered
+              class="marketplace-detail-descriptions"
+              size="small"
             >
-              <span class="marketplace-mono">{{ detail.pluginId }}</span>
-            </DescriptionsItem>
-            <DescriptionsItem
-              :label="
-                $t('plugin.linapro-plugin-marketplace.detail.fields.publisher')
-              "
-            >
-              {{
-                detail.publisher?.name || detail.publisher?.publisherKey || "-"
-              }}
-            </DescriptionsItem>
-            <DescriptionsItem
-              :label="
-                $t(
-                  'plugin.linapro-plugin-marketplace.detail.fields.latestVersion',
-                )
-              "
-            >
-              {{ detail.latestVersion || "-" }}
-            </DescriptionsItem>
-            <DescriptionsItem
-              :label="
-                $t('plugin.linapro-plugin-marketplace.detail.fields.downloads')
-              "
-            >
-              {{ detail.downloadCount }}
-            </DescriptionsItem>
-            <DescriptionsItem
-              :label="
-                $t('plugin.linapro-plugin-marketplace.detail.fields.license')
-              "
-            >
-              {{ detail.license || "-" }}
-            </DescriptionsItem>
-            <DescriptionsItem
-              :label="
-                $t('plugin.linapro-plugin-marketplace.detail.fields.updatedAt')
-              "
-            >
-              {{ formatTimestamp(detail.updatedAt) }}
-            </DescriptionsItem>
-            <DescriptionsItem
-              :label="
-                $t('plugin.linapro-plugin-marketplace.detail.fields.risk')
-              "
-              :span="2"
-            >
-              <Space v-if="hasRiskCounts()" wrap :size="[4, 4]">
-                <Tag v-if="getRiskCounts().high > 0" color="error">
-                  {{
-                    $t("plugin.linapro-plugin-marketplace.catalog.risk.high", {
-                      count: getRiskCounts().high,
-                    })
-                  }}
+              <DescriptionsItem
+                :label="
+                  $t('plugin.linapro-plugin-marketplace.detail.fields.pluginId')
+                "
+              >
+                <span class="marketplace-mono">{{ detail.pluginId }}</span>
+              </DescriptionsItem>
+              <DescriptionsItem
+                :label="
+                  $t('plugin.linapro-plugin-marketplace.detail.fields.publisher')
+                "
+              >
+                {{
+                  detail.publisher?.name ||
+                  detail.publisher?.publisherKey ||
+                  "-"
+                }}
+              </DescriptionsItem>
+              <DescriptionsItem
+                :label="
+                  $t('plugin.linapro-plugin-marketplace.detail.fields.status')
+                "
+              >
+                <Tag
+                  :color="
+                    getStatusColor(detail.marketStatus, detail.processStatus)
+                  "
+                >
+                  {{ formatStatus(detail.marketStatus, detail.processStatus) }}
                 </Tag>
-                <Tag v-if="getRiskCounts().warning > 0" color="warning">
+              </DescriptionsItem>
+              <DescriptionsItem
+                :label="
+                  $t(
+                    'plugin.linapro-plugin-marketplace.detail.fields.sourceKind',
+                  )
+                "
+              >
+                <Tag :color="getSourceKindColor(detail.sourceKind)">
+                  {{ formatSourceKind(detail.sourceKind) }}
+                </Tag>
+              </DescriptionsItem>
+              <DescriptionsItem
+                :label="
+                  $t(
+                    'plugin.linapro-plugin-marketplace.detail.fields.latestVersion',
+                  )
+                "
+              >
+                <span class="marketplace-mono">
+                  {{ detail.latestVersion || "-" }}
+                </span>
+              </DescriptionsItem>
+              <DescriptionsItem
+                :label="
+                  $t('plugin.linapro-plugin-marketplace.detail.fields.downloads')
+                "
+              >
+                {{ detail.downloadCount }}
+              </DescriptionsItem>
+              <DescriptionsItem
+                :label="
+                  $t('plugin.linapro-plugin-marketplace.detail.fields.license')
+                "
+              >
+                {{ detail.license || "-" }}
+              </DescriptionsItem>
+              <DescriptionsItem
+                :label="
+                  $t('plugin.linapro-plugin-marketplace.detail.fields.updatedAt')
+                "
+              >
+                {{ formatTimestamp(detail.updatedAt) }}
+              </DescriptionsItem>
+              <DescriptionsItem
+                v-if="detail.sourceKind === 'git' && detail.repoUrl"
+                :label="
+                  $t('plugin.linapro-plugin-marketplace.detail.fields.repoUrl')
+                "
+                :span="2"
+              >
+                <a
+                  class="marketplace-link"
+                  :href="detail.repoUrl"
+                  rel="noopener noreferrer"
+                  target="_blank"
+                >
+                  {{ detail.repoUrl }}
+                </a>
+              </DescriptionsItem>
+              <DescriptionsItem
+                v-if="detail.lastSyncMessage"
+                :label="
+                  $t(
+                    'plugin.linapro-plugin-marketplace.detail.fields.lastSyncMessage',
+                  )
+                "
+                :span="2"
+              >
+                <span class="marketplace-muted">{{ detail.lastSyncMessage }}</span>
+              </DescriptionsItem>
+              <DescriptionsItem
+                :label="
+                  $t('plugin.linapro-plugin-marketplace.detail.fields.risk')
+                "
+                :span="2"
+              >
+                <Space v-if="hasRiskCounts()" wrap :size="[4, 4]">
+                  <Tag v-if="getRiskCounts().high > 0" color="error">
+                    {{
+                      $t("plugin.linapro-plugin-marketplace.catalog.risk.high", {
+                        count: getRiskCounts().high,
+                      })
+                    }}
+                  </Tag>
+                  <Tag v-if="getRiskCounts().warning > 0" color="warning">
+                    {{
+                      $t(
+                        "plugin.linapro-plugin-marketplace.catalog.risk.warning",
+                        { count: getRiskCounts().warning },
+                      )
+                    }}
+                  </Tag>
+                  <Tag v-if="getRiskCounts().info > 0" color="processing">
+                    {{
+                      $t("plugin.linapro-plugin-marketplace.catalog.risk.info", {
+                        count: getRiskCounts().info,
+                      })
+                    }}
+                  </Tag>
+                </Space>
+                <Tag v-else-if="hasRiskAssessment()" color="success">
+                  {{ $t("plugin.linapro-plugin-marketplace.catalog.risk.none") }}
+                </Tag>
+                <Tag v-else>
                   {{
                     $t(
-                      "plugin.linapro-plugin-marketplace.catalog.risk.warning",
-                      { count: getRiskCounts().warning },
+                      "plugin.linapro-plugin-marketplace.catalog.risk.unassessed",
                     )
                   }}
                 </Tag>
-                <Tag v-if="getRiskCounts().info > 0" color="processing">
-                  {{
-                    $t("plugin.linapro-plugin-marketplace.catalog.risk.info", {
-                      count: getRiskCounts().info,
-                    })
-                  }}
-                </Tag>
-              </Space>
-              <Tag v-else-if="hasRiskAssessment()" color="success">
-                {{ $t("plugin.linapro-plugin-marketplace.catalog.risk.none") }}
-              </Tag>
-              <Tag v-else>
-                {{
-                  $t(
-                    "plugin.linapro-plugin-marketplace.catalog.risk.unassessed",
-                  )
-                }}
-              </Tag>
-            </DescriptionsItem>
-          </Descriptions>
+              </DescriptionsItem>
+            </Descriptions>
 
-          <Tabs v-model:active-key="activeTab" class="marketplace-detail-tabs">
+            <Tabs
+              v-model:active-key="activeTab"
+              class="marketplace-detail-tabs"
+              :class="{ 'marketplace-detail-tabs--embedded': embedded }"
+            >
             <TabPane
               key="versions"
               :tab="
@@ -1041,9 +1332,7 @@ function formatBytes(value?: number) {
               />
               <Empty
                 v-else-if="versionLoadState === 'empty'"
-                :description="
-                  $t('plugin.linapro-plugin-marketplace.detail.empty.versions')
-                "
+                :description="versionsEmptyDescription()"
               />
               <VersionGrid
                 v-else
@@ -1058,6 +1347,13 @@ function formatBytes(value?: number) {
                     <span class="marketplace-version">{{ row.version }}</span>
                     <span class="marketplace-muted">
                       {{ formatPluginType(row.pluginType) }}
+                    </span>
+                    <span
+                      v-if="formatReleaseSourcePin(row)"
+                      class="marketplace-muted marketplace-source-pin"
+                      :title="formatReleaseSourcePin(row)"
+                    >
+                      {{ formatReleaseSourcePin(row) }}
                     </span>
                   </Space>
                 </template>
@@ -1220,6 +1516,7 @@ function formatBytes(value?: number) {
               </Spin>
             </TabPane>
           </Tabs>
+          </div>
         </template>
 
         <Alert
@@ -1238,15 +1535,32 @@ function formatBytes(value?: number) {
         />
       </Spin>
     </div>
-  </Page>
+  </component>
 </template>
 
 <style scoped>
+.marketplace-detail-modal-root {
+  min-height: 0;
+}
+
 .marketplace-detail-shell {
   display: flex;
   min-height: 100%;
   flex-direction: column;
   gap: 16px;
+}
+
+.marketplace-detail-shell--embedded {
+  min-height: 0;
+  max-height: min(72vh, 820px);
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.marketplace-detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .marketplace-detail-header {
@@ -1279,12 +1593,55 @@ function formatBytes(value?: number) {
   white-space: nowrap;
 }
 
+.marketplace-detail-embedded-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.marketplace-detail-embedded-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 12px;
+}
+
+.marketplace-detail-embedded-title {
+  margin: 0;
+  min-width: 0;
+  color: var(--ant-color-text);
+  font-size: 18px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.marketplace-detail-embedded-summary {
+  margin: 0;
+  color: var(--ant-color-text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.marketplace-detail-pipeline-alert {
+  margin: 0;
+}
+
 .marketplace-detail-descriptions {
   background: var(--ant-color-bg-container);
 }
 
 .marketplace-detail-tabs {
   min-height: 0;
+}
+
+.marketplace-detail-tabs--embedded :deep(.ant-tabs-content-holder) {
+  min-height: 180px;
+}
+
+.marketplace-link {
+  color: var(--ant-color-primary);
+  word-break: break-all;
 }
 
 .marketplace-version {
@@ -1296,6 +1653,25 @@ function formatBytes(value?: number) {
   color: var(--ant-color-text-secondary);
   font-size: 12px;
   line-height: 1.45;
+}
+
+.marketplace-source-pin {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  font-family: var(
+    --font-family-mono,
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    "Liberation Mono",
+    "Courier New",
+    monospace
+  );
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .marketplace-mono {
