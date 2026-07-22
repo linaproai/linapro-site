@@ -13,6 +13,16 @@
 | 源码交付 | 下载的源码插件必须放入`apps/lina-plugins/<plugin-id>`并通过宿主重新构建部署 |
 | 动态交付 | 下载的动态插件包必须复用现有本地动态插件上传治理 |
 
+## 本地存储路径配置
+
+市场上传包、Git 文档快照与受控下载内容落在本地磁盘目录，由 `storage.root` 控制。
+
+| 配置键 | 用途 | 默认值 |
+|--------|------|--------|
+| `storage.root` | 制品与文档快照根目录 | `temp/plugin-marketplace/artifacts` |
+
+相对路径相对宿主进程工作目录解析（`make dev` 通常为 `apps/lina-core`，因此开发数据落在 `apps/lina-core/temp/`，已被 gitignore）。**不要**把该路径指到仓库源码树（例如 `apps/lina-core/data/`）。生产环境建议使用仓库外的绝对路径。
+
 ## Git 平台 Token 配置
 
 登记 Git 源时若未填写发布者个人访问令牌，市场会回退读取插件业务配置中的平台级 Token，用于调用 GitHub/Gitee API 做元数据发现（列 tag、读 tree、读 `plugin.yaml`），以规避未认证限流。
@@ -22,23 +32,22 @@
 | `github.accessToken` | GitHub PAT（Classic：`public_repo`；Fine-grained：`Contents: Read`） |
 | `gitee.accessToken` | Gitee 个人访问令牌（可选） |
 
-配置来源（独占优先级，不合并）：
+配置由**本插件维护**，不要写入宿主框架 `config.yaml`。来源（独占优先级，不合并）：
 
-1. 宿主 `config.yaml` 的 `plugin.linapro-plugin-marketplace` 段  
-2. 生产配置根下 `plugins/linapro-plugin-marketplace/config.yaml`  
-3. 开发默认 `manifest/config/config.yaml`  
+1. 开发默认：`apps/lina-plugins/linapro-plugin-marketplace/manifest/config/config.yaml`  
+2. 生产：配置根下的 `plugins/linapro-plugin-marketplace/config.yaml`  
 
 模板见 `manifest/config/config.example.yaml`。平台 Token **不会**写入发布者凭证表，也不会被后续 API 回显；发布者表单中的 `accessToken` 仍优先于平台配置。
 
-宿主配置示例：
+插件配置示例（`manifest/config/config.yaml` 或生产插件配置文件）：
 
 ```yaml
-plugin:
-  linapro-plugin-marketplace:
-    github:
-      accessToken: "ghp_xxxxxxxx"
-    gitee:
-      accessToken: ""
+storage:
+  root: "temp/plugin-marketplace/artifacts"
+github:
+  accessToken: "ghp_xxxxxxxx"
+gitee:
+  accessToken: ""
 ```
 
 ## 验证

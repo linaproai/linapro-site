@@ -266,46 +266,40 @@ CREATE UNIQUE INDEX IF NOT EXISTS uk_plugin_marketplace_credential_ref ON plugin
 CREATE INDEX IF NOT EXISTS idx_plugin_marketplace_credential_owner ON plugin_marketplace_credential ("owner_user_id", "provider");
 
 -- ============================================================
--- 按版本与语言的市场文档索引
+-- 版本展示元数据（名称/摘要多语言）；文档正文与图片不入库，权威在制品磁盘
 -- ============================================================
-CREATE TABLE IF NOT EXISTS plugin_marketplace_doc (
+CREATE TABLE IF NOT EXISTS plugin_marketplace_display_i18n (
     "id"              INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     "release_id"      INT NOT NULL DEFAULT 0,
     "plugin_id"       VARCHAR(64) NOT NULL DEFAULT '',
     "release_version" VARCHAR(32) NOT NULL DEFAULT '',
     "locale"          VARCHAR(32) NOT NULL DEFAULT '',
-    "doc_path"        VARCHAR(255) NOT NULL DEFAULT '',
-    "source_kind"     VARCHAR(32) NOT NULL DEFAULT '',
-    "title"           VARCHAR(255) NOT NULL DEFAULT '',
-    "summary"         VARCHAR(1024) NOT NULL DEFAULT '',
-    "content_hash"    VARCHAR(64) NOT NULL DEFAULT '',
-    "search_text"     TEXT,
+    "name"            VARCHAR(128) NOT NULL DEFAULT '',
+    "summary"         VARCHAR(512) NOT NULL DEFAULT '',
+    "source"          VARCHAR(32) NOT NULL DEFAULT '',
     "created_at"      TIMESTAMPTZ,
     "updated_at"      TIMESTAMPTZ,
     "deleted_at"      TIMESTAMPTZ
 );
 
-COMMENT ON TABLE plugin_marketplace_doc IS '插件市场文档索引表';
-COMMENT ON COLUMN plugin_marketplace_doc."id" IS '主键 ID';
-COMMENT ON COLUMN plugin_marketplace_doc."release_id" IS '归属版本 ID';
-COMMENT ON COLUMN plugin_marketplace_doc."plugin_id" IS '稳定插件 ID';
-COMMENT ON COLUMN plugin_marketplace_doc."release_version" IS '插件发布版本号';
-COMMENT ON COLUMN plugin_marketplace_doc."locale" IS '文档语言';
-COMMENT ON COLUMN plugin_marketplace_doc."doc_path" IS 'manifest/docs 内路径或 README 回退路径';
-COMMENT ON COLUMN plugin_marketplace_doc."source_kind" IS '文档来源类型：manifest_docs/readme';
-COMMENT ON COLUMN plugin_marketplace_doc."title" IS '文档标题';
-COMMENT ON COLUMN plugin_marketplace_doc."summary" IS '文档检索摘要';
-COMMENT ON COLUMN plugin_marketplace_doc."content_hash" IS '文档内容哈希';
-COMMENT ON COLUMN plugin_marketplace_doc."search_text" IS '用于检索索引的纯文本';
-COMMENT ON COLUMN plugin_marketplace_doc."created_at" IS '创建时间';
-COMMENT ON COLUMN plugin_marketplace_doc."updated_at" IS '更新时间';
-COMMENT ON COLUMN plugin_marketplace_doc."deleted_at" IS '删除时间';
+COMMENT ON TABLE plugin_marketplace_display_i18n IS '插件市场版本展示元数据多语言表（仅名称与摘要）';
+COMMENT ON COLUMN plugin_marketplace_display_i18n."id" IS '主键 ID';
+COMMENT ON COLUMN plugin_marketplace_display_i18n."release_id" IS '归属版本 ID';
+COMMENT ON COLUMN plugin_marketplace_display_i18n."plugin_id" IS '稳定插件 ID';
+COMMENT ON COLUMN plugin_marketplace_display_i18n."release_version" IS '插件发布版本号';
+COMMENT ON COLUMN plugin_marketplace_display_i18n."locale" IS '展示语言';
+COMMENT ON COLUMN plugin_marketplace_display_i18n."name" IS '本地化展示名称';
+COMMENT ON COLUMN plugin_marketplace_display_i18n."summary" IS '本地化列表摘要';
+COMMENT ON COLUMN plugin_marketplace_display_i18n."source" IS '来源：package_i18n/plugin_yaml/publisher';
+COMMENT ON COLUMN plugin_marketplace_display_i18n."created_at" IS '创建时间';
+COMMENT ON COLUMN plugin_marketplace_display_i18n."updated_at" IS '更新时间';
+COMMENT ON COLUMN plugin_marketplace_display_i18n."deleted_at" IS '删除时间';
 
-CREATE UNIQUE INDEX IF NOT EXISTS uk_plugin_marketplace_doc_release_locale_path
-    ON plugin_marketplace_doc ("release_id", "locale", "doc_path")
+CREATE UNIQUE INDEX IF NOT EXISTS uk_plugin_marketplace_display_i18n_release_locale
+    ON plugin_marketplace_display_i18n ("release_id", "locale")
     WHERE "deleted_at" IS NULL;
-CREATE INDEX IF NOT EXISTS idx_plugin_marketplace_doc_plugin_locale ON plugin_marketplace_doc ("plugin_id", "release_version", "locale");
-CREATE INDEX IF NOT EXISTS idx_plugin_marketplace_doc_hash ON plugin_marketplace_doc ("release_id", "content_hash");
+CREATE INDEX IF NOT EXISTS idx_plugin_marketplace_display_i18n_plugin_version
+    ON plugin_marketplace_display_i18n ("plugin_id", "release_version", "locale");
 
 -- ============================================================
 -- 版本详情与审核页使用的风险发现

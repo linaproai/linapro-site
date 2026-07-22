@@ -160,7 +160,7 @@ describe("marketplace apidoc i18n", () => {
     }
 
     assert.equal(new Set(requiredKeys).size, requiredKeys.length);
-    assert.equal(requiredKeys.length, 76);
+    assert.equal(requiredKeys.length, 78);
     for (const key of requiredKeys) {
       assert.equal(typeof zh[key], "string", `missing zh-CN key ${key}`);
       assert.match(

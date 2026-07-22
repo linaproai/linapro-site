@@ -66,6 +66,27 @@ test.describe("TC-3 marketplace English workspace", () => {
     await expect(
       page.getByText("Place the source under apps/lina-plugins"),
     ).toBeVisible();
+    await marketplace.expectDocumentLocaleOptions(["en-US", "zh-CN"]);
+    const docsRequestCount = mockState.inspectionResponses.filter(
+      (response) => response.kind === "docs",
+    ).length;
+    await marketplace.switchDocumentLocale("zh-CN");
+    await expect(page.getByText("源码演示指南").first()).toBeVisible();
+    await expect(
+      page.getByText("将源码放入 apps/lina-plugins"),
+    ).toBeVisible();
+    expect(
+      mockState.inspectionResponses.filter(
+        (response) => response.kind === "docs",
+      ).length,
+    ).toBe(docsRequestCount);
+    await marketplace.switchDocumentLocale("en-US");
+    await expect(page.getByText("Source Demo Guide").first()).toBeVisible();
+    expect(
+      mockState.inspectionResponses.filter(
+        (response) => response.kind === "docs",
+      ).length,
+    ).toBe(docsRequestCount);
     await captureMarketplaceScreenshot(page, "english-detail-docs");
 
     await marketplace.openRisksForVersion("v1.0.0");

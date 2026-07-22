@@ -128,7 +128,10 @@ export class MarketplacePage {
     await this.searchGrid(reviewTableSelector, "/market/review-queue");
   }
 
-  async expectColumn(table: "admin" | "mine" | "review", title: string) {
+  async expectColumn(
+    table: "admin" | "mine" | "review",
+    title: RegExp | string,
+  ) {
     const selector =
       table === "admin"
         ? adminTableSelector
@@ -326,19 +329,40 @@ export class MarketplacePage {
   }
 
   async openNewVersionDrawer(pluginId: string) {
-    const moreButton = await this.rowActionButton(
+    // Row actions are fixed: Detail / New Version / Delist (no overflow menu).
+    const newVersionButton = await this.rowActionButton(
       mineTableSelector,
       pluginId,
-      /更\s*多|More/u,
+      /新版本|New Version/u,
     );
-    await moreButton.click();
-    const menu = this.page.locator(".ant-dropdown:visible").last();
-    await expect(menu).toBeVisible();
-    await menu.getByRole("menuitem", { name: /新版本|New Version/u }).click();
+    await newVersionButton.click();
     await expect(this.publishDrawer()).toBeVisible();
     await expect(
       this.publishDrawer().getByText(/新版本|New Version/u, { exact: true }),
     ).toBeVisible();
+  }
+
+  async expectMineRowActions(pluginId: string) {
+    const row = this.mineRow(pluginId);
+    await expect(
+      row.getByRole("button", { name: /详情|Detail/u }),
+    ).toBeVisible();
+    await expect(
+      row.getByRole("button", { name: /新版本|New Version/u }),
+    ).toBeVisible();
+    await expect(
+      row.getByRole("button", { name: /下架|Delist/u }),
+    ).toBeVisible();
+    await expect(
+      row.getByRole("button", { name: /发布|Publish/u }),
+    ).toHaveCount(0);
+    await expect(
+      row.getByRole("button", { name: /更\s*多|More/u }),
+    ).toHaveCount(0);
+  }
+
+  async expectMineSourceColumn() {
+    await this.expectColumn("mine", /来源|Source/u);
   }
 
   async closePublishDrawer() {
@@ -596,18 +620,13 @@ export class MarketplacePage {
   }
 
   async publishOwnedPlugin(pluginId: string) {
-    // Publish is a primary row action, not under the overflow menu.
-    const row = this.mineRow(pluginId);
-    await row.getByRole("button", { name: /发布|Publish/u }).click();
+    // Manual publish is no longer a row action; async pipeline owns listing.
+    void pluginId;
   }
 
   async delistOwnedPlugin(pluginId: string) {
     const row = this.mineRow(pluginId);
-    await row.getByRole("button", { name: /更多|More/u }).click();
-    await this.page
-      .locator(".ant-dropdown:visible")
-      .getByText(/下架|Delist/u)
-      .click();
+    await row.getByRole("button", { name: /下架|Delist/u }).click();
     const confirm = this.page.locator(".ant-modal:visible").last();
     await expect(confirm).toBeVisible();
     await confirm.getByRole("button", { name: /确 定|OK|确定/u }).click();
@@ -678,6 +697,22 @@ export class MarketplacePage {
     await expect(
       this.page.getByRole("tab", { name: /文档|Docs/u }),
     ).toHaveAttribute("aria-selected", "true");
+  }
+
+  async expectDocumentLocaleOptions(locales: string[]) {
+    const segmented = this.detailShell().locator(".ant-segmented").first();
+    await expect(segmented).toBeVisible();
+    for (const locale of locales) {
+      await expect(segmented.getByText(locale, { exact: true })).toBeVisible();
+    }
+  }
+
+  async switchDocumentLocale(locale: string) {
+    await this.detailShell()
+      .locator(".ant-segmented")
+      .first()
+      .getByText(locale, { exact: true })
+      .click();
   }
 
   async openRisksForVersion(version: string) {

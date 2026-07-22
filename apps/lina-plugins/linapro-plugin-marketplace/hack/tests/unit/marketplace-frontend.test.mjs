@@ -74,6 +74,7 @@ describe("marketplace frontend API adapter", () => {
       "marketplacePluginList",
       "marketplacePluginDetail",
       "marketplaceReleaseDocument",
+      "marketplaceReleaseDocumentBundle",
       "marketplaceReleaseRisks",
       "marketplaceDownloadSessionCreate",
       "marketplaceDownloadSessionBlob",
@@ -100,6 +101,7 @@ describe("marketplace frontend API adapter", () => {
 
     assert.match(source, /items:\s*result\.list\s*\?\?\s*\[\]/);
     assert.match(source, /total:\s*result\.total\s*\?\?\s*0/);
+    assert.match(source, /documents:\s*res\.documents\s*\?\?\s*\[\]/);
   });
 });
 
@@ -115,6 +117,8 @@ describe("marketplace frontend composition logic", () => {
     assert.match(source, /mine\.columns\.pluginId/);
     assert.match(source, /mine\.columns\.name/);
     assert.match(source, /mine\.columns\.summary/);
+    assert.match(source, /mine\.columns\.sourceKind/);
+    assert.match(source, /field:\s*["']sourceKind["']/);
     assert.match(source, /mine\.actions\.registerPublisher/);
     // Status filter options must match publisher-visible process tags.
     assert.match(source, /value:\s*["']pending_verify["']/);
@@ -122,7 +126,8 @@ describe("marketplace frontend composition logic", () => {
     assert.match(source, /value:\s*["']published["']/);
     assert.match(source, /value:\s*["']failed["']/);
     assert.match(source, /field:\s*["']downloadCount["']/);
-    assert.match(source, /minWidth:\s*260/);
+    // Source is a dedicated column; name no longer hosts a source-kind tag.
+    assert.match(source, /slots:\s*\{\s*default:\s*["']sourceKind["']\s*\}/);
     assert.doesNotMatch(
       source,
       /openGitPublishDrawer|mine\.actions\.registerGit/,
@@ -135,9 +140,10 @@ describe("marketplace frontend composition logic", () => {
     assert.match(mine, /useVbenForm/);
     assert.match(mine, /const UploadDragger = Upload\.Dragger/);
     assert.match(mine, /marketplacePackageAdd/);
-    assert.match(mine, /marketplacePluginPublish/);
     assert.match(mine, /marketplacePluginDelist/);
     assert.match(mine, /marketplaceGitSourceRegister/);
+    assert.match(mine, /marketplaceGitSourceSync/);
+    assert.match(mine, /handleNewVersion/);
     assert.match(mine, /publishSourceKind/);
     assert.match(mine, /PublisherDrawer/);
     assert.match(mine, /handleAddPackage/);
@@ -147,6 +153,11 @@ describe("marketplace frontend composition logic", () => {
     assert.match(mine, /boundPublisher/);
     assert.match(mine, /buildPublisherSchema\(\)/);
     assert.match(mine, /mine\.actions\.add/);
+    // Row actions: Detail / New Version / Delist only (no publish / more menu).
+    assert.match(mine, /mine\.actions\.newVersion/);
+    assert.match(mine, /mine\.actions\.delist/);
+    assert.doesNotMatch(mine, /marketplacePluginPublish/);
+    assert.doesNotMatch(mine, /Dropdown|MenuItem|pages\.common\.more/);
     assert.doesNotMatch(mine, /mine\.actions\.saveGitSource/);
     assert.doesNotMatch(mine, /fieldName:\s*"visibility"/);
     // Drawer chrome keeps “添加插件”; body must not repeat pluginBasic heading.
@@ -156,12 +167,23 @@ describe("marketplace frontend composition logic", () => {
     const detail = readPluginFile("frontend/pages/detail/index.vue");
     const admin = readPluginFile("frontend/pages/admin-list/index.vue");
     const types = readPluginFile("frontend/types/marketplace.ts");
+    assert.match(detail, /preferences\.app\.locale/);
+    assert.match(detail, /marketplaceReleaseDocumentBundle/);
+    assert.match(detail, /availableDocuments/);
+    assert.match(detail, /availableDocumentLocaleOptions/);
+    assert.match(detail, /handleSelectDocumentLocale/);
+    assert.match(detail, /Segmented/);
+    assert.match(detail, /chooseDocumentFromBundle/);
+    assert.doesNotMatch(detail, /marketplaceReleaseDocument\(/);
     assert.doesNotMatch(detail, /pending_fetch|pendingFetch/);
     assert.doesNotMatch(admin, /pending_fetch|pendingFetch/);
     assert.doesNotMatch(types, /pending_fetch/);
     assert.match(types, /pending_verify/);
+    assert.match(types, /MarketplaceDocumentBundle/);
+    assert.match(types, /documents:\s*MarketplaceDocumentItem\[\]/);
     assert.match(review, /marketplaceReviewQueueList/);
     assert.match(review, /marketplaceReleaseReview/);
+    assert.match(review, /preferences\.app\.locale/);
     assert.match(review, /class="marketplace-review-risk-list"/);
     assert.match(review, /risk\.source/);
     assert.match(review, /risk\.summary/);

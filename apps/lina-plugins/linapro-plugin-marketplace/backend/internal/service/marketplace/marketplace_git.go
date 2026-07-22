@@ -53,7 +53,11 @@ const (
 	// maxGitDocsIndexed caps remote documentation reads during Git discovery.
 	maxGitDocsIndexed = 20
 	// maxGitDocBytes rejects oversized remote markdown files during indexing.
-	maxGitDocBytes            = 256 * 1024
+	maxGitDocBytes = 256 * 1024
+	// maxGitI18nFilesIndexed caps remote runtime i18n JSON reads used for display name/summary.
+	maxGitI18nFilesIndexed = 40
+	// maxGitI18nFileBytes rejects oversized remote i18n JSON during display catalog loads.
+	maxGitI18nFileBytes       = 256 * 1024
 	gitMetadataUserAgent      = "LinaPro-Plugin-Marketplace/1.0"
 	gitRequiredPathPluginYAML = "plugin.yaml"
 	gitRequiredPathBackendGo  = "backend/plugin.go"
@@ -684,12 +688,16 @@ func (s *serviceImpl) discoverGitMetadataForPlugin(
 
 	synced := 0
 	failures := 0
+	var firstFailure string
 	for index, ref := range refs {
 		// Full docs/sql/i18n enrichment is applied to every discovered ref, but
 		// remote doc body reads are bounded inside enrichGitReleaseMetadata.
 		created, discoverErr := s.discoverOneGitRef(ctx, plugin, repo, ref, token, client, treePaths, index == 0)
 		if discoverErr != nil {
 			failures++
+			if firstFailure == "" {
+				firstFailure = gitPublicErrorMessage(discoverErr)
+			}
 			continue
 		}
 		if created {
@@ -702,9 +710,15 @@ func (s *serviceImpl) discoverGitMetadataForPlugin(
 	if failures > 0 && synced == 0 {
 		status = gitSyncStatusFailed
 		message = fmt.Sprintf("failed to import %d refs", failures)
+		if firstFailure != "" {
+			message = message + ": " + firstFailure
+		}
 	} else if failures > 0 {
 		status = gitSyncStatusPartial
 		message = fmt.Sprintf("discovered %d drafts with %d ref failures", synced, failures)
+		if firstFailure != "" {
+			message = message + ": " + firstFailure
+		}
 	}
 	if err = s.updateGitSyncStatus(ctx, plugin.Id, status, message); err != nil {
 		return nil, err
@@ -864,6 +878,24 @@ func (s *serviceImpl) discoverOneGitRef(
 	// Keep publisher-facing plugin identity aligned with the discovered plugin.yaml.
 	if applyErr := s.applyGitManifestToPlugin(ctx, plugin, manifest, versionLabel, release.ID); applyErr != nil {
 		return false, applyErr
+	}
+	// Persist display name/summary per locale. Base row comes from plugin.yaml;
+	// remote runtime i18n catalogs (manifest/i18n/<locale>/*.json, non-apidoc)
+	// override with plugin.<id>.name / plugin.<id>.description when present.
+	defaultLocale := defaultDisplayLocale
+	if manifest.I18N != nil {
+		defaultLocale = defaultLocaleFromManifest(manifest.I18N.Default)
+	}
+	displayItems := buildDisplayI18nFromPackageYAML(
+		plugin.PluginId,
+		firstNonEmpty(manifest.Name, plugin.Name, plugin.PluginId),
+		firstNonEmpty(manifest.Description, plugin.Summary),
+		defaultLocale,
+	)
+	localeCatalogs := loadGitDisplayI18nCatalogs(ctx, client, repo, ref.Name, token, repoPath, treePaths)
+	displayItems = mergePackageI18nDisplayItems(plugin.PluginId, displayItems, localeCatalogs)
+	if displayErr := s.replaceReleaseDisplayI18n(ctx, release, displayItems); displayErr != nil {
+		return false, displayErr
 	}
 
 	if enrichDocs {
@@ -1079,8 +1111,80 @@ func classifyGitI18NPath(relPath string) (locale string, kind string) {
 	return locale, "runtime"
 }
 
+// selectGitRuntimeI18nPaths returns relative runtime i18n JSON paths under the
+// plugin root. API doc catalogs under apidoc/ are excluded because they do not
+// carry display name/summary keys.
+func selectGitRuntimeI18nPaths(treePaths []string, repoPath string) []string {
+	out := make([]string, 0)
+	for _, raw := range treePaths {
+		rel, ok := gitRelativePluginPath(raw, repoPath)
+		if !ok {
+			continue
+		}
+		if strings.ToLower(path.Ext(rel)) != ".json" {
+			continue
+		}
+		locale, kind := classifyGitI18NPath(rel)
+		if locale == "" || kind != "runtime" {
+			continue
+		}
+		out = append(out, rel)
+	}
+	sort.Strings(out)
+	if len(out) > maxGitI18nFilesIndexed {
+		out = out[:maxGitI18nFilesIndexed]
+	}
+	return out
+}
+
+// loadGitDisplayI18nCatalogs reads remote runtime i18n JSON files and builds
+// locale catalogs for display name/summary projection. Failed or oversized
+// reads are skipped so plugin.yaml fallback rows still persist.
+func loadGitDisplayI18nCatalogs(
+	ctx context.Context,
+	client gitRemoteClient,
+	repo gitRepoRef,
+	ref string,
+	token string,
+	repoPath string,
+	treePaths []string,
+) map[string]map[string]string {
+	out := make(map[string]map[string]string)
+	if client == nil {
+		return out
+	}
+	candidates := selectGitRuntimeI18nPaths(treePaths, repoPath)
+	for _, relPath := range candidates {
+		body, readErr := client.ReadFile(ctx, repo, ref, gitPathJoin(repoPath, relPath), token)
+		if readErr != nil {
+			continue
+		}
+		if len(body) == 0 || len(body) > maxGitI18nFileBytes {
+			continue
+		}
+		locale, _ := classifyGitI18NPath(relPath)
+		normalizedLocale := normalizeDisplayLocale(locale)
+		if normalizedLocale == "" {
+			continue
+		}
+		catalog, parseErr := parseFlatI18nJSON(body)
+		if parseErr != nil || len(catalog) == 0 {
+			continue
+		}
+		merged := out[normalizedLocale]
+		if merged == nil {
+			merged = make(map[string]string)
+			out[normalizedLocale] = merged
+		}
+		for key, value := range catalog {
+			merged[key] = value
+		}
+	}
+	return out
+}
+
 // indexGitReleaseDocuments reads remote Markdown docs under the plugin root and
-// writes marketplace document index rows for the release.
+// writes a disk snapshot under ArtifactStore for later language-aware reads.
 func (s *serviceImpl) indexGitReleaseDocuments(
 	ctx context.Context,
 	client gitRemoteClient,
@@ -1099,6 +1203,7 @@ func (s *serviceImpl) indexGitReleaseDocuments(
 		return nil
 	}
 	items := make([]*marketplaceDocumentIndexItem, 0, len(candidates))
+	rawBodies := make(map[string][]byte, len(candidates))
 	for _, relPath := range candidates {
 		body, readErr := client.ReadFile(ctx, repo, ref, gitPathJoin(repoPath, relPath), token)
 		if readErr != nil {
@@ -1137,11 +1242,12 @@ func (s *serviceImpl) indexGitReleaseDocuments(
 			continue
 		}
 		items = append(items, item)
+		rawBodies[documentIndexKey(item.Locale, item.DocPath)] = body
 	}
 	if len(items) == 0 {
 		return nil
 	}
-	return s.replaceReleaseDocuments(ctx, release, items)
+	return s.replaceReleaseGitDocumentSnapshot(ctx, release, items, rawBodies)
 }
 
 func selectGitDocPathsForIndexing(treePaths []string, repoPath string) []string {
@@ -1330,6 +1436,7 @@ type gitPluginManifest struct {
 	Description  string                       `json:"description,omitempty" yaml:"description"`
 	Homepage     string                       `json:"homepage,omitempty" yaml:"homepage"`
 	License      string                       `json:"license,omitempty" yaml:"license"`
+	I18N         *sourcePackageI18N           `json:"i18n,omitempty" yaml:"i18n"`
 	Dependencies *sourcePackageDependencySpec `json:"dependencies,omitempty" yaml:"dependencies"`
 }
 

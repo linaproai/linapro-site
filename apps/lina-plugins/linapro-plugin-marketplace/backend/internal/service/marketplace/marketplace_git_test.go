@@ -526,6 +526,93 @@ func TestBuildGitResourceSummariesFromTree(t *testing.T) {
 	}
 }
 
+func TestSelectGitRuntimeI18nPathsExcludesApidoc(t *testing.T) {
+	t.Parallel()
+	tree := []string{
+		"demo/manifest/i18n/en-US/plugin.json",
+		"demo/manifest/i18n/en-US/apidoc/api.json",
+		"demo/manifest/i18n/zh-CN/plugin.json",
+		"demo/manifest/i18n/zh-CN/menu.json",
+		"demo/manifest/docs/zh-CN/index.md",
+		"other/manifest/i18n/en-US/plugin.json",
+	}
+	selected := selectGitRuntimeI18nPaths(tree, "demo")
+	if len(selected) != 3 {
+		t.Fatalf("expected 3 runtime i18n files, got %#v", selected)
+	}
+	for _, path := range selected {
+		if strings.Contains(path, "apidoc") {
+			t.Fatalf("apidoc path should be excluded: %s", path)
+		}
+	}
+}
+
+func TestLoadGitDisplayI18nCatalogsMergesNestedPluginKeys(t *testing.T) {
+	t.Parallel()
+	tree := []string{
+		"linapro-ai-core/manifest/i18n/en-US/plugin.json",
+		"linapro-ai-core/manifest/i18n/en-US/apidoc/ai.json",
+		"linapro-ai-core/manifest/i18n/zh-CN/plugin.json",
+	}
+	client := stubGitClient{
+		files: map[string][]byte{
+			"main:linapro-ai-core/manifest/i18n/en-US/plugin.json": []byte(`{
+  "plugin": {
+    "linapro-ai-core": {
+      "name": "AI Hub",
+      "description": "English summary"
+    }
+  }
+}`),
+			"main:linapro-ai-core/manifest/i18n/en-US/apidoc/ai.json": []byte(`{"api.x":"should not load"}`),
+			"main:linapro-ai-core/manifest/i18n/zh-CN/plugin.json": []byte(`{
+  "plugin": {
+    "linapro-ai-core": {
+      "name": "智能中心",
+      "description": "中文摘要"
+    }
+  }
+}`),
+		},
+	}
+	catalogs := loadGitDisplayI18nCatalogs(
+		context.Background(),
+		client,
+		gitRepoRef{},
+		"main",
+		"",
+		"linapro-ai-core",
+		tree,
+	)
+	if catalogs["en-US"]["plugin.linapro-ai-core.name"] != "AI Hub" {
+		t.Fatalf("unexpected en-US catalog: %#v", catalogs["en-US"])
+	}
+	if catalogs["zh-CN"]["plugin.linapro-ai-core.description"] != "中文摘要" {
+		t.Fatalf("unexpected zh-CN catalog: %#v", catalogs["zh-CN"])
+	}
+	if _, ok := catalogs["en-US"]["api.x"]; ok {
+		t.Fatal("apidoc keys must not be loaded into display catalogs")
+	}
+
+	base := buildDisplayI18nFromPackageYAML(
+		"linapro-ai-core",
+		"AI Hub",
+		"Official source plugin",
+		"en-US",
+	)
+	items := mergePackageI18nDisplayItems("linapro-ai-core", base, catalogs)
+	byLocale := map[string]*marketplaceDisplayI18nItem{}
+	for _, item := range items {
+		byLocale[item.Locale] = item
+	}
+	if byLocale["zh-CN"] == nil || byLocale["zh-CN"].Name != "智能中心" || byLocale["zh-CN"].Summary != "中文摘要" {
+		t.Fatalf("expected zh-CN display from git i18n, got %#v", byLocale["zh-CN"])
+	}
+	if byLocale["en-US"] == nil || byLocale["en-US"].Name != "AI Hub" {
+		t.Fatalf("expected en-US display from git i18n, got %#v", byLocale["en-US"])
+	}
+}
+
 func TestDiscoverSourcePluginRootsSinglePlugin(t *testing.T) {
 	t.Parallel()
 	manifest := []byte("id: demo-plugin\nname: Demo\nversion: 1.0.0\ntype: source\n")

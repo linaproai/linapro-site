@@ -37,6 +37,7 @@ test.describe("TC-1 marketplace publisher workspace", () => {
     ).toBeVisible();
     await marketplace.expectColumn("mine", "可见性");
     await marketplace.expectColumn("mine", "下载量");
+    await marketplace.expectMineSourceColumn();
     await marketplace.expectNoHorizontalPageOverflow();
     await marketplace.expectNoHorizontalMineTableOverflow();
     await expect(
@@ -268,12 +269,10 @@ test.describe("TC-1 marketplace publisher workspace", () => {
     ]);
     await expect(marketplace.mineRow(pluginId)).toContainText("v1.0.0");
     // Add-plugin lands in pending_verify; UI shows 待验证 instead of raw 草稿.
-    // First-time verify/review is owned by the async process pipeline, so the
-    // manual publish row action stays hidden while pending_verify.
+    // Row actions stay Detail / New Version / Delist only (no publish/more).
     await expect(marketplace.mineRow(pluginId)).toContainText("待验证");
-    await expect(
-      marketplace.mineRow(pluginId).getByRole("button", { name: /发布|Publish/u }),
-    ).toHaveCount(0);
+    await marketplace.expectMineRowActions(pluginId);
+    await marketplace.expectMineRowActions(marketplaceSourcePluginId());
     await captureMarketplaceScreenshot(page, "mine-private-pending-verify");
 
     await marketplace.openNewVersionDrawer(marketplaceSourcePluginId());

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"lina-core/pkg/bizerr"
+	"linapro-plugin-marketplace/backend/internal/model/entity"
 )
 
 func TestIndexMarketplaceDocumentEscapesScript(t *testing.T) {
@@ -43,7 +44,37 @@ func TestIndexMarketplaceDocumentRejectsTraversalImage(t *testing.T) {
 	}
 }
 
-func TestSelectMarketplaceDocumentFallbackUsesDefaultLocale(t *testing.T) {
+func TestDocumentRecordFromIndexItemMapsReleaseAndRender(t *testing.T) {
+	record := documentRecordFromIndexItem(
+		&entity.PluginMarketplaceRelease{
+			Id:             7,
+			PluginId:       "linapro-demo-source",
+			ReleaseVersion: "v0.1.0",
+		},
+		&marketplaceDocumentIndexItem{
+			Locale:          "en-US",
+			DocPath:         "index.md",
+			SourceKind:      documentSourceKindManifestDocs,
+			Title:           "English docs",
+			Summary:         "Summary",
+			ContentHash:     strings.Repeat("a", 64),
+			SearchText:      "Plain text",
+			RenderedContent: "<h1>English docs</h1>\n",
+		},
+	)
+	if record == nil {
+		t.Fatal("expected document record")
+	}
+	if record.RenderedContent != "<h1>English docs</h1>\n" {
+		t.Fatalf("expected rendered content from disk index item, got %#v", record.RenderedContent)
+	}
+	if record.PluginID != "linapro-demo-source" || record.Path != "index.md" {
+		t.Fatalf("unexpected record projection: %#v", record)
+	}
+}
+
+func TestSelectMarketplaceDocumentFallbackSingleLocaleAlwaysUsed(t *testing.T) {
+	// Only one language is indexed: show it even when the user asks for English.
 	record, err := selectMarketplaceDocumentFallback([]*DocumentRecord{{
 		PluginID:   "linapro-demo-source",
 		Version:    "v0.1.0",
@@ -52,19 +83,143 @@ func TestSelectMarketplaceDocumentFallbackUsesDefaultLocale(t *testing.T) {
 		SourceKind: documentSourceKindManifestDocs,
 		Title:      "中文文档",
 	}}, GetReleaseDocumentInput{
-		PluginID:      "linapro-demo-source",
-		Version:       "v0.1.0",
-		Locale:        "en-US",
-		DefaultLocale: "zh-CN",
+		PluginID: "linapro-demo-source",
+		Version:  "v0.1.0",
+		Locale:   "en-US",
 	})
 	if err != nil {
 		t.Fatalf("selectMarketplaceDocumentFallback returned error: %v", err)
 	}
 	if record == nil {
-		t.Fatal("expected fallback document")
+		t.Fatal("expected single-locale document")
 	}
 	if record.ResolvedLocale != "zh-CN" || !record.FallbackUsed {
-		t.Fatalf("unexpected fallback metadata: %#v", record)
+		t.Fatalf("unexpected single-locale metadata: %#v", record)
+	}
+}
+
+func TestCollectMarketplaceDocumentBundleReturnsSamePathLanguages(t *testing.T) {
+	records := []*DocumentRecord{
+		{
+			PluginID:        "linapro-demo-source",
+			Version:         "v0.1.0",
+			Locale:          "en-US",
+			Path:            "index.md",
+			SourceKind:      documentSourceKindManifestDocs,
+			Title:           "English docs",
+			RenderedContent: "<h1>English docs</h1>\n",
+		},
+		{
+			PluginID:        "linapro-demo-source",
+			Version:         "v0.1.0",
+			Locale:          "zh-CN",
+			Path:            "index.md",
+			SourceKind:      documentSourceKindManifestDocs,
+			Title:           "中文文档",
+			RenderedContent: "<h1>中文文档</h1>\n",
+		},
+		{
+			PluginID:        "linapro-demo-source",
+			Version:         "v0.1.0",
+			Locale:          "zh-CN",
+			Path:            "guide.md",
+			SourceKind:      documentSourceKindManifestDocs,
+			Title:           "指南",
+			RenderedContent: "<h1>指南</h1>\n",
+		},
+	}
+	input := GetReleaseDocumentInput{
+		PluginID: "linapro-demo-source",
+		Version:  "v0.1.0",
+		Locale:   "zh-CN",
+		Path:     "index.md",
+	}
+	selected, err := selectMarketplaceDocumentFallback(records, input)
+	if err != nil {
+		t.Fatalf("selectMarketplaceDocumentFallback returned error: %v", err)
+	}
+	bundle, err := collectMarketplaceDocumentBundle(records, selected, input)
+	if err != nil {
+		t.Fatalf("collectMarketplaceDocumentBundle returned error: %v", err)
+	}
+	items := documentItemsFromRecords(bundle)
+
+	if len(items) != 2 {
+		t.Fatalf("expected two same-path language documents, got %d", len(items))
+	}
+	if items[0].Path != "index.md" || items[1].Path != "index.md" {
+		t.Fatalf("expected only same-path documents, got %#v", items)
+	}
+	if items[0].Content == "" || items[1].Content == "" {
+		t.Fatalf("expected rendered content snapshots in bundle: %#v", items)
+	}
+}
+
+func TestSelectMarketplaceDocumentFallbackPrefersUserLocaleWhenMultiple(t *testing.T) {
+	record, err := selectMarketplaceDocumentFallback([]*DocumentRecord{
+		{
+			PluginID:   "linapro-demo-source",
+			Version:    "v0.1.0",
+			Locale:     "zh-CN",
+			Path:       "index.md",
+			SourceKind: documentSourceKindManifestDocs,
+			Title:      "中文文档",
+		},
+		{
+			PluginID:   "linapro-demo-source",
+			Version:    "v0.1.0",
+			Locale:     "en-US",
+			Path:       "index.md",
+			SourceKind: documentSourceKindManifestDocs,
+			Title:      "English docs",
+		},
+	}, GetReleaseDocumentInput{
+		PluginID: "linapro-demo-source",
+		Version:  "v0.1.0",
+		Locale:   "zh-CN",
+	})
+	if err != nil {
+		t.Fatalf("selectMarketplaceDocumentFallback returned error: %v", err)
+	}
+	if record == nil {
+		t.Fatal("expected user-locale document")
+	}
+	if record.ResolvedLocale != "zh-CN" || record.FallbackUsed {
+		t.Fatalf("unexpected user-locale metadata: %#v", record)
+	}
+}
+
+func TestSelectMarketplaceDocumentFallbackUsesEnglishWhenUnmatched(t *testing.T) {
+	record, err := selectMarketplaceDocumentFallback([]*DocumentRecord{
+		{
+			PluginID:   "linapro-demo-source",
+			Version:    "v0.1.0",
+			Locale:     "zh-CN",
+			Path:       "index.md",
+			SourceKind: documentSourceKindManifestDocs,
+			Title:      "中文文档",
+		},
+		{
+			PluginID:   "linapro-demo-source",
+			Version:    "v0.1.0",
+			Locale:     "en-US",
+			Path:       "index.md",
+			SourceKind: documentSourceKindManifestDocs,
+			Title:      "English docs",
+		},
+	}, GetReleaseDocumentInput{
+		PluginID: "linapro-demo-source",
+		Version:  "v0.1.0",
+		Locale:   "ja-JP",
+	})
+	if err != nil {
+		t.Fatalf("selectMarketplaceDocumentFallback returned error: %v", err)
+	}
+	if record == nil {
+		t.Fatal("expected English fallback document")
+	}
+	if record.ResolvedLocale != "en-US" || !record.FallbackUsed {
+		t.Fatalf("unexpected English fallback metadata: %#v", record)
 	}
 }
 
@@ -89,5 +244,39 @@ func TestSelectMarketplaceDocumentFallbackUsesReadme(t *testing.T) {
 	}
 	if record.SourceKind != documentSourceKindReadme || !record.FallbackUsed {
 		t.Fatalf("unexpected README fallback metadata: %#v", record)
+	}
+}
+
+func TestSelectMarketplaceDocumentFallbackReadmeUsesEnglishWhenUnmatched(t *testing.T) {
+	record, err := selectMarketplaceDocumentFallback([]*DocumentRecord{
+		{
+			PluginID:   "linapro-demo-source",
+			Version:    "v0.1.0",
+			Locale:     "zh-CN",
+			Path:       readmeCNDocumentPath,
+			SourceKind: documentSourceKindReadme,
+			Title:      "中文 README",
+		},
+		{
+			PluginID:   "linapro-demo-source",
+			Version:    "v0.1.0",
+			Locale:     "en-US",
+			Path:       readmeDocumentPath,
+			SourceKind: documentSourceKindReadme,
+			Title:      "English README",
+		},
+	}, GetReleaseDocumentInput{
+		PluginID: "linapro-demo-source",
+		Version:  "v0.1.0",
+		Locale:   "ja-JP",
+	})
+	if err != nil {
+		t.Fatalf("selectMarketplaceDocumentFallback returned error: %v", err)
+	}
+	if record == nil {
+		t.Fatal("expected English README fallback document")
+	}
+	if record.Path != readmeDocumentPath || record.ResolvedLocale != fallbackEnUSLocale || !record.FallbackUsed {
+		t.Fatalf("unexpected README English fallback metadata: %#v", record)
 	}
 }

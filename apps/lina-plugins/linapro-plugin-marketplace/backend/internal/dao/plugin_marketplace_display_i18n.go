@@ -8,15 +8,15 @@ import (
 	"linapro-plugin-marketplace/backend/internal/dao/internal"
 )
 
-// pluginMarketplaceDocDao is the data access object for the table plugin_marketplace_doc.
+// pluginMarketplaceDisplayI18nDao is the data access object for the table plugin_marketplace_display_i18n.
 // You can define custom methods on it to extend its functionality as needed.
-type pluginMarketplaceDocDao struct {
-	*internal.PluginMarketplaceDocDao
+type pluginMarketplaceDisplayI18nDao struct {
+	*internal.PluginMarketplaceDisplayI18nDao
 }
 
 var (
-	// PluginMarketplaceDoc is a globally accessible object for table plugin_marketplace_doc operations.
-	PluginMarketplaceDoc = pluginMarketplaceDocDao{internal.NewPluginMarketplaceDocDao()}
+	// PluginMarketplaceDisplayI18n is a globally accessible object for table plugin_marketplace_display_i18n operations.
+	PluginMarketplaceDisplayI18n = pluginMarketplaceDisplayI18nDao{internal.NewPluginMarketplaceDisplayI18nDao()}
 )
 
 // Add your custom methods and functionality below.

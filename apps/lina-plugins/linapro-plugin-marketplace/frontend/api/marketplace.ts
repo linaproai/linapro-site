@@ -5,7 +5,7 @@
 import type { RequestClientConfig } from "@vben/request";
 
 import type {
-  MarketplaceDocumentItem,
+  MarketplaceDocumentBundle,
   MarketplaceDocumentParams,
   MarketplaceDownloadSessionCreateParams,
   MarketplaceDownloadSessionItem,
@@ -350,11 +350,29 @@ export async function marketplaceReleaseDocument(
   params?: MarketplaceDocumentParams,
   scope: MarketplaceReadScope = "public",
 ) {
-  const res = await requestClient.get<{ document: MarketplaceDocumentItem }>(
+  const res = await marketplaceReleaseDocumentBundle(
+    pluginId,
+    version,
+    params,
+    scope,
+  );
+  return res.document ?? null;
+}
+
+export async function marketplaceReleaseDocumentBundle(
+  pluginId: string,
+  version: string,
+  params?: MarketplaceDocumentParams,
+  scope: MarketplaceReadScope = "public",
+) {
+  const res = await requestClient.get<MarketplaceDocumentBundle>(
     marketplacePath(readReleasePath(pluginId, version, "docs", scope)),
     { params },
   );
-  return res.document;
+  return {
+    document: res.document ?? null,
+    documents: res.documents ?? [],
+  };
 }
 
 export async function marketplaceReleaseRisks(

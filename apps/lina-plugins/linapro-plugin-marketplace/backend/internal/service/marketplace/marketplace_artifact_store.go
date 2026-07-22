@@ -15,6 +15,7 @@ import (
 	"github.com/gogf/gf/v2/errors/gerror"
 
 	"lina-core/pkg/bizerr"
+	"lina-core/pkg/plugin/capability/plugincap"
 )
 
 // ArtifactStore persists marketplace package bytes keyed by storage key.
@@ -35,13 +36,23 @@ type LocalArtifactStore struct {
 	root string
 }
 
+// defaultArtifactStoreRoot is the relative filesystem root used when no
+// storage.root config or constructor argument is provided. It stays under the
+// process working directory's temp tree so development artifacts are not written
+// into tracked source paths such as apps/lina-core/data/.
+const defaultArtifactStoreRoot = "temp/plugin-marketplace/artifacts"
+
+// configKeyStorageRoot is the plugin-scoped config key for the local artifact
+// root used by package uploads, Git docs snapshots, and download streaming.
+const configKeyStorageRoot = "storage.root"
+
 // NewLocalArtifactStore creates a local-disk artifact store rooted at rootDir.
-// Empty rootDir defaults to data/plugin-marketplace/artifacts under the process
-// working directory.
+// Empty rootDir defaults to temp/plugin-marketplace/artifacts under the process
+// working directory (typically apps/lina-core/temp when the host starts there).
 func NewLocalArtifactStore(rootDir string) (*LocalArtifactStore, error) {
 	root := strings.TrimSpace(rootDir)
 	if root == "" {
-		root = filepath.Join("data", "plugin-marketplace", "artifacts")
+		root = defaultArtifactStoreRoot
 	}
 	absRoot, err := filepath.Abs(root)
 	if err != nil {
@@ -51,6 +62,29 @@ func NewLocalArtifactStore(rootDir string) (*LocalArtifactStore, error) {
 		return nil, gerror.Wrapf(err, "create marketplace artifact root %q", absRoot)
 	}
 	return &LocalArtifactStore{root: absRoot}, nil
+}
+
+// resolveArtifactStoreRoot returns the configured local artifact root, or the
+// default temp path when storage.root is unset or blank.
+func resolveArtifactStoreRoot(ctx context.Context, pluginConfig plugincap.ConfigService) string {
+	if pluginConfig != nil {
+		configured, err := pluginConfig.String(ctx, configKeyStorageRoot, "")
+		if err == nil {
+			if root := strings.TrimSpace(configured); root != "" {
+				return root
+			}
+		}
+	}
+	return defaultArtifactStoreRoot
+}
+
+// Root returns the absolute filesystem root used by this store. Tests and
+// diagnostics use it to assert configured storage locations.
+func (s *LocalArtifactStore) Root() string {
+	if s == nil {
+		return ""
+	}
+	return s.root
 }
 
 // Put stores object bytes for one storage key.

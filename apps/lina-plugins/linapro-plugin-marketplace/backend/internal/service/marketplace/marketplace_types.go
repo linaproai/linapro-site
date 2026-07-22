@@ -183,6 +183,7 @@ type ListPluginsInput struct {
 	Publisher   string                         // Publisher optionally narrows by publisher key.
 	HostVersion string                         // HostVersion optionally applies a database-side compatibility range filter.
 	Visibility  VisibilitySubject              // Visibility is the current caller snapshot for catalog filtering.
+	Locale      string                         // Locale is the preferred display language for name/summary projection.
 }
 
 // ListOwnedPluginsInput carries publisher-owned plugin list filters.
@@ -195,7 +196,8 @@ type ListOwnedPluginsInput struct {
 	// (draft/published/delisted/deprecated) or process pipeline status
 	// (pending_verify/pending_review/completed/failed).
 	Status      string
-	OwnerUserID int64 // OwnerUserID is required and filters publishers owned by the user.
+	OwnerUserID int64  // OwnerUserID is required and filters publishers owned by the user.
+	Locale      string // Locale is the preferred display language for name/summary projection.
 }
 
 // ListManagedPluginsInput carries reviewer-managed plugin list filters.
@@ -209,6 +211,7 @@ type ListManagedPluginsInput struct {
 	// (pending_verify/pending_review/completed/failed).
 	Status    string
 	Publisher string // Publisher optionally narrows by publisher key.
+	Locale    string // Locale is the preferred display language for name/summary projection.
 }
 
 // ListReviewQueueInput carries cross-plugin review queue filters.
@@ -230,6 +233,7 @@ type ReviewQueueOutput struct {
 type GetPluginDetailInput struct {
 	PluginID   string            // PluginID is the stable marketplace plugin ID.
 	Visibility VisibilitySubject // Visibility is the current caller snapshot for detail filtering.
+	Locale     string            // Locale is the preferred display language for name/summary projection.
 }
 
 // ListReleasesInput carries release list filters and pagination.
@@ -276,9 +280,11 @@ type RiskListOutput struct {
 	Total int
 }
 
-// DocumentOutput contains one marketplace release document projection.
+// DocumentOutput contains the selected marketplace release document plus the
+// same-path language bundle for local switching.
 type DocumentOutput struct {
-	Document *marketv1.MarketplaceDocumentItem
+	Document  *marketv1.MarketplaceDocumentItem
+	Documents []*marketv1.MarketplaceDocumentItem
 }
 
 // DownloadEventType identifies one controlled marketplace download event.
@@ -464,6 +470,7 @@ type DocumentRecord struct {
 	Summary         string
 	ContentHash     string
 	SearchText      string
+	RenderedContent string
 	FallbackUsed    bool
 	UpdatedAt       *time.Time
 }

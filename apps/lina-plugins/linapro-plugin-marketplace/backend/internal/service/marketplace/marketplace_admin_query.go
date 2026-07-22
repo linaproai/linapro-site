@@ -28,6 +28,7 @@ func (s *serviceImpl) ListOwnedPlugins(ctx context.Context, in ListOwnedPluginsI
 		PluginType:  in.PluginType,
 		Status:      in.Status,
 		OwnerUserID: in.OwnerUserID,
+		Locale:      in.Locale,
 	})
 }
 
@@ -52,6 +53,7 @@ func (s *serviceImpl) ListManagedPlugins(ctx context.Context, in ListManagedPlug
 		Status:             in.Status,
 		PublisherIDs:       publisherIDs,
 		MatchPublisherName: true,
+		Locale:             in.Locale,
 	})
 }
 
@@ -149,6 +151,7 @@ type pluginIdentityListFilter struct {
 	OwnerUserID        int64
 	PublisherIDs       []int
 	MatchPublisherName bool
+	Locale             string
 }
 
 func (s *serviceImpl) listPluginsFromIdentityTable(
@@ -244,6 +247,10 @@ func (s *serviceImpl) listPluginsFromIdentityTable(
 	if err != nil {
 		return nil, err
 	}
+	displayByRelease, err := s.batchDisplayI18nByReleaseIDs(ctx, latestReleaseIDsFromPlugins(rows))
+	if err != nil {
+		return nil, err
+	}
 
 	items := make([]*marketv1.MarketplacePluginListItem, 0, len(rows))
 	for _, row := range rows {
@@ -252,10 +259,17 @@ func (s *serviceImpl) listPluginsFromIdentityTable(
 		}
 		release := releases[row.LatestReleaseId]
 		tagCodes := tagCodesByPlugin[row.Id]
+		displayName, displaySummary := pickDisplayNameSummary(
+			displayByRelease[row.LatestReleaseId],
+			in.Locale,
+			"",
+			row.Name,
+			row.Summary,
+		)
 		item := &marketv1.MarketplacePluginListItem{
 			PluginId:        row.PluginId,
-			Name:            row.Name,
-			Summary:         row.Summary,
+			Name:            displayName,
+			Summary:         displaySummary,
 			Publisher:       publisherItemFromEntity(publishers[row.PublisherId], "", false),
 			PluginType:      marketv1.MarketplacePluginType(row.PluginType),
 			MarketStatus:    marketv1.MarketplaceStatus(row.MarketStatus),

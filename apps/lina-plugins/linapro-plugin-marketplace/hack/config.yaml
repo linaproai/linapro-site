@@ -8,7 +8,7 @@ gfcli:
         tables: >-
           plugin_marketplace_artifact,
           plugin_marketplace_credential,
-          plugin_marketplace_doc,
+          plugin_marketplace_display_i18n,
           plugin_marketplace_download_event,
           plugin_marketplace_download_session,
           plugin_marketplace_plugin,

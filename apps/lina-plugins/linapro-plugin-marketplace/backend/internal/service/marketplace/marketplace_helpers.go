@@ -217,28 +217,6 @@ func artifactRecordFromEntity(row *entity.PluginMarketplaceArtifact) *ArtifactRe
 	}
 }
 
-// documentRecordFromEntity maps a generated document entity to a service record.
-func documentRecordFromEntity(row *entity.PluginMarketplaceDoc) *DocumentRecord {
-	if row == nil {
-		return nil
-	}
-	return &DocumentRecord{
-		ID:             row.Id,
-		ReleaseID:      row.ReleaseId,
-		PluginID:       row.PluginId,
-		Version:        row.ReleaseVersion,
-		Locale:         row.Locale,
-		ResolvedLocale: row.Locale,
-		Path:           row.DocPath,
-		SourceKind:     row.SourceKind,
-		Title:          row.Title,
-		Summary:        row.Summary,
-		ContentHash:    row.ContentHash,
-		SearchText:     row.SearchText,
-		UpdatedAt:      cloneTime(row.UpdatedAt),
-	}
-}
-
 // cloneTime avoids returning pointers owned by generated entity structs.
 func cloneTime(value *time.Time) *time.Time {
 	if value == nil {

@@ -71,6 +71,10 @@
 - [x] **FB-10**: 无 tag 回退 main 时须在 release 表记录发现时的 commit id；`distribution.ref` 优先使用该 commit，禁止仅以浮动 `main` 分支下载已发布/已登记版本
 - [x] **FB-11**: 插件须保留多版本历史记录，用户可查询并选择安装任一已发布历史版本（兼容性回退）
 - [x] **FB-12**: 补充历史版本与 Git commit 钉扎 E2E（TC006）及 source pin i18n（避免 vue-i18n `@` 链接语法）
+- [x] **FB-13**: 插件市场展示插件文档时按用户当前语言环境自动选择 i18n 文档：仅一种语言则展示该语言；多种语言优先匹配用户语言；无法匹配则回退英文
+- [x] **FB-14**: 「我的插件」操作列仅保留三个按钮：详情、新版本、下架；新版本请求服务端自动更新版本信息；详情展示插件信息与文档；下架撤回发布状态并在市场不可见
+- [x] **FB-15**: 「我的插件」列表将来源（sourceKind）单独展示为一列，不再作为名称右侧标签
+- [x] **FB-16**: 市场需持久化版本文档语言包正文快照，并让详情页一次读取多语言文档集合后本地快速切换
 
 ## 8. 任务完成影响记录
 
@@ -80,3 +84,21 @@
 - [x] 8.4 开发工具跨平台：有影响；marketplace.install 使用 stdlib HTTP + 本地 git，已在 README 中英文说明
 - [x] 8.5 DI：无新增运行期宿主 DI；市场服务仍 `New(nil)` 自建 artifact store；Jobs 注册使用同一构造路径
 - [x] 8.6 验证：`GOWORK=off go test ./backend/...`（marketplace 插件）通过；`linactl` build 通过；`openspec validate ... --strict` 通过
+
+## Feedback 影响记录（FB-13 ~ FB-15）
+
+- [x] i18n：有影响；文档选择按请求语言/Accept-Language；更新 `mine.messages.packageAdded`/`delistOnlyPublished`/`confirm.delist` 中英文文案
+- [x] 缓存一致性：无影响；文档读取仍走既有版本索引与按需渲染，未改缓存键策略
+- [x] 数据权限/可见性：无新增写路径权限；下架仍复用既有 `OwnerDelistPlugin` 归属校验与公开目录过滤
+- [x] 开发工具跨平台：无影响
+- [x] DI：无新增运行期依赖；文档 locale 使用 `gi18n.LanguageFromCtx` 与 `Accept-Language`，未注入新服务
+- [x] 测试：文档 fallback 单测更新；前端 composition 单测更新；E2E POM/TC001 覆盖三按钮与来源列；`openspec validate ... --strict` 通过
+
+## Feedback 影响记录（FB-16）
+
+- [x] i18n：有影响；已维护插件 `zh-CN`/`en-US` 运行时资源与 `zh-CN` apidoc 翻译，插件前端/i18n 静态测试通过；全局`make i18n.check`失败于既有宿主 `linapro-content-notice` 缺失键，非本次 marketplace 变更引入
+- [x] 缓存一致性：有影响；文档正文快照以 `plugin_marketplace_doc` 为权威数据源，发布包解析或 Git 发现时整体替换，详情读取不新增运行时缓存
+- [x] 数据权限/可见性：有影响；文档包读取复用既有 `requireVisibleRelease`，不可见版本不得返回任何语言内容
+- [x] 开发工具跨平台：无影响；不新增或修改默认开发工具入口
+- [x] DI：无新增运行期依赖；复用市场服务、文档索引与现有 artifact/Git 发现流程
+- [x] 测试：补充后端文档快照/多语言包单测、前端本地切换静态测试与 E2E 子断言；`GOWORK=off go test ./backend/... -count=1`、插件前端/apidoc i18n 静态测试、`make lint.go dir=apps/lina-plugins/linapro-plugin-marketplace plugins=1`、`make plugins.check`、`openspec validate ... --strict`通过；`db.init`/`dao`因本地数据库既有 schema 缺失和插件表未初始化阻断，浏览器 E2E 未运行

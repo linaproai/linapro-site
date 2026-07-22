@@ -1,21 +1,23 @@
 # LinaPro Plugin Marketplace — configuration template.
-# Copy values into one of the runtime config sources (do not rely on this file
-# as a runtime default; config.example.yaml is never loaded automatically):
+# Marketplace settings are maintained by this plugin, not by the host framework
+# config.yaml. Copy values into one of the plugin-owned runtime sources
+# (config.example.yaml itself is never loaded automatically):
 #
-# 1) Host main config (highest priority, exclusive section):
-#    apps/lina-core/manifest/config/config.yaml
-#      plugin:
-#        linapro-plugin-marketplace:
-#          github:
-#            accessToken: "ghp_xxx"
-# 2) Production file under the host config root:
-#    plugins/linapro-plugin-marketplace/config.yaml
-# 3) Development default in this plugin:
+# 1) Development default in this plugin:
 #    apps/lina-plugins/linapro-plugin-marketplace/manifest/config/config.yaml
+# 2) Production file under the host config root (plugin-scoped path only):
+#    <config-root>/plugins/linapro-plugin-marketplace/config.yaml
 #
 # These platform tokens are used only when a Git source registration does not
 # supply its own accessToken. They are never returned by marketplace APIs and
 # are not written into per-publisher credential rows.
+
+# Local filesystem root for marketplace package bytes, Git documentation
+# snapshots, and controlled download content. Relative paths resolve from the
+# host process working directory. Development default stays under temp/; use an
+# absolute path in production (for example /var/lib/linapro/plugin-marketplace).
+storage:
+  root: "temp/plugin-marketplace/artifacts"
 
 # GitHub personal access token for public repository metadata discovery.
 # Classic: public_repo. Fine-grained: Contents: Read on the target repos.

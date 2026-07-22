@@ -1,24 +1,26 @@
-// This file implements marketplace document indexing and lookup. It extracts
-// version-scoped Markdown metadata from source or dynamic packages, validates
-// image paths before indexing, renders conservative safe HTML, writes bounded
-// document index rows, and applies locale fallback without loading package
-// content from storage.
+// This file implements marketplace document lookup from version artifact disk
+// storage. Markdown is rendered on read from package ZIP or Git docs snapshots;
+// document bodies are never persisted in database tables.
 
 package marketplace
 
 import (
 	"archive/zip"
+	"bytes"
 	"context"
+	"encoding/json"
 	"html"
+	"io"
 	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
 
-	"github.com/gogf/gf/v2/database/gdb"
+	"gopkg.in/yaml.v3"
 
 	"lina-core/pkg/bizerr"
+	marketv1 "linapro-plugin-marketplace/backend/api/market/v1"
 	"linapro-plugin-marketplace/backend/internal/dao"
 	"linapro-plugin-marketplace/backend/internal/model/do"
 	"linapro-plugin-marketplace/backend/internal/model/entity"
@@ -57,36 +59,15 @@ type marketplaceDocumentIndexItem struct {
 	RenderedContent string
 }
 
-// ResolveReleaseDocumentIndex returns one indexed document selected by fallback rules.
+// ResolveReleaseDocumentIndex returns one document selected by fallback rules.
 func (s *serviceImpl) ResolveReleaseDocumentIndex(
 	ctx context.Context,
 	in GetReleaseDocumentInput,
 ) (*DocumentRecord, error) {
-	release, err := s.requireVisibleRelease(
-		ctx,
-		in.PluginID,
-		in.Version,
-		in.Visibility,
-		marketplaceVisibilityPermissionView,
-	)
+	records, err := s.loadVisibleReleaseDocumentRecords(ctx, in)
 	if err != nil {
 		return nil, err
 	}
-
-	var rows []*entity.PluginMarketplaceDoc
-	if err = dao.PluginMarketplaceDoc.Ctx(ctx).
-		Where(do.PluginMarketplaceDoc{ReleaseId: release.Id}).
-		OrderAsc(dao.PluginMarketplaceDoc.Columns().SourceKind).
-		OrderAsc(dao.PluginMarketplaceDoc.Columns().Locale).
-		OrderAsc(dao.PluginMarketplaceDoc.Columns().DocPath).
-		Scan(&rows); err != nil {
-		return nil, bizerr.WrapCode(err, CodeMarketplaceStorageFailed)
-	}
-	records := make([]*DocumentRecord, 0, len(rows))
-	for _, row := range rows {
-		records = append(records, documentRecordFromEntity(row))
-	}
-
 	selected, err := selectMarketplaceDocumentFallback(records, in)
 	if err != nil {
 		return nil, err
@@ -97,132 +78,318 @@ func (s *serviceImpl) ResolveReleaseDocumentIndex(
 	return selected, nil
 }
 
-// replaceReleaseDocuments replaces indexed document rows for one mutable release.
-func (s *serviceImpl) replaceReleaseDocuments(
+// loadVisibleReleaseDocumentRecords loads candidate documents for one visible
+// release from package ZIP artifacts or Git docs disk snapshots.
+func (s *serviceImpl) loadVisibleReleaseDocumentRecords(
 	ctx context.Context,
-	release *ReleaseRecord,
-	items []*marketplaceDocumentIndexItem,
-) error {
-	if release == nil {
-		return bizerr.NewCode(CodeMarketplaceInvalidInput)
-	}
-
-	var existingRows []*entity.PluginMarketplaceDoc
-	if err := dao.PluginMarketplaceDoc.Ctx(ctx).
-		Where(do.PluginMarketplaceDoc{ReleaseId: release.ID}).
-		Scan(&existingRows); err != nil {
-		return bizerr.WrapCode(err, CodeMarketplaceStorageFailed)
-	}
-	existingByKey := make(map[string]*entity.PluginMarketplaceDoc, len(existingRows))
-	for _, row := range existingRows {
-		if row == nil {
-			continue
-		}
-		existingByKey[documentIndexKey(row.Locale, row.DocPath)] = row
-	}
-
-	desired := make(map[string]struct{}, len(items))
-	return dao.PluginMarketplaceDoc.Transaction(ctx, func(ctx context.Context, _ gdb.TX) error {
-		for _, item := range items {
-			if item == nil {
-				continue
-			}
-			key := documentIndexKey(item.Locale, item.DocPath)
-			desired[key] = struct{}{}
-			data := marketplaceDocumentData(release, item)
-			existing := existingByKey[key]
-			if existing == nil {
-				if _, err := dao.PluginMarketplaceDoc.Ctx(ctx).Data(data).Insert(); err != nil {
-					return bizerr.WrapCode(err, CodeMarketplaceStorageFailed)
-				}
-				continue
-			}
-			if _, err := dao.PluginMarketplaceDoc.Ctx(ctx).
-				Where(do.PluginMarketplaceDoc{Id: existing.Id}).
-				Data(data).
-				Update(); err != nil {
-				return bizerr.WrapCode(err, CodeMarketplaceStorageFailed)
-			}
-		}
-
-		for _, row := range existingRows {
-			if row == nil {
-				continue
-			}
-			if _, ok := desired[documentIndexKey(row.Locale, row.DocPath)]; ok {
-				continue
-			}
-			if _, err := dao.PluginMarketplaceDoc.Ctx(ctx).
-				Where(do.PluginMarketplaceDoc{Id: row.Id}).
-				Delete(); err != nil {
-				return bizerr.WrapCode(err, CodeMarketplaceStorageFailed)
-			}
-		}
-		return nil
-	})
-}
-
-// marketplaceDocumentData builds one DO payload for inserting or updating document indexes.
-func marketplaceDocumentData(
-	release *ReleaseRecord,
-	item *marketplaceDocumentIndexItem,
-) do.PluginMarketplaceDoc {
-	return do.PluginMarketplaceDoc{
-		ReleaseId:      release.ID,
-		PluginId:       release.PluginID,
-		ReleaseVersion: release.Version,
-		Locale:         item.Locale,
-		DocPath:        item.DocPath,
-		SourceKind:     item.SourceKind,
-		Title:          item.Title,
-		Summary:        item.Summary,
-		ContentHash:    item.ContentHash,
-		SearchText:     item.SearchText,
-	}
-}
-
-// buildSourcePackageDocumentIndex extracts Markdown docs from a source ZIP package.
-func buildSourcePackageDocumentIndex(
-	manifest *sourcePackageManifest,
-	files map[string]*zip.File,
-	rootPrefix string,
-) ([]*marketplaceDocumentIndexItem, error) {
-	return buildZipDocumentIndex(manifestDefaultLocale(manifest), files, rootPrefix)
-}
-
-// buildDynamicPackageDocumentIndex extracts Markdown docs from dynamic ZIP and embedded resources.
-func buildDynamicPackageDocumentIndex(
-	manifest *sourcePackageManifest,
-	files map[string]*zip.File,
-	rootPrefix string,
-	resources []*dynamicPackageManifestResource,
-) ([]*marketplaceDocumentIndexItem, error) {
-	items, err := buildZipDocumentIndex(manifestDefaultLocale(manifest), files, rootPrefix)
+	in GetReleaseDocumentInput,
+) ([]*DocumentRecord, error) {
+	release, err := s.requireVisibleRelease(
+		ctx,
+		in.PluginID,
+		in.Version,
+		in.Visibility,
+		marketplaceVisibilityPermissionView,
+	)
 	if err != nil {
 		return nil, err
 	}
-	for _, resource := range resources {
-		if resource == nil || !strings.HasPrefix(resource.Path, marketplaceDocsPrefix) ||
-			strings.ToLower(filepath.Ext(resource.Path)) != ".md" {
+	requestedPath, err := normalizeMarketplaceDocumentPath(in.Path)
+	if err != nil {
+		return nil, err
+	}
+	candidatePaths := documentCandidatePaths(requestedPath)
+
+	items, err := s.loadReleaseDocumentIndexItems(ctx, release)
+	if err != nil {
+		return nil, err
+	}
+	records := make([]*DocumentRecord, 0, len(items))
+	allowedPaths := make(map[string]struct{}, len(candidatePaths))
+	for _, candidatePath := range candidatePaths {
+		allowedPaths[candidatePath] = struct{}{}
+	}
+	for _, item := range items {
+		if item == nil {
 			continue
 		}
-		locale, docPath, parseErr := parseManifestDocsPath(resource.Path, manifestDefaultLocale(manifest))
-		if parseErr != nil {
-			return nil, parseErr
+		if _, ok := allowedPaths[item.DocPath]; !ok {
+			continue
 		}
-		item, indexErr := indexMarketplaceDocument(
-			locale,
-			docPath,
-			documentSourceKindManifestDocs,
-			string(resource.Content),
-		)
+		records = append(records, documentRecordFromIndexItem(release, item))
+	}
+	return records, nil
+}
+
+// documentCandidatePaths returns doc paths considered for one request path.
+func documentCandidatePaths(requestedPath string) []string {
+	candidatePaths := []string{requestedPath}
+	if isIndexDocumentPath(requestedPath) {
+		candidatePaths = append(candidatePaths, readmeCNDocumentPath, readmeDocumentPath)
+	}
+	seenPath := make(map[string]struct{}, len(candidatePaths))
+	filteredPaths := make([]string, 0, len(candidatePaths))
+	for _, candidatePath := range candidatePaths {
+		if _, ok := seenPath[candidatePath]; ok {
+			continue
+		}
+		seenPath[candidatePath] = struct{}{}
+		filteredPaths = append(filteredPaths, candidatePath)
+	}
+	return filteredPaths
+}
+
+// loadReleaseDocumentIndexItems reads all package/Git docs for one release.
+func (s *serviceImpl) loadReleaseDocumentIndexItems(
+	ctx context.Context,
+	release *entity.PluginMarketplaceRelease,
+) ([]*marketplaceDocumentIndexItem, error) {
+	if release == nil {
+		return nil, bizerr.NewCode(CodeMarketplaceInvalidInput)
+	}
+	items, err := s.loadDocumentIndexItemsFromPackageArtifact(ctx, release)
+	if err != nil {
+		return nil, err
+	}
+	if len(items) > 0 {
+		return items, nil
+	}
+	return s.loadDocumentIndexItemsFromGitSnapshot(ctx, release)
+}
+
+// loadDocumentIndexItemsFromPackageArtifact opens the primary package ZIP and
+// extracts Markdown docs for rendering.
+func (s *serviceImpl) loadDocumentIndexItemsFromPackageArtifact(
+	ctx context.Context,
+	release *entity.PluginMarketplaceRelease,
+) ([]*marketplaceDocumentIndexItem, error) {
+	if s == nil || s.artifacts == nil || release == nil {
+		return nil, nil
+	}
+	artifact, err := s.selectPackageArtifactForDocuments(ctx, release)
+	if err != nil {
+		return nil, err
+	}
+	if artifact == nil || strings.TrimSpace(artifact.StorageKey) == "" {
+		return nil, nil
+	}
+	localPath, err := s.artifacts.LocalPath(ctx, artifact.StorageKey)
+	if err != nil {
+		return nil, err
+	}
+	reader, err := zip.OpenReader(localPath)
+	if err != nil {
+		return nil, bizerr.WrapCode(err, CodeMarketplaceStorageFailed)
+	}
+	defer func() {
+		_ = reader.Close()
+	}()
+	fileIndex, err := indexSourceZipFiles(reader.File)
+	if err != nil {
+		return nil, err
+	}
+	rootPrefix, err := detectSourcePackageRoot(fileIndex)
+	if err != nil {
+		// Dynamic packages may place plugin.yaml at root without source layout.
+		rootPrefix = ""
+		if _, ok := fileIndex[sourcePackageManifestPath]; !ok {
+			return nil, nil
+		}
+	}
+	defaultLocale := fallbackEnUSLocale
+	if manifestFile := fileIndex[rootPrefix+sourcePackageManifestPath]; manifestFile != nil {
+		if content, readErr := readZipFile(manifestFile); readErr == nil {
+			manifest := &sourcePackageManifest{}
+			if yaml.Unmarshal(content, manifest) == nil {
+				normalizeSourcePackageManifest(manifest)
+				defaultLocale = manifestDefaultLocale(manifest)
+			}
+		}
+	}
+	return buildZipDocumentIndex(defaultLocale, fileIndex, rootPrefix)
+}
+
+// selectPackageArtifactForDocuments returns the package ZIP preferred for docs.
+func (s *serviceImpl) selectPackageArtifactForDocuments(
+	ctx context.Context,
+	release *entity.PluginMarketplaceRelease,
+) (*entity.PluginMarketplaceArtifact, error) {
+	if release == nil {
+		return nil, nil
+	}
+	var rows []*entity.PluginMarketplaceArtifact
+	cols := dao.PluginMarketplaceArtifact.Columns()
+	if err := dao.PluginMarketplaceArtifact.Ctx(ctx).
+		Fields(
+			cols.Id,
+			cols.ReleaseId,
+			cols.ArtifactType,
+			cols.StorageKey,
+			cols.FileName,
+		).
+		Where(do.PluginMarketplaceArtifact{ReleaseId: release.Id}).
+		Scan(&rows); err != nil {
+		return nil, bizerr.WrapCode(err, CodeMarketplaceStorageFailed)
+	}
+	pluginType := marketv1.MarketplacePluginType(release.PluginType)
+	var selected *entity.PluginMarketplaceArtifact
+	for _, row := range rows {
+		if row == nil {
+			continue
+		}
+		if !isPackageDocumentArtifactType(row.ArtifactType) {
+			continue
+		}
+		if selected == nil || artifactPriority(row, pluginType) < artifactPriority(selected, pluginType) {
+			selected = row
+		}
+	}
+	return selected, nil
+}
+
+// isPackageDocumentArtifactType reports package archives that may contain docs.
+func isPackageDocumentArtifactType(artifactType string) bool {
+	switch marketv1.MarketplaceArtifactType(artifactType) {
+	case marketv1.MarketplaceArtifactTypeSourceZip,
+		marketv1.MarketplaceArtifactTypeSourceTarGz,
+		marketv1.MarketplaceArtifactTypeDynamicZip,
+		marketv1.MarketplaceArtifactTypeDynamicTarGz:
+		return true
+	default:
+		return false
+	}
+}
+
+// docsSnapshotManifest is the on-disk index for Git-sourced documentation.
+type docsSnapshotManifest struct {
+	Items []*docsSnapshotManifestItem `json:"items"`
+}
+
+// docsSnapshotManifestItem points at one Markdown body stored under ArtifactStore.
+type docsSnapshotManifestItem struct {
+	Locale     string `json:"locale"`
+	DocPath    string `json:"docPath"`
+	SourceKind string `json:"sourceKind"`
+	ContentKey string `json:"contentKey"`
+}
+
+// replaceReleaseGitDocumentSnapshot writes rendered Git docs to artifact disk.
+func (s *serviceImpl) replaceReleaseGitDocumentSnapshot(
+	ctx context.Context,
+	release *ReleaseRecord,
+	items []*marketplaceDocumentIndexItem,
+	rawBodies map[string][]byte,
+) error {
+	if s == nil || s.artifacts == nil || release == nil {
+		return bizerr.NewCode(CodeMarketplaceInvalidInput)
+	}
+	root := docsSnapshotRoot(release.PluginID, release.Version)
+	manifest := &docsSnapshotManifest{Items: make([]*docsSnapshotManifestItem, 0, len(items))}
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+		key := documentIndexKey(item.Locale, item.DocPath)
+		body := rawBodies[key]
+		if len(body) == 0 {
+			continue
+		}
+		contentKey := path.Join(root, "content", item.ContentHash+".md")
+		if err := s.artifacts.Put(ctx, contentKey, bytes.NewReader(body)); err != nil {
+			return err
+		}
+		manifest.Items = append(manifest.Items, &docsSnapshotManifestItem{
+			Locale:     item.Locale,
+			DocPath:    item.DocPath,
+			SourceKind: item.SourceKind,
+			ContentKey: contentKey,
+		})
+	}
+	payload, err := json.Marshal(manifest)
+	if err != nil {
+		return bizerr.WrapCode(err, CodeMarketplaceStorageFailed)
+	}
+	return s.artifacts.Put(ctx, docsSnapshotManifestKey(release.PluginID, release.Version), bytes.NewReader(payload))
+}
+
+// loadDocumentIndexItemsFromGitSnapshot loads Git docs previously written to disk.
+func (s *serviceImpl) loadDocumentIndexItemsFromGitSnapshot(
+	ctx context.Context,
+	release *entity.PluginMarketplaceRelease,
+) ([]*marketplaceDocumentIndexItem, error) {
+	if s == nil || s.artifacts == nil || release == nil {
+		return nil, nil
+	}
+	reader, err := s.artifacts.Open(ctx, docsSnapshotManifestKey(release.PluginId, release.ReleaseVersion))
+	if err != nil {
+		// Missing snapshot is normal for releases without Git docs enrichment.
+		return nil, nil
+	}
+	defer func() {
+		_ = reader.Close()
+	}()
+	payload, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, bizerr.WrapCode(err, CodeMarketplaceStorageFailed)
+	}
+	var manifest docsSnapshotManifest
+	if err = json.Unmarshal(payload, &manifest); err != nil {
+		return nil, bizerr.WrapCode(err, CodeMarketplaceStorageFailed)
+	}
+	items := make([]*marketplaceDocumentIndexItem, 0, len(manifest.Items))
+	for _, entry := range manifest.Items {
+		if entry == nil || strings.TrimSpace(entry.ContentKey) == "" {
+			continue
+		}
+		bodyReader, openErr := s.artifacts.Open(ctx, entry.ContentKey)
+		if openErr != nil {
+			continue
+		}
+		body, readErr := io.ReadAll(bodyReader)
+		_ = bodyReader.Close()
+		if readErr != nil || len(body) == 0 {
+			continue
+		}
+		item, indexErr := indexMarketplaceDocument(entry.Locale, entry.DocPath, entry.SourceKind, string(body))
 		if indexErr != nil {
-			return nil, indexErr
+			continue
 		}
 		items = append(items, item)
 	}
 	sortMarketplaceDocumentIndex(items)
 	return dedupeMarketplaceDocumentIndex(items), nil
+}
+
+func docsSnapshotRoot(pluginID string, version string) string {
+	return path.Join("docs-snapshot", normalizeKey(pluginID), normalizeKey(version))
+}
+
+func docsSnapshotManifestKey(pluginID string, version string) string {
+	return path.Join(docsSnapshotRoot(pluginID, version), "manifest.json")
+}
+
+// documentRecordFromIndexItem projects an in-memory index item for one release.
+func documentRecordFromIndexItem(
+	release *entity.PluginMarketplaceRelease,
+	item *marketplaceDocumentIndexItem,
+) *DocumentRecord {
+	if release == nil || item == nil {
+		return nil
+	}
+	return &DocumentRecord{
+		ReleaseID:       release.Id,
+		PluginID:        release.PluginId,
+		Version:         release.ReleaseVersion,
+		Locale:          item.Locale,
+		ResolvedLocale:  item.Locale,
+		Path:            item.DocPath,
+		SourceKind:      item.SourceKind,
+		Title:           item.Title,
+		Summary:         item.Summary,
+		ContentHash:     item.ContentHash,
+		SearchText:      item.SearchText,
+		RenderedContent: item.RenderedContent,
+	}
 }
 
 // buildZipDocumentIndex extracts manifest/docs and README Markdown from ZIP files.
@@ -441,6 +608,13 @@ func validateMarketplaceDocumentAssetPath(
 }
 
 // selectMarketplaceDocumentFallback applies locale and README fallback rules to index records.
+// Selection order for version-scoped marketplace docs:
+//  1. When only one manifest_docs language exists for the path, return that language.
+//  2. When multiple languages exist, prefer an exact match to the user locale.
+//  3. Otherwise prefer English (en-US / en).
+//  4. For the index path only, apply the same requested-locale / English
+//     fallback order to README.zh-CN.md / README.md.
+//  5. As a last resort, return any remaining manifest_docs candidate for the path.
 func selectMarketplaceDocumentFallback(
 	records []*DocumentRecord,
 	in GetReleaseDocumentInput,
@@ -450,35 +624,136 @@ func selectMarketplaceDocumentFallback(
 		return nil, err
 	}
 	requestedLocale := normalizeDocumentLocale(in.Locale)
-	candidateLocales := uniqueDocumentLocales(
-		requestedLocale,
-		normalizeDocumentLocale(in.DefaultLocale),
-		fallbackZhCNLocale,
-		fallbackEnUSLocale,
-		defaultDocumentLocale,
-	)
 
 	byKey := make(map[string]*DocumentRecord, len(records))
+	pathLocales := make([]string, 0, 4)
+	seenPathLocales := make(map[string]struct{}, 4)
 	for _, record := range records {
 		if record == nil {
 			continue
 		}
 		byKey[documentLookupKey(record.SourceKind, record.Locale, record.Path)] = record
+		if record.SourceKind != documentSourceKindManifestDocs || record.Path != requestedPath {
+			continue
+		}
+		locale := normalizeDocumentLocale(record.Locale)
+		if _, ok := seenPathLocales[locale]; ok {
+			continue
+		}
+		seenPathLocales[locale] = struct{}{}
+		pathLocales = append(pathLocales, locale)
 	}
+
+	// Single available language: always show it regardless of the request locale.
+	if len(pathLocales) == 1 {
+		if record := byKey[documentLookupKey(documentSourceKindManifestDocs, pathLocales[0], requestedPath)]; record != nil {
+			return markDocumentFallback(record, requestedLocale, requestedPath), nil
+		}
+	}
+
+	// Multiple languages: prefer the user locale, then English.
+	candidateLocales := uniqueDocumentLocales(
+		requestedLocale,
+		fallbackEnUSLocale,
+		"en",
+	)
+	// Drop the synthetic "default" marker so empty request locale does not pin
+	// an artificial locale before English.
+	filteredCandidates := make([]string, 0, len(candidateLocales))
 	for _, locale := range candidateLocales {
+		if locale == defaultDocumentLocale {
+			continue
+		}
+		filteredCandidates = append(filteredCandidates, locale)
+	}
+	for _, locale := range filteredCandidates {
 		if record := byKey[documentLookupKey(documentSourceKindManifestDocs, locale, requestedPath)]; record != nil {
 			return markDocumentFallback(record, requestedLocale, requestedPath), nil
 		}
 	}
 	if isIndexDocumentPath(requestedPath) {
-		if record := byKey[documentLookupKey(documentSourceKindReadme, fallbackZhCNLocale, readmeCNDocumentPath)]; record != nil {
+		if record := selectReadmeDocumentFallback(byKey, filteredCandidates); record != nil {
 			return markDocumentFallback(record, requestedLocale, requestedPath), nil
 		}
-		if record := byKey[documentLookupKey(documentSourceKindReadme, fallbackEnUSLocale, readmeDocumentPath)]; record != nil {
+	}
+	// Last resort: any remaining manifest_docs language for the path.
+	for _, locale := range pathLocales {
+		if record := byKey[documentLookupKey(documentSourceKindManifestDocs, locale, requestedPath)]; record != nil {
 			return markDocumentFallback(record, requestedLocale, requestedPath), nil
 		}
 	}
 	return nil, nil
+}
+
+// selectReadmeDocumentFallback applies locale fallback to README entry docs.
+func selectReadmeDocumentFallback(
+	byKey map[string]*DocumentRecord,
+	candidateLocales []string,
+) *DocumentRecord {
+	if len(byKey) == 0 {
+		return nil
+	}
+	readmeRecords := []*DocumentRecord{
+		byKey[documentLookupKey(documentSourceKindReadme, fallbackZhCNLocale, readmeCNDocumentPath)],
+		byKey[documentLookupKey(documentSourceKindReadme, fallbackEnUSLocale, readmeDocumentPath)],
+	}
+	available := make([]*DocumentRecord, 0, len(readmeRecords))
+	for _, record := range readmeRecords {
+		if record != nil {
+			available = append(available, record)
+		}
+	}
+	if len(available) == 1 {
+		return available[0]
+	}
+	for _, locale := range candidateLocales {
+		for _, record := range available {
+			if normalizeDocumentLocale(record.Locale) == locale {
+				return record
+			}
+		}
+	}
+	return nil
+}
+
+// collectMarketplaceDocumentBundle returns same-path language alternatives for the selected document.
+func collectMarketplaceDocumentBundle(
+	records []*DocumentRecord,
+	selected *DocumentRecord,
+	in GetReleaseDocumentInput,
+) ([]*DocumentRecord, error) {
+	if selected == nil {
+		return nil, nil
+	}
+	requestedPath, err := normalizeMarketplaceDocumentPath(in.Path)
+	if err != nil {
+		return nil, err
+	}
+	requestedLocale := normalizeDocumentLocale(in.Locale)
+	bundle := make([]*DocumentRecord, 0, len(records))
+	for _, record := range records {
+		if record == nil {
+			continue
+		}
+		switch selected.SourceKind {
+		case documentSourceKindManifestDocs:
+			if record.SourceKind != documentSourceKindManifestDocs || record.Path != requestedPath {
+				continue
+			}
+		case documentSourceKindReadme:
+			if record.SourceKind != documentSourceKindReadme || !isIndexDocumentPath(requestedPath) {
+				continue
+			}
+		default:
+			continue
+		}
+		cloned := *record
+		cloned.RequestedLocale = requestedLocale
+		cloned.ResolvedLocale = record.Locale
+		cloned.FallbackUsed = false
+		bundle = append(bundle, &cloned)
+	}
+	return bundle, nil
 }
 
 // markDocumentFallback clones one record and annotates fallback metadata.

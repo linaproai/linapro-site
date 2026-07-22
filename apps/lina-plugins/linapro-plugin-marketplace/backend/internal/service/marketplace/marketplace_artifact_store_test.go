@@ -7,6 +7,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -46,5 +47,99 @@ func TestLocalArtifactStorePutOpenAndRejectsTraversal(t *testing.T) {
 	}
 	if _, err = store.Open(ctx, "missing/package.zip"); err == nil {
 		t.Fatal("expected missing object to fail")
+	}
+}
+
+func TestResolveArtifactStoreRootUsesConfigAndDefault(t *testing.T) {
+	t.Parallel()
+
+	if got := resolveArtifactStoreRoot(context.Background(), nil); got != defaultArtifactStoreRoot {
+		t.Fatalf("nil config root = %q, want %q", got, defaultArtifactStoreRoot)
+	}
+	if got := resolveArtifactStoreRoot(context.Background(), stubPluginConfig{}); got != defaultArtifactStoreRoot {
+		t.Fatalf("empty config root = %q, want %q", got, defaultArtifactStoreRoot)
+	}
+
+	configured := filepath.Join(t.TempDir(), "marketplace-artifacts")
+	got := resolveArtifactStoreRoot(context.Background(), stubPluginConfig{
+		values: map[string]string{
+			configKeyStorageRoot: configured,
+		},
+	})
+	if got != configured {
+		t.Fatalf("configured root = %q, want %q", got, configured)
+	}
+}
+
+func TestNewLocalArtifactStoreEmptyRootUsesTempDefault(t *testing.T) {
+	t.Parallel()
+
+	// Use an isolated process CWD so the default relative path does not write
+	// into the repository tree during unit tests.
+	originalWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd: %v", err)
+	}
+	workDir := t.TempDir()
+	if err = os.Chdir(workDir); err != nil {
+		t.Fatalf("Chdir: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(originalWD)
+	})
+
+	store, err := NewLocalArtifactStore("")
+	if err != nil {
+		t.Fatalf("NewLocalArtifactStore: %v", err)
+	}
+	root := store.Root()
+	wantSuffix := filepath.FromSlash(defaultArtifactStoreRoot)
+	if !strings.HasSuffix(root, wantSuffix) {
+		t.Fatalf("default root = %q, want suffix %q", root, wantSuffix)
+	}
+	// macOS may surface temp paths as /var vs /private/var; canonicalize both.
+	absWorkDir, err := filepath.EvalSymlinks(workDir)
+	if err != nil {
+		t.Fatalf("EvalSymlinks workdir: %v", err)
+	}
+	absRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatalf("EvalSymlinks root: %v", err)
+	}
+	rel, err := filepath.Rel(absWorkDir, absRoot)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		t.Fatalf("default root %q should stay under test workdir %q (rel=%q err=%v)", absRoot, absWorkDir, rel, err)
+	}
+	if _, err = os.Stat(root); err != nil {
+		t.Fatalf("default root should exist: %v", err)
+	}
+}
+
+func TestNewUsesConfiguredArtifactRoot(t *testing.T) {
+	t.Parallel()
+
+	configured := filepath.Join(t.TempDir(), "from-config")
+	svc, err := New(nil, stubPluginConfig{
+		values: map[string]string{
+			configKeyStorageRoot: configured,
+		},
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	impl, ok := svc.(*serviceImpl)
+	if !ok || impl == nil {
+		t.Fatal("expected serviceImpl")
+	}
+	store, ok := impl.artifacts.(*LocalArtifactStore)
+	if !ok || store == nil {
+		t.Fatal("expected LocalArtifactStore")
+	}
+	abs, absErr := filepath.Abs(configured)
+	if absErr != nil {
+		t.Fatalf("Abs: %v", absErr)
+	}
+	if store.Root() != abs {
+		t.Fatalf("store root = %q, want %q", store.Root(), abs)
 	}
 }

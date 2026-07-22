@@ -110,7 +110,7 @@ func (s *serviceImpl) UploadSourcePackage(
 		if err != nil {
 			return err
 		}
-		if err = s.replaceReleaseDocuments(ctx, release, scan.docsIndex); err != nil {
+		if err = s.replaceReleaseDisplayI18n(ctx, release, scan.displayI18n); err != nil {
 			return err
 		}
 		if err = s.replaceReleaseRisks(ctx, release, scan.diagnostics); err != nil {
@@ -149,7 +149,7 @@ type sourcePackageScan struct {
 	i18nSummary       string
 	docsSummary       string
 	riskSummary       string
-	docsIndex         []*marketplaceDocumentIndexItem
+	displayI18n       []*marketplaceDisplayI18nItem
 	diagnostics       []*PackageDiagnostic
 }
 
@@ -299,10 +299,21 @@ func scanSourcePackage(in UploadSourcePackageInput) (scan *sourcePackageScan, er
 	if err != nil {
 		return nil, err
 	}
-	docsIndex, err := buildSourcePackageDocumentIndex(manifest, fileIndex, rootPrefix)
-	if err != nil {
-		return nil, err
+	defaultLocale := defaultDisplayLocale
+	if manifest.I18N != nil {
+		defaultLocale = defaultLocaleFromManifest(manifest.I18N.Default)
 	}
+	displayI18n := buildDisplayI18nFromPackageYAML(
+		manifest.ID,
+		manifest.Name,
+		manifest.Description,
+		defaultLocale,
+	)
+	localeCatalogs, catalogErr := extractSourcePackageDisplayCatalogs(fileIndex, rootPrefix)
+	if catalogErr != nil {
+		return nil, catalogErr
+	}
+	displayI18n = mergePackageI18nDisplayItems(manifest.ID, displayI18n, localeCatalogs)
 	diagnostics := sourcePackageDiagnostics(manifest, sqlResources, i18nResources, docsResources)
 	manifestSnapshot, err := packageJSONString(manifest)
 	if err != nil {
@@ -366,7 +377,7 @@ func scanSourcePackage(in UploadSourcePackageInput) (scan *sourcePackageScan, er
 		i18nSummary:       i18nSummary,
 		docsSummary:       docsSummary,
 		riskSummary:       riskSummary,
-		docsIndex:         docsIndex,
+		displayI18n:       displayI18n,
 		diagnostics:       diagnostics,
 	}, err
 }

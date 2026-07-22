@@ -8,7 +8,7 @@ import "github.com/gogf/gf/v2/frame/g"
 
 // ReleaseDocsReq is the request for reading marketplace documentation of one release.
 type ReleaseDocsReq struct {
-	g.Meta   `path:"/market/plugins/{pluginId}/releases/{version}/docs" method:"get" tags:"Plugin Marketplace" summary:"Get marketplace release documentation" permission:"market:plugin:view" dc:"Return one version-scoped marketplace document with safe-rendering metadata and language fallback information. The endpoint reads only the selected document resource for a visible release and rejects paths outside the version documentation boundary."`
+	g.Meta   `path:"/market/plugins/{pluginId}/releases/{version}/docs" method:"get" tags:"Plugin Marketplace" summary:"Get marketplace release documentation" permission:"market:plugin:view" dc:"Return the selected version-scoped marketplace document and the same-path language bundle with safe-rendered content. The endpoint reads only persisted document snapshots for a visible release and rejects paths outside the version documentation boundary."`
 	PluginId string `json:"pluginId" v:"required|length:1,64" dc:"Stable plugin ID whose release documentation is read" eg:"linapro-demo-source"`
 	Version  string `json:"version" v:"required|length:1,32" dc:"Release version whose documentation is read" eg:"v0.1.0"`
 	Locale   string `json:"locale" dc:"Preferred document locale; when empty the server uses the request locale and then applies marketplace fallback rules" eg:"en-US"`
@@ -17,12 +17,13 @@ type ReleaseDocsReq struct {
 
 // ReleaseDocsRes is the response for reading marketplace documentation of one release.
 type ReleaseDocsRes struct {
-	Document *MarketplaceDocumentItem `json:"document" dc:"Version-scoped marketplace document with safe rendered content and fallback metadata" eg:"{}"`
+	Document  *MarketplaceDocumentItem   `json:"document" dc:"Version-scoped marketplace document with safe rendered content and fallback metadata" eg:"{}"`
+	Documents []*MarketplaceDocumentItem `json:"documents" dc:"Same-path marketplace document language bundle with safe rendered content for local switching" eg:"[]"`
 }
 
 // MyReleaseDocsReq is the request for reading documentation of one publisher-owned release.
 type MyReleaseDocsReq struct {
-	g.Meta   `path:"/market/my-plugins/{pluginId}/releases/{version}/docs" method:"get" tags:"Plugin Marketplace" summary:"Get my marketplace release documentation" permission:"market:plugin:publish" dc:"Return one version-scoped document for a release owned by the current publisher user. Ownership is enforced before unpublished documentation is loaded."`
+	g.Meta   `path:"/market/my-plugins/{pluginId}/releases/{version}/docs" method:"get" tags:"Plugin Marketplace" summary:"Get my marketplace release documentation" permission:"market:plugin:publish" dc:"Return the selected version-scoped document and same-path language bundle for a release owned by the current publisher user. Ownership is enforced before unpublished documentation is loaded."`
 	PluginId string `json:"pluginId" v:"required|length:1,64" dc:"Stable publisher-owned plugin ID" eg:"linapro-demo-source"`
 	Version  string `json:"version" v:"required|length:1,32" dc:"Owned release version whose documentation is read" eg:"v0.1.0"`
 	Locale   string `json:"locale" dc:"Preferred document locale" eg:"en-US"`
@@ -31,12 +32,13 @@ type MyReleaseDocsReq struct {
 
 // MyReleaseDocsRes is the response for reading publisher-owned release documentation.
 type MyReleaseDocsRes struct {
-	Document *MarketplaceDocumentItem `json:"document" dc:"Publisher-owned version-scoped marketplace document" eg:"{}"`
+	Document  *MarketplaceDocumentItem   `json:"document" dc:"Publisher-owned version-scoped marketplace document" eg:"{}"`
+	Documents []*MarketplaceDocumentItem `json:"documents" dc:"Publisher-owned same-path marketplace document language bundle" eg:"[]"`
 }
 
 // ManagedReleaseDocsReq is the request for reading reviewer-managed release documentation.
 type ManagedReleaseDocsReq struct {
-	g.Meta   `path:"/market/managed-plugins/{pluginId}/releases/{version}/docs" method:"get" tags:"Plugin Marketplace" summary:"Get managed marketplace release documentation" permission:"market:plugin:review" dc:"Return one version-scoped document for reviewer inspection, including documentation from submitted or otherwise unpublished releases."`
+	g.Meta   `path:"/market/managed-plugins/{pluginId}/releases/{version}/docs" method:"get" tags:"Plugin Marketplace" summary:"Get managed marketplace release documentation" permission:"market:plugin:review" dc:"Return the selected version-scoped document and same-path language bundle for reviewer inspection, including documentation from submitted or otherwise unpublished releases."`
 	PluginId string `json:"pluginId" v:"required|length:1,64" dc:"Stable plugin ID inspected by the review operator" eg:"linapro-demo-source"`
 	Version  string `json:"version" v:"required|length:1,32" dc:"Managed release version whose documentation is read" eg:"v0.1.0"`
 	Locale   string `json:"locale" dc:"Preferred document locale" eg:"en-US"`
@@ -45,7 +47,8 @@ type ManagedReleaseDocsReq struct {
 
 // ManagedReleaseDocsRes is the response for reading reviewer-managed release documentation.
 type ManagedReleaseDocsRes struct {
-	Document *MarketplaceDocumentItem `json:"document" dc:"Reviewer-managed version-scoped marketplace document" eg:"{}"`
+	Document  *MarketplaceDocumentItem   `json:"document" dc:"Reviewer-managed version-scoped marketplace document" eg:"{}"`
+	Documents []*MarketplaceDocumentItem `json:"documents" dc:"Reviewer-managed same-path marketplace document language bundle" eg:"[]"`
 }
 
 // ReleaseRisksReq is the request for querying risk findings of one release.

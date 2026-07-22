@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gogf/gf/v2/frame/g"
+	"github.com/gogf/gf/v2/i18n/gi18n"
 	"github.com/gogf/gf/v2/net/ghttp"
 
 	"lina-core/pkg/bizerr"
@@ -20,6 +21,29 @@ import (
 	marketv1 "linapro-plugin-marketplace/backend/api/market/v1"
 	marketplacesvc "linapro-plugin-marketplace/backend/internal/service/marketplace"
 )
+
+// resolveDocumentLocale prefers an explicit query/body locale, then the host
+// request language injected by middleware, then Accept-Language.
+func resolveDocumentLocale(ctx context.Context, explicit string) string {
+	if locale := strings.TrimSpace(explicit); locale != "" {
+		return locale
+	}
+	if lang := strings.TrimSpace(gi18n.LanguageFromCtx(ctx)); lang != "" {
+		return lang
+	}
+	request := g.RequestFromCtx(ctx)
+	if request == nil {
+		return ""
+	}
+	header := strings.TrimSpace(request.Header.Get("Accept-Language"))
+	if header == "" {
+		return ""
+	}
+	// Accept-Language may be "zh-CN,zh;q=0.9,en;q=0.8" — take the primary tag.
+	primary := strings.Split(header, ",")[0]
+	primary = strings.Split(primary, ";")[0]
+	return strings.TrimSpace(primary)
+}
 
 // currentVisibilitySubject builds the marketplace visibility filter subject.
 func (c *ControllerV1) currentVisibilitySubject(ctx context.Context) marketplacesvc.VisibilitySubject {

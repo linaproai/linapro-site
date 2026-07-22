@@ -24,6 +24,7 @@ import { defineAsyncComponent, onMounted, watch } from "vue";
 import { useRoute } from "vue-router";
 
 import { Page, useVbenModal } from "@vben/common-ui";
+import { preferences } from "@vben/preferences";
 
 import { Tag } from "ant-design-vue";
 
@@ -266,6 +267,18 @@ watch(
   () => [route.query.view, route.query.pluginId] as const,
   () => {
     openDetailFromRouteQuery();
+  },
+);
+
+// Name/summary are backend-localized per request locale. Re-query when the
+// workbench language changes so list cells do not keep the previous language.
+watch(
+  () => preferences.app.locale,
+  async (locale, previousLocale) => {
+    if (!previousLocale || locale === previousLocale) {
+      return;
+    }
+    await gridApi.query();
   },
 );
 

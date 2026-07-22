@@ -129,7 +129,7 @@ func (s *serviceImpl) UploadDynamicPackage(
 		if err != nil {
 			return err
 		}
-		if err = s.replaceReleaseDocuments(ctx, release, scan.docsIndex); err != nil {
+		if err = s.replaceReleaseDisplayI18n(ctx, release, scan.displayI18n); err != nil {
 			return err
 		}
 		if err = s.replaceReleaseRisks(ctx, release, scan.diagnostics); err != nil {
@@ -175,7 +175,7 @@ type dynamicPackageScan struct {
 	i18nSummary        string
 	docsSummary        string
 	riskSummary        string
-	docsIndex          []*marketplaceDocumentIndexItem
+	displayI18n        []*marketplaceDisplayI18nItem
 	diagnostics        []*PackageDiagnostic
 }
 
@@ -376,14 +376,25 @@ func scanDynamicPackage(in UploadDynamicPackageInput) (scan *dynamicPackageScan,
 	if err != nil {
 		return nil, err
 	}
-	docsIndex, err := buildDynamicPackageDocumentIndex(rootManifest, fileIndex, rootPrefix, wasmSpec.resources)
-	if err != nil {
-		return nil, err
-	}
 	docsSummary, err := packageJSONString(docs)
 	if err != nil {
 		return nil, err
 	}
+	defaultLocale := defaultDisplayLocale
+	if rootManifest.I18N != nil {
+		defaultLocale = defaultLocaleFromManifest(rootManifest.I18N.Default)
+	}
+	displayI18n := buildDisplayI18nFromPackageYAML(
+		rootManifest.ID,
+		rootManifest.Name,
+		rootManifest.Description,
+		defaultLocale,
+	)
+	displayI18n = mergePackageI18nDisplayItems(
+		rootManifest.ID,
+		displayI18n,
+		extractDynamicPackageDisplayCatalogs(wasmSpec.runtimeI18N),
+	)
 	diagnostics := dynamicPackageDiagnostics(wasmSpec)
 	riskSummary, err := packageJSONString(buildSourceRiskSummary(diagnostics))
 	if err != nil {
@@ -438,7 +449,7 @@ func scanDynamicPackage(in UploadDynamicPackageInput) (scan *dynamicPackageScan,
 		i18nSummary:        i18nSummary,
 		docsSummary:        docsSummary,
 		riskSummary:        riskSummary,
-		docsIndex:          docsIndex,
+		displayI18n:        displayI18n,
 		diagnostics:        diagnostics,
 	}, err
 }

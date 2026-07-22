@@ -270,7 +270,7 @@ func TestRiskItemFromEntityParsesPayload(t *testing.T) {
 	}
 }
 
-func TestDocumentItemFromRecordEscapesIndexedText(t *testing.T) {
+func TestDocumentItemFromRecordUsesRenderedContentSnapshot(t *testing.T) {
 	item := documentItemFromRecord(&DocumentRecord{
 		PluginID:        "linapro-demo-source",
 		Version:         "v0.1.0",
@@ -280,13 +280,13 @@ func TestDocumentItemFromRecordEscapesIndexedText(t *testing.T) {
 		SourceKind:      documentSourceKindManifestDocs,
 		Title:           "Demo",
 		Summary:         "Summary",
-		SearchText:      `<script>alert("x")</script>`,
+		RenderedContent: `<p>&lt;script&gt;alert("x")&lt;/script&gt;</p>`,
 		ContentHash:     strings.Repeat("a", 64),
 		FallbackUsed:    true,
 	})
 
 	if strings.Contains(item.Content, "<script>") {
-		t.Fatalf("expected indexed content to be escaped, got %s", item.Content)
+		t.Fatalf("expected rendered snapshot to remain safe, got %s", item.Content)
 	}
 	if !strings.Contains(item.Content, "&lt;script&gt;") {
 		t.Fatalf("expected escaped script marker, got %s", item.Content)

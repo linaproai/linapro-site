@@ -104,6 +104,8 @@ type PluginItem = {
     warning: number;
   };
   sourceDelivery: "dynamic_upload_required" | "source_rebuild_required";
+  /** Publish channel shown as a dedicated Mine list column. */
+  sourceKind?: "git" | "upload";
   summary: string;
   tagCodes: string[];
   tags: Array<{
@@ -374,6 +376,7 @@ const plugins: PluginItem[] = [
       warning: 2,
     },
     sourceDelivery: "source_rebuild_required",
+    sourceKind: "upload",
     summary: "Source plugin package for rebuild-based delivery.",
     tagCodes: ["official", "source"],
     tags: [
@@ -406,6 +409,7 @@ const plugins: PluginItem[] = [
       warning: 1,
     },
     sourceDelivery: "dynamic_upload_required",
+    sourceKind: "upload",
     summary: "Dynamic plugin package for runtime upload governance.",
     tagCodes: ["official", "dynamic"],
     tags: [
@@ -565,6 +569,30 @@ const documents = new Map<string, DocumentItem>([
       version: externalPendingRelease.version,
     },
   ],
+]);
+
+const sourceReleaseZhDocument: DocumentItem = {
+  content:
+    "<h2>源码演示指南</h2><p>将源码放入 apps/lina-plugins 并重新构建宿主后再启用。</p>",
+  contentHash: "source-doc-zh-hash",
+  fallbackUsed: false,
+  locale: "zh-CN",
+  path: "index.md",
+  pluginId: sourcePluginId,
+  resolvedLocale: "zh-CN",
+  sourceKind: "manifest_docs",
+  summary: "源码包交付中文文档。",
+  title: "源码演示指南",
+  updatedAt: mockNow,
+  version: sourceRelease.version,
+};
+
+const documentBundles = new Map<string, DocumentItem[]>(
+  [...documents.entries()].map(([key, document]) => [key, [document]]),
+);
+documentBundles.set(releaseKey(sourcePluginId, sourceRelease.version), [
+  documents.get(releaseKey(sourcePluginId, sourceRelease.version))!,
+  sourceReleaseZhDocument,
 ]);
 
 const risks = new Map<string, RiskItem[]>([
@@ -999,6 +1027,7 @@ async function handleMarketplaceRoute(
         release.pluginType === "dynamic"
           ? "dynamic_upload_required"
           : "source_rebuild_required",
+      sourceKind: existing?.sourceKind ?? "upload",
       summary: existing?.summary ?? "Auto-parsed marketplace package draft.",
       tagCodes: existing?.tagCodes ?? [],
       tags: existing?.tags ?? [],
@@ -1204,8 +1233,17 @@ async function handleMarketplaceRoute(
       segments[2],
       segments[4],
     );
+    const key = releaseKey(segments[2], segments[4]);
+    const bundle = documentBundles.get(key) ?? [];
     await fulfillData(route, {
-      document: documents.get(releaseKey(segments[2], segments[4])) ?? null,
+      document:
+        selectDocumentBundleItem(
+          bundle,
+          requestURL.searchParams.get("locale") ?? "",
+        ) ??
+        documents.get(key) ??
+        null,
+      documents: bundle,
     });
     state.inspectionResponses.push({
       kind: "docs",
@@ -1377,6 +1415,36 @@ async function waitForInspectionDelay(
   if (delayMs > 0) {
     await new Promise((resolve) => setTimeout(resolve, delayMs));
   }
+}
+
+function selectDocumentBundleItem(
+  bundle: DocumentItem[],
+  locale: string,
+): DocumentItem | null {
+  if (bundle.length === 0) {
+    return null;
+  }
+  if (bundle.length === 1) {
+    return bundle[0];
+  }
+  const preferred = locale.trim().toLowerCase();
+  if (preferred) {
+    const exact = bundle.find(
+      (document) =>
+        (document.resolvedLocale || document.locale).toLowerCase() ===
+        preferred,
+    );
+    if (exact) {
+      return exact;
+    }
+  }
+  return (
+    bundle.find((document) =>
+      ["en-us", "en"].includes(
+        (document.resolvedLocale || document.locale).toLowerCase(),
+      ),
+    ) ?? bundle[0]
+  );
 }
 
 function publicFrontendSettings() {

@@ -26,6 +26,7 @@ func (c *ControllerV1) PluginList(ctx context.Context, req *marketv1.PluginListR
 		Publisher:   req.Publisher,
 		HostVersion: req.HostVersion,
 		Visibility:  c.currentVisibilitySubject(ctx),
+		Locale:      resolveDocumentLocale(ctx, ""),
 	})
 	if err != nil {
 		return nil, err
@@ -46,6 +47,7 @@ func (c *ControllerV1) MyPluginList(ctx context.Context, req *marketv1.MyPluginL
 		PluginType:  req.PluginType,
 		Status:      req.Status,
 		OwnerUserID: userID,
+		Locale:      resolveDocumentLocale(ctx, ""),
 	})
 	if err != nil {
 		return nil, err
@@ -65,6 +67,7 @@ func (c *ControllerV1) ManagedPluginList(
 		PluginType: req.PluginType,
 		Status:     req.Status,
 		Publisher:  req.Publisher,
+		Locale:     resolveDocumentLocale(ctx, ""),
 	})
 	if err != nil {
 		return nil, err
@@ -95,6 +98,7 @@ func (c *ControllerV1) PluginDetail(ctx context.Context, req *marketv1.PluginDet
 	out, err := c.marketSvc.GetPluginDetail(ctx, marketplacesvc.GetPluginDetailInput{
 		PluginID:   req.PluginId,
 		Visibility: c.currentVisibilitySubject(ctx),
+		Locale:     resolveDocumentLocale(ctx, ""),
 	})
 	if err != nil {
 		return nil, err
@@ -107,6 +111,7 @@ func (c *ControllerV1) MyPluginDetail(ctx context.Context, req *marketv1.MyPlugi
 	out, err := c.marketSvc.GetPluginDetail(ctx, marketplacesvc.GetPluginDetailInput{
 		PluginID:   req.PluginId,
 		Visibility: c.currentPublisherVisibilitySubject(ctx),
+		Locale:     resolveDocumentLocale(ctx, ""),
 	})
 	if err != nil {
 		return nil, err
@@ -119,6 +124,7 @@ func (c *ControllerV1) ManagedPluginDetail(ctx context.Context, req *marketv1.Ma
 	out, err := c.marketSvc.GetPluginDetail(ctx, marketplacesvc.GetPluginDetailInput{
 		PluginID:   req.PluginId,
 		Visibility: c.currentReviewerVisibilitySubject(ctx),
+		Locale:     resolveDocumentLocale(ctx, ""),
 	})
 	if err != nil {
 		return nil, err
@@ -179,14 +185,14 @@ func (c *ControllerV1) ReleaseDocs(ctx context.Context, req *marketv1.ReleaseDoc
 	out, err := c.marketSvc.GetReleaseDocument(ctx, marketplacesvc.GetReleaseDocumentInput{
 		PluginID:   req.PluginId,
 		Version:    req.Version,
-		Locale:     req.Locale,
+		Locale:     resolveDocumentLocale(ctx, req.Locale),
 		Path:       req.Path,
 		Visibility: c.currentVisibilitySubject(ctx),
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &marketv1.ReleaseDocsRes{Document: out.Document}, nil
+	return &marketv1.ReleaseDocsRes{Document: out.Document, Documents: out.Documents}, nil
 }
 
 // MyReleaseDocs returns documentation within publisher ownership.
@@ -194,14 +200,14 @@ func (c *ControllerV1) MyReleaseDocs(ctx context.Context, req *marketv1.MyReleas
 	out, err := c.marketSvc.GetReleaseDocument(ctx, marketplacesvc.GetReleaseDocumentInput{
 		PluginID:   req.PluginId,
 		Version:    req.Version,
-		Locale:     req.Locale,
+		Locale:     resolveDocumentLocale(ctx, req.Locale),
 		Path:       req.Path,
 		Visibility: c.currentPublisherVisibilitySubject(ctx),
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &marketv1.MyReleaseDocsRes{Document: out.Document}, nil
+	return &marketv1.MyReleaseDocsRes{Document: out.Document, Documents: out.Documents}, nil
 }
 
 // ManagedReleaseDocs returns documentation for a review operator.
@@ -209,14 +215,14 @@ func (c *ControllerV1) ManagedReleaseDocs(ctx context.Context, req *marketv1.Man
 	out, err := c.marketSvc.GetReleaseDocument(ctx, marketplacesvc.GetReleaseDocumentInput{
 		PluginID:   req.PluginId,
 		Version:    req.Version,
-		Locale:     req.Locale,
+		Locale:     resolveDocumentLocale(ctx, req.Locale),
 		Path:       req.Path,
 		Visibility: c.currentReviewerVisibilitySubject(ctx),
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &marketv1.ManagedReleaseDocsRes{Document: out.Document}, nil
+	return &marketv1.ManagedReleaseDocsRes{Document: out.Document, Documents: out.Documents}, nil
 }
 
 // ReleaseRisks returns paginated scanner risk findings for one release.

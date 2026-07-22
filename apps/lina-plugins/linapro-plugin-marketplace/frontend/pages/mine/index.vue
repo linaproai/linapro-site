@@ -28,12 +28,10 @@ import { useRoute } from "vue-router";
 
 import { Page, useVbenDrawer, useVbenModal } from "@vben/common-ui";
 import { IconifyIcon } from "@vben/icons";
+import { preferences } from "@vben/preferences";
 
 import {
   Alert,
-  Dropdown,
-  Menu,
-  MenuItem,
   Modal,
   Space,
   Tag,
@@ -53,7 +51,6 @@ import {
   marketplaceMyPluginList,
   marketplacePackageAdd,
   marketplacePluginDelist,
-  marketplacePluginPublish,
   marketplacePublisherCreate,
   marketplacePublisherList,
   marketplacePublisherUpdate,
@@ -383,8 +380,8 @@ function buildFormOptions() {
 }
 
 function buildColumns(): MineGridOptions["columns"] {
-  // Layout mirrors system plugin management: id, name, description, version,
-  // type, status, then operational metadata and a compact action column.
+  // Layout: id, name, source (own column), summary, version, downloads, type,
+  // status, visibility, updated time, and a fixed three-action column.
   return [
     {
       align: "left",
@@ -398,12 +395,16 @@ function buildColumns(): MineGridOptions["columns"] {
       className: "mine-name-column",
       field: "name",
       headerAlign: "center",
-      // Wider than the system plugin name column so source-kind tags stay
-      // readable without squeezing long display names.
-      minWidth: 260,
+      minWidth: 200,
       showOverflow: false,
       slots: { default: "name" },
       title: t("plugin.linapro-plugin-marketplace.mine.columns.name"),
+    },
+    {
+      field: "sourceKind",
+      slots: { default: "sourceKind" },
+      title: t("plugin.linapro-plugin-marketplace.mine.columns.sourceKind"),
+      width: 120,
     },
     {
       align: "left",
@@ -459,7 +460,7 @@ function buildColumns(): MineGridOptions["columns"] {
       fixed: "right",
       slots: { default: "action" },
       title: t("plugin.linapro-plugin-marketplace.catalog.columns.actions"),
-      width: 200,
+      width: 220,
     },
   ];
 }
@@ -628,32 +629,6 @@ function buildPluginSchema(
   ];
 }
 
-function canPublishRow(row: MarketplacePluginListItem) {
-  // Async pipeline owns first-time verify/review; manual publish is for
-  // re-submit after failure/rejection or re-listing after delist.
-  if (
-    row.processStatus === "pending_verify" ||
-    row.processStatus === "pending_review" ||
-    row.latestReviewStatus === "submitted" ||
-    row.latestReviewStatus === "reviewing"
-  ) {
-    return false;
-  }
-  if (row.marketStatus === "delisted") {
-    return true;
-  }
-  if (row.processStatus === "failed") {
-    return Boolean(row.latestVersion);
-  }
-  if (row.marketStatus === "draft") {
-    return Boolean(row.latestVersion);
-  }
-  // Published plugins can publish again when a draft/rejected version is ready.
-  return (
-    row.latestReviewStatus === "draft" || row.latestReviewStatus === "rejected"
-  );
-}
-
 function canDelistRow(row: MarketplacePluginListItem) {
   return row.marketStatus === "published";
 }
@@ -689,6 +664,18 @@ watch(
   () => [route.query.view, route.query.pluginId] as const,
   () => {
     openDetailFromRouteQuery();
+  },
+);
+
+// Name/summary are backend-localized per request locale. Re-query when the
+// workbench language changes so list cells do not keep the previous language.
+watch(
+  () => preferences.app.locale,
+  async (locale, previousLocale) => {
+    if (!previousLocale || locale === previousLocale) {
+      return;
+    }
+    await gridApi.query();
   },
 );
 
@@ -1023,21 +1010,13 @@ async function handleRegisterGitSource() {
   }
 }
 
-async function handlePublishPlugin(row: MarketplacePluginListItem) {
-  try {
-    await marketplacePluginPublish(row.pluginId, {
-      version: row.latestVersion || undefined,
-    });
-    message.success(
-      t("plugin.linapro-plugin-marketplace.mine.messages.publishSubmitted"),
-    );
-    await gridApi.reload();
-  } catch {
-    // API errors are shown by request client handlers.
-  }
-}
-
 async function handleDelistPlugin(row: MarketplacePluginListItem) {
+  if (!canDelistRow(row)) {
+    message.warning(
+      t("plugin.linapro-plugin-marketplace.mine.messages.delistOnlyPublished"),
+    );
+    return;
+  }
   Modal.confirm({
     title: t("plugin.linapro-plugin-marketplace.mine.actions.delist"),
     content: t("plugin.linapro-plugin-marketplace.mine.confirm.delist"),
@@ -1051,18 +1030,27 @@ async function handleDelistPlugin(row: MarketplacePluginListItem) {
   });
 }
 
-async function handleSyncGitSource(row: MarketplacePluginListItem) {
-  try {
-    const result = await marketplaceGitSourceSync(row.pluginId);
-    message.success(
-      t("plugin.linapro-plugin-marketplace.mine.messages.gitSynced", {
-        count: result.synced,
-      }),
-    );
-    await gridApi.reload();
-  } catch {
-    // API errors are shown by request client handlers.
+/**
+ * "新版本" asks the server to refresh version metadata:
+ * - git: trigger metadata discovery/sync
+ * - upload: open package upload so the server can parse a new package version
+ */
+async function handleNewVersion(row: MarketplacePluginListItem) {
+  if (row.sourceKind === "git") {
+    try {
+      const result = await marketplaceGitSourceSync(row.pluginId);
+      message.success(
+        t("plugin.linapro-plugin-marketplace.mine.messages.gitSynced", {
+          count: result.synced,
+        }),
+      );
+      await gridApi.reload();
+    } catch {
+      // API errors are shown by request client handlers.
+    }
+    return;
   }
+  openPublishDrawer(row);
 }
 </script>
 
@@ -1089,19 +1077,15 @@ async function handleSyncGitSource(row: MarketplacePluginListItem) {
       </template>
 
       <template #name="{ row }">
-        <div
-          class="flex w-full min-w-0 max-w-full items-center gap-1.5 overflow-hidden whitespace-nowrap"
-        >
-          <span class="min-w-0 truncate font-medium" :title="row.name">
-            {{ row.name }}
-          </span>
-          <Tag
-            class="m-0 shrink-0 whitespace-nowrap leading-5"
-            :color="getSourceKindColor(row.sourceKind)"
-          >
-            {{ formatSourceKind(row.sourceKind) }}
-          </Tag>
+        <div class="max-w-full truncate font-medium" :title="row.name">
+          {{ row.name }}
         </div>
+      </template>
+
+      <template #sourceKind="{ row }">
+        <Tag :color="getSourceKindColor(row.sourceKind)">
+          {{ formatSourceKind(row.sourceKind) }}
+        </Tag>
       </template>
 
       <template #summary="{ row }">
@@ -1144,46 +1128,17 @@ async function handleSyncGitSource(row: MarketplacePluginListItem) {
           <ghost-button @click.stop="handleOpenDetail(row)">
             {{ $t("plugin.linapro-plugin-marketplace.catalog.actions.detail") }}
           </ghost-button>
-          <ghost-button
-            v-if="canPublishRow(row)"
-            @click.stop="handlePublishPlugin(row)"
-          >
-            {{ $t("plugin.linapro-plugin-marketplace.mine.actions.publish") }}
+          <ghost-button @click.stop="handleNewVersion(row)">
+            {{
+              $t("plugin.linapro-plugin-marketplace.mine.actions.newVersion")
+            }}
           </ghost-button>
-          <Dropdown placement="bottomRight">
-            <template #overlay>
-              <Menu>
-                <MenuItem
-                  v-if="canDelistRow(row)"
-                  key="delist"
-                  @click="handleDelistPlugin(row)"
-                >
-                  {{
-                    $t("plugin.linapro-plugin-marketplace.mine.actions.delist")
-                  }}
-                </MenuItem>
-                <MenuItem key="new-version" @click="openPublishDrawer(row)">
-                  {{
-                    $t(
-                      "plugin.linapro-plugin-marketplace.mine.actions.newVersion",
-                    )
-                  }}
-                </MenuItem>
-                <MenuItem
-                  v-if="row.sourceKind === 'git'"
-                  key="sync-git"
-                  @click="handleSyncGitSource(row)"
-                >
-                  {{
-                    $t("plugin.linapro-plugin-marketplace.mine.actions.syncGit")
-                  }}
-                </MenuItem>
-              </Menu>
-            </template>
-            <a-button size="small" type="link" @click.stop>
-              {{ $t("pages.common.more") }}
-            </a-button>
-          </Dropdown>
+          <ghost-button
+            :disabled="!canDelistRow(row)"
+            @click.stop="handleDelistPlugin(row)"
+          >
+            {{ $t("plugin.linapro-plugin-marketplace.mine.actions.delist") }}
+          </ghost-button>
         </Space>
       </template>
     </Grid>

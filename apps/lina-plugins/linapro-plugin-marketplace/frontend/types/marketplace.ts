@@ -294,6 +294,11 @@ export interface MarketplaceDocumentItem {
   version: string;
 }
 
+export interface MarketplaceDocumentBundle {
+  document?: MarketplaceDocumentItem | null;
+  documents: MarketplaceDocumentItem[];
+}
+
 export interface MarketplaceRiskListParams extends MarketplacePageParams {
   severity?: MarketplaceRiskSeverity;
   type?: MarketplaceRiskType;

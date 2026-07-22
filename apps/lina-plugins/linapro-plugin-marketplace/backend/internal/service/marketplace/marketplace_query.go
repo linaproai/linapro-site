@@ -7,10 +7,8 @@
 package marketplace
 
 import (
-	"archive/zip"
 	"context"
 	"encoding/json"
-	"html"
 	"strings"
 	"time"
 
@@ -85,9 +83,29 @@ func (s *serviceImpl) ListPlugins(ctx context.Context, in ListPluginsInput) (*Pl
 	if err != nil {
 		return nil, err
 	}
+	releaseIDs := make([]int, 0, len(rows))
+	for _, row := range rows {
+		if row != nil {
+			releaseIDs = append(releaseIDs, row.LatestReleaseId)
+		}
+	}
+	displayByRelease, err := s.batchDisplayI18nByReleaseIDs(ctx, releaseIDs)
+	if err != nil {
+		return nil, err
+	}
 	items := make([]*marketv1.MarketplacePluginListItem, 0, len(rows))
 	for _, row := range rows {
-		items = append(items, pluginListItemFromReadModel(row, publishers[row.PublisherId]))
+		item := pluginListItemFromReadModel(row, publishers[row.PublisherId])
+		if item != nil && row != nil {
+			item.Name, item.Summary = pickDisplayNameSummary(
+				displayByRelease[row.LatestReleaseId],
+				in.Locale,
+				"",
+				row.Name,
+				row.Summary,
+			)
+		}
+		items = append(items, item)
 	}
 	return &PluginListOutput{List: items, Total: total}, nil
 }
@@ -135,6 +153,19 @@ func (s *serviceImpl) GetPluginDetail(ctx context.Context, in GetPluginDetailInp
 		return nil, err
 	}
 	detail := pluginDetailItemFromEntities(plugin, publishers[plugin.PublisherId], tags, latestRelease, artifacts)
+	if detail != nil && plugin.LatestReleaseId > 0 {
+		displayByRelease, displayErr := s.batchDisplayI18nByReleaseIDs(ctx, []int{plugin.LatestReleaseId})
+		if displayErr != nil {
+			return nil, displayErr
+		}
+		detail.Name, detail.Summary = pickDisplayNameSummary(
+			displayByRelease[plugin.LatestReleaseId],
+			in.Locale,
+			"",
+			plugin.Name,
+			plugin.Summary,
+		)
+	}
 	return &PluginDetailOutput{Plugin: detail}, nil
 }
 
@@ -263,24 +294,40 @@ func (s *serviceImpl) ListReleaseRisks(ctx context.Context, in ListReleaseRisksI
 	return &RiskListOutput{List: items, Total: total}, nil
 }
 
-// GetReleaseDocument returns one marketplace document projection with rendered body.
+// GetReleaseDocument returns one selected document and same-path language snapshots.
 func (s *serviceImpl) GetReleaseDocument(ctx context.Context, in GetReleaseDocumentInput) (*DocumentOutput, error) {
-	record, err := s.ResolveReleaseDocumentIndex(ctx, in)
+	records, err := s.loadVisibleReleaseDocumentRecords(ctx, in)
 	if err != nil {
 		return nil, err
 	}
-	item := documentItemFromRecord(record)
-	if item == nil {
-		return &DocumentOutput{}, nil
-	}
-	content, err := s.loadDocumentRenderedContent(ctx, record)
+	selected, err := selectMarketplaceDocumentFallback(records, in)
 	if err != nil {
 		return nil, err
 	}
-	if content != "" {
-		item.Content = content
+	if selected == nil {
+		return nil, bizerr.NewCode(CodeMarketplaceDocumentNotFound)
 	}
-	return &DocumentOutput{Document: item}, nil
+	bundle, err := collectMarketplaceDocumentBundle(records, selected, in)
+	if err != nil {
+		return nil, err
+	}
+	return &DocumentOutput{
+		Document:  documentItemFromRecord(selected),
+		Documents: documentItemsFromRecords(bundle),
+	}, nil
+}
+
+// documentItemsFromRecords projects indexed document records to API DTOs.
+func documentItemsFromRecords(records []*DocumentRecord) []*marketv1.MarketplaceDocumentItem {
+	items := make([]*marketv1.MarketplaceDocumentItem, 0, len(records))
+	for _, record := range records {
+		item := documentItemFromRecord(record)
+		if item == nil {
+			continue
+		}
+		items = append(items, item)
+	}
+	return items
 }
 
 // rebuildPluginReadModel refreshes the catalog projection for one marketplace plugin.
@@ -1056,11 +1103,6 @@ func documentItemFromRecord(record *DocumentRecord) *marketv1.MarketplaceDocumen
 	if record == nil {
 		return nil
 	}
-	content := ""
-	if record.SearchText != "" {
-		// Fallback only: real reads replace this with package-rendered HTML.
-		content = "<p>" + html.EscapeString(record.SearchText) + "</p>"
-	}
 	return &marketv1.MarketplaceDocumentItem{
 		PluginId:       record.PluginID,
 		Version:        record.Version,
@@ -1070,127 +1112,11 @@ func documentItemFromRecord(record *DocumentRecord) *marketv1.MarketplaceDocumen
 		SourceKind:     record.SourceKind,
 		Title:          record.Title,
 		Summary:        record.Summary,
-		Content:        content,
+		Content:        record.RenderedContent,
 		ContentHash:    record.ContentHash,
 		FallbackUsed:   record.FallbackUsed,
 		UpdatedAt:      unixMillisPtr(record.UpdatedAt),
 	}
-}
-
-// loadDocumentRenderedContent reopens the release package and renders the selected document.
-func (s *serviceImpl) loadDocumentRenderedContent(
-	ctx context.Context,
-	record *DocumentRecord,
-) (rendered string, err error) {
-	if record == nil || s.artifacts == nil {
-		return "", nil
-	}
-	artifact, err := s.selectPackageArtifactForRelease(ctx, record.ReleaseID)
-	if err != nil || artifact == nil || normalizeKey(artifact.StorageKey) == "" {
-		return "", err
-	}
-	localPath, err := s.artifacts.LocalPath(ctx, artifact.StorageKey)
-	if err != nil {
-		return "", err
-	}
-	zipReader, err := zip.OpenReader(localPath)
-	if err != nil {
-		return "", bizerr.WrapCode(err, CodeMarketplaceStorageFailed)
-	}
-	defer func() {
-		if closeErr := zipReader.Close(); closeErr != nil && err == nil {
-			err = bizerr.WrapCode(closeErr, CodeMarketplaceStorageFailed)
-		}
-	}()
-	fileIndex, err := indexSourceZipFiles(zipReader.File)
-	if err != nil {
-		return "", err
-	}
-	rootPrefix := detectPackageRootPrefix(fileIndex)
-	relativePath := documentRelativePackagePath(record, rootPrefix)
-	file := fileIndex[relativePath]
-	if file == nil {
-		// Try without root prefix when package is single-rooted but index keys include root.
-		file = fileIndex[strings.TrimPrefix(relativePath, rootPrefix)]
-	}
-	if file == nil {
-		return "", nil
-	}
-	raw, err := readZipFile(file)
-	if err != nil {
-		return "", bizerr.WrapCode(err, CodeMarketplacePackageScanFailed)
-	}
-	item, err := indexMarketplaceDocument(record.ResolvedLocale, record.Path, record.SourceKind, string(raw))
-	if err != nil {
-		return "", err
-	}
-	return item.RenderedContent, nil
-}
-
-// selectPackageArtifactForRelease returns the primary package artifact for one release.
-func (s *serviceImpl) selectPackageArtifactForRelease(
-	ctx context.Context,
-	releaseID int,
-) (*ArtifactRecord, error) {
-	if releaseID <= 0 {
-		return nil, nil
-	}
-	for _, artifactType := range []string{
-		marketv1.MarketplaceArtifactTypeSourceZip.String(),
-		marketv1.MarketplaceArtifactTypeSourceTarGz.String(),
-		marketv1.MarketplaceArtifactTypeDynamicZip.String(),
-		marketv1.MarketplaceArtifactTypeDynamicTarGz.String(),
-	} {
-		row, err := s.getArtifactByReleaseType(ctx, releaseID, artifactType)
-		if err != nil {
-			return nil, err
-		}
-		if row != nil {
-			return artifactRecordFromEntity(row), nil
-		}
-	}
-	return nil, nil
-}
-
-// documentRelativePackagePath rebuilds the package-relative path for one indexed document.
-func documentRelativePackagePath(record *DocumentRecord, rootPrefix string) string {
-	if record == nil {
-		return ""
-	}
-	switch record.SourceKind {
-	case documentSourceKindReadme:
-		return rootPrefix + record.Path
-	default:
-		if looksLikeLocale(record.ResolvedLocale) && record.ResolvedLocale != defaultDocumentLocale {
-			return rootPrefix + marketplaceDocsPrefix + record.ResolvedLocale + "/" + record.Path
-		}
-		return rootPrefix + marketplaceDocsPrefix + record.Path
-	}
-}
-
-// detectPackageRootPrefix returns the single plugin root prefix when present.
-func detectPackageRootPrefix(files map[string]*zip.File) string {
-	if _, ok := files[sourcePackageManifestPath]; ok {
-		return ""
-	}
-	root := ""
-	for filePath := range files {
-		segments := strings.Split(filePath, "/")
-		if len(segments) < 2 {
-			return ""
-		}
-		if root == "" {
-			root = segments[0]
-			continue
-		}
-		if root != segments[0] {
-			return ""
-		}
-	}
-	if root == "" {
-		return ""
-	}
-	return root + "/"
 }
 
 // publisherItemFromEntity projects a publisher row with read-model fallback fields.

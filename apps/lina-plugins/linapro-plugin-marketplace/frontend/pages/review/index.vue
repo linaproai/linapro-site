@@ -28,6 +28,7 @@ import { defineAsyncComponent, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 
 import { Page, useVbenDrawer, useVbenModal } from "@vben/common-ui";
+import { preferences } from "@vben/preferences";
 
 import {
   Alert,
@@ -498,7 +499,12 @@ async function handleInspect(row: MarketplaceReviewQueueItem) {
       },
       "managed",
     ),
-    marketplaceReleaseDocument(row.pluginId, row.version, undefined, "managed"),
+    marketplaceReleaseDocument(
+      row.pluginId,
+      row.version,
+      { locale: preferences.app.locale },
+      "managed",
+    ),
   ]);
 
   if (requestId !== inspectionRequestId) {

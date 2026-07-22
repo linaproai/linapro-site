@@ -65,9 +65,8 @@ type Service interface {
 	UploadDynamicPackage(ctx context.Context, in UploadDynamicPackageInput) (*DynamicPackageUploadResult, error)
 
 	// ResolveReleaseDocumentIndex returns the indexed marketplace document
-	// metadata selected by locale fallback rules. It reads bounded index rows
-	// for one release and does not load package content; later document-content
-	// endpoints combine this metadata with artifact storage reads.
+	// snapshot selected by locale fallback rules. It reads bounded index rows
+	// for one release and does not load package content or call Git providers.
 	ResolveReleaseDocumentIndex(ctx context.Context, in GetReleaseDocumentInput) (*DocumentRecord, error)
 
 	// ListPlugins returns a paginated catalog page from the marketplace read
@@ -106,9 +105,8 @@ type Service interface {
 	ListReleaseRisks(ctx context.Context, in ListReleaseRisksInput) (*RiskListOutput, error)
 
 	// GetReleaseDocument returns the selected document projection for one
-	// release. The current implementation uses indexed safe metadata and search
-	// text; durable package-content reads are introduced when storage-backed
-	// download/content access is wired.
+	// release plus same-path language snapshots. It loads Markdown from version
+	// package artifacts or Git docs disk snapshots and renders safe HTML on read.
 	GetReleaseDocument(ctx context.Context, in GetReleaseDocumentInput) (*DocumentOutput, error)
 
 	// CreateDownloadSession creates a short-lived authorization session for one
@@ -204,15 +202,16 @@ type serviceImpl struct {
 
 // New creates a marketplace domain service. artifacts is required for package
 // upload persistence, document body reads, and controlled download streaming.
-// When artifacts is nil, New creates a local filesystem store under the default
-// marketplace artifact root so builtin deployments remain self-contained.
+// When artifacts is nil, New creates a local filesystem store under
+// storage.root from pluginConfig, or temp/plugin-marketplace/artifacts when
+// that config is empty, so development data stays outside tracked source trees.
 // pluginConfig is the current plugin's static configuration reader from
 // Plugins().Config(); it may be nil in unit tests. When present, Git metadata
 // discovery falls back to github.accessToken / gitee.accessToken when a
 // publisher does not supply a per-registration token.
 func New(artifacts ArtifactStore, pluginConfig plugincap.ConfigService) (Service, error) {
 	if artifacts == nil {
-		store, err := NewLocalArtifactStore("")
+		store, err := NewLocalArtifactStore(resolveArtifactStoreRoot(context.Background(), pluginConfig))
 		if err != nil {
 			return nil, err
 		}

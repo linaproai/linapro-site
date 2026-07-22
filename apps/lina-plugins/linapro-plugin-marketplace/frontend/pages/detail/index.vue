@@ -33,6 +33,7 @@ import { useRoute, useRouter } from "vue-router";
 import { useAccess } from "@vben/access";
 import { Page } from "@vben/common-ui";
 import { IconifyIcon } from "@vben/icons";
+import { preferences } from "@vben/preferences";
 import { breakpointsTailwind, useBreakpoints } from "@vueuse/core";
 
 import {
@@ -41,6 +42,7 @@ import {
   DescriptionsItem,
   Empty,
   Modal,
+  Segmented,
   Space,
   Spin,
   TabPane,
@@ -61,7 +63,7 @@ import {
   marketplaceDownloadSessionBlob,
   marketplaceDownloadSessionCreate,
   marketplacePluginDetail,
-  marketplaceReleaseDocument,
+  marketplaceReleaseDocumentBundle,
   marketplaceReleaseList,
   marketplaceReleaseRisks,
 } from "../../api/marketplace";
@@ -134,6 +136,7 @@ const { hasAccessByCodes } = useAccess();
 
 const detail = ref<MarketplacePluginDetailItem | null>(null);
 const currentDocument = ref<MarketplaceDocumentItem | null>(null);
+const availableDocuments = ref<MarketplaceDocumentItem[]>([]);
 const currentRisks = ref<MarketplaceRiskItem[]>([]);
 const selectedRelease = ref<MarketplaceReleaseItem | null>(null);
 const activeTab = ref<DetailTabKey>("versions");
@@ -147,6 +150,26 @@ const documentLoadState = ref<LoadState>("idle");
 const riskLoadState = ref<LoadState>("idle");
 let pageRequestId = 0;
 let releaseContextRequestId = 0;
+
+const activeDocumentLocale = computed(
+  () =>
+    currentDocument.value?.resolvedLocale ||
+    currentDocument.value?.locale ||
+    "",
+);
+const availableDocumentLocaleOptions = computed(() => {
+  const seen = new Set<string>();
+  return availableDocuments.value
+    .map((document) => document.resolvedLocale || document.locale)
+    .filter((locale) => {
+      if (!locale || seen.has(locale)) {
+        return false;
+      }
+      seen.add(locale);
+      return true;
+    })
+    .map((locale) => ({ label: locale, value: locale }));
+});
 
 const [VersionGrid, versionGridApi] = useVbenVxeGrid<MarketplaceReleaseItem>({
   gridOptions: {
@@ -299,6 +322,7 @@ async function initializePage() {
   releaseContextRequestId += 1;
   detail.value = null;
   currentDocument.value = null;
+  availableDocuments.value = [];
   currentRisks.value = [];
   selectedRelease.value = null;
   activeTab.value = "versions";
@@ -357,6 +381,7 @@ async function handleSelectRelease(
 async function loadReleaseContext(row: MarketplaceReleaseItem) {
   const requestId = ++releaseContextRequestId;
   currentDocument.value = null;
+  availableDocuments.value = [];
   currentRisks.value = [];
   documentLoading.value = true;
   riskLoading.value = true;
@@ -373,22 +398,33 @@ async function loadReleaseDocument(
   requestId: number,
 ) {
   try {
-    const result = await marketplaceReleaseDocument(
+    // Pass the active UI locale so marketplace docs can prefer a matching
+    // plugin i18n document; the server still applies single-locale / English
+    // fallback when the preferred locale is missing.
+    const result = await marketplaceReleaseDocumentBundle(
       row.pluginId,
       row.version,
-      undefined,
+      { locale: preferences.app.locale },
       readScope.value,
     );
     if (!isCurrentReleaseRequest(row, requestId)) {
       return;
     }
-    currentDocument.value = result;
-    documentLoadState.value = "ready";
+    availableDocuments.value =
+      result.documents.length > 0
+        ? result.documents
+        : result.document
+          ? [result.document]
+          : [];
+    currentDocument.value =
+      result.document ?? availableDocuments.value[0] ?? null;
+    documentLoadState.value = currentDocument.value ? "ready" : "empty";
   } catch (error) {
     if (!isCurrentReleaseRequest(row, requestId)) {
       return;
     }
     currentDocument.value = null;
+    availableDocuments.value = [];
     documentLoadState.value = isMarketplaceErrorKey(
       error,
       "error.plugin.marketplace.document.not.found",
@@ -399,6 +435,57 @@ async function loadReleaseDocument(
     if (isCurrentReleaseRequest(row, requestId)) {
       documentLoading.value = false;
     }
+  }
+}
+
+watch(
+  () => preferences.app.locale,
+  (locale) => {
+    applyPreferredDocumentLocale(locale);
+  },
+);
+
+function applyPreferredDocumentLocale(locale: string) {
+  const document = chooseDocumentFromBundle(locale);
+  if (document) {
+    currentDocument.value = document;
+  }
+}
+
+function chooseDocumentFromBundle(locale: string) {
+  const documents = availableDocuments.value;
+  if (documents.length === 0) {
+    return null;
+  }
+  if (documents.length === 1) {
+    return documents[0];
+  }
+  const preferred = locale.trim().toLowerCase();
+  if (preferred) {
+    const exact = documents.find(
+      (document) =>
+        (document.resolvedLocale || document.locale).toLowerCase() === preferred,
+    );
+    if (exact) {
+      return exact;
+    }
+  }
+  return (
+    documents.find((document) =>
+      ["en-us", "en"].includes(
+        (document.resolvedLocale || document.locale).toLowerCase(),
+      ),
+    ) ?? documents[0]
+  );
+}
+
+function handleSelectDocumentLocale(value: string | number) {
+  const locale = String(value);
+  const document = availableDocuments.value.find(
+    (item) => (item.resolvedLocale || item.locale) === locale,
+  );
+  if (document) {
+    currentDocument.value = document;
   }
 }
 
@@ -1446,6 +1533,18 @@ function formatBytes(value?: number) {
                       {{ currentDocument.title || selectedRelease?.version }}
                     </h3>
                     <Space wrap :size="[6, 6]">
+                      <Segmented
+                        v-if="availableDocumentLocaleOptions.length > 1"
+                        :aria-label="
+                          $t(
+                            'plugin.linapro-plugin-marketplace.detail.docs.locale',
+                          )
+                        "
+                        :options="availableDocumentLocaleOptions"
+                        size="small"
+                        :value="activeDocumentLocale"
+                        @change="handleSelectDocumentLocale"
+                      />
                       <Tag>{{ currentDocument.resolvedLocale }}</Tag>
                       <Tag>{{ currentDocument.path }}</Tag>
                     </Space>

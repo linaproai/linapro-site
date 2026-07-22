@@ -13,6 +13,16 @@ The plugin owns marketplace-specific backend code, frontend resources, SQL, runt
 | Source delivery | Downloaded source plugins must be placed under `apps/lina-plugins/<plugin-id>` and deployed through a host rebuild |
 | Dynamic delivery | Downloaded dynamic packages must reuse the existing local dynamic plugin upload governance |
 
+## Local Storage Path Configuration
+
+Uploaded packages, Git documentation snapshots, and controlled download bytes are stored on the local filesystem under `storage.root`.
+
+| Config key | Purpose | Default |
+|------------|---------|---------|
+| `storage.root` | Artifact and docs-snapshot root | `temp/plugin-marketplace/artifacts` |
+
+Relative paths resolve against the host process working directory (`make dev` usually runs under `apps/lina-core`, so development data lands in `apps/lina-core/temp/`, which is gitignored). Do **not** point this path into tracked source trees such as `apps/lina-core/data/`. Production deployments should use an absolute path outside the repository.
+
 ## Git Platform Token Configuration
 
 When a publisher registers a Git source without a personal access token, the marketplace falls back to plugin-scoped platform tokens for GitHub/Gitee metadata discovery (list tags, read tree, read `plugin.yaml`). This avoids unauthenticated API rate limits on shared egress IPs.
@@ -22,23 +32,22 @@ When a publisher registers a Git source without a personal access token, the mar
 | `github.accessToken` | GitHub PAT (classic `public_repo`, or fine-grained Contents: Read) |
 | `gitee.accessToken` | Optional Gitee personal access token |
 
-Config sources (exclusive priority, no merge):
+These settings are **owned by this plugin** and must not be placed in the host framework `config.yaml`. Sources (exclusive priority, no merge):
 
-1. Host `config.yaml` section `plugin.linapro-plugin-marketplace`
-2. Production file `plugins/linapro-plugin-marketplace/config.yaml` under the host config root
-3. Development default `manifest/config/config.yaml`
+1. Development default: `apps/lina-plugins/linapro-plugin-marketplace/manifest/config/config.yaml`
+2. Production: `plugins/linapro-plugin-marketplace/config.yaml` under the host config root
 
 See `manifest/config/config.example.yaml` for the full template. Platform tokens are **not** stored in publisher credential rows and are never returned by marketplace APIs. A publisher-supplied form `accessToken` always wins over the platform config.
 
-Host config example:
+Plugin config example (`manifest/config/config.yaml` or the production plugin config file):
 
 ```yaml
-plugin:
-  linapro-plugin-marketplace:
-    github:
-      accessToken: "ghp_xxxxxxxx"
-    gitee:
-      accessToken: ""
+storage:
+  root: "temp/plugin-marketplace/artifacts"
+github:
+  accessToken: "ghp_xxxxxxxx"
+gitee:
+  accessToken: ""
 ```
 
 ## Verification
