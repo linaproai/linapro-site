@@ -365,9 +365,12 @@ export async function marketplaceReleaseDocumentBundle(
   params?: MarketplaceDocumentParams,
   scope: MarketplaceReadScope = "public",
 ) {
+  // Missing docs is a normal empty state for many releases; callers map
+  // PLUGIN_MARKETPLACE_DOCUMENT_NOT_FOUND to empty UI. Silence the global
+  // toast so opening detail does not look like a hard failure.
   const res = await requestClient.get<MarketplaceDocumentBundle>(
     marketplacePath(readReleasePath(pluginId, version, "docs", scope)),
-    { params },
+    { params, silentErrorMessage: true },
   );
   return {
     document: res.document ?? null,

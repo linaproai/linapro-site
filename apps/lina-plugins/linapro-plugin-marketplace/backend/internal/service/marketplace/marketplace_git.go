@@ -1212,31 +1212,7 @@ func (s *serviceImpl) indexGitReleaseDocuments(
 		if len(body) == 0 || len(body) > maxGitDocBytes {
 			continue
 		}
-		sourceKind := documentSourceKindManifestDocs
-		locale := defaultDocumentLocale
-		docPath := relPath
-		switch strings.ToLower(relPath) {
-		case readmeDocumentPath:
-			sourceKind = documentSourceKindReadme
-			docPath = readmeDocumentPath
-		case readmeCNDocumentPath, "readme.zh-cn.md":
-			sourceKind = documentSourceKindReadme
-			locale = fallbackZhCNLocale
-			docPath = readmeCNDocumentPath
-		default:
-			// manifest/docs/<locale>/... or manifest/docs/*.md
-			if strings.HasPrefix(relPath, marketplaceDocsPrefix) {
-				docPath = strings.TrimPrefix(relPath, marketplaceDocsPrefix)
-				parts := strings.Split(docPath, "/")
-				if len(parts) >= 2 {
-					// Prefer first directory segment as locale when it looks like zh-CN/en-US.
-					if strings.Contains(parts[0], "-") || parts[0] == "zh" || parts[0] == "en" {
-						locale = parts[0]
-						docPath = strings.Join(parts[1:], "/")
-					}
-				}
-			}
-		}
+		sourceKind, locale, docPath := resolveGitDocumentIdentity(relPath)
 		item, indexErr := indexMarketplaceDocument(locale, docPath, sourceKind, string(body))
 		if indexErr != nil {
 			continue
@@ -1248,6 +1224,36 @@ func (s *serviceImpl) indexGitReleaseDocuments(
 		return nil
 	}
 	return s.replaceReleaseGitDocumentSnapshot(ctx, release, items, rawBodies)
+}
+
+// resolveGitDocumentIdentity maps one repo-relative markdown path to marketplace
+// document identity fields used when indexing Git release documentation.
+// README case labels must be lowercased because the switch compares
+// strings.ToLower(relPath); English README locale matches ZIP indexing (en-US).
+func resolveGitDocumentIdentity(relPath string) (sourceKind string, locale string, docPath string) {
+	sourceKind = documentSourceKindManifestDocs
+	locale = defaultDocumentLocale
+	docPath = relPath
+	switch strings.ToLower(relPath) {
+	case "readme.md":
+		return documentSourceKindReadme, fallbackEnUSLocale, readmeDocumentPath
+	case "readme.zh-cn.md":
+		return documentSourceKindReadme, fallbackZhCNLocale, readmeCNDocumentPath
+	default:
+		// manifest/docs/<locale>/... or manifest/docs/*.md
+		if strings.HasPrefix(relPath, marketplaceDocsPrefix) {
+			docPath = strings.TrimPrefix(relPath, marketplaceDocsPrefix)
+			parts := strings.Split(docPath, "/")
+			if len(parts) >= 2 {
+				// Prefer first directory segment as locale when it looks like zh-CN/en-US.
+				if strings.Contains(parts[0], "-") || parts[0] == "zh" || parts[0] == "en" {
+					locale = parts[0]
+					docPath = strings.Join(parts[1:], "/")
+				}
+			}
+		}
+		return sourceKind, locale, docPath
+	}
 }
 
 func selectGitDocPathsForIndexing(treePaths []string, repoPath string) []string {

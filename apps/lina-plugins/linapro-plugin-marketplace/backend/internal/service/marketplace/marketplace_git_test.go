@@ -526,6 +526,26 @@ func TestBuildGitResourceSummariesFromTree(t *testing.T) {
 	}
 }
 
+func TestResolveGitDocumentIdentityReadmeUsesEnUS(t *testing.T) {
+	t.Parallel()
+	sourceKind, locale, docPath := resolveGitDocumentIdentity("README.md")
+	if sourceKind != documentSourceKindReadme || locale != fallbackEnUSLocale || docPath != readmeDocumentPath {
+		t.Fatalf("unexpected README.md identity: kind=%q locale=%q path=%q", sourceKind, locale, docPath)
+	}
+	sourceKind, locale, docPath = resolveGitDocumentIdentity("readme.md")
+	if sourceKind != documentSourceKindReadme || locale != fallbackEnUSLocale || docPath != readmeDocumentPath {
+		t.Fatalf("unexpected lowercased README identity: kind=%q locale=%q path=%q", sourceKind, locale, docPath)
+	}
+	sourceKind, locale, docPath = resolveGitDocumentIdentity("README.zh-CN.md")
+	if sourceKind != documentSourceKindReadme || locale != fallbackZhCNLocale || docPath != readmeCNDocumentPath {
+		t.Fatalf("unexpected README.zh-CN.md identity: kind=%q locale=%q path=%q", sourceKind, locale, docPath)
+	}
+	sourceKind, locale, docPath = resolveGitDocumentIdentity("manifest/docs/zh-CN/index.md")
+	if sourceKind != documentSourceKindManifestDocs || locale != fallbackZhCNLocale || docPath != defaultDocumentPath {
+		t.Fatalf("unexpected manifest docs identity: kind=%q locale=%q path=%q", sourceKind, locale, docPath)
+	}
+}
+
 func TestSelectGitRuntimeI18nPathsExcludesApidoc(t *testing.T) {
 	t.Parallel()
 	tree := []string{

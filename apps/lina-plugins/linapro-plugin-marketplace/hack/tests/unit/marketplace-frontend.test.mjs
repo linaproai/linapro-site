@@ -85,6 +85,12 @@ describe("marketplace frontend API adapter", () => {
       );
     }
 
+    // Document reads map "not found" to empty UI; avoid global error toasts.
+    assert.match(
+      source,
+      /marketplaceReleaseDocumentBundle[\s\S]*silentErrorMessage:\s*true/,
+    );
+
     for (const endpoint of [
       "market/plugins",
       "market/publishers",
