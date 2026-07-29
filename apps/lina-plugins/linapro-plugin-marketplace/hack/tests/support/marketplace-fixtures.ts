@@ -193,6 +193,43 @@ const sourcePluginId = "linapro-demo-source";
 const dynamicPluginId = "linapro-demo-dynamic";
 const privatePluginId = "linapro-private-reports";
 const externalPluginId = "acme-observability";
+const zhCNPluginDisplay = new Map<
+  string,
+  Pick<PluginItem, "description" | "name" | "summary">
+>([
+  [
+    sourcePluginId,
+    {
+      description: "用于重新构建交付的源码插件包。",
+      name: "LinaPro 源码演示",
+      summary: "面向重新构建交付的源码插件包。",
+    },
+  ],
+  [
+    dynamicPluginId,
+    {
+      description: "用于运行时上传治理的动态插件包。",
+      name: "LinaPro 动态插件演示",
+      summary: "用于运行时上传治理的动态插件包。",
+    },
+  ],
+  [
+    privatePluginId,
+    {
+      description: "面向租户范围的私有报表插件。",
+      name: "私有报表自动化",
+      summary: "面向租户范围的私有报表插件。",
+    },
+  ],
+  [
+    externalPluginId,
+    {
+      description: "由独立发布者提供的运维遥测插件。",
+      name: "Acme 可观测性",
+      summary: "由独立发布者提供的运维遥测插件。",
+    },
+  ],
+]);
 const runtimeMessagesByLocale: Record<
   MarketplaceLocale,
   Record<string, string>
@@ -754,9 +791,9 @@ export async function openMarketplaceWorkbench(
   page: Page,
   language?: "English" | "简体中文",
 ) {
-  // Prefer a host shell that exists even when dashboard analytics is disabled
-  // or returns 404 in local environments.
-  await page.goto(workspacePath("/"), {
+  // The marketplace mock always supplies this host route. Entering `/` can
+  // redirect to the real user's homePath, which is absent from the mocked menu.
+  await page.goto(workspacePath("/dashboard/analytics"), {
     waitUntil: "domcontentloaded",
   });
   await waitForRouteReady(page, 15_000);
@@ -902,7 +939,13 @@ async function handleMarketplaceRoute(
     state.listRequests.push(new URLSearchParams(requestURL.searchParams));
     await fulfillData(
       route,
-      listPlugins(data, apiPath, requestURL.searchParams, options),
+      listPlugins(
+        data,
+        apiPath,
+        requestURL.searchParams,
+        resolveRequestLocale(route),
+        options,
+      ),
     );
     return;
   }
@@ -928,10 +971,15 @@ async function handleMarketplaceRoute(
         }
         return ["reviewing", "submitted"].includes(item.reviewStatus);
       })
-      .map((item) => ({
-        ...item,
-        pluginName: data.pluginsById.get(item.pluginId)?.name || item.pluginId,
-      }))
+      .map((item) => {
+        const plugin = data.pluginsById.get(item.pluginId);
+        return {
+          ...item,
+          pluginName: plugin
+            ? localizePlugin(plugin, resolveRequestLocale(route)).name
+            : item.pluginId,
+        };
+      })
       .filter((item) => {
         if (!keyword) {
           return true;
@@ -1101,10 +1149,15 @@ async function handleMarketplaceRoute(
     isMarketplaceReadCollection(segments[1])
   ) {
     await fulfillData(route, {
-      plugin: pluginDetail(data, segments[2], {
-        includePrivatePlugins:
-          options.includePrivatePlugins || segments[1] !== "plugins",
-      }),
+      plugin: pluginDetail(
+        data,
+        segments[2],
+        {
+          includePrivatePlugins:
+            options.includePrivatePlugins || segments[1] !== "plugins",
+        },
+        resolveRequestLocale(route),
+      ),
     });
     return;
   }
@@ -1321,6 +1374,7 @@ function listPlugins(
   data: MarketplaceMockData,
   apiPath: string,
   searchParams: URLSearchParams,
+  locale: MarketplaceLocale,
   options: { includePrivatePlugins: boolean },
 ) {
   const keyword = searchParams.get("keyword")?.trim().toLowerCase() ?? "";
@@ -1328,15 +1382,17 @@ function listPlugins(
   const publisher = searchParams.get("publisher")?.trim().toLowerCase() ?? "";
   const status = searchParams.get("status")?.trim() ?? "";
   const tagCode = searchParams.get("tagCode")?.trim().toLowerCase() ?? "";
-  const availablePlugins = [...data.pluginsById.values()].filter((item) => {
-    if (apiPath === "market/my-plugins") {
-      return item.publisher?.publisherKey === linaPublisher.publisherKey;
-    }
-    if (apiPath === "market/managed-plugins") {
-      return true;
-    }
-    return options.includePrivatePlugins || item.visibility !== "private";
-  });
+  const availablePlugins = [...data.pluginsById.values()]
+    .filter((item) => {
+      if (apiPath === "market/my-plugins") {
+        return item.publisher?.publisherKey === linaPublisher.publisherKey;
+      }
+      if (apiPath === "market/managed-plugins") {
+        return true;
+      }
+      return options.includePrivatePlugins || item.visibility !== "private";
+    })
+    .map((item) => localizePlugin(item, locale));
   const filtered = availablePlugins.filter((item) => {
     if (keyword) {
       const haystack =
@@ -1637,6 +1693,27 @@ function marketplaceMenuRoutes(
     },
     {
       children: [
+        {
+          component: "system/user/index",
+          meta: {
+            icon: "lucide:users",
+            title: locale === "en-US" ? "Users" : "用户管理",
+          },
+          name: "SystemUser",
+          path: "/system/user",
+        },
+      ],
+      component: "BasicLayout",
+      meta: {
+        icon: "lucide:settings",
+        order: 7,
+        title: locale === "en-US" ? "Settings" : "设置",
+      },
+      name: "System",
+      path: "/system",
+    },
+    {
+      children: [
         marketplaceMenuRoute({
           authority: "plugin:list",
           icon: "lucide:plug",
@@ -1715,6 +1792,7 @@ function pluginDetail(
   data: MarketplaceMockData,
   pluginId: string,
   options: { includePrivatePlugins: boolean },
+  locale: MarketplaceLocale,
 ) {
   const plugin = data.pluginsById.get(pluginId);
   if (
@@ -1723,7 +1801,13 @@ function pluginDetail(
   ) {
     return null;
   }
-  return plugin;
+  return localizePlugin(plugin, locale);
+}
+
+function localizePlugin(plugin: PluginItem, locale: MarketplaceLocale) {
+  const display =
+    locale === "zh-CN" ? zhCNPluginDisplay.get(plugin.pluginId) : null;
+  return display ? { ...plugin, ...display } : plugin;
 }
 
 function pageResult<T>(items: T[]) {

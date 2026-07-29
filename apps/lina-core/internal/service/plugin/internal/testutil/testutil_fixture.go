@@ -62,16 +62,15 @@ func CreateTestPluginDir(t *testing.T, pluginID string) string {
 			if _, err := services.Plugins().Config().Exists(ctx, "monitor.interval"); err != nil {
 				return err
 			}
-			return registrar.AddWithMetadata(
-				ctx,
-				"# * * * * *",
-				pluginID+"-test-source-fixture-job",
-				"Test Source Fixture Job",
-				"Verifies source-plugin job collection receives host services.",
-				func(ctx context.Context) error {
+			return registrar.Add(ctx, pluginhost.JobSpec{
+				Pattern:     "# * * * * *",
+				Name:        pluginID + "-test-source-fixture-job",
+				DisplayName: "Test Source Fixture Job",
+				Description: "Verifies source-plugin job collection receives host services.",
+				Handler: func(ctx context.Context) error {
 					return nil
 				},
-			)
+			})
 		},
 	); err != nil {
 		t.Fatalf("failed to register source plugin fixture job %s: %v", pluginID, err)

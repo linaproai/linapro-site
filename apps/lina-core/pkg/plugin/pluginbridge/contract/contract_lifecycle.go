@@ -62,6 +62,33 @@ type LifecycleContract struct {
 	TimeoutMs int `json:"timeoutMs,omitempty" yaml:"timeoutMs,omitempty"`
 }
 
+// InstallMode identifies how a tenant-aware plugin is enabled across tenants.
+// Values match plugin.yaml default_install_mode and api/plugin/v1.InstallMode.
+type InstallMode string
+
+// Supported plugin install modes on the dynamic lifecycle wire contract.
+const (
+	// InstallModeGlobal enables one shared installation for the platform.
+	InstallModeGlobal InstallMode = "global"
+	// InstallModeTenantScoped enables or disables the plugin per tenant.
+	InstallModeTenantScoped InstallMode = "tenant_scoped"
+)
+
+// String returns the canonical install mode value.
+func (m InstallMode) String() string {
+	return string(m)
+}
+
+// IsValid reports whether the install mode is a known non-empty value.
+func (m InstallMode) IsValid() bool {
+	switch m {
+	case InstallModeGlobal, InstallModeTenantScoped:
+		return true
+	default:
+		return false
+	}
+}
+
 // ManifestSnapshotV1 is the typed manifest snapshot published to plugin
 // lifecycle callbacks. The type definition is owned by the neutral
 // capability/capmodel primitive package; this alias keeps the versioned wire
@@ -81,9 +108,9 @@ type LifecycleRequest struct {
 	// TenantID is the tenant affected by tenant-scoped lifecycle operations.
 	TenantID int `json:"tenantId,omitempty"`
 	// FromMode is the previous install mode for install-mode changes.
-	FromMode string `json:"fromMode,omitempty"`
+	FromMode InstallMode `json:"fromMode,omitempty"`
 	// ToMode is the target install mode for install-mode changes.
-	ToMode string `json:"toMode,omitempty"`
+	ToMode InstallMode `json:"toMode,omitempty"`
 	// PurgeStorageData reports whether uninstall should clear plugin storage/data.
 	PurgeStorageData bool `json:"purgeStorageData,omitempty"`
 	// FromManifest is the effective manifest snapshot before upgrade when applicable.

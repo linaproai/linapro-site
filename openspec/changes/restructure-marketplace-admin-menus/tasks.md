@@ -39,3 +39,25 @@
 - [x] **FB-9**: 添加插件的上传包流程仅上传压缩包；服务端自动解压、校验目录规范并解析 plugin.yaml 基本信息，不要求手填 ID/名称/版本/类型。
 - [x] **FB-10**: 添加插件的 Git 仓库流程去掉可见性选择；默认私有草稿直至发布审核通过。
 - [x] **FB-11**: 统一“添加插件”抽屉中上传包与 Git 仓库模式的左右布局、底部主按钮位置和“添加插件”按钮文案。由插件前端单测、TC-1a、TC004 与 1440 视口截图审查覆盖。
+- [x] **FB-12**: 逐页审查「我的插件」「插件列表」「插件审核」的中英文布局与核心交互，以「我的插件」为基准统一筛选区、表格列顺序与固定操作列，修复英文关键表头、审核提交时间截断及固定操作列遮挡关键状态，并由 TC-2a、TC-3a 及 1440/1024/390 截图回归覆盖。
+- [x] **FB-13**: 阶段 A：去掉用户可感知的「可见性」设计——「我的插件」与详情不再展示可见性列/标签；公开市场目录以已发布状态为准；审核通过时内部同步 visibility=public；保留底层字段与过滤兼容。由前端单测、TC-1a/TC-3a 与 `openspec validate restructure-marketplace-admin-menus --strict` 覆盖。
+
+### FB-13 影响与验证记录
+
+- `i18n`：无新增键；去掉可见性列/标签展示，既有 `detail.visibility.*` 资源保留未删。
+- 缓存一致性：无影响；未改缓存或读模型失效机制（仍走既有 `rebuildPluginReadModel`）。
+- 数据权限/可见性：有影响但边界收敛为状态驱动——公开目录仍要求 `market_status=published`，审核通过时同步 `visibility=public`；底层 grant 过滤兼容保留；未删除 API 字段。
+- 开发工具跨平台：无影响。
+- 运行期依赖与`DI`：无影响。
+- 测试：`marketplace-frontend` 单测 10/10；`go test ./backend/internal/service/marketplace/` 通过；E2E TC-1a、TC-3a 通过。
+
+### FB-12 影响与验证记录
+
+- `i18n`有影响：三页在`locale`变化时重建筛选项、列标题与操作文案，`E2E`明确断言中英文实际文案与本地化插件名称，不依赖双语正则作为翻译正确性证据。
+- 缓存一致性无影响：页面布局、表格配置与详情弹窗装配不读写缓存或派生快照。
+- 数据权限无影响：未修改菜单权限、API 权限、角色范围或数据读写边界；E2E 继续覆盖发布者、审核者与无下载权限角色。
+- 开发工具跨平台无影响：未修改开发工具、脚本、runner 或默认执行入口。
+- 运行期依赖与`DI`无影响：前端详情弹窗改为既有组件静态导入，未新增后端依赖、构造函数或启动装配。
+- 测试策略：`Marketplace`六个`TC`文件共`9/9`通过；已多模态审查中文`1440/1024`、英文三表`1440`及详情、文档、风险、错误态`390`截图，未发现页面级横向溢出、关键表头截断、固定操作列遮挡或原始`i18n key`。
+- 已通过前端单测`10/10`、`vue-tsc`、`make lint plugins=1`、`make plugins.check`、`Prettier`、`git diff --check`与`openspec validate restructure-marketplace-admin-menus --strict`。
+- 全局`make i18n.check`已在应用当前工作区差异并按`linapro/main`锁定提交`ebbd06be350e1953a02cca39df6559eee0ad09d0`检出完整`official-plugins`的临时工作区通过；此前失败是当前官网检出仅包含`Marketplace`、未包含`linapro-content-notice`自有资源所致，三个宿主引用键在该插件`en-US`与`zh-CN`资源中均已存在。

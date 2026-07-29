@@ -31,7 +31,7 @@ test.describe("TC-6 marketplace history versions and git pin", () => {
 
     const marketplace = new MarketplacePage(page);
     await marketplace.gotoDetail(marketplaceSourcePluginId());
-    await expect(marketplace.detailShell()).toContainText("LinaPro Source Demo");
+    await expect(marketplace.detailShell()).toContainText("LinaPro 源码演示");
 
     const latestRow = marketplace.detailReleaseRow("v1.0.0");
     const historyRow = marketplace.detailReleaseRow("v0.9.0");
@@ -110,9 +110,6 @@ test.describe("TC-6 marketplace history versions and git pin", () => {
     ]);
 
     await marketplace.expectNoRawI18nKeys();
-    await captureMarketplaceScreenshot(
-      page,
-      "detail-history-version-download",
-    );
+    await captureMarketplaceScreenshot(page, "detail-history-version-download");
   });
 });

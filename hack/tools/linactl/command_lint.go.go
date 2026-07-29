@@ -1,6 +1,7 @@
 // This file implements Go static lint commands. It runs golangci-lint through
 // the current Go workspace modules and applies a dedicated multi-target dead
-// code check for packages that contain `wasip1`-gated guest code.
+// code check for packages that contain `wasip1`-gated guest code. It also runs
+// repository governance checks (test naming, API contracts) before static analysis.
 
 package main
 
@@ -16,6 +17,8 @@ import (
 	"strings"
 	"time"
 
+	"linactl/internal/apicontractcheck"
+	"linactl/internal/gotestnames"
 	"linactl/internal/toolutil"
 )
 
@@ -102,6 +105,14 @@ func runLintGo(ctx context.Context, a *app, input commandInput) error {
 
 	plans, err := goLintModulePlans(ctx, &workspaceApp, modules)
 	if err != nil {
+		return err
+	}
+
+	// Fail fast on governance checks before installing/running heavy linters.
+	if err = runGoTestNameCheck(a, modules, dirSet); err != nil {
+		return err
+	}
+	if err = runAPIContractCheck(a, modules, dirSet); err != nil {
 		return err
 	}
 
@@ -193,6 +204,30 @@ func runLintGo(ctx context.Context, a *app, input commandInput) error {
 		)
 	}
 	return nil
+}
+
+// runGoTestNameCheck enforces backend-go unit-test file naming pairing for the
+// modules included in the current lint.go plan. Full-workspace runs leave scope
+// empty so gotestnames scans the default repository roots; dir-scoped runs limit
+// the scan to the resolved module directory.
+func runGoTestNameCheck(a *app, modules []string, dirScoped bool) error {
+	opts := gotestnames.Options{}
+	if dirScoped {
+		opts.ScopeDirs = append([]string(nil), modules...)
+	}
+	return gotestnames.Check(a.root, a.stdout, opts)
+}
+
+// runAPIContractCheck enforces generic public API DTO contract rules (no entity
+// imports; no sensitive JSON fields on response-shaped types). Full-workspace
+// runs scan host and plugin API roots; dir-scoped runs only roots under the
+// resolved module(s).
+func runAPIContractCheck(a *app, modules []string, dirScoped bool) error {
+	opts := apicontractcheck.Options{}
+	if dirScoped {
+		opts.ScopeDirs = append([]string(nil), modules...)
+	}
+	return apicontractcheck.Check(a.root, a.stdout, opts)
 }
 
 // goLintResolveModuleDir resolves dir to the owning Go module directory.

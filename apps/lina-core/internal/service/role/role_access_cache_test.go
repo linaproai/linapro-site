@@ -5,19 +5,17 @@ package role
 
 import (
 	"context"
+	"github.com/gogf/gf/v2/container/gvar"
+	"github.com/gogf/gf/v2/os/gcache"
+	"lina-core/internal/service/cachecoord"
+	hostconfig "lina-core/internal/service/config"
+	"lina-core/internal/service/coordination"
+	"lina-core/internal/service/datascope"
 	"reflect"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/gogf/gf/v2/container/gvar"
-	"github.com/gogf/gf/v2/os/gcache"
-
-	"lina-core/internal/service/cachecoord"
-	hostconfig "lina-core/internal/service/config"
-	"lina-core/internal/service/coordination"
-	"lina-core/internal/service/datascope"
 )
 
 // fakeRoleConfigService provides deterministic config values for access-cache tests.
@@ -917,4 +915,13 @@ func TestLoadTokenAccessContextWithCacheLockSuppressesDuplicateLoads(t *testing.
 	if count != workers {
 		t.Fatalf("expected %d access results, got %d", workers, count)
 	}
+}
+
+// clearLocalAccessRevision drops the process-local revision so tests can force
+// the next read to resynchronize from the configured revision controller.
+func clearLocalAccessRevision() {
+	accessRevisionState.Lock()
+	accessRevisionState.value = 0
+	accessRevisionState.expireAt = time.Time{}
+	accessRevisionState.Unlock()
 }

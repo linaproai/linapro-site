@@ -109,6 +109,10 @@ func (s *serviceImpl) ListReviewQueue(ctx context.Context, in ListReviewQueueInp
 	if err != nil {
 		return nil, err
 	}
+	displayByRelease, err := s.batchDisplayI18nByReleaseIDs(ctx, releaseIDsFromEntities(rows))
+	if err != nil {
+		return nil, err
+	}
 	publishers, err := s.batchPublishersByID(ctx, publisherIDsFromReleases(rows))
 	if err != nil {
 		return nil, err
@@ -125,7 +129,7 @@ func (s *serviceImpl) ListReviewQueue(ctx context.Context, in ListReviewQueueInp
 		}
 		items = append(items, &marketv1.MarketplaceReviewQueueItem{
 			PluginId:      row.PluginId,
-			PluginName:    pluginNames[row.PluginRecordId],
+			PluginName:    reviewQueuePluginName(row, pluginNames, displayByRelease, in.Locale),
 			Version:       row.ReleaseVersion,
 			PluginType:    marketv1.MarketplacePluginType(row.PluginType),
 			ReleaseStatus: marketv1.MarketplaceStatus(row.ReleaseStatus),
@@ -139,6 +143,27 @@ func (s *serviceImpl) ListReviewQueue(ctx context.Context, in ListReviewQueueInp
 		})
 	}
 	return &ReviewQueueOutput{List: items, Total: total}, nil
+}
+
+// reviewQueuePluginName selects the requested release locale and preserves the
+// identity-table name as the final fallback.
+func reviewQueuePluginName(
+	row *entity.PluginMarketplaceRelease,
+	pluginNames map[int]string,
+	displayByRelease map[int][]*entity.PluginMarketplaceDisplayI18n,
+	locale string,
+) string {
+	if row == nil {
+		return ""
+	}
+	name, _ := pickDisplayNameSummary(
+		displayByRelease[row.Id],
+		locale,
+		"",
+		pluginNames[row.PluginRecordId],
+		"",
+	)
+	return name
 }
 
 type pluginIdentityListFilter struct {

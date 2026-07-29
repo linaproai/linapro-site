@@ -13,10 +13,10 @@ import (
 
 // PluginMarketplaceDisplayI18nDao is the data access object for the table plugin_marketplace_display_i18n.
 type PluginMarketplaceDisplayI18nDao struct {
-	table    string                               // table is the underlying table name of the DAO.
-	group    string                               // group is the database configuration group name of the current DAO.
-	columns  PluginMarketplaceDisplayI18nColumns  // columns contains all the column names of Table for convenient usage.
-	handlers []gdb.ModelHandler                   // handlers for customized model modification.
+	table    string                              // table is the underlying table name of the DAO.
+	group    string                              // group is the database configuration group name of the current DAO.
+	columns  PluginMarketplaceDisplayI18nColumns // columns contains all the column names of Table for convenient usage.
+	handlers []gdb.ModelHandler                  // handlers for customized model modification.
 }
 
 // PluginMarketplaceDisplayI18nColumns defines and stores column names for the table plugin_marketplace_display_i18n.

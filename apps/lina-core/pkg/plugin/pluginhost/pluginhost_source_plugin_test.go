@@ -275,7 +275,7 @@ func TestHookPayloadHelpersBuildPublishedKeys(t *testing.T) {
 	if HookPayloadStringValue(authValues, HookPayloadKeyClientType) != "web" {
 		t.Fatalf("expected auth payload clientType to be published")
 	}
-	if HookPayloadStringValue(authValues, HookPayloadKeyReason) != AuthHookReasonLoginSuccessful {
+	if HookPayloadStringValue(authValues, HookPayloadKeyReason) != AuthHookReasonLoginSuccessful.String() {
 		t.Fatalf("expected auth payload reason to be published")
 	}
 }
@@ -555,7 +555,7 @@ func TestSourcePluginLifecycleCallbackAdapterRunsInstallModeChange(t *testing.T)
 		if input.PluginID() != "test-plugin-before-install-mode" {
 			t.Fatalf("expected plugin id to be published, got %s", input.PluginID())
 		}
-		if input.FromMode() != "global" || input.ToMode() != "tenant_scoped" {
+		if input.FromMode() != PluginInstallModeGlobal || input.ToMode() != PluginInstallModeTenantScoped {
 			t.Fatalf("expected install mode transition to be published, got %s -> %s", input.FromMode(), input.ToMode())
 		}
 		return false, "plugin.test.installMode.blocked", nil
@@ -568,8 +568,8 @@ func TestSourcePluginLifecycleCallbackAdapterRunsInstallModeChange(t *testing.T)
 		InstallModeInput: NewSourcePluginInstallModeChangeInput(
 			"test-plugin-before-install-mode",
 			LifecycleHookBeforeInstallModeChange.String(),
-			"global",
-			"tenant_scoped",
+			PluginInstallModeGlobal,
+			PluginInstallModeTenantScoped,
 		),
 		Participants: []LifecycleParticipant{
 			{

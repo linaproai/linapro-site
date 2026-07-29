@@ -5,14 +5,13 @@ package wasm
 
 import (
 	"context"
+	bridgehostcall "lina-core/pkg/plugin/pluginbridge/protocol"
+	"lina-core/pkg/plugin/pluginbridge/protocol/hostservices"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
-
-	bridgehostcall "lina-core/pkg/plugin/pluginbridge/protocol"
-	"lina-core/pkg/plugin/pluginbridge/protocol/hostservices"
 )
 
 func TestHostServiceDispatchRegistryCoversCatalog(t *testing.T) {
@@ -165,4 +164,14 @@ func readWasmSourceFile(t *testing.T, root string, name string) string {
 		t.Fatalf("read %s failed: %v", name, err)
 	}
 	return string(content)
+}
+
+// registeredMethods returns registered service/method pairs in insertion order.
+func (r *hostServiceDispatchRegistry) registeredMethods() []hostServiceDispatchMethod {
+	if r == nil || len(r.methods) == 0 {
+		return nil
+	}
+	methods := make([]hostServiceDispatchMethod, len(r.methods))
+	copy(methods, r.methods)
+	return methods
 }

@@ -489,4 +489,3 @@ func errorCodeFromRuntimeMessageKey(messageKey string) string {
 	}
 	return strings.Join(parts, "_")
 }
-

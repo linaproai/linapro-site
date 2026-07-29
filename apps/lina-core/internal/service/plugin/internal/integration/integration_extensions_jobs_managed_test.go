@@ -1,225 +1,131 @@
-// This file covers managed scheduled-job collection for source plugins and
-// Jobs-domain dynamic plugin declarations.
+// This file white-box tests managedJobCollector.Add JobSpec policy handling
+// in integration_extensions_jobs_managed.go.
 
-package integration_test
+package integration
 
 import (
 	"context"
-	pluginv1 "lina-core/api/plugin/v1"
-	"strings"
+	jobv1 "lina-core/api/job/v1"
+	"lina-core/pkg/plugin/pluginhost"
 	"testing"
-	"time"
-
-	"lina-core/internal/service/plugin/internal/catalog"
-	"lina-core/internal/service/plugin/internal/integration"
-	"lina-core/internal/service/plugin/internal/runtime"
-	"lina-core/internal/service/plugin/internal/testutil"
-	"lina-core/pkg/plugin/pluginbridge/protocol"
-	"lina-core/pkg/statusflag"
 )
 
-// TestListExecutableJobsIncludesSourcePluginDefinitions verifies source
-// plugins still contribute plugin-owned scheduled jobs through the host-managed
-// Jobs projection path.
-func TestListExecutableJobsIncludesSourcePluginDefinitions(t *testing.T) {
-	services := testutil.NewServices()
+// TestManagedJobCollectorAddPreservesScopeAndConcurrency ensures master_only +
+// singleton declarations survive collection for multi-node scheduling.
+func TestManagedJobCollectorAddPreservesScopeAndConcurrency(t *testing.T) {
+	t.Parallel()
 
-	pluginID := "plugin-dev-source-jobs-managed"
-	testutil.CreateTestPluginDir(t, pluginID)
-
-	items, err := services.Integration.ListExecutableJobs(context.Background())
-	if err != nil {
-		t.Fatalf("expected managed job listing to succeed, got error: %v", err)
+	collector := &managedJobCollector{
+		pluginID: "linapro-plugin-marketplace",
+		items:    make([]ManagedJob, 0, 1),
 	}
-	if !managedJobListContainsPlugin(items, pluginID) {
-		t.Fatalf("expected managed job list to include source plugin %s", pluginID)
-	}
-}
-
-// TestListJobDeclarationsIncludesDynamicJobsRegisterDefinitions verifies
-// dynamic plugins can declare built-in jobs through the Jobs-domain discovery
-// method and publish executable handlers through the same management projection.
-func TestListJobDeclarationsIncludesDynamicJobsRegisterDefinitions(t *testing.T) {
-	ctx := context.Background()
-	const pluginID = "plugin-dev-dynamic-jobs-register"
-	executor := &fakeDynamicJobRuntime{
-		contracts: []*protocol.JobContract{{
-			Name:           "heartbeat",
-			DisplayName:    "Dynamic Plugin Heartbeat",
-			Description:    "Verifies dynamic Jobs declaration execution.",
-			Pattern:        "# */10 * * * *",
-			Timezone:       protocol.DefaultJobContractTimezone,
-			Scope:          protocol.JobScopeAllNode,
-			Concurrency:    protocol.JobConcurrencySingleton,
-			MaxConcurrency: 1,
-			TimeoutSeconds: 30,
-			RequestType:    "JobHeartbeatReq",
-			InternalPath:   "/job-heartbeat",
-		}},
-	}
-	services := testutil.NewServicesWithRuntimeService(executor)
-
-	hostServices := []*protocol.HostServiceSpec{{
-		Service: protocol.HostServiceJobs,
-		Methods: []string{
-			protocol.HostServiceMethodJobsRegister,
-		},
-	}}
-	artifactPath := testutil.CreateTestRuntimeStorageArtifactWithHostServices(
-		t,
-		pluginID,
-		"Dynamic Jobs Register Plugin",
-		"v0.1.0",
-		hostServices,
-		nil,
-		nil,
-	)
-	testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
-	t.Cleanup(func() {
-		testutil.CleanupPluginGovernanceRowsHard(t, ctx, pluginID)
+	err := collector.Add(context.Background(), pluginhost.JobSpec{
+		Pattern:     "@every 10s",
+		Name:        "linapro-plugin-marketplace-process-pipeline",
+		DisplayName: "Marketplace process pipeline",
+		Description: "Discover, verify, and auto-submit marketplace plugins",
+		Scope:       pluginhost.JobScopeMasterOnly,
+		Concurrency: pluginhost.JobConcurrencySingleton,
+		Handler:     func(context.Context) error { return nil },
 	})
-
-	manifest, err := services.Catalog.LoadManifestFromArtifactPath(artifactPath)
 	if err != nil {
-		t.Fatalf("expected dynamic manifest to load, got error: %v", err)
+		t.Fatalf("Add: %v", err)
 	}
-	manifest.ScopeNature = pluginv1.ScopeNaturePlatformOnly.String()
-	manifest.DefaultInstallMode = pluginv1.InstallModeGlobal.String()
-	if _, err = services.Store.SyncManifest(ctx, manifest); err != nil {
-		t.Fatalf("expected dynamic manifest sync to succeed, got error: %v", err)
+	if len(collector.items) != 1 {
+		t.Fatalf("expected 1 job, got %d", len(collector.items))
 	}
-	if err = services.Store.SetPluginInstalled(ctx, pluginID, statusflag.Installed.Int()); err != nil {
-		t.Fatalf("expected dynamic plugin install state to be set, got error: %v", err)
+	item := collector.items[0]
+	if item.Pattern != "@every 10s" {
+		t.Fatalf("pattern=%q", item.Pattern)
 	}
-	if err = services.Store.SetPluginStatus(ctx, pluginID, statusflag.EnabledValue.Int()); err != nil {
-		t.Fatalf("expected dynamic plugin enabled state to be set, got error: %v", err)
+	if item.Scope != jobv1.ScopeMasterOnly {
+		t.Fatalf("scope=%q want %q", item.Scope, jobv1.ScopeMasterOnly)
 	}
-	services.Integration.SetPluginEnabledState(pluginID, true)
-
-	executableItems, err := services.Integration.ListExecutableJobsByPlugin(ctx, pluginID)
-	if err != nil {
-		t.Fatalf("expected executable managed job list to succeed, got error: %v", err)
+	if item.Concurrency != jobv1.ConcurrencySingleton {
+		t.Fatalf("concurrency=%q want %q", item.Concurrency, jobv1.ConcurrencySingleton)
 	}
-	if len(executableItems) != 1 {
-		t.Fatalf("expected dynamic plugin to expose one executable scheduled job, got %#v", executableItems)
-	}
-	assertDynamicJobProjection(t, executableItems[0], pluginID)
-	if executableItems[0].Handler == nil {
-		t.Fatalf("expected dynamic job projection to publish an execution handler")
-	}
-	if err = executableItems[0].Handler(ctx); err != nil {
-		t.Fatalf("expected dynamic job handler to execute through runtime executor, got error: %v", err)
-	}
-	if executor.executeCalls != 1 || executor.executedName != "heartbeat" {
-		t.Fatalf("expected one dynamic job execution for heartbeat, got calls=%d name=%q", executor.executeCalls, executor.executedName)
-	}
-
-	declaredItems, err := services.Integration.ListJobDeclarationsByPlugin(ctx, pluginID)
-	if err != nil {
-		t.Fatalf("expected declaration job list to succeed, got error: %v", err)
-	}
-	if len(declaredItems) != 1 {
-		t.Fatalf("expected dynamic plugin to expose one scheduled-job declaration, got %#v", declaredItems)
-	}
-	assertDynamicJobProjection(t, declaredItems[0], pluginID)
-
-	installedItems, err := services.Integration.ListInstalledJobDeclarations(ctx)
-	if err != nil {
-		t.Fatalf("expected installed declaration job list to succeed, got error: %v", err)
-	}
-	installedItem, ok := managedJobListFindPlugin(installedItems, pluginID)
-	if !ok {
-		t.Fatalf("expected installed dynamic plugin %s to expose scheduled-job declarations, got %#v", pluginID, installedItems)
-	}
-	assertDynamicJobProjection(t, installedItem, pluginID)
-
-	if executor.discoverCalls < 3 {
-		t.Fatalf("expected discovery to run for executable, declared, and installed projections, got %d", executor.discoverCalls)
+	if item.MaxConcurrency != 1 {
+		t.Fatalf("maxConcurrency=%d", item.MaxConcurrency)
 	}
 }
 
-// managedJobListContainsPlugin reports whether a managed job list includes
-// at least one definition owned by pluginID.
-func managedJobListContainsPlugin(items []integration.ManagedJob, pluginID string) bool {
-	_, ok := managedJobListFindPlugin(items, pluginID)
-	return ok
-}
+// TestManagedJobCollectorAddLeavesOptionalPolicyEmpty keeps host defaults when
+// Scope and Concurrency are omitted from JobSpec.
+func TestManagedJobCollectorAddLeavesOptionalPolicyEmpty(t *testing.T) {
+	t.Parallel()
 
-// managedJobListFindPlugin returns the first managed job owned by pluginID.
-func managedJobListFindPlugin(items []integration.ManagedJob, pluginID string) (integration.ManagedJob, bool) {
-	for _, item := range items {
-		if item.PluginID == pluginID {
-			return item, true
-		}
+	collector := &managedJobCollector{
+		pluginID: "demo-plugin",
+		items:    make([]ManagedJob, 0, 1),
 	}
-	return integration.ManagedJob{}, false
-}
-
-// assertDynamicJobProjection verifies the host projection created from one
-// dynamic Jobs declaration.
-func assertDynamicJobProjection(t *testing.T, item integration.ManagedJob, pluginID string) {
-	t.Helper()
-
-	if item.PluginID != pluginID {
-		t.Fatalf("expected pluginID %q, got %q", pluginID, item.PluginID)
+	if err := collector.Add(context.Background(), pluginhost.JobSpec{
+		Pattern:     "0 * * * * *",
+		Name:        "demo-job",
+		DisplayName: "Demo Job",
+		Description: "Demo description",
+		Handler:     func(context.Context) error { return nil },
+	}); err != nil {
+		t.Fatalf("Add: %v", err)
 	}
-	if item.Name != "heartbeat" {
-		t.Fatalf("expected job name heartbeat, got %q", item.Name)
+	if len(collector.items) != 1 {
+		t.Fatalf("expected 1 job, got %d", len(collector.items))
 	}
-	if item.DisplayName != "Dynamic Plugin Heartbeat" {
-		t.Fatalf("expected display name to be preserved, got %q", item.DisplayName)
+	if collector.items[0].Scope != "" {
+		t.Fatalf("scope should stay empty for host default, got %q", collector.items[0].Scope)
 	}
-	if item.Pattern != "# */10 * * * *" {
-		t.Fatalf("expected pattern to be preserved, got %q", item.Pattern)
-	}
-	if item.Timezone != protocol.DefaultJobContractTimezone {
-		t.Fatalf("expected timezone %q, got %q", protocol.DefaultJobContractTimezone, item.Timezone)
-	}
-	if item.Timeout != 30*time.Second {
-		t.Fatalf("expected timeout 30s, got %s", item.Timeout)
-	}
-	if !strings.Contains(item.Description, "dynamic Jobs declaration") {
-		t.Fatalf("expected description to be preserved, got %q", item.Description)
+	if collector.items[0].Concurrency != "" {
+		t.Fatalf("concurrency should stay empty for host default, got %q", collector.items[0].Concurrency)
 	}
 }
 
-// fakeDynamicJobRuntime supplies deterministic dynamic Jobs declarations for
-// integration tests without executing a real Wasm artifact.
-type fakeDynamicJobRuntime struct {
-	runtime.Service
+// TestManagedJobCollectorAddRejectsMissingRequiredFields covers Pattern/Name/Handler.
+func TestManagedJobCollectorAddRejectsMissingRequiredFields(t *testing.T) {
+	t.Parallel()
 
-	contracts     []*protocol.JobContract
-	discoverCalls int
-	executeCalls  int
-	executedName  string
+	collector := &managedJobCollector{pluginID: "demo-plugin", items: make([]ManagedJob, 0)}
+	handler := func(context.Context) error { return nil }
+
+	if err := collector.Add(context.Background(), pluginhost.JobSpec{
+		Name:    "demo",
+		Handler: handler,
+	}); err == nil {
+		t.Fatal("expected empty Pattern to fail")
+	}
+	if err := collector.Add(context.Background(), pluginhost.JobSpec{
+		Pattern: "@every 1s",
+		Handler: handler,
+	}); err == nil {
+		t.Fatal("expected empty Name to fail")
+	}
+	if err := collector.Add(context.Background(), pluginhost.JobSpec{
+		Pattern: "@every 1s",
+		Name:    "demo",
+	}); err == nil {
+		t.Fatal("expected nil Handler to fail")
+	}
 }
 
-// DiscoverJobContracts returns detached declared job contracts for one plugin.
-func (f *fakeDynamicJobRuntime) DiscoverJobContracts(
-	_ context.Context,
-	manifest *catalog.Manifest,
-) ([]*protocol.JobContract, error) {
-	f.discoverCalls++
-	out := make([]*protocol.JobContract, 0, len(f.contracts))
-	for _, contract := range f.contracts {
-		if contract == nil {
-			continue
-		}
-		snapshot := *contract
-		out = append(out, &snapshot)
-	}
-	return out, nil
-}
+// TestManagedJobCollectorAddRejectsInvalidEnums covers typed scope/concurrency.
+func TestManagedJobCollectorAddRejectsInvalidEnums(t *testing.T) {
+	t.Parallel()
 
-// ExecuteDeclaredJob records one dynamic job execution request.
-func (f *fakeDynamicJobRuntime) ExecuteDeclaredJob(
-	_ context.Context,
-	_ *catalog.Manifest,
-	contract *protocol.JobContract,
-) error {
-	f.executeCalls++
-	if contract != nil {
-		f.executedName = contract.Name
+	collector := &managedJobCollector{pluginID: "demo-plugin", items: make([]ManagedJob, 0)}
+	handler := func(context.Context) error { return nil }
+
+	if err := collector.Add(context.Background(), pluginhost.JobSpec{
+		Pattern: "@every 1s",
+		Name:    "demo",
+		Scope:   pluginhost.JobScope("not-a-scope"),
+		Handler: handler,
+	}); err == nil {
+		t.Fatal("expected invalid Scope to fail")
 	}
-	return nil
+	if err := collector.Add(context.Background(), pluginhost.JobSpec{
+		Pattern:     "@every 1s",
+		Name:        "demo",
+		Concurrency: pluginhost.JobConcurrency("not-a-mode"),
+		Handler:     handler,
+	}); err == nil {
+		t.Fatal("expected invalid Concurrency to fail")
+	}
 }

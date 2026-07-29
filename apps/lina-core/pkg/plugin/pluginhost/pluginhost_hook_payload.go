@@ -34,21 +34,52 @@ const (
 	HookPayloadKeyReason HookPayloadKey = "reason"
 )
 
+// AuthHookReason identifies one stable authentication lifecycle reason code
+// published to plugins through HookPayloadKeyReason.
+type AuthHookReason string
+
 // Stable reason codes published with host authentication lifecycle events.
 const (
 	// AuthHookReasonLoginSuccessful identifies successful login events.
-	AuthHookReasonLoginSuccessful = "loginSuccessful"
+	AuthHookReasonLoginSuccessful AuthHookReason = "loginSuccessful"
 	// AuthHookReasonLoginFailed identifies generic failed login events.
-	AuthHookReasonLoginFailed = "loginFailed"
+	AuthHookReasonLoginFailed AuthHookReason = "loginFailed"
 	// AuthHookReasonLogoutSuccessful identifies successful logout events.
-	AuthHookReasonLogoutSuccessful = "logoutSuccessful"
+	AuthHookReasonLogoutSuccessful AuthHookReason = "logoutSuccessful"
 	// AuthHookReasonInvalidCredentials identifies invalid credential events.
-	AuthHookReasonInvalidCredentials = "invalidCredentials"
+	AuthHookReasonInvalidCredentials AuthHookReason = "invalidCredentials"
 	// AuthHookReasonUserDisabled identifies disabled account events.
-	AuthHookReasonUserDisabled = "userDisabled"
+	AuthHookReasonUserDisabled AuthHookReason = "userDisabled"
 	// AuthHookReasonIPBlacklisted identifies blocked login IP events.
-	AuthHookReasonIPBlacklisted = "ipBlacklisted"
+	AuthHookReasonIPBlacklisted AuthHookReason = "ipBlacklisted"
+	// AuthHookReasonTenantUnavailable identifies tenant service or membership failures.
+	AuthHookReasonTenantUnavailable AuthHookReason = "tenant_unavailable"
+	// AuthHookReasonExternalNotProvisioned identifies external-identity logins
+	// with no linked local account.
+	AuthHookReasonExternalNotProvisioned AuthHookReason = "external_not_provisioned"
 )
+
+// String returns the canonical auth hook reason code.
+func (r AuthHookReason) String() string {
+	return string(r)
+}
+
+// IsValid reports whether the reason is a known non-empty auth hook reason.
+func (r AuthHookReason) IsValid() bool {
+	switch r {
+	case AuthHookReasonLoginSuccessful,
+		AuthHookReasonLoginFailed,
+		AuthHookReasonLogoutSuccessful,
+		AuthHookReasonInvalidCredentials,
+		AuthHookReasonUserDisabled,
+		AuthHookReasonIPBlacklisted,
+		AuthHookReasonTenantUnavailable,
+		AuthHookReasonExternalNotProvisioned:
+		return true
+	default:
+		return false
+	}
+}
 
 // AuthHookPayloadInput defines the published auth hook payload fields.
 type AuthHookPayloadInput struct {
@@ -67,7 +98,7 @@ type AuthHookPayloadInput struct {
 	// Message is the English fallback audit message delivered to plugins.
 	Message string
 	// Reason is the stable auth lifecycle reason code delivered to plugins.
-	Reason string
+	Reason AuthHookReason
 }
 
 // PluginLifecycleHookPayloadInput defines the published plugin lifecycle hook fields.
@@ -97,7 +128,7 @@ func BuildAuthHookPayloadValues(input AuthHookPayloadInput) map[string]interface
 		HookPayloadKeyBrowser.String():    input.Browser,
 		HookPayloadKeyOS.String():         input.OS,
 		HookPayloadKeyMessage.String():    input.Message,
-		HookPayloadKeyReason.String():     input.Reason,
+		HookPayloadKeyReason.String():     input.Reason.String(),
 	}
 }
 

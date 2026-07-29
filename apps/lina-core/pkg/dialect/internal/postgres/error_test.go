@@ -4,9 +4,9 @@ package postgres
 
 import (
 	"errors"
-	"testing"
-
 	"github.com/gogf/gf/v2/errors/gerror"
+	"strings"
+	"testing"
 )
 
 // fakeSQLStateError mimics the SQLSTATE shape exposed by PostgreSQL drivers.
@@ -116,5 +116,20 @@ func TestErrorHelpersClassifyWrappedErrors(t *testing.T) {
 	}
 	if IsUniqueConstraintViolation(gerror.Wrap(fakeSQLStateError{state: errorNotNullViolation}, "insert failed")) {
 		t.Fatal("expected not-null SQLSTATE not to be a unique constraint violation")
+	}
+}
+
+// isConstraintViolation classifies PostgreSQL constraint failures by stable SQLSTATE code.
+func isConstraintViolation(err error) bool {
+	return isConstraintSQLState(sqlState(err))
+}
+
+// isConstraintSQLState reports whether a PostgreSQL SQLSTATE is a constraint violation.
+func isConstraintSQLState(code string) bool {
+	switch strings.TrimSpace(code) {
+	case errorUniqueViolation, errorCheckViolation, errorForeignKeyViolation, errorNotNullViolation:
+		return true
+	default:
+		return false
 	}
 }

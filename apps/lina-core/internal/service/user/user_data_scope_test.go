@@ -7,12 +7,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"testing"
-	"time"
-
 	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/xuri/excelize/v2"
-
 	"lina-core/internal/dao"
 	"lina-core/internal/model"
 	"lina-core/internal/model/do"
@@ -22,6 +18,8 @@ import (
 	"lina-core/pkg/plugin/capability/capmodel"
 	"lina-core/pkg/plugin/capability/orgcap"
 	"lina-core/pkg/statusflag"
+	"testing"
+	"time"
 )
 
 // TestUserDataScopeListSelfShowsOnlyCurrentUser verifies self-scope list
@@ -580,4 +578,25 @@ func (f userDataScopeStaticOrgCap) ReplaceUserAssignments(context.Context, int, 
 // CleanupUserAssignments accepts assignment cleanup without doing work.
 func (f userDataScopeStaticOrgCap) CleanupUserAssignments(context.Context, int) error {
 	return nil
+}
+
+// userDataScope represents the role data range used by host user management tests.
+type userDataScope = datascope.Scope
+
+// User data-scope levels follow sys_role.data_scope values in tests.
+const (
+	userDataScopeNone   userDataScope = datascope.ScopeNone
+	userDataScopeAll    userDataScope = datascope.ScopeAll
+	userDataScopeTenant userDataScope = datascope.ScopeTenant
+	userDataScopeDept   userDataScope = datascope.ScopeDept
+	userDataScopeSelf   userDataScope = datascope.ScopeSelf
+)
+
+// currentUserDataScope computes the widest enabled role data-scope for the current test user.
+func (s *serviceImpl) currentUserDataScope(ctx context.Context) (userDataScope, int, error) {
+	currentScope, err := s.currentScopeSvc().Current(ctx)
+	if err != nil {
+		return userDataScopeNone, 0, err
+	}
+	return userDataScope(currentScope.Scope), currentScope.UserID, nil
 }

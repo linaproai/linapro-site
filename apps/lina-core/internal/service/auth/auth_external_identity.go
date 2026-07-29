@@ -121,7 +121,7 @@ func (s *serviceImpl) LoginByExternalIdentity(ctx context.Context, in ExternalLo
 	// dispatchExternalLoginFailed publishes a login-failed hook. The username is
 	// best-effort: the resolved account username when known, otherwise the
 	// captured email used only for audit context.
-	dispatchExternalLoginFailed := func(username string, message string, reason string) {
+	dispatchExternalLoginFailed := func(username string, message string, reason pluginhost.AuthHookReason) {
 		s.dispatchAuthHookEvent(ctx, pluginhost.ExtensionPointAuthLoginFailed, pluginhost.AuthHookPayloadInput{
 			UserName:   username,
 			Status:     authLoginStatusFail,
@@ -149,7 +149,7 @@ func (s *serviceImpl) LoginByExternalIdentity(ctx context.Context, in ExternalLo
 	// login never leaks whether the captured email exists as another account.
 	userID, err := s.resolveExternalUserID(ctx, in, provider, subject)
 	if err != nil {
-		dispatchExternalLoginFailed(in.Email, authEventMessageExternalNotProvisioned, authHookReasonExternalNotProvisioned)
+		dispatchExternalLoginFailed(in.Email, authEventMessageExternalNotProvisioned, pluginhost.AuthHookReasonExternalNotProvisioned)
 		return nil, err
 	}
 
@@ -160,7 +160,7 @@ func (s *serviceImpl) LoginByExternalIdentity(ctx context.Context, in ExternalLo
 		return nil, err
 	}
 	if user == nil {
-		dispatchExternalLoginFailed(in.Email, authEventMessageExternalNotProvisioned, authHookReasonExternalNotProvisioned)
+		dispatchExternalLoginFailed(in.Email, authEventMessageExternalNotProvisioned, pluginhost.AuthHookReasonExternalNotProvisioned)
 		return nil, bizerr.NewCode(CodeAuthExternalUserNotProvisioned)
 	}
 	if user.Status == statusflag.Disabled.Int() {
@@ -174,7 +174,7 @@ func (s *serviceImpl) LoginByExternalIdentity(ctx context.Context, in ExternalLo
 		return nil, err
 	}
 	if user.TenantId != int(tenantcap.PLATFORM) && (!tenantSvcAvailable || len(tenants) == 0) {
-		dispatchExternalLoginFailed(user.Username, authEventMessageTenantUnavailable, authHookReasonTenantUnavailable)
+		dispatchExternalLoginFailed(user.Username, authEventMessageTenantUnavailable, pluginhost.AuthHookReasonTenantUnavailable)
 		return nil, bizerr.NewCode(CodeAuthTenantUnavailable)
 	}
 	if len(tenants) > 1 {

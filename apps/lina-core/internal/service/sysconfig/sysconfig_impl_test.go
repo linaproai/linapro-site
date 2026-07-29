@@ -69,7 +69,7 @@ func TestUpdateAllowsBuiltInFlaggedSystemParameter(t *testing.T) {
 	)
 
 	err := New(hostconfig.New(), nil).Update(ctx, UpdateInput{
-		Id: record.Id,
+		Id:    record.Id,
 		Value: &updatedValue,
 	})
 	if err != nil {
@@ -182,7 +182,7 @@ func TestUpdateRejectsProtectedRuntimeParamRename(t *testing.T) {
 	)
 
 	err := New(hostconfig.New(), nil).Update(ctx, UpdateInput{
-		Id: runtimeParam.Id,
+		Id:  runtimeParam.Id,
 		Key: &newKey,
 	})
 	if err == nil {
@@ -200,7 +200,7 @@ func TestUpdateRejectsProtectedPublicFrontendSettingRename(t *testing.T) {
 	)
 
 	err := New(hostconfig.New(), nil).Update(ctx, UpdateInput{
-		Id: publicSetting.Id,
+		Id:  publicSetting.Id,
 		Key: &newKey,
 	})
 	if err == nil {
@@ -252,7 +252,7 @@ func TestUpdateProtectedRuntimeParamRefreshesConfigSnapshot(t *testing.T) {
 
 	updatedValue := "8h"
 	err = New(hostconfig.New(), nil).Update(ctx, UpdateInput{
-		Id: runtimeParam.Id,
+		Id:    runtimeParam.Id,
 		Value: &updatedValue,
 	})
 	if err != nil {
@@ -323,7 +323,7 @@ func TestUpdateProtectedPublicFrontendSettingRefreshesConfigSnapshot(t *testing.
 
 	updatedValue := "LinaPro Console"
 	err = New(hostconfig.New(), nil).Update(ctx, UpdateInput{
-		Id: publicSetting.Id,
+		Id:    publicSetting.Id,
 		Value: &updatedValue,
 	})
 	if err != nil {

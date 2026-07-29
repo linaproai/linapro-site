@@ -25,6 +25,8 @@ test.describe("TC005 marketplace tar.gz upload accept", () => {
     const marketplace = new MarketplacePage(page);
     await marketplace.gotoMine();
     await marketplace.openPublishDrawer();
+    // Default is Git; switch to upload to assert package accept attributes.
+    await marketplace.selectPublishSourceKind("upload");
     await marketplace.expectAddPluginDrawerLayout();
 
     const accept = page

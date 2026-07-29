@@ -221,6 +221,7 @@ type ListReviewQueueInput struct {
 	PluginID     string                           // PluginID optionally narrows one plugin.
 	ReviewStatus marketv1.MarketplaceReviewStatus // ReviewStatus optionally narrows one review state.
 	Keyword      string                           // Keyword optionally matches plugin ID and version.
+	Locale       string                           // Locale is the preferred display language for plugin name projection.
 }
 
 // ReviewQueueOutput contains one paginated marketplace review queue page.

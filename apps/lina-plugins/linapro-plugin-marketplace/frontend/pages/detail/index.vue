@@ -23,7 +23,6 @@ import type {
   MarketplaceRiskSeverity,
   MarketplaceRiskType,
   MarketplaceStatus,
-  MarketplaceVisibility,
 } from "../../types/marketplace";
 import type { MarketplaceReadScope } from "../../api/marketplace";
 
@@ -1026,20 +1025,6 @@ function getReviewStatusColor(status: MarketplaceReviewStatus) {
   }
 }
 
-function formatVisibility(visibility: MarketplaceVisibility) {
-  switch (visibility) {
-    case "private": {
-      return t("plugin.linapro-plugin-marketplace.detail.visibility.private");
-    }
-    case "public": {
-      return t("plugin.linapro-plugin-marketplace.detail.visibility.public");
-    }
-    case "reserved": {
-      return t("plugin.linapro-plugin-marketplace.detail.visibility.reserved");
-    }
-  }
-}
-
 function formatArtifactType(type?: MarketplaceArtifactType) {
   switch (type) {
     case "dynamic_zip": {
@@ -1197,7 +1182,6 @@ function formatBytes(value?: number) {
           >
             {{ formatStatus(detail.marketStatus, detail.processStatus) }}
           </Tag>
-          <Tag>{{ formatVisibility(detail.visibility) }}</Tag>
         </Space>
       </div>
 
@@ -1219,11 +1203,6 @@ function formatBytes(value?: number) {
                     "
                   >
                     {{ formatStatus(detail.marketStatus, detail.processStatus) }}
-                  </Tag>
-                  <Tag
-                    :color="detail.visibility === 'public' ? 'green' : 'default'"
-                  >
-                    {{ formatVisibility(detail.visibility) }}
                   </Tag>
                   <Tag
                     v-if="detail.sourceKind"

@@ -7,6 +7,7 @@ package integration
 import (
 	"context"
 	"strings"
+	"sync"
 
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/os/gcron"
@@ -21,6 +22,12 @@ type sourceJobRegistrar struct {
 	pluginID string
 	service  *serviceImpl
 	services capability.Services
+
+	// runningByName implements process-local singleton guards for jobs that
+	// declare JobConcurrencySingleton (or leave concurrency empty, which
+	// defaults to singleton).
+	runningMu     sync.Mutex
+	runningByName map[string]bool
 }
 
 // Ensure sourceJobRegistrar satisfies the published registrar contract.
@@ -34,47 +41,94 @@ func newSourceJobRegistrar(pluginID string, service *serviceImpl) pluginhost.Job
 		services = service.sourceServicesForPlugin(normalizedPluginID)
 	}
 	return &sourceJobRegistrar{
-		pluginID: normalizedPluginID,
-		service:  service,
-		services: services,
+		pluginID:      normalizedPluginID,
+		service:       service,
+		services:      services,
+		runningByName: make(map[string]bool),
 	}
 }
 
-// Add registers one guarded scheduled job.
-func (r *sourceJobRegistrar) Add(
-	ctx context.Context,
-	pattern string,
-	name string,
-	handler pluginhost.JobHandler,
-) error {
-	return r.AddWithMetadata(ctx, pattern, name, name, "", handler)
-}
-
-// AddWithMetadata registers one guarded scheduled job with English source display metadata.
-func (r *sourceJobRegistrar) AddWithMetadata(
-	ctx context.Context,
-	pattern string,
-	name string,
-	displayName string,
-	description string,
-	handler pluginhost.JobHandler,
-) error {
-	if handler == nil {
+// Add registers one guarded scheduled job described by JobSpec on the direct
+// gcron path, applying master-only and singleton guards when requested.
+func (r *sourceJobRegistrar) Add(ctx context.Context, spec pluginhost.JobSpec) error {
+	if spec.Handler == nil {
 		return gerror.New("pluginhost: job handler is nil")
 	}
+
+	jobName := strings.TrimSpace(spec.Name)
+	pattern := strings.TrimSpace(spec.Pattern)
+	if pattern == "" {
+		return gerror.New("pluginhost: job pattern is empty")
+	}
+	if jobName == "" {
+		return gerror.New("pluginhost: job name is empty")
+	}
+
+	scope := pluginhost.JobScope(strings.TrimSpace(spec.Scope.String()))
+	concurrency := pluginhost.JobConcurrency(strings.TrimSpace(spec.Concurrency.String()))
+	if scope != "" && !scope.IsValid() {
+		return gerror.Newf("pluginhost: job scope is invalid: %s", scope)
+	}
+	if concurrency != "" && !concurrency.IsValid() {
+		return gerror.Newf("pluginhost: job concurrency is invalid: %s", concurrency)
+	}
+	// Empty concurrency defaults to singleton so long-running ticks cannot stack.
+	if concurrency == "" {
+		concurrency = pluginhost.JobConcurrencySingleton
+	}
+	handler := spec.Handler
 
 	_, err := gcron.Add(ctx, pattern, func(jobCtx context.Context) {
 		if !r.canRun(jobCtx) {
 			return
 		}
+		if scope == pluginhost.JobScopeMasterOnly && !r.IsPrimaryNode() {
+			return
+		}
+		if concurrency == pluginhost.JobConcurrencySingleton {
+			if !r.tryBeginSingleton(jobName) {
+				return
+			}
+			defer r.endSingleton(jobName)
+		}
 		// Protect every scheduled-job callback at runtime so disabling a plugin
 		// immediately stops future executions without requiring host restart or
 		// plugin re-registration.
 		if runErr := handler(jobCtx); runErr != nil {
-			logger.Warningf(jobCtx, "plugin job failed plugin=%s name=%s err=%v", r.pluginID, name, runErr)
+			logger.Warningf(jobCtx, "plugin job failed plugin=%s name=%s err=%v", r.pluginID, jobName, runErr)
 		}
-	}, name)
+	}, jobName)
 	return err
+}
+
+// tryBeginSingleton marks one job as running when no prior run is active.
+func (r *sourceJobRegistrar) tryBeginSingleton(name string) bool {
+	if r == nil {
+		return false
+	}
+	r.runningMu.Lock()
+	defer r.runningMu.Unlock()
+	if r.runningByName == nil {
+		r.runningByName = make(map[string]bool)
+	}
+	if r.runningByName[name] {
+		return false
+	}
+	r.runningByName[name] = true
+	return true
+}
+
+// endSingleton clears the process-local running mark for one job.
+func (r *sourceJobRegistrar) endSingleton(name string) {
+	if r == nil {
+		return
+	}
+	r.runningMu.Lock()
+	defer r.runningMu.Unlock()
+	if r.runningByName == nil {
+		return
+	}
+	delete(r.runningByName, name)
 }
 
 // IsPrimaryNode reports whether the current host node is the primary node.

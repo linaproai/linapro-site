@@ -688,11 +688,12 @@ func (s *serviceImpl) discoverGitMetadataForPlugin(
 
 	synced := 0
 	failures := 0
+	skippedImmutable := 0
 	var firstFailure string
 	for index, ref := range refs {
 		// Full docs/sql/i18n enrichment is applied to every discovered ref, but
 		// remote doc body reads are bounded inside enrichGitReleaseMetadata.
-		created, discoverErr := s.discoverOneGitRef(ctx, plugin, repo, ref, token, client, treePaths, index == 0)
+		outcome, discoverErr := s.discoverOneGitRef(ctx, plugin, repo, ref, token, client, treePaths, index == 0)
 		if discoverErr != nil {
 			failures++
 			if firstFailure == "" {
@@ -700,8 +701,13 @@ func (s *serviceImpl) discoverGitMetadataForPlugin(
 			}
 			continue
 		}
-		if created {
+		switch outcome {
+		case gitDiscoverRefCreatedOrUpdated:
 			synced++
+		case gitDiscoverRefImmutable:
+			// Existing submitted/published versions are a successful no-op.
+			// Count them so re-registration is not reported as "discovered 0".
+			skippedImmutable++
 		}
 	}
 
@@ -719,6 +725,12 @@ func (s *serviceImpl) discoverGitMetadataForPlugin(
 		if firstFailure != "" {
 			message = message + ": " + firstFailure
 		}
+	} else if synced == 0 && skippedImmutable > 0 {
+		// Existing immutable versions are a successful no-op discovery, not a failure.
+		message = fmt.Sprintf(
+			"discovered 0 new draft releases (%d existing immutable version(s))",
+			skippedImmutable,
+		)
 	}
 	if err = s.updateGitSyncStatus(ctx, plugin.Id, status, message); err != nil {
 		return nil, err
@@ -743,6 +755,13 @@ func (s *serviceImpl) discoverGitMetadataForPlugin(
 				marketv1.MarketplaceProcessStatusPendingVerify,
 			)
 		}
+	} else if skippedImmutable > 0 {
+		// Re-register / re-sync with only immutable versions: restore the plugin
+		// process status from the existing submitted or published release so the
+		// owner UI does not stay at failed/pending_verify with zero drafts.
+		if _, healErr := s.healProcessStatusFromExistingReleases(ctx, plugin); healErr != nil {
+			return nil, healErr
+		}
 	}
 	record, err := s.getPluginRecordByID(ctx, plugin.Id)
 	if err != nil {
@@ -750,6 +769,19 @@ func (s *serviceImpl) discoverGitMetadataForPlugin(
 	}
 	return &DiscoverGitMetadataResult{Plugin: record, Synced: synced}, nil
 }
+
+// gitDiscoverRefOutcome classifies one ref import attempt for sync diagnostics.
+type gitDiscoverRefOutcome int
+
+const (
+	// gitDiscoverRefNone means no draft was written and the ref was not an
+	// immutable skip (unexpected empty result; treat as no-op).
+	gitDiscoverRefNone gitDiscoverRefOutcome = iota
+	// gitDiscoverRefCreatedOrUpdated means a mutable draft was inserted or replaced.
+	gitDiscoverRefCreatedOrUpdated
+	// gitDiscoverRefImmutable means the version already exists as submitted/published.
+	gitDiscoverRefImmutable
+)
 
 func (s *serviceImpl) discoverOneGitRef(
 	ctx context.Context,
@@ -760,24 +792,24 @@ func (s *serviceImpl) discoverOneGitRef(
 	client gitRemoteClient,
 	treePaths []string,
 	enrichDocs bool,
-) (createdOrUpdated bool, err error) {
+) (outcome gitDiscoverRefOutcome, err error) {
 	repoPath := normalizeGitRepoPath(plugin.RepoPath)
 	manifestBytes, err := client.ReadFile(ctx, repo, ref.Name, gitPathJoin(repoPath, gitRequiredPathPluginYAML), token)
 	if err != nil {
-		return false, err
+		return gitDiscoverRefNone, err
 	}
 	manifest, err := parseGitPluginManifest(manifestBytes)
 	if err != nil {
-		return false, err
+		return gitDiscoverRefNone, err
 	}
 	if err = validateGitSourceManifest(manifest); err != nil {
-		return false, err
+		return gitDiscoverRefNone, err
 	}
 	if normalizeKey(manifest.ID) != normalizeKey(plugin.PluginId) {
-		return false, packageDiagnosticError(CodeMarketplacePackageManifestMismatch, "plugin.yaml id does not match marketplace plugin id")
+		return gitDiscoverRefNone, packageDiagnosticError(CodeMarketplacePackageManifestMismatch, "plugin.yaml id does not match marketplace plugin id")
 	}
 	if ref.Kind == gitDiscoveryRefKindTag && !versionsSemanticallyEqual(ref.Name, manifest.Version) {
-		return false, bizerr.NewCode(
+		return gitDiscoverRefNone, bizerr.NewCode(
 			CodeMarketplaceGitVersionMismatch,
 			bizerr.P("diagnostic", "tag "+ref.Name+" does not match plugin.yaml version "+manifest.Version),
 		)
@@ -785,23 +817,23 @@ func (s *serviceImpl) discoverOneGitRef(
 	// Prefer tree path set when available to avoid extra PathExists round-trips.
 	if len(treePaths) > 0 {
 		if !gitPathSetHasSourceStructure(buildGitPathSet(treePaths), repoPath) {
-			return false, packageDiagnosticError(
+			return gitDiscoverRefNone, packageDiagnosticError(
 				CodeMarketplacePackageStructureInvalid,
 				"remote repository is missing required source plugin files",
 			)
 		}
 	} else if err = validateGitRemoteStructure(ctx, client, repo, ref.Name, repoPath, token); err != nil {
-		return false, err
+		return gitDiscoverRefNone, err
 	}
 
 	// Pin the resolved commit so installs do not float with branch tips.
 	sourceCommit, err := client.ResolveCommitSHA(ctx, repo, ref.Name, token)
 	if err != nil {
-		return false, err
+		return gitDiscoverRefNone, err
 	}
 	sourceCommit = normalizeKey(sourceCommit)
 	if sourceCommit == "" {
-		return false, packageDiagnosticError(
+		return gitDiscoverRefNone, packageDiagnosticError(
 			CodeMarketplaceGitDiscoveryFailed,
 			"failed to resolve commit SHA for ref "+ref.Name,
 		)
@@ -810,37 +842,37 @@ func (s *serviceImpl) discoverOneGitRef(
 	versionLabel := normalizeVersionLabel(manifest.Version)
 	existing, err := s.getReleaseByPluginVersion(ctx, plugin.PluginId, versionLabel)
 	if err != nil {
-		return false, err
+		return gitDiscoverRefNone, err
 	}
 	if existing != nil && immutableRelease(existing) {
-		return false, nil
+		return gitDiscoverRefImmutable, nil
 	}
 
 	snapshot, err := packageJSONString(manifest)
 	if err != nil {
-		return false, err
+		return gitDiscoverRefNone, err
 	}
 	deps, err := packageJSONString(buildSourceDependencySummary(manifestAsSource(manifest)))
 	if err != nil {
-		return false, err
+		return gitDiscoverRefNone, err
 	}
 	sqlSummary, i18nSummary, docsSummary := buildGitResourceSummariesFromTree(treePaths, repoPath)
 	sqlJSON, err := packageJSONString(sqlSummary)
 	if err != nil {
-		return false, err
+		return gitDiscoverRefNone, err
 	}
 	i18nJSON, err := packageJSONString(i18nSummary)
 	if err != nil {
-		return false, err
+		return gitDiscoverRefNone, err
 	}
 	docsJSON, err := packageJSONString(docsSummary)
 	if err != nil {
-		return false, err
+		return gitDiscoverRefNone, err
 	}
 	diagnostics := sourcePackageDiagnostics(manifestAsSource(manifest), sqlSummary, i18nSummary, docsSummary)
 	riskJSON, err := packageJSONString(buildSourceRiskSummary(diagnostics))
 	if err != nil {
-		return false, err
+		return gitDiscoverRefNone, err
 	}
 
 	reviewMessage := "Imported from Git tag " + ref.Name
@@ -869,15 +901,15 @@ func (s *serviceImpl) discoverOneGitRef(
 
 	release, err := s.saveGitReleaseDraft(ctx, plugin, in)
 	if err != nil {
-		return false, err
+		return gitDiscoverRefNone, err
 	}
 	if release == nil {
-		return false, nil
+		return gitDiscoverRefNone, nil
 	}
 
 	// Keep publisher-facing plugin identity aligned with the discovered plugin.yaml.
 	if applyErr := s.applyGitManifestToPlugin(ctx, plugin, manifest, versionLabel, release.ID); applyErr != nil {
-		return false, applyErr
+		return gitDiscoverRefNone, applyErr
 	}
 	// Persist display name/summary per locale. Base row comes from plugin.yaml;
 	// remote runtime i18n catalogs (manifest/i18n/<locale>/*.json, non-apidoc)
@@ -895,7 +927,7 @@ func (s *serviceImpl) discoverOneGitRef(
 	localeCatalogs := loadGitDisplayI18nCatalogs(ctx, client, repo, ref.Name, token, repoPath, treePaths)
 	displayItems = mergePackageI18nDisplayItems(plugin.PluginId, displayItems, localeCatalogs)
 	if displayErr := s.replaceReleaseDisplayI18n(ctx, release, displayItems); displayErr != nil {
-		return false, displayErr
+		return gitDiscoverRefNone, displayErr
 	}
 
 	if enrichDocs {
@@ -904,7 +936,7 @@ func (s *serviceImpl) discoverOneGitRef(
 			_ = s.updateGitSyncStatus(ctx, plugin.Id, gitSyncStatusPartial, "release imported; documentation indexing incomplete: "+gitPublicErrorMessage(docsErr))
 		}
 	}
-	return true, nil
+	return gitDiscoverRefCreatedOrUpdated, nil
 }
 
 // saveGitReleaseDraft persists a mutable Git-sourced release draft.

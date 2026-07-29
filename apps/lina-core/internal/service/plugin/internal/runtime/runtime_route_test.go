@@ -6,18 +6,8 @@ package runtime
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
-	"os"
-	"path/filepath"
-	"runtime"
-	"strings"
-	"testing"
-	"time"
-
 	"github.com/gogf/gf/v2/net/ghttp"
 	"github.com/golang-jwt/jwt/v5"
-
 	"lina-core/internal/dao"
 	"lina-core/internal/model/do"
 	configsvc "lina-core/internal/service/config"
@@ -28,6 +18,14 @@ import (
 	tokencap "lina-core/pkg/plugin/capability/authcap/token"
 	bridgecontract "lina-core/pkg/plugin/pluginbridge/contract"
 	"lina-core/pkg/plugin/pluginhost"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"testing"
+	"time"
 )
 
 // TestDynamicRouteEntrypointStaysSlim verifies runtime_route.go stays focused on
@@ -481,3 +479,6 @@ func countSourceLines(content string) int {
 	}
 	return lines
 }
+
+// statusNormal represents the normal/enabled status for role and menu test rows.
+const statusNormal = 1

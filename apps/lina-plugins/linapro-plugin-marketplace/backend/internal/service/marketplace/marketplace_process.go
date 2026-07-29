@@ -57,6 +57,11 @@ func (s *serviceImpl) processOnePlugin(
 	switch status {
 	case marketv1.MarketplaceProcessStatusPendingVerify:
 		return s.processPendingVerify(ctx, plugin)
+	case marketv1.MarketplaceProcessStatusFailed:
+		// Self-heal re-registration leftovers: when a release is already
+		// submitted/published, restore the matching process_status without
+		// re-running discovery (which would only report immutable skips).
+		return s.healProcessStatusFromExistingReleases(ctx, plugin)
 	default:
 		return false, nil
 	}
@@ -65,6 +70,11 @@ func (s *serviceImpl) processOnePlugin(
 // processPendingVerify discovers Git metadata when needed, validates that a
 // processable draft exists, then auto-submits it into the human review queue
 // (pending_review). Upload packages already have package bytes on the platform.
+//
+// Re-registering a Git monorepo re-queues plugins into pending_verify even when
+// an earlier run already submitted or published a release. Immutable releases
+// are skipped by discovery, so this stage must reconcile existing advanced
+// releases instead of failing with "no verifiable draft release".
 func (s *serviceImpl) processPendingVerify(
 	ctx context.Context,
 	plugin *entity.PluginMarketplacePlugin,
@@ -86,6 +96,14 @@ func (s *serviceImpl) processPendingVerify(
 		}
 	}
 	if release == nil {
+		// No mutable draft: heal from an already submitted/reviewing/published release.
+		healed, healErr := s.healProcessStatusFromExistingReleases(ctx, plugin)
+		if healErr != nil {
+			return false, healErr
+		}
+		if healed {
+			return true, nil
+		}
 		return false, bizerr.NewCode(
 			CodeMarketplacePackageScanFailed,
 			bizerr.P("diagnostic", "no verifiable draft release is ready for review"),
@@ -143,9 +161,12 @@ func (s *serviceImpl) listPluginsForProcessPipeline(
 	cols := dao.PluginMarketplacePlugin.Columns()
 	var rows []*entity.PluginMarketplacePlugin
 	// Include published plugins when a newer draft version re-enters the pipeline.
+	// Also include failed plugins so already-submitted/published releases can
+	// self-heal after Git monorepo re-registration (see healProcessStatusFromExistingReleases).
 	err := dao.PluginMarketplacePlugin.Ctx(ctx).
 		WhereIn(cols.ProcessStatus, []string{
 			marketv1.MarketplaceProcessStatusPendingVerify.String(),
+			marketv1.MarketplaceProcessStatusFailed.String(),
 		}).
 		WhereIn(cols.MarketStatus, []string{
 			marketv1.MarketplaceStatusDraft.String(),
@@ -188,6 +209,85 @@ func (s *serviceImpl) findProcessableDraftRelease(
 		return nil, bizerr.WrapCode(err, CodeMarketplaceStorageFailed)
 	}
 	return release, nil
+}
+
+// findLatestRelease loads the newest release row for one plugin identity.
+func (s *serviceImpl) findLatestRelease(
+	ctx context.Context,
+	plugin *entity.PluginMarketplacePlugin,
+) (*entity.PluginMarketplaceRelease, error) {
+	if plugin == nil || normalizeKey(plugin.PluginId) == "" {
+		return nil, nil
+	}
+	cols := dao.PluginMarketplaceRelease.Columns()
+	var release *entity.PluginMarketplaceRelease
+	err := dao.PluginMarketplaceRelease.Ctx(ctx).
+		Where(do.PluginMarketplaceRelease{PluginId: plugin.PluginId}).
+		OrderDesc(cols.UpdatedAt).
+		OrderDesc(cols.Id).
+		Limit(1).
+		Scan(&release)
+	if err != nil {
+		return nil, bizerr.WrapCode(err, CodeMarketplaceStorageFailed)
+	}
+	return release, nil
+}
+
+// reconcileProcessStatusFromRelease maps an already-advanced release to the
+// plugin process_status that should be restored without creating a new draft.
+// Returns ok=false when the release still needs the normal verify/submit path.
+func reconcileProcessStatusFromRelease(
+	release *entity.PluginMarketplaceRelease,
+) (marketv1.MarketplaceProcessStatus, bool) {
+	if release == nil {
+		return "", false
+	}
+	// Published / approved releases complete the async pipeline.
+	if marketv1.MarketplaceStatus(release.ReleaseStatus) == marketv1.MarketplaceStatusPublished ||
+		marketv1.MarketplaceReviewStatus(release.ReviewStatus) == marketv1.MarketplaceReviewStatusApproved {
+		return marketv1.MarketplaceProcessStatusCompleted, true
+	}
+	// Submitted or reviewing drafts are already waiting for human review.
+	switch marketv1.MarketplaceReviewStatus(release.ReviewStatus) {
+	case marketv1.MarketplaceReviewStatusSubmitted, marketv1.MarketplaceReviewStatusReviewing:
+		return marketv1.MarketplaceProcessStatusPendingReview, true
+	default:
+		return "", false
+	}
+}
+
+// healProcessStatusFromExistingReleases restores plugin process_status from an
+// already submitted/reviewing/published release. Used when re-registration
+// re-queues pending_verify but discovery cannot refresh immutable releases.
+// Returns healed=true when status was reconciled.
+func (s *serviceImpl) healProcessStatusFromExistingReleases(
+	ctx context.Context,
+	plugin *entity.PluginMarketplacePlugin,
+) (bool, error) {
+	if plugin == nil {
+		return false, nil
+	}
+	latest, err := s.findLatestRelease(ctx, plugin)
+	if err != nil {
+		return false, err
+	}
+	status, ok := reconcileProcessStatusFromRelease(latest)
+	if !ok {
+		return false, nil
+	}
+	// Keep last_sync_message from discovery/sync diagnostics; only restore process_status.
+	if err = s.setPluginProcessStatus(ctx, plugin.Id, status, ""); err != nil {
+		return false, err
+	}
+	if latest != nil && latest.Id > 0 {
+		if _, updateErr := dao.PluginMarketplaceRelease.Ctx(ctx).
+			Where(do.PluginMarketplaceRelease{Id: latest.Id}).
+			Data(do.PluginMarketplaceRelease{ProcessStatus: status.String()}).
+			Update(); updateErr != nil {
+			return false, bizerr.WrapCode(updateErr, CodeMarketplaceStorageFailed)
+		}
+	}
+	return true, nil
 }
 
 // releaseHasVerificationPayload reports whether a draft carries scan/manifest data.

@@ -53,7 +53,7 @@ func (s *serviceImpl) Login(ctx context.Context, in LoginInput) (*LoginOutput, e
 		return nil, err
 	}
 
-	dispatchLoginFailed := func(username string, msg string, reason string) {
+	dispatchLoginFailed := func(username string, msg string, reason pluginhost.AuthHookReason) {
 		s.dispatchAuthHookEvent(ctx, pluginhost.ExtensionPointAuthLoginFailed, pluginhost.AuthHookPayloadInput{
 			UserName:   username,
 			Status:     authLoginStatusFail,
@@ -107,7 +107,7 @@ func (s *serviceImpl) Login(ctx context.Context, in LoginInput) (*LoginOutput, e
 		return nil, err
 	}
 	if user.TenantId != int(tenantcap.PLATFORM) && (!tenantSvcAvailable || len(tenants) == 0) {
-		dispatchLoginFailed(in.Username, authEventMessageTenantUnavailable, authHookReasonTenantUnavailable)
+		dispatchLoginFailed(in.Username, authEventMessageTenantUnavailable, pluginhost.AuthHookReasonTenantUnavailable)
 		return nil, bizerr.NewCode(CodeAuthTenantUnavailable)
 	}
 	if len(tenants) > 1 {

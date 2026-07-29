@@ -11,6 +11,28 @@ function readPluginFile(relativePath) {
   return readFileSync(path.join(pluginRoot, relativePath), "utf8");
 }
 
+/**
+ * Extract minWidth for a vxe column object where `field` appears before minWidth.
+ * Returns null when the field or minWidth cannot be found.
+ */
+function extractColumnMinWidth(source, field) {
+  const escaped = field.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = source.match(
+    new RegExp(
+      String.raw`field:\s*["']${escaped}["'][\s\S]*?minWidth:\s*(\d+)`,
+    ),
+  );
+  return match ? Number(match[1]) : null;
+}
+
+function extractColumnWidth(source, field) {
+  const escaped = field.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = source.match(
+    new RegExp(String.raw`field:\s*["']${escaped}["'][\s\S]*?width:\s*(\d+)`),
+  );
+  return match ? Number(match[1]) : null;
+}
+
 function listVuePages() {
   const pagesRoot = path.join(pluginRoot, "frontend", "pages");
   const result = [];
@@ -126,6 +148,9 @@ describe("marketplace frontend composition logic", () => {
     assert.match(source, /mine\.columns\.sourceKind/);
     assert.match(source, /field:\s*["']sourceKind["']/);
     assert.match(source, /mine\.actions\.registerPublisher/);
+    assert.match(source, /publisherToolbarLabel/);
+    assert.match(source, /toolbarHasPublisher/);
+    assert.match(source, /loadPublishersForToolbar/);
     // Status filter options must match publisher-visible process tags.
     assert.match(source, /value:\s*["']pending_verify["']/);
     assert.match(source, /value:\s*["']pending_review["']/);
@@ -134,6 +159,46 @@ describe("marketplace frontend composition logic", () => {
     assert.match(source, /field:\s*["']downloadCount["']/);
     // Source is a dedicated column; name no longer hosts a source-kind tag.
     assert.match(source, /slots:\s*\{\s*default:\s*["']sourceKind["']\s*\}/);
+    // Add-plugin: Git repository is left option and the default selection.
+    assert.match(
+      source,
+      /value:\s*["']git["'][\s\S]*?value:\s*["']upload["']/,
+    );
+    assert.match(source, /defaultValue:\s*["']git["']/);
+    assert.match(source, /ref<PublishSourceKind>\(["']git["']\)/);
+    assert.match(source, /setValues\(\{\s*sourceKind:\s*["']git["']\s*\}\)/);
+    // Identity first: name then description (summary), then ops-critical status.
+    // Visibility is not a user-facing column; public catalog is status-driven.
+    assert.match(
+      source,
+      /field:\s*["']name["'][\s\S]*?field:\s*["']summary["'][\s\S]*?field:\s*["']marketStatus["'][\s\S]*?field:\s*["']latestVersion["'][\s\S]*?field:\s*["']downloadCount["']/,
+    );
+    assert.doesNotMatch(source, /field:\s*["']visibility["']/);
+    // Readable floors for identity columns — guard against density-driven narrowing.
+    assert.ok(
+      extractColumnMinWidth(source, "pluginId") >= 200,
+      "mine pluginId column minWidth must be >= 200",
+    );
+    assert.ok(
+      extractColumnMinWidth(source, "name") >= 200,
+      "mine name column minWidth must be >= 200",
+    );
+    assert.ok(
+      extractColumnMinWidth(source, "summary") >= 260,
+      "mine summary/description column minWidth must be >= 260",
+    );
+    assert.ok(
+      extractColumnWidth(source, "latestVersion") >= 132,
+      "mine latest-version header must fit English copy",
+    );
+    assert.ok(
+      extractColumnWidth(source, "downloadCount") >= 112,
+      "mine downloads header must fit English copy",
+    );
+    assert.ok(
+      extractColumnWidth(source, "updatedAt") >= 184,
+      "mine updatedAt must fit YYYY-MM-DD HH:mm:ss",
+    );
     assert.doesNotMatch(
       source,
       /openGitPublishDrawer|mine\.actions\.registerGit/,
@@ -166,6 +231,8 @@ describe("marketplace frontend composition logic", () => {
     assert.doesNotMatch(mine, /Dropdown|MenuItem|pages\.common\.more/);
     assert.doesNotMatch(mine, /mine\.actions\.saveGitSource/);
     assert.doesNotMatch(mine, /fieldName:\s*"visibility"/);
+    assert.doesNotMatch(mine, /field:\s*["']visibility["']/);
+    assert.doesNotMatch(mine, /formatVisibility/);
     // Drawer chrome keeps “添加插件”; body must not repeat pluginBasic heading.
     assert.doesNotMatch(mine, /mine\.sections\.pluginBasic/);
     // Process pipeline no longer exposes pending_fetch to the UI.
@@ -173,6 +240,8 @@ describe("marketplace frontend composition logic", () => {
     const detail = readPluginFile("frontend/pages/detail/index.vue");
     const admin = readPluginFile("frontend/pages/admin-list/index.vue");
     const types = readPluginFile("frontend/types/marketplace.ts");
+    // Detail header tags: type + status (+ source); no user-facing visibility.
+    assert.doesNotMatch(detail, /formatVisibility/);
     assert.match(detail, /preferences\.app\.locale/);
     assert.match(detail, /marketplaceReleaseDocumentBundle/);
     assert.match(detail, /availableDocuments/);
@@ -193,6 +262,74 @@ describe("marketplace frontend composition logic", () => {
     assert.match(review, /class="marketplace-review-risk-list"/);
     assert.match(review, /risk\.source/);
     assert.match(review, /risk\.summary/);
+    // Inspect path must import nextTick; missing import hard-crashes the drawer.
+    assert.match(
+      review,
+      /import\s*\{[^}]*\bnextTick\b[^}]*\}\s*from\s*["']vue["']/,
+    );
+    assert.match(review, /class="plugin-marketplace-review"/);
+    // Locale switch rebuilds filter/column/decision chrome (same pattern as mine).
+    assert.match(
+      review,
+      /preferences\.app\.locale[\s\S]*?buildFormOptions\(\)[\s\S]*?buildColumns\(\)[\s\S]*?buildDecisionSchema\(\)/,
+    );
+    // Review status is ops-critical: keep it before version/submittedAt.
+    assert.match(
+      review,
+      /field:\s*["']reviewStatus["'][\s\S]*?field:\s*["']version["']/,
+    );
+    // Admin list matches mine table chrome (split id/name, status early, tags).
+    assert.match(admin, /class="plugin-marketplace-admin-list"/);
+    assert.match(admin, /mine\.columns\.pluginId/);
+    assert.match(admin, /mine\.columns\.name/);
+    assert.match(admin, /mine\.fields\.status/);
+    assert.match(admin, /rowClassName:\s*["']cursor-pointer["']/);
+    assert.match(admin, /slots:\s*\{\s*default:\s*["']name["']\s*\}/);
+    assert.match(admin, /max-w-full truncate font-medium/);
+    assert.match(admin, /font-mono text-xs tabular-nums/);
+    assert.match(admin, /buildStatusTooltip/);
+    assert.match(
+      admin,
+      /getMarketStatusColor\(row\.marketStatus,\s*row\.processStatus\)/,
+    );
+    assert.match(
+      admin,
+      /case\s*["']pending_review["'][\s\S]*?return\s*["']gold["']/,
+    );
+    assert.match(
+      admin,
+      /preferences\.app\.locale[\s\S]*?buildFormOptions\(\)[\s\S]*?buildColumns\(\)/,
+    );
+    // Split identity columns + status early (same order pattern as mine).
+    assert.match(
+      admin,
+      /field:\s*["']pluginId["'][\s\S]*?field:\s*["']name["'][\s\S]*?field:\s*["']marketStatus["'][\s\S]*?field:\s*["']latestReviewStatus["']/,
+    );
+    // Stacked two-line plugin cell must not return (diverges from mine chrome).
+    assert.doesNotMatch(
+      admin,
+      /admin-plugin-cell|admin-plugin-name|admin-plugin-id/,
+    );
+    assert.ok(
+      extractColumnMinWidth(admin, "pluginId") >= 200,
+      "admin pluginId column minWidth must be >= 200 (match mine)",
+    );
+    assert.ok(
+      extractColumnMinWidth(admin, "name") >= 200,
+      "admin name column minWidth must be >= 200 (match mine)",
+    );
+    assert.ok(
+      extractColumnWidth(admin, "latestVersion") >= 132,
+      "admin latest-version header must fit English copy",
+    );
+    assert.ok(
+      extractColumnWidth(admin, "downloadCount") >= 112,
+      "admin downloads header must fit English copy",
+    );
+    assert.ok(
+      extractColumnWidth(review, "submittedAt") >= 184,
+      "review submitted timestamp must fit without ellipsis",
+    );
   });
 
   it("hides downloads without the marketplace download permission", () => {
@@ -254,6 +391,30 @@ describe("marketplace frontend i18n keys", () => {
       assert.ok(zhKeys.has(key), `missing zh-CN key ${key}`);
     }
     assert.deepEqual([...enKeys].sort(), [...zhKeys].sort());
+    assert.equal(
+      zh["plugin.linapro-plugin-marketplace.mine.columns.pluginId"],
+      "插件标识",
+    );
+    assert.equal(
+      zh["plugin.linapro-plugin-marketplace.mine.columns.name"],
+      "插件名称",
+    );
+    assert.equal(
+      zh["plugin.linapro-plugin-marketplace.mine.columns.summary"],
+      "插件描述",
+    );
+    assert.equal(
+      en["plugin.linapro-plugin-marketplace.mine.columns.pluginId"],
+      "Plugin Identifier",
+    );
+    assert.equal(
+      en["plugin.linapro-plugin-marketplace.mine.columns.name"],
+      "Plugin Name",
+    );
+    assert.equal(
+      en["plugin.linapro-plugin-marketplace.mine.columns.summary"],
+      "Description",
+    );
   });
 });
 

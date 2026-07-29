@@ -35,39 +35,74 @@ test.describe("TC-1 marketplace publisher workspace", () => {
     await expect(
       page.getByText("我的插件", { exact: true }).last(),
     ).toBeVisible();
-    await marketplace.expectColumn("mine", "可见性");
+    await marketplace.expectColumn("mine", "插件标识");
+    await marketplace.expectColumn("mine", "插件名称");
+    await marketplace.expectColumn("mine", "插件描述");
+    await marketplace.expectColumn("mine", "状态");
     await marketplace.expectColumn("mine", "下载量");
     await marketplace.expectMineSourceColumn();
+    // Visibility is not a user-facing mine column (status drives catalog).
+    await expect(
+      page
+        .locator(
+          ".plugin-marketplace-mine .vxe-table--main-wrapper .vxe-header--column",
+        )
+        .filter({ hasText: "可见性" }),
+    ).toHaveCount(0);
+    // Description sits immediately to the right of Name.
+    const mineHeaders = page.locator(
+      ".plugin-marketplace-mine .vxe-table--main-wrapper .vxe-header--column",
+    );
+    const nameIdx = await mineHeaders
+      .filter({ hasText: "插件名称" })
+      .first()
+      .evaluate((el) =>
+        Array.from(el.parentElement?.children ?? []).indexOf(el),
+      );
+    const summaryIdx = await mineHeaders
+      .filter({ hasText: "插件描述" })
+      .first()
+      .evaluate((el) =>
+        Array.from(el.parentElement?.children ?? []).indexOf(el),
+      );
+    expect(summaryIdx).toBe(nameIdx + 1);
     await marketplace.expectNoHorizontalPageOverflow();
     await marketplace.expectNoHorizontalMineTableOverflow();
     await expect(
       marketplace.mineRow(marketplaceSourcePluginId()),
-    ).toContainText("公开");
+    ).toContainText("LinaPro 源码演示");
+    await expect(
+      marketplace.mineRow(marketplaceSourcePluginId()),
+    ).toContainText("已发布");
     await expect(
       marketplace.mineRow(marketplaceDynamicPluginId()),
-    ).toContainText("公开");
+    ).toContainText("已发布");
     await expect(
       marketplace.mineRow(marketplacePrivatePluginId()),
-    ).toContainText("私有");
+    ).toBeVisible();
     await expect(
       marketplace.mineRow(marketplaceExternalPluginId()),
     ).toHaveCount(0);
     await marketplace.expectMineSearchFormStatusOptions();
     await marketplace.expectNoRegisterGitToolbarAction();
     await expect(
-      page.getByRole("button", { name: "登记发布者" }),
+      page.getByRole("button", { name: "编辑发布者" }),
     ).toBeVisible();
     await expect(page.getByRole("button", { name: "添加插件" })).toBeVisible();
     await captureMarketplaceScreenshot(page, "mine-first-load");
 
     await page.setViewportSize({ height: 768, width: 1024 });
     await marketplace.expectColumn("mine", "更新时间");
+    await marketplace.expectColumnHeaderFits("mine", "更新时间");
+    await marketplace.expectVisibleCellContentFits(
+      "mine",
+      "mine-updated-at-column",
+    );
     await marketplace.expectNoHorizontalMineTableOverflow();
     await marketplace.expectMineRowsVerticallySeparated();
     const compactSourceRow = marketplace.mineRow(marketplaceSourcePluginId());
     await expect(compactSourceRow).toContainText("源码插件");
     await expect(compactSourceRow).toContainText("已发布");
-    await expect(compactSourceRow).toContainText("公开");
     await expect(compactSourceRow).toContainText("v1.0.0");
     // Download count is projected next to latest version; review status is no
     // longer a dedicated mine-table column.
@@ -137,24 +172,21 @@ test.describe("TC-1 marketplace publisher workspace", () => {
     ).toBeVisible();
     // Drawer body must not repeat the same title under the chrome header.
     await expect(
-      marketplace
-        .publishDrawer()
-        .locator("h3")
-        .filter({ hasText: "添加插件" }),
+      marketplace.publishDrawer().locator("h3").filter({ hasText: "添加插件" }),
     ).toHaveCount(0);
     await expect(
       marketplace.publishDrawer().getByText("分发方式"),
     ).toBeVisible();
+    const sourceKindRadios = marketplace
+      .publishDrawer()
+      .locator("label.ant-radio-button-wrapper");
+    // Git repository is left (default); upload package is right.
+    await expect(sourceKindRadios.nth(0)).toContainText("Git 仓库");
+    await expect(sourceKindRadios.nth(1)).toContainText("上传包");
     await expect(
       marketplace
         .publishDrawer()
-        .locator("label.ant-radio-button-wrapper")
-        .filter({ hasText: "上传包" }),
-    ).toBeVisible();
-    await expect(
-      marketplace
-        .publishDrawer()
-        .locator("label.ant-radio-button-wrapper")
+        .locator("label.ant-radio-button-wrapper-checked")
         .filter({ hasText: "Git 仓库" }),
     ).toBeVisible();
     await expect(
@@ -163,6 +195,38 @@ test.describe("TC-1 marketplace publisher workspace", () => {
     await expect(marketplace.publishDrawer().getByText("可见性")).toHaveCount(
       0,
     );
+    await marketplace.expectAddPluginDrawerLayout();
+    // Default Git mode exposes repo fields and hides package upload.
+    await expect(
+      marketplace
+        .publishDrawer()
+        .locator("label")
+        .filter({ hasText: "仓库地址" }),
+    ).toBeVisible();
+    await expect(
+      marketplace.publishDrawer().getByTestId("mine-package-field"),
+    ).toBeHidden();
+    await expect(
+      marketplace
+        .publishDrawer()
+        .locator(".ant-form-item:visible")
+        .filter({ hasText: "插件 ID" }),
+    ).toHaveCount(0);
+    await expect(
+      marketplace
+        .publishDrawer()
+        .locator(".ant-form-item:visible")
+        .filter({ hasText: "可见性" }),
+    ).toHaveCount(0);
+    await expect(
+      marketplace
+        .publishDrawer()
+        .locator(".mine-drawer-actions")
+        .getByRole("button", { name: "添加插件" }),
+    ).toBeVisible();
+    await captureMarketplaceScreenshot(page, "mine-publish-git-mode");
+
+    await marketplace.selectPublishSourceKind("upload");
     await marketplace.expectAddPluginDrawerLayout();
     // Package upload sits in the same form label column as distribution mode.
     await expect(
@@ -179,36 +243,6 @@ test.describe("TC-1 marketplace publisher workspace", () => {
     await marketplace.openPublishDrawer();
     await marketplace.expectPluginDraftReset();
 
-    await marketplace.selectPublishSourceKind("git");
-    await expect(
-      marketplace
-        .publishDrawer()
-        .locator("label")
-        .filter({ hasText: "仓库地址" }),
-    ).toBeVisible();
-    await expect(
-      marketplace
-        .publishDrawer()
-        .locator(".ant-form-item:visible")
-        .filter({ hasText: "插件 ID" }),
-    ).toHaveCount(0);
-    await expect(
-      marketplace
-        .publishDrawer()
-        .locator(".ant-form-item:visible")
-        .filter({ hasText: "可见性" }),
-    ).toHaveCount(0);
-    await expect(
-      marketplace.publishDrawer().getByTestId("mine-package-field"),
-    ).toBeHidden();
-    await expect(
-      marketplace
-        .publishDrawer()
-        .locator(".mine-drawer-actions")
-        .getByRole("button", { name: "添加插件" }),
-    ).toBeVisible();
-    await marketplace.expectAddPluginDrawerLayout();
-    await captureMarketplaceScreenshot(page, "mine-publish-git-mode");
     await marketplace.selectPublishSourceKind("upload");
     await marketplace.expectAddPluginDrawerLayout();
     await expect(

@@ -20,10 +20,9 @@ import type {
   MarketplaceProcessStatus,
   MarketplacePublisherItem,
   MarketplaceStatus,
-  MarketplaceVisibility,
 } from "../../types/marketplace";
 
-import { computed, defineAsyncComponent, onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 
 import { Page, useVbenDrawer, useVbenModal } from "@vben/common-ui";
@@ -55,6 +54,7 @@ import {
   marketplacePublisherList,
   marketplacePublisherUpdate,
 } from "../../api/marketplace";
+import DetailModalContent from "../detail/detail-modal.vue";
 
 type GridPageInfo = {
   currentPage: number;
@@ -80,14 +80,14 @@ const workflowMessageKey = "plugin-marketplace-publish-workflow";
 const mineRowClickIgnoredFields = new Set(["action"]);
 
 const [DetailModal, detailModalApi] = useVbenModal({
-  connectedComponent: defineAsyncComponent(
-    () => import("../detail/detail-modal.vue"),
-  ),
+  connectedComponent: DetailModalContent,
 });
 const publishMode = ref<PublishMode>("plugin");
-const publishSourceKind = ref<PublishSourceKind>("upload");
+const publishSourceKind = ref<PublishSourceKind>("git");
 const publishers = ref<MarketplacePublisherItem[]>([]);
 const boundPublisher = ref<MarketplacePublisherItem | null>(null);
+/** Toolbar label only — not cleared when the publish drawer resets form state. */
+const toolbarHasPublisher = ref(false);
 const uploadFileList = ref<UploadFile[]>([]);
 const versionTarget = ref<MarketplacePluginListItem | null>(null);
 const drawerTitle = computed(() => {
@@ -107,6 +107,11 @@ const publisherDrawerTitle = computed(() =>
     : t("plugin.linapro-plugin-marketplace.mine.actions.registerPublisher"),
 );
 const hasPublishers = computed(() => publishers.value.length > 0);
+const publisherToolbarLabel = computed(() =>
+  toolbarHasPublisher.value
+    ? t("plugin.linapro-plugin-marketplace.mine.actions.editPublisher")
+    : t("plugin.linapro-plugin-marketplace.mine.actions.registerPublisher"),
+);
 
 const [Grid, gridApi] = useVbenVxeGrid<MarketplacePluginListItem>({
   formOptions: {
@@ -248,7 +253,7 @@ const [PublishDrawer, publishDrawerApi] = useVbenDrawer({
       }
 
       publishMode.value = "plugin";
-      publishSourceKind.value = "upload";
+      publishSourceKind.value = "git";
       const result = await marketplacePublisherList({
         pageNum: 1,
         pageSize: 100,
@@ -257,7 +262,7 @@ const [PublishDrawer, publishDrawerApi] = useVbenDrawer({
       pluginFormApi.setState({
         schema: buildPluginSchema(publishers.value),
       });
-      await pluginFormApi.setValues({ sourceKind: "upload" });
+      await pluginFormApi.setValues({ sourceKind: "git" });
       if (publishers.value[0]) {
         await pluginFormApi.setFieldValue(
           "publisherKey",
@@ -380,8 +385,8 @@ function buildFormOptions() {
 }
 
 function buildColumns(): MineGridOptions["columns"] {
-  // Layout: id, name, source (own column), summary, version, downloads, type,
-  // status, visibility, updated time, and a fixed three-action column.
+  // Keep status early (ops-critical). pluginId/name minWidth floors stay readable
+  // for typical plugin ids and localized names; do not tighten them for density.
   return [
     {
       align: "left",
@@ -396,71 +401,71 @@ function buildColumns(): MineGridOptions["columns"] {
       field: "name",
       headerAlign: "center",
       minWidth: 200,
-      showOverflow: false,
+      showOverflow: "ellipsis",
       slots: { default: "name" },
       title: t("plugin.linapro-plugin-marketplace.mine.columns.name"),
-    },
-    {
-      field: "sourceKind",
-      slots: { default: "sourceKind" },
-      title: t("plugin.linapro-plugin-marketplace.mine.columns.sourceKind"),
-      width: 120,
     },
     {
       align: "left",
       className: "mine-summary-column",
       field: "summary",
       headerAlign: "center",
-      minWidth: 220,
-      showOverflow: false,
+      // Wider than name so short plugin descriptions stay readable before ellipsis.
+      minWidth: 260,
+      showOverflow: "ellipsis",
       slots: { default: "summary" },
       title: t("plugin.linapro-plugin-marketplace.mine.columns.summary"),
     },
     {
+      field: "marketStatus",
+      showOverflow: "ellipsis",
+      slots: { default: "marketStatus" },
+      title: t("plugin.linapro-plugin-marketplace.mine.fields.status"),
+      // Wide enough for en-US "Pending Review" / zh-CN "待审核" tags.
+      width: 124,
+    },
+    {
       field: "latestVersion",
-      showOverflow: false,
+      showOverflow: "ellipsis",
       slots: { default: "latestVersion" },
       title: t("plugin.linapro-plugin-marketplace.detail.fields.latestVersion"),
-      width: 148,
+      width: 132,
     },
     {
       field: "downloadCount",
       formatter: ({ cellValue }: { cellValue?: null | number }) =>
         String(cellValue ?? 0),
       title: t("plugin.linapro-plugin-marketplace.catalog.columns.downloads"),
-      width: 100,
+      width: 112,
+    },
+    {
+      field: "sourceKind",
+      slots: { default: "sourceKind" },
+      title: t("plugin.linapro-plugin-marketplace.mine.columns.sourceKind"),
+      width: 108,
     },
     {
       field: "pluginType",
       slots: { default: "pluginType" },
       title: t("plugin.linapro-plugin-marketplace.catalog.columns.type"),
-      width: 108,
-    },
-    {
-      field: "marketStatus",
-      slots: { default: "marketStatus" },
-      title: t("plugin.linapro-plugin-marketplace.mine.fields.status"),
-      width: 120,
-    },
-    {
-      field: "visibility",
-      slots: { default: "visibility" },
-      title: t("plugin.linapro-plugin-marketplace.console.fields.visibility"),
       width: 96,
     },
     {
+      // Match review submittedAt: full "YYYY-MM-DD HH:mm:ss" without clipping.
+      className: "mine-updated-at-column",
       field: "updatedAt",
       formatter: ({ cellValue }: { cellValue?: null | number | string }) =>
         formatTimestamp(cellValue),
       title: t("plugin.linapro-plugin-marketplace.catalog.columns.updatedAt"),
-      width: 180,
+      width: 184,
     },
     {
       field: "action",
       fixed: "right",
       slots: { default: "action" },
       title: t("plugin.linapro-plugin-marketplace.catalog.columns.actions"),
-      width: 220,
+      // Three ghost buttons: Details / New Version / Delist (en needs ~228px).
+      width: 232,
     },
   ];
 }
@@ -546,12 +551,12 @@ function buildPublisherSelectField(
 function buildSourceKindOptions() {
   return [
     {
-      label: t("plugin.linapro-plugin-marketplace.mine.sourceKind.upload"),
-      value: "upload",
-    },
-    {
       label: t("plugin.linapro-plugin-marketplace.mine.sourceKind.git"),
       value: "git",
+    },
+    {
+      label: t("plugin.linapro-plugin-marketplace.mine.sourceKind.upload"),
+      value: "upload",
     },
   ];
 }
@@ -568,7 +573,7 @@ function buildPluginSchema(
         options: buildSourceKindOptions(),
         optionType: "button",
       },
-      defaultValue: "upload",
+      defaultValue: "git",
       fieldName: "sourceKind",
       formItemClass: "md:col-span-2",
       label: t("plugin.linapro-plugin-marketplace.mine.fields.sourceKind"),
@@ -588,9 +593,7 @@ function buildPluginSchema(
       formItemClass: "mine-package-form-item md:col-span-2",
       // Tall control stack (hint + dragger): keep label top-aligned with sourceKind.
       labelClass: "self-start pt-1",
-      label: t(
-        "plugin.linapro-plugin-marketplace.mine.sections.packageUpload",
-      ),
+      label: t("plugin.linapro-plugin-marketplace.mine.sections.packageUpload"),
     },
     {
       component: "Input",
@@ -651,12 +654,24 @@ function resolvePublisherKey(
   throw new Error("validation");
 }
 
+async function loadPublishersForToolbar() {
+  try {
+    const result = await marketplacePublisherList({
+      pageNum: 1,
+      pageSize: 1,
+    });
+    toolbarHasPublisher.value = result.items.length > 0;
+  } catch {
+    // Toolbar label falls back to register; list reload still works independently.
+  }
+}
+
 onMounted(async () => {
   gridApi.setState({ formOptions: buildFormOptions() });
   gridApi.setGridOptions({ columns: buildColumns() });
   publisherFormApi.setState({ schema: buildPublisherSchema() });
   pluginFormApi.setState({ schema: buildPluginSchema([]) });
-  await gridApi.reload();
+  await Promise.all([gridApi.reload(), loadPublishersForToolbar()]);
   openDetailFromRouteQuery();
 });
 
@@ -667,14 +682,18 @@ watch(
   },
 );
 
-// Name/summary are backend-localized per request locale. Re-query when the
-// workbench language changes so list cells do not keep the previous language.
+// Name/summary are backend-localized per request locale. Rebuild chrome and
+// re-query when the workbench language changes so headers/filters/cells match.
 watch(
   () => preferences.app.locale,
   async (locale, previousLocale) => {
     if (!previousLocale || locale === previousLocale) {
       return;
     }
+    gridApi.setState({ formOptions: buildFormOptions() });
+    gridApi.setGridOptions({ columns: buildColumns() });
+    publisherFormApi.setState({ schema: buildPublisherSchema() });
+    pluginFormApi.setState({ schema: buildPluginSchema(publishers.value) });
     await gridApi.query();
   },
 );
@@ -782,20 +801,6 @@ function buildStatusTooltip(row: MarketplacePluginListItem) {
   return parts.join(" · ");
 }
 
-function formatVisibility(visibility: MarketplaceVisibility) {
-  switch (visibility) {
-    case "private": {
-      return t("plugin.linapro-plugin-marketplace.detail.visibility.private");
-    }
-    case "reserved": {
-      return t("plugin.linapro-plugin-marketplace.detail.visibility.reserved");
-    }
-    default: {
-      return t("plugin.linapro-plugin-marketplace.detail.visibility.public");
-    }
-  }
-}
-
 function formatReviewStatus(status?: string) {
   switch (status) {
     case "approved": {
@@ -858,7 +863,7 @@ function openPublishDrawer(row?: MarketplacePluginListItem) {
 async function resetPublishWorkflow() {
   await pluginFormApi.resetForm();
   publishMode.value = "plugin";
-  publishSourceKind.value = "upload";
+  publishSourceKind.value = "git";
   publishers.value = [];
   versionTarget.value = null;
   uploadFileList.value = [];
@@ -900,6 +905,7 @@ async function handleSavePublisher() {
         verified: false,
       };
     }
+    toolbarHasPublisher.value = true;
     message.success({
       content: t(
         "plugin.linapro-plugin-marketplace.console.messages.publisherSaved",
@@ -1064,11 +1070,7 @@ async function handleNewVersion(row: MarketplacePluginListItem) {
       <template #toolbar-tools>
         <Space>
           <a-button @click="openPublisherDrawer()">
-            {{
-              $t(
-                "plugin.linapro-plugin-marketplace.mine.actions.registerPublisher",
-              )
-            }}
+            {{ publisherToolbarLabel }}
           </a-button>
           <a-button type="primary" @click="openPublishDrawer()">
             {{ $t("plugin.linapro-plugin-marketplace.mine.actions.add") }}
@@ -1111,16 +1113,12 @@ async function handleNewVersion(row: MarketplacePluginListItem) {
 
       <template #marketStatus="{ row }">
         <Tooltip :title="buildStatusTooltip(row)">
-          <Tag :color="getMarketStatusColor(row.marketStatus, row.processStatus)">
+          <Tag
+            :color="getMarketStatusColor(row.marketStatus, row.processStatus)"
+          >
             {{ formatMarketStatus(row.marketStatus, row.processStatus) }}
           </Tag>
         </Tooltip>
-      </template>
-
-      <template #visibility="{ row }">
-        <Tag :color="row.visibility === 'public' ? 'green' : 'default'">
-          {{ formatVisibility(row.visibility) }}
-        </Tag>
       </template>
 
       <template #action="{ row }">
@@ -1312,6 +1310,11 @@ async function handleNewVersion(row: MarketplacePluginListItem) {
   overflow: hidden;
 }
 
+:deep(.mine-updated-at-column .vxe-cell) {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .mine-publish-sections {
   display: grid;
   gap: 20px;
@@ -1361,5 +1364,10 @@ async function handleNewVersion(row: MarketplacePluginListItem) {
 
 .mine-draft-result {
   margin-top: 12px;
+}
+
+/* Keep dense action buttons on one line inside the fixed action column. */
+:deep(.plugin-marketplace-mine .vxe-body--column.col--fixed .ant-space) {
+  flex-wrap: nowrap;
 }
 </style>

@@ -273,8 +273,8 @@ func TestRunLifecycleCallbacksRunsInstallModeChange(t *testing.T) {
 		InstallModeInput: NewSourcePluginInstallModeChangeInput(
 			"install-mode-aware",
 			LifecycleHookBeforeInstallModeChange.String(),
-			"global",
-			"tenant_scoped",
+			PluginInstallModeGlobal,
+			PluginInstallModeTenantScoped,
 		),
 		Participants: []LifecycleParticipant{
 			{

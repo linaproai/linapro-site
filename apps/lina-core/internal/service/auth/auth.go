@@ -55,10 +55,6 @@ const (
 	authEventMessageLogoutSuccessful = "Logout successful"
 	// authEventMessageExternalNotProvisioned is the English fallback for unlinked external-identity messages.
 	authEventMessageExternalNotProvisioned = "No local account is linked to this external identity"
-	// authHookReasonTenantUnavailable identifies tenant service or membership failures.
-	authHookReasonTenantUnavailable = "tenant_unavailable"
-	// authHookReasonExternalNotProvisioned identifies external-identity logins with no linked local account.
-	authHookReasonExternalNotProvisioned = "external_not_provisioned"
 )
 
 // tokenKind identifies the intended use of one signed JWT. The underlying

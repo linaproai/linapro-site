@@ -173,6 +173,27 @@ func TestPluginRecordIDsFromReleasesDeduplicates(t *testing.T) {
 	}
 }
 
+func TestReviewQueuePluginNameUsesRequestedLocale(t *testing.T) {
+	row := &entity.PluginMarketplaceRelease{Id: 7, PluginRecordId: 5}
+	displayByRelease := map[int][]*entity.PluginMarketplaceDisplayI18n{
+		7: {
+			{Locale: "en-US", Name: "Object Storage - S3"},
+			{Locale: "zh-CN", Name: "对象存储-S3"},
+		},
+	}
+	pluginNames := map[int]string{5: "Object Storage - S3"}
+
+	got := reviewQueuePluginName(row, pluginNames, displayByRelease, "zh-CN")
+	if got != "对象存储-S3" {
+		t.Fatalf("expected localized review queue name, got %q", got)
+	}
+
+	got = reviewQueuePluginName(row, pluginNames, nil, "zh-CN")
+	if got != pluginNames[5] {
+		t.Fatalf("expected identity fallback name, got %q", got)
+	}
+}
+
 func TestTagCodesByPluginRecordGroupsAndDeduplicatesRows(t *testing.T) {
 	rows := []*entity.PluginMarketplacePluginTag{
 		{PluginRecordId: 10, TagCode: "observability"},

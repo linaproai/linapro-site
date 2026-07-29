@@ -233,12 +233,16 @@ func (s *serviceImpl) approveRelease(
 ) (*ReleaseRecord, error) {
 	now := time.Now()
 	if err := dao.PluginMarketplaceRelease.Transaction(ctx, func(ctx context.Context, _ gdb.TX) error {
+		// Status drives public catalog; keep internal visibility in sync so
+		// published plugins are publicly listed without a separate user-facing
+		// visibility policy.
 		if _, updateErr := dao.PluginMarketplaceRelease.Ctx(ctx).
 			Where(do.PluginMarketplaceRelease{Id: release.Id}).
 			Data(do.PluginMarketplaceRelease{
 				ReleaseStatus: marketv1.MarketplaceStatusPublished.String(),
 				ReviewStatus:  marketv1.MarketplaceReviewStatusApproved.String(),
 				ProcessStatus: marketv1.MarketplaceProcessStatusCompleted.String(),
+				Visibility:    marketv1.MarketplaceVisibilityPublic.String(),
 				ReviewMessage: normalizeKey(message),
 				ReviewedAt:    &now,
 				PublishedAt:   &now,
@@ -250,6 +254,7 @@ func (s *serviceImpl) approveRelease(
 		pluginData := do.PluginMarketplacePlugin{
 			MarketStatus:    marketv1.MarketplaceStatusPublished.String(),
 			ProcessStatus:   marketv1.MarketplaceProcessStatusCompleted.String(),
+			Visibility:      marketv1.MarketplaceVisibilityPublic.String(),
 			LatestReleaseId: release.Id,
 			LatestVersion:   release.ReleaseVersion,
 		}

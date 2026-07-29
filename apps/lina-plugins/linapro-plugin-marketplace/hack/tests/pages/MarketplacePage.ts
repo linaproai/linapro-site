@@ -19,7 +19,7 @@ type VisibilityLabel =
 const adminTableSelector = ".plugin-marketplace-admin-list .vxe-table";
 const detailReleaseTableSelector = ".marketplace-detail-shell .vxe-table";
 const mineTableSelector = ".plugin-marketplace-mine .vxe-table";
-const reviewTableSelector = ".vxe-table:visible";
+const reviewTableSelector = ".plugin-marketplace-review .vxe-table";
 const rawMarketplaceKeyPattern =
   /plugin\.linapro-plugin-marketplace|error\.plugin\.marketplace/u;
 
@@ -132,12 +132,7 @@ export class MarketplacePage {
     table: "admin" | "mine" | "review",
     title: RegExp | string,
   ) {
-    const selector =
-      table === "admin"
-        ? adminTableSelector
-        : table === "mine"
-          ? mineTableSelector
-          : reviewTableSelector;
+    const selector = this.tableSelector(table);
     await expect(
       this.page
         .locator(`${selector} .vxe-header--column`)
@@ -146,30 +141,57 @@ export class MarketplacePage {
     ).toBeVisible();
   }
 
-  async expectAdminTableNoHorizontalOverflow() {
-    const body = this.page
-      .locator(
-        `${adminTableSelector} .vxe-table--main-wrapper .vxe-table--body-wrapper`,
-      )
+  async expectColumnHeaderFits(
+    table: "admin" | "mine" | "review",
+    title: string,
+  ) {
+    const header = this.page
+      .locator(`${this.tableSelector(table)} .vxe-header--column`)
+      .filter({ hasText: title })
       .first();
-    await expect(body).toBeVisible();
+    await expect(header).toBeVisible();
+    const label = header.locator(".vxe-cell--title").first();
+    await expect(label).toBeVisible();
     await expect
       .poll(async () =>
-        body.evaluate((element) => element.scrollWidth - element.clientWidth),
+        label.evaluate(
+          (element) => element.scrollWidth <= element.clientWidth + 1,
+        ),
       )
-      .toBeLessThanOrEqual(1);
+      .toBe(true);
   }
 
-  async expectAdminColumnBeforeFixedActions(title: string) {
-    const column = this.page
-      .locator(
-        `${adminTableSelector} .vxe-table--main-wrapper .vxe-header--column`,
+  async expectVisibleCellContentFits(
+    table: "admin" | "mine" | "review",
+    columnClass: string,
+  ) {
+    const cells = this.page.locator(
+      `${this.tableSelector(table)} .vxe-body--column.${columnClass} .vxe-cell`,
+    );
+    await expect(cells.first()).toBeVisible();
+    await expect
+      .poll(async () =>
+        cells.evaluateAll((elements) =>
+          elements.every(
+            (element) => element.scrollWidth <= element.clientWidth + 1,
+          ),
+        ),
       )
+      .toBe(true);
+  }
+
+  async expectColumnBeforeFixedActions(
+    table: "admin" | "mine" | "review",
+    title: string,
+  ) {
+    const selector = this.tableSelector(table);
+    const column = this.page
+      .locator(`${selector} .vxe-table--main-wrapper .vxe-header--column`)
       .filter({ hasText: title })
       .first();
     const actionColumn = this.page
       .locator(
-        `${adminTableSelector} .vxe-table--main-wrapper .vxe-header--column`,
+        `${selector} .vxe-table--fixed-right-wrapper .vxe-header--column`,
       )
       .filter({ hasText: /操作|Actions/u })
       .first();
@@ -195,6 +217,14 @@ export class MarketplacePage {
     ).toHaveCount(count);
   }
 
+  private tableSelector(table: "admin" | "mine" | "review") {
+    return table === "admin"
+      ? adminTableSelector
+      : table === "mine"
+        ? mineTableSelector
+        : reviewTableSelector;
+  }
+
   async openMineDetail(pluginId: string) {
     await this.openDetailFromTable(mineTableSelector, pluginId);
   }
@@ -218,7 +248,7 @@ export class MarketplacePage {
       if ((await backButton.count()) > 0) {
         await backButton.click();
       } else {
-        await detailDialog.locator(".ant-modal-close").click();
+        await detailDialog.locator("button:has(svg.lucide-x)").last().click();
       }
       await expect(detailDialog).toBeHidden({ timeout: 15_000 });
     } else {
@@ -343,18 +373,18 @@ export class MarketplacePage {
   }
 
   async expectMineRowActions(pluginId: string) {
-    const row = this.mineRow(pluginId);
+    const row = await this.rowActionScope(mineTableSelector, pluginId);
     await expect(
-      row.getByRole("button", { name: /详情|Detail/u }),
+      row.getByRole("button", { name: /详\s*情|Details/u }),
     ).toBeVisible();
     await expect(
-      row.getByRole("button", { name: /新版本|New Version/u }),
+      row.getByRole("button", { name: /新\s*版\s*本|New\s+Version/u }),
     ).toBeVisible();
     await expect(
-      row.getByRole("button", { name: /下架|Delist/u }),
+      row.getByRole("button", { name: /下\s*架|Delist/u }),
     ).toBeVisible();
     await expect(
-      row.getByRole("button", { name: /发布|Publish/u }),
+      row.getByRole("button", { name: /发\s*布|Publish/u }),
     ).toHaveCount(0);
     await expect(
       row.getByRole("button", { name: /更\s*多|More/u }),
@@ -407,13 +437,14 @@ export class MarketplacePage {
 
   async expectPluginDraftReset() {
     // Package-add form only keeps distribution mode; upload list must reset.
+    // Default distribution is Git repository (left option).
     await expect(
       this.publishDrawer().locator(".ant-upload-list-item"),
     ).toHaveCount(0);
     await expect(
       this.publishDrawer()
         .locator("label.ant-radio-button-wrapper-checked")
-        .filter({ hasText: /上传包|Upload Package/u }),
+        .filter({ hasText: /Git 仓库|Git Repository/u }),
     ).toBeVisible();
   }
 
@@ -586,13 +617,28 @@ export class MarketplacePage {
     const drawer = this.publishDrawer();
     // Prefer the form-aligned package field (add-plugin), then section heading
     // (new-version), then any file input in the drawer.
-    const packageFieldInput = drawer
-      .getByTestId("mine-package-field")
-      .locator('input[type="file"]')
-      .first();
-    if ((await packageFieldInput.count()) > 0) {
-      await packageFieldInput.setInputFiles(file);
-      return;
+    // Add-plugin defaults to Git; switch to upload only when source-kind radios exist.
+    const packageField = drawer.getByTestId("mine-package-field");
+    if ((await packageField.count()) > 0) {
+      if (await packageField.isVisible().catch(() => false)) {
+        await packageField
+          .locator('input[type="file"]')
+          .first()
+          .setInputFiles(file);
+        return;
+      }
+      const uploadRadio = drawer
+        .locator("label.ant-radio-button-wrapper")
+        .filter({ hasText: /上传包|Upload Package/u });
+      if (await uploadRadio.isVisible().catch(() => false)) {
+        await this.selectPublishSourceKind("upload");
+        await packageField
+          .locator('input[type="file"]')
+          .first()
+          .setInputFiles(file);
+        return;
+      }
+      // Hidden package field without radios = new-version mode; fall through.
     }
     const sectionInput = this.publishSection(
       /上传压缩包|Upload Package|版本包|Release Package/u,
@@ -860,6 +906,11 @@ export class MarketplacePage {
     rowText: string,
     buttonName: RegExp,
   ) {
+    const row = await this.rowActionScope(tableSelector, rowText);
+    return row.getByRole("button", { name: buttonName }).first();
+  }
+
+  private async rowActionScope(tableSelector: string, rowText: string) {
     await waitForRouteReady(this.page, 15_000);
     await waitForTableReady(this.page, tableSelector, 15_000);
     const mainRows = this.page.locator(
@@ -880,9 +931,9 @@ export class MarketplacePage {
         )
         .nth(index);
       if (await fixedRow.isVisible().catch(() => false)) {
-        return fixedRow.getByRole("button", { name: buttonName }).first();
+        return fixedRow;
       }
-      return row.getByRole("button", { name: buttonName }).first();
+      return row;
     }
     throw new Error(`Table row not found: ${rowText}`);
   }

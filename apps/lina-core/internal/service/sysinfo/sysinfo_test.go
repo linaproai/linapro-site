@@ -5,15 +5,13 @@ package sysinfo
 import (
 	"context"
 	"errors"
-	"testing"
-	"time"
-
-	_ "lina-core/pkg/dbdriver"
-
 	"lina-core/internal/service/cachecoord"
 	"lina-core/internal/service/cluster"
 	"lina-core/internal/service/config"
 	"lina-core/internal/service/coordination"
+	_ "lina-core/pkg/dbdriver"
+	"testing"
+	"time"
 )
 
 const (

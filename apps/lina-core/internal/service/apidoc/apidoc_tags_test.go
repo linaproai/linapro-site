@@ -198,11 +198,11 @@ func TestOrderOpenAPIDocumentTagsUsesGenericHierarchy(t *testing.T) {
 func TestAssignOpenAPIDocumentTagsCollectsAndOrdersDynamically(t *testing.T) {
 	document := goai.New()
 	document.Paths = goai.Paths{
-		"/role": {Get: &goai.Operation{Tags: []string{"角色管理"}}},
-		"/auth/login": {Post: &goai.Operation{Tags: []string{"身份认证"}}},
-		"/x/ldap/login": {Post: &goai.Operation{Tags: []string{"授权登录/LDAP"}}},
+		"/role":            {Get: &goai.Operation{Tags: []string{"角色管理"}}},
+		"/auth/login":      {Post: &goai.Operation{Tags: []string{"身份认证"}}},
+		"/x/ldap/login":    {Post: &goai.Operation{Tags: []string{"授权登录/LDAP"}}},
 		"/x/oidc/settings": {Get: &goai.Operation{Tags: []string{"授权登录/OIDC"}}},
-		"/x/notice": {Get: &goai.Operation{Tags: []string{"通知公告"}}},
+		"/x/notice":        {Get: &goai.Operation{Tags: []string{"通知公告"}}},
 	}
 	assignOpenAPIDocumentTags(document)
 	if document.Tags == nil {

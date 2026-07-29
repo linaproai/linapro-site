@@ -5,12 +5,11 @@ package shellexec
 import (
 	"context"
 	"errors"
+	configsvc "lina-core/internal/service/config"
 	"runtime"
 	"strings"
 	"testing"
 	"time"
-
-	configsvc "lina-core/internal/service/config"
 )
 
 // fakeShellGate returns one fixed shell enablement state for tests.

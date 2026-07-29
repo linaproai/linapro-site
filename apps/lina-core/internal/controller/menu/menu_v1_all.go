@@ -201,7 +201,7 @@ func convertToRouteItems(items []*menusvc.MenuItem) []*v1.MenuRouteItem {
 				route.Component = generateComponentPath(item.Component)
 				route.Meta.Query = mergeMenuQueryParams(menuQuery, map[string]string{
 					pluginhost.DynamicEmbeddedSourceQueryKey: menuLinkTarget,
-					pluginhost.DynamicAccessModeQueryKey:     pluginhost.DynamicAccessModeEmbeddedMount,
+					pluginhost.DynamicAccessModeQueryKey:     pluginhost.DynamicAccessModeEmbeddedMount.String(),
 				})
 			} else if item.IsFrame == 1 {
 				route.Component = "BasicLayout"
@@ -402,7 +402,8 @@ func isRuntimeEmbeddedMountMenu(item *menusvc.MenuItem, menuQuery map[string]str
 	if normalizeMenuComponentPath(item.Component) != pluginhost.DynamicPageComponentPath {
 		return false
 	}
-	return strings.TrimSpace(menuQuery[pluginhost.DynamicAccessModeQueryKey]) == pluginhost.DynamicAccessModeEmbeddedMount
+	return pluginhost.DynamicAccessMode(strings.TrimSpace(menuQuery[pluginhost.DynamicAccessModeQueryKey])) ==
+		pluginhost.DynamicAccessModeEmbeddedMount
 }
 
 // normalizeMenuComponentPath normalizes one stored component path into the

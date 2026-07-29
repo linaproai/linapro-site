@@ -24,7 +24,7 @@ import type {
   MarketplaceRiskType,
 } from "../../types/marketplace";
 
-import { defineAsyncComponent, onMounted, ref, watch } from "vue";
+import { nextTick, onMounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 
 import { Page, useVbenDrawer, useVbenModal } from "@vben/common-ui";
@@ -50,6 +50,7 @@ import {
   marketplaceReleaseRisks,
   marketplaceReviewQueueList,
 } from "../../api/marketplace";
+import DetailModalContent from "../detail/detail-modal.vue";
 
 type GridPageInfo = {
   currentPage: number;
@@ -73,9 +74,7 @@ type ReviewQueueRow = MarketplaceReviewQueueItem & {
 const route = useRoute();
 
 const [DetailModal, detailModalApi] = useVbenModal({
-  connectedComponent: defineAsyncComponent(
-    () => import("../detail/detail-modal.vue"),
-  ),
+  connectedComponent: DetailModalContent,
 });
 
 const selectedRelease = ref<MarketplaceReviewQueueItem | null>(null);
@@ -90,10 +89,10 @@ const [Grid, gridApi] = useVbenVxeGrid<ReviewQueueRow>({
   formOptions: {
     commonConfig: {
       componentProps: { allowClear: true },
-      labelWidth: 100,
+      labelWidth: 80,
     },
     schema: [],
-    wrapperClass: "grid-cols-1 md:grid-cols-2 xl:grid-cols-3",
+    wrapperClass: "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
   },
   gridOptions: {
     columns: [],
@@ -125,7 +124,7 @@ const [Grid, gridApi] = useVbenVxeGrid<ReviewQueueRow>({
       },
     },
     rowConfig: { keyField: "reviewKey" },
-    showOverflow: "tooltip",
+    showOverflow: "ellipsis",
     id: "plugin-marketplace-review-queue",
   },
 });
@@ -158,9 +157,14 @@ function buildFormOptions(): VbenFormProps {
   return {
     commonConfig: {
       componentProps: { allowClear: true },
-      labelWidth: 100,
+      labelWidth: 80,
     },
     schema: [
+      {
+        component: "Input",
+        fieldName: "keyword",
+        label: t("plugin.linapro-plugin-marketplace.catalog.fields.keyword"),
+      },
       {
         component: "Input",
         fieldName: "pluginId",
@@ -201,54 +205,59 @@ function buildFormOptions(): VbenFormProps {
           "plugin.linapro-plugin-marketplace.detail.columns.reviewStatus",
         ),
       },
-      {
-        component: "Input",
-        fieldName: "keyword",
-        label: t("plugin.linapro-plugin-marketplace.catalog.fields.keyword"),
-      },
     ],
-    wrapperClass: "grid-cols-1 md:grid-cols-2 xl:grid-cols-3",
+    wrapperClass: "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
   };
 }
 
 function buildColumns(): ReviewGridOptions["columns"] {
+  // Dense layout aligned with My Plugins: keep review status early (ops-critical),
+  // leave plugin name flexible, and keep Inspect fixed on the right.
   return [
     {
+      align: "left",
       field: "pluginId",
-      minWidth: 200,
+      headerAlign: "center",
+      minWidth: 176,
+      showOverflow: "ellipsis",
       slots: { default: "plugin" },
       title: t("plugin.linapro-plugin-marketplace.catalog.columns.plugin"),
     },
     {
-      field: "version",
-      minWidth: 120,
-      title: t("plugin.linapro-plugin-marketplace.detail.columns.version"),
-    },
-    {
-      field: "pluginType",
-      slots: { default: "pluginType" },
-      title: t("plugin.linapro-plugin-marketplace.catalog.fields.pluginType"),
-      width: 120,
-    },
-    {
       field: "reviewStatus",
+      showOverflow: "ellipsis",
       slots: { default: "reviewStatus" },
       title: t("plugin.linapro-plugin-marketplace.detail.columns.reviewStatus"),
-      width: 120,
+      // Wide enough for en-US "Submitted" / zh-CN "已提交" tags.
+      width: 116,
     },
     {
+      className: "review-submitted-at-column",
       field: "submittedAt",
       formatter: ({ cellValue }: { cellValue?: null | number | string }) =>
         formatTimestamp(cellValue),
       title: t("plugin.linapro-plugin-marketplace.review.columns.submittedAt"),
-      width: 180,
+      width: 184,
+    },
+    {
+      field: "version",
+      showOverflow: "ellipsis",
+      title: t("plugin.linapro-plugin-marketplace.detail.columns.version"),
+      width: 92,
+    },
+    {
+      field: "pluginType",
+      slots: { default: "pluginType" },
+      title: t("plugin.linapro-plugin-marketplace.catalog.columns.type"),
+      width: 96,
     },
     {
       field: "action",
       fixed: "right",
       slots: { default: "action" },
       title: t("plugin.linapro-plugin-marketplace.detail.columns.actions"),
-      width: 120,
+      // Inspect ghost button (en-US "Inspect" / zh-CN "检查").
+      width: 88,
     },
   ];
 }
@@ -302,6 +311,24 @@ watch(
   () => [route.query.view, route.query.pluginId] as const,
   () => {
     openDetailFromRouteQuery();
+  },
+);
+
+// Rebuild chrome and re-query when the workbench language changes so
+// headers/filters/decision form match the active locale.
+watch(
+  () => preferences.app.locale,
+  async (locale, previousLocale) => {
+    if (!previousLocale || locale === previousLocale) {
+      return;
+    }
+    gridApi.setState({ formOptions: buildFormOptions() });
+    gridApi.setGridOptions({
+      columns: buildColumns(),
+      emptyText: t("plugin.linapro-plugin-marketplace.console.empty.queue"),
+    });
+    decisionFormApi.setState({ schema: buildDecisionSchema() });
+    await gridApi.query();
   },
 );
 
@@ -593,6 +620,7 @@ function getReviewDrawerTitle() {
   <Page :auto-content-height="true">
     <DetailModal />
     <Grid
+      class="plugin-marketplace-review"
       :table-title="$t('plugin.linapro-plugin-marketplace.review.tableTitle')"
     >
       <template #plugin="{ row }">

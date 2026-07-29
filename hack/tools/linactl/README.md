@@ -120,6 +120,11 @@ When `dir` is passed to `linactl dev`, it runs the same targeted build path as `
 
 `linactl lint.go` runs the repository `Go` static lint gate through `golangci-lint`. The main lint binary version is pinned by the repository root `.golangci-lint-version`, the rules live in the repository root `.golangci.yml`, and dead-code checks use the pinned `staticcheck` version from the repository root `.staticcheck-version`.
 
+Before static analysis, `lint.go` runs repository governance checks:
+
+1. **Go unit-test file naming** (`internal/gotestnames`): each `*_test.go` must have a sibling production file with the same stem (`X.go` ↔ `X_test.go`). Historical unpaired paths are frozen in `internal/gotestnames/allowlist.json`; new code must rename or merge instead of expanding the allowlist.
+2. **Public API DTO contracts** (`internal/apicontractcheck`): walks host `apps/lina-core/api` and plugin `apps/lina-plugins/*/backend/api` trees with **no per-resource type registry**. New API packages are covered automatically. Rules: no `internal/model/entity` imports; response-shaped exported structs (name suffixes such as `Res`/`Item`) must not expose sensitive JSON fields (`password`, `deletedAt`, `engine`, `hash`; `path` only on file-related type names).
+
 If `golangci-lint` or `staticcheck` is missing from `PATH` or reports a different version, `linactl lint.go` installs the pinned version with `go install` and then runs that exact binary. `linactl env.setup` performs the same pinned-tool installation before frontend and browser setup so new development environments can prepare the Go lint tools up front. The installation uses `GOWORK=off` and strips build-tag or cross-compilation variables so plugin-full lint settings do not affect the external tool build. First-time installation needs normal Go module network access.
 
 ```bash
@@ -134,7 +139,7 @@ go run . lint.go plugins=0
 
 Use `plugins=0` for the host workspace, covering `apps/lina-core` and `hack/tools/linactl`. Use `plugins=1` when official plugin sources are initialized; this mode prepares the ignored `temp/go.work.plugins` workspace and lints host, tool, and official plugin `Go` modules. If `plugins` is omitted, `linactl` keeps the existing auto-detection behavior used by build and test commands.
 
-Optional `dir=<path>` narrows the scan to the single Go module that owns the path. Plugin roots that contain `plugin.yaml` and `backend/go.mod` resolve to the backend module; nested package directories walk up to the nearest `go.mod` under the repository root. The plan and summary output print `scope=dir` and the resolved module so local or agent runs are not mistaken for full-workspace coverage. CI and review gates still use the default full-workspace scan without `dir`.
+Optional `dir=<path>` narrows the scan to the single Go module that owns the path (including the test-name check). Plugin roots that contain `plugin.yaml` and `backend/go.mod` resolve to the backend module; nested package directories walk up to the nearest `go.mod` under the repository root. The plan and summary output print `scope=dir` and the resolved module so local or agent runs are not mistaken for full-workspace coverage. CI and review gates still use the default full-workspace scan without `dir`.
 
 `golangci-lint` does not enable the standalone `unused` linter. `linactl lint.go` runs `staticcheck U1000` for dead-code checks across all packages; packages that contain non-test files with `//go:build wasip1` or `//go:build !wasip1` use a host plus `GOOS=wasip1 GOARCH=wasm` matrix so guest-only bridge code is not reported as dead code under the default host build.
 

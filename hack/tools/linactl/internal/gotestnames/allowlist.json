@@ -1,0 +1,4 @@
+{
+  "paths": [],
+  "note": "Frozen non-1:1 *_test.go paths only. Prefer rename/merge to X.go↔X_test.go; keep empty when possible."
+}

@@ -27,9 +27,58 @@ const (
 	DynamicEmbeddedSourceQueryKey = "embeddedSrc"
 	// DynamicAccessModeQueryKey is the menu query key controlling dynamic plugin page access mode.
 	DynamicAccessModeQueryKey = "pluginAccessMode"
-	// DynamicAccessModeEmbeddedMount is the access mode for ESM-mounted dynamic plugin pages.
-	DynamicAccessModeEmbeddedMount = "embedded-mount"
 )
+
+// DynamicAccessMode identifies how a dynamic plugin page is mounted in the workbench.
+type DynamicAccessMode string
+
+// Supported dynamic plugin page access modes.
+const (
+	// DynamicAccessModeEmbeddedMount mounts a runtime ESM asset inside the host shell.
+	DynamicAccessModeEmbeddedMount DynamicAccessMode = "embedded-mount"
+)
+
+// String returns the canonical dynamic access mode value.
+func (m DynamicAccessMode) String() string {
+	return string(m)
+}
+
+// IsValid reports whether the access mode is a known non-empty value.
+func (m DynamicAccessMode) IsValid() bool {
+	switch m {
+	case DynamicAccessModeEmbeddedMount:
+		return true
+	default:
+		return false
+	}
+}
+
+// PluginInstallMode identifies how a tenant-aware plugin is enabled across tenants.
+// Values match api/plugin/v1.InstallMode and plugin.yaml default_install_mode.
+type PluginInstallMode string
+
+// Supported plugin install modes published to lifecycle callbacks.
+const (
+	// PluginInstallModeGlobal enables one shared installation for the platform.
+	PluginInstallModeGlobal PluginInstallMode = "global"
+	// PluginInstallModeTenantScoped enables or disables the plugin per tenant.
+	PluginInstallModeTenantScoped PluginInstallMode = "tenant_scoped"
+)
+
+// String returns the canonical install mode value.
+func (m PluginInstallMode) String() string {
+	return string(m)
+}
+
+// IsValid reports whether the install mode is a known non-empty value.
+func (m PluginInstallMode) IsValid() bool {
+	switch m {
+	case PluginInstallModeGlobal, PluginInstallModeTenantScoped:
+		return true
+	default:
+		return false
+	}
+}
 
 // Declarations defines the grouped declaration-time contract published to
 // source plugins during compile-time registration.

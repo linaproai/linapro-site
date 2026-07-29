@@ -6,12 +6,8 @@ package integration
 import (
 	"context"
 	"fmt"
-	pluginv1 "lina-core/api/plugin/v1"
-	"strings"
-	"time"
-
 	"github.com/gogf/gf/v2/errors/gerror"
-
+	pluginv1 "lina-core/api/plugin/v1"
 	"lina-core/internal/service/jobmeta"
 	"lina-core/internal/service/plugin/internal/catalog"
 	"lina-core/internal/service/plugin/internal/plugintypes"
@@ -19,6 +15,8 @@ import (
 	"lina-core/pkg/plugin/pluginbridge/protocol"
 	"lina-core/pkg/plugin/pluginhost"
 	"lina-core/pkg/statusflag"
+	"strings"
+	"time"
 )
 
 const (
@@ -36,41 +34,19 @@ type managedJobCollector struct {
 // Ensure managedJobCollector satisfies the published registrar contract.
 var _ pluginhost.JobsRegistrar = (*managedJobCollector)(nil)
 
-// Add records one plugin-owned scheduled job definition.
-func (c *managedJobCollector) Add(
-	ctx context.Context,
-	pattern string,
-	name string,
-	handler pluginhost.JobHandler,
-) error {
-	return c.AddWithMetadata(
-		ctx,
-		pattern,
-		name,
-		name,
-		fmt.Sprintf("Built-in scheduled job registered by plugin %s.", strings.TrimSpace(c.pluginID)),
-		handler,
-	)
-}
-
-// AddWithMetadata records one plugin-owned scheduled job definition with display metadata.
-func (c *managedJobCollector) AddWithMetadata(
-	ctx context.Context,
-	pattern string,
-	name string,
-	displayName string,
-	description string,
-	handler pluginhost.JobHandler,
-) error {
-	if handler == nil {
+// Add records one plugin-owned scheduled job definition for sys_job projection.
+func (c *managedJobCollector) Add(ctx context.Context, spec pluginhost.JobSpec) error {
+	if spec.Handler == nil {
 		return gerror.New("plugin job handler cannot be nil")
 	}
 
 	var (
-		trimmedPattern     = strings.TrimSpace(pattern)
-		trimmedName        = strings.TrimSpace(name)
-		trimmedDisplayName = strings.TrimSpace(displayName)
-		trimmedDescription = strings.TrimSpace(description)
+		trimmedPattern     = strings.TrimSpace(spec.Pattern)
+		trimmedName        = strings.TrimSpace(spec.Name)
+		trimmedDisplayName = strings.TrimSpace(spec.DisplayName)
+		trimmedDescription = strings.TrimSpace(spec.Description)
+		scope              = pluginhost.JobScope(strings.TrimSpace(spec.Scope.String()))
+		concurrency        = pluginhost.JobConcurrency(strings.TrimSpace(spec.Concurrency.String()))
 	)
 	if trimmedPattern == "" {
 		return gerror.New("plugin job expression cannot be empty")
@@ -78,11 +54,33 @@ func (c *managedJobCollector) AddWithMetadata(
 	if trimmedName == "" {
 		return gerror.New("plugin job name cannot be empty")
 	}
+	if scope != "" && !scope.IsValid() {
+		return gerror.Newf("plugin job scope is invalid: %s", scope)
+	}
+	if concurrency != "" && !concurrency.IsValid() {
+		return gerror.Newf("plugin job concurrency is invalid: %s", concurrency)
+	}
 	if trimmedDisplayName == "" {
 		trimmedDisplayName = trimmedName
 	}
 	if trimmedDescription == "" {
 		trimmedDescription = fmt.Sprintf("Built-in scheduled job registered by plugin %s.", strings.TrimSpace(c.pluginID))
+	}
+
+	maxConcurrency := spec.MaxConcurrency
+	if maxConcurrency <= 0 {
+		maxConcurrency = 1
+	}
+
+	// Preserve empty enum zero-values so buildPluginBuiltinJobs applies host
+	// defaults; only pass non-empty validated constants into Normalize.
+	projectedScope := jobmeta.JobScope("")
+	if scope != "" {
+		projectedScope = jobmeta.NormalizeJobScope(scope.String())
+	}
+	projectedConcurrency := jobmeta.JobConcurrency("")
+	if concurrency != "" {
+		projectedConcurrency = jobmeta.NormalizeJobConcurrency(concurrency.String())
 	}
 
 	c.items = append(c.items, ManagedJob{
@@ -92,11 +90,11 @@ func (c *managedJobCollector) AddWithMetadata(
 		Description:    trimmedDescription,
 		Pattern:        trimmedPattern,
 		Timezone:       "Asia/Shanghai",
-		Scope:          "", // Source-plugin RegisterJobs callbacks do not expose scope metadata.
-		Concurrency:    "",
-		MaxConcurrency: 1,
+		Scope:          projectedScope,
+		Concurrency:    projectedConcurrency,
+		MaxConcurrency: maxConcurrency,
 		Timeout:        managedJobDefaultTimeout,
-		Handler:        handler,
+		Handler:        spec.Handler,
 	})
 	return nil
 }

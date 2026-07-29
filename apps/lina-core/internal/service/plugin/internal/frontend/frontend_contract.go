@@ -187,7 +187,7 @@ func validateHostedMenuMode(
 ) error {
 	var (
 		componentPath       = strings.TrimSpace(menu.Component)
-		accessMode          = strings.TrimSpace(queryParams[pluginhost.DynamicAccessModeQueryKey])
+		accessMode          = pluginhost.DynamicAccessMode(strings.TrimSpace(queryParams[pluginhost.DynamicAccessModeQueryKey]))
 		isEmbeddedComponent = componentPath == pluginhost.DynamicPageComponentPath
 	)
 
@@ -210,7 +210,7 @@ func validateHostedMenuMode(
 			"hosted asset menus using component %s must declare query_param.%s=%s",
 			pluginhost.DynamicPageComponentPath,
 			pluginhost.DynamicAccessModeQueryKey,
-			pluginhost.DynamicAccessModeEmbeddedMount,
+			pluginhost.DynamicAccessModeEmbeddedMount.String(),
 		)
 	}
 	return nil

@@ -8,16 +8,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
-	"os"
-	"path/filepath"
-	"testing"
-	"time"
-
 	pluginv1 "lina-core/api/plugin/v1"
 	configsvc "lina-core/internal/service/config"
 	"lina-core/internal/service/plugin/internal/resourcefs"
 	"lina-core/pkg/plugin/pluginbridge/protocol"
 	"lina-core/pkg/plugin/pluginhost"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
 )
 
 // TestRuntimeManifestCacheReusesStatGuardForThirtyArtifacts verifies repeated
@@ -473,4 +473,15 @@ func encodeCacheTestWasmULEB128(value uint32) []byte {
 			return result
 		}
 	}
+}
+
+// runtimeArtifactParseCount returns how many times this service fully parsed an artifact path.
+func (s *serviceImpl) runtimeArtifactParseCount(artifactPath string) int {
+	if s == nil {
+		return 0
+	}
+	key := filepath.Clean(strings.TrimSpace(artifactPath))
+	s.cacheMu.RLock()
+	defer s.cacheMu.RUnlock()
+	return s.parseCounts[key]
 }

@@ -32,7 +32,13 @@ test.describe("TC004 marketplace git source register entry", () => {
     await expect(
       marketplace.publishDrawer().locator("h2").filter({ hasText: "添加插件" }),
     ).toBeVisible();
-    await marketplace.selectPublishSourceKind("git");
+    // Git is the default left option; no need to switch source kind.
+    await expect(
+      marketplace
+        .publishDrawer()
+        .locator("label.ant-radio-button-wrapper-checked")
+        .filter({ hasText: "Git 仓库" }),
+    ).toBeVisible();
     await expect(
       marketplace
         .publishDrawer()

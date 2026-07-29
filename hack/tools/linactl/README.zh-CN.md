@@ -120,6 +120,11 @@ status:
 
 `linactl lint.go`通过`golangci-lint`运行仓库`Go`静态检查门禁。主检查工具版本由仓库根目录`.golangci-lint-version`锁定，规则配置位于仓库根目录`.golangci.yml`，死代码检查使用仓库根目录`.staticcheck-version`锁定的`staticcheck`版本。
 
+在静态分析之前，`lint.go`会先运行仓库治理检查：
+
+1. **Go 单元测试文件命名**（`internal/gotestnames`）：每个`*_test.go`必须有同名生产文件（`X.go` ↔ `X_test.go`）。历史未配对路径冻结在`internal/gotestnames/allowlist.json`；新代码应改名或合并，不要扩展 allowlist。
+2. **公开 API DTO 契约**（`internal/apicontractcheck`）：扫描宿主`apps/lina-core/api`与插件`apps/lina-plugins/*/backend/api`，**无需按资源维护类型清单**，新增 API 包自动覆盖。规则：禁止导入`internal/model/entity`；响应形态导出结构体（名称后缀如`Res`/`Item`）不得暴露敏感 JSON 字段（`password`、`deletedAt`、`engine`、`hash`；`path`仅约束文件相关类型名）。
+
 如果`PATH`中缺少`golangci-lint`或`staticcheck`，或其版本与锁定版本不一致，`linactl lint.go`会通过`go install`安装锁定版本，并使用安装后的精确二进制继续执行。`linactl env.setup`会在前端和浏览器环境安装前执行同一套锁定工具安装流程，使新开发环境能够提前准备`Go`静态检查工具。安装流程使用`GOWORK=off`并移除构建标签或交叉编译变量，避免插件完整模式的 lint 设置影响外部工具构建。首次安装需要正常的`Go`模块网络访问。
 
 ```bash
@@ -134,7 +139,7 @@ go run . lint.go plugins=0
 
 使用`plugins=0`检查宿主工作区，覆盖`apps/lina-core`和`hack/tools/linactl`。官方插件源码已初始化时，使用`plugins=1`；该模式会准备已忽略的`temp/go.work.plugins`工作区，并检查宿主、工具和官方插件`Go`模块。未传入`plugins`时，`linactl`沿用构建和测试命令的自动探测行为。
 
-可选`dir=<path>`会将扫描范围收敛到该路径所属的单个`Go module`。包含`plugin.yaml`且存在`backend/go.mod`的插件根目录会解析到`backend`模块；子包目录会向上查找仓库根内最近的`go.mod`。plan 与 summary 输出会打印`scope=dir`和解析后的模块路径，避免本地或 Agent 定向检查被误认为全量覆盖。`CI`与审查门禁仍以不传`dir`的工作区全量扫描为准。
+可选`dir=<path>`会将扫描范围收敛到该路径所属的单个`Go module`（包含测试命名检查）。包含`plugin.yaml`且存在`backend/go.mod`的插件根目录会解析到`backend`模块；子包目录会向上查找仓库根内最近的`go.mod`。plan 与 summary 输出会打印`scope=dir`和解析后的模块路径，避免本地或 Agent 定向检查被误认为全量覆盖。`CI`与审查门禁仍以不传`dir`的工作区全量扫描为准。
 
 `golangci-lint`不启用独立`unused` linter。`linactl lint.go`会对所有包运行`staticcheck U1000`作为死代码检查；非测试文件包含`//go:build wasip1`或`//go:build !wasip1`的包使用宿主目标和`GOOS=wasip1 GOARCH=wasm`矩阵，避免 guest 专属桥接代码在默认宿主构建下被误报为死代码。
 

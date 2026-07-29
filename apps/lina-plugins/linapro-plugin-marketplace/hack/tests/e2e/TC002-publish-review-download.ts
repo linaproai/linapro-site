@@ -36,16 +36,20 @@ test.describe("TC-2 marketplace reviewer workspace", () => {
     ).toBeVisible();
     await expect(
       marketplace.adminRow(marketplaceSourcePluginId()),
-    ).toBeVisible();
+    ).toContainText("LinaPro 源码演示");
     await expect(
       marketplace.adminRow(marketplaceDynamicPluginId()),
-    ).toBeVisible();
+    ).toContainText("LinaPro 动态插件演示");
     await expect(
       marketplace.adminRow(marketplaceExternalPluginId()),
-    ).toBeVisible();
-    await marketplace.expectColumn("admin", "更新时间");
-    await marketplace.expectAdminTableNoHorizontalOverflow();
-    await marketplace.expectAdminColumnBeforeFixedActions("更新时间");
+    ).toContainText("Acme 可观测性");
+    // Table chrome matches My Plugins: separate pluginId/name, status early.
+    // Updated At may sit behind horizontal scroll at mid widths.
+    await marketplace.expectColumn("admin", "插件标识");
+    await marketplace.expectColumn("admin", "名称");
+    await marketplace.expectColumn("admin", "状态");
+    await marketplace.expectColumnBeforeFixedActions("admin", "状态");
+    await marketplace.expectColumnBeforeFixedActions("admin", "审核");
     await captureMarketplaceScreenshot(page, "admin-list-first-load");
 
     await marketplace.filterAdminByKeyword("source");
@@ -58,9 +62,7 @@ test.describe("TC-2 marketplace reviewer workspace", () => {
     await captureMarketplaceScreenshot(page, "admin-list-filtered");
 
     await marketplace.openAdminDetail(marketplaceSourcePluginId());
-    await expect(marketplace.detailShell()).toContainText(
-      "LinaPro Source Demo",
-    );
+    await expect(marketplace.detailShell()).toContainText("LinaPro 源码演示");
     await marketplace.backFromDetail("admin-list");
     await expect(
       marketplace.adminRow(marketplaceSourcePluginId()),
@@ -74,10 +76,16 @@ test.describe("TC-2 marketplace reviewer workspace", () => {
     ).toBeVisible();
     await expect(
       marketplace.reviewRow(marketplaceDynamicPluginId(), "v2.1.0"),
-    ).toBeVisible();
+    ).toContainText("LinaPro 动态插件演示");
     await expect(
       marketplace.reviewRow(marketplaceExternalPluginId(), "v0.9.0"),
-    ).toBeVisible();
+    ).toContainText("Acme 可观测性");
+    await marketplace.expectVisibleCellContentFits(
+      "review",
+      "review-submitted-at-column",
+    );
+    await marketplace.expectColumnBeforeFixedActions("review", "提交时间");
+    await marketplace.expectColumnBeforeFixedActions("review", "版本");
     await marketplace.expectNoHorizontalPageOverflow();
     expect(mockState.reviewQueueRequests.length).toBeGreaterThan(0);
     expect(mockState.reviewQueueRequests[0]?.get("pluginId")).toBeNull();

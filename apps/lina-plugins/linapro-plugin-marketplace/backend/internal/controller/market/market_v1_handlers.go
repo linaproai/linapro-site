@@ -86,6 +86,7 @@ func (c *ControllerV1) ReviewQueueList(
 		PluginID:     req.PluginId,
 		ReviewStatus: req.ReviewStatus,
 		Keyword:      req.Keyword,
+		Locale:       resolveDocumentLocale(ctx, ""),
 	})
 	if err != nil {
 		return nil, err

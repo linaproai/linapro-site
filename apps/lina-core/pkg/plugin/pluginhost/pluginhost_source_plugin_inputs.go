@@ -93,9 +93,9 @@ type SourcePluginInstallModeChangeInput interface {
 	// Operation returns the stable lifecycle operation key.
 	Operation() string
 	// FromMode returns the current install mode.
-	FromMode() string
+	FromMode() PluginInstallMode
 	// ToMode returns the requested install mode.
-	ToMode() string
+	ToMode() PluginInstallMode
 }
 
 // SourcePluginUpgradeInput exposes one host-confirmed source-plugin runtime
@@ -152,8 +152,8 @@ type sourcePluginTenantLifecycleInput struct {
 type sourcePluginInstallModeChangeInput struct {
 	pluginID  string
 	operation string
-	fromMode  string
-	toMode    string
+	fromMode  PluginInstallMode
+	toMode    PluginInstallMode
 }
 
 // sourcePluginUpgradeInput is the host-owned implementation passed to source
@@ -305,8 +305,8 @@ func NewSourcePluginTenantLifecycleInput(operation string, tenantID int) SourceP
 func NewSourcePluginInstallModeChangeInput(
 	pluginID string,
 	operation string,
-	fromMode string,
-	toMode string,
+	fromMode PluginInstallMode,
+	toMode PluginInstallMode,
 ) SourcePluginInstallModeChangeInput {
 	return &sourcePluginInstallModeChangeInput{
 		pluginID:  pluginID,
@@ -494,7 +494,7 @@ func (i *sourcePluginInstallModeChangeInput) Operation() string {
 }
 
 // FromMode returns the current install mode.
-func (i *sourcePluginInstallModeChangeInput) FromMode() string {
+func (i *sourcePluginInstallModeChangeInput) FromMode() PluginInstallMode {
 	if i == nil {
 		return ""
 	}
@@ -502,7 +502,7 @@ func (i *sourcePluginInstallModeChangeInput) FromMode() string {
 }
 
 // ToMode returns the requested install mode.
-func (i *sourcePluginInstallModeChangeInput) ToMode() string {
+func (i *sourcePluginInstallModeChangeInput) ToMode() PluginInstallMode {
 	if i == nil {
 		return ""
 	}

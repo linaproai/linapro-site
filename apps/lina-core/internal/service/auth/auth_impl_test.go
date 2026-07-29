@@ -572,8 +572,8 @@ func TestLoginRejectsTenantUserWhenTenantServiceUnavailable(t *testing.T) {
 	if len(hooks.loginFailed) != 1 {
 		t.Fatalf("expected one tenant unavailable failure hook, got %#v", hooks.loginFailed)
 	}
-	if hooks.loginFailed[0].Reason != authHookReasonTenantUnavailable {
-		t.Fatalf("expected tenant unavailable reason %q, got %q", authHookReasonTenantUnavailable, hooks.loginFailed[0].Reason)
+	if hooks.loginFailed[0].Reason != pluginhost.AuthHookReasonTenantUnavailable {
+		t.Fatalf("expected tenant unavailable reason %q, got %q", pluginhost.AuthHookReasonTenantUnavailable, hooks.loginFailed[0].Reason)
 	}
 	if len(hooks.loginSucceeded) != 0 {
 		t.Fatalf("expected no login success hook, got %#v", hooks.loginSucceeded)
@@ -1268,7 +1268,7 @@ func authHookPayloadInputFromValues(values map[string]interface{}) pluginhost.Au
 		Browser:    pluginhost.HookPayloadStringValue(values, pluginhost.HookPayloadKeyBrowser),
 		OS:         pluginhost.HookPayloadStringValue(values, pluginhost.HookPayloadKeyOS),
 		Message:    pluginhost.HookPayloadStringValue(values, pluginhost.HookPayloadKeyMessage),
-		Reason:     pluginhost.HookPayloadStringValue(values, pluginhost.HookPayloadKeyReason),
+		Reason:     pluginhost.AuthHookReason(pluginhost.HookPayloadStringValue(values, pluginhost.HookPayloadKeyReason)),
 	}
 }
 

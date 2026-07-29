@@ -111,30 +111,34 @@ func registerMarketplaceJobs(ctx context.Context, registrar pluginhost.JobsRegis
 	if err != nil {
 		return gerror.Wrap(err, "create marketplace service for jobs")
 	}
-	// Every minute: advance pending_verify plugins toward review.
-	if err = registrar.AddWithMetadata(
-		ctx,
-		"0 * * * * *",
-		"linapro-plugin-marketplace-process-pipeline",
-		"Marketplace process pipeline",
-		"Discover, verify, and auto-submit marketplace plugins waiting in the async process queue",
-		func(jobCtx context.Context) error {
+	// Every 10 seconds on the primary node only. Singleton skips overlapping ticks
+	// when a previous monorepo discovery batch is still running.
+	if err = registrar.Add(ctx, pluginhost.JobSpec{
+		Pattern:     "@every 10s",
+		Name:        "linapro-plugin-marketplace-process-pipeline",
+		DisplayName: "Marketplace process pipeline",
+		Description: "Discover, verify, and auto-submit marketplace plugins waiting in the async process queue",
+		Scope:       pluginhost.JobScopeMasterOnly,
+		Concurrency: pluginhost.JobConcurrencySingleton,
+		Handler: func(jobCtx context.Context) error {
 			_, processErr := marketSvc.ProcessMarketplacePipeline(jobCtx)
 			return processErr
 		},
-	); err != nil {
+	}); err != nil {
 		return err
 	}
 	// Every 20 minutes: poll already registered Git sources for new tags.
-	return registrar.AddWithMetadata(
-		ctx,
-		"0 */20 * * * *",
-		"linapro-plugin-marketplace-git-metadata-sync",
-		"Marketplace Git metadata sync",
-		"Discover marketplace Git source tags and plugin.yaml metadata without cloning full repositories",
-		func(jobCtx context.Context) error {
+	// Master-only + singleton avoid multi-node Git API storms.
+	return registrar.Add(ctx, pluginhost.JobSpec{
+		Pattern:     "0 */20 * * * *",
+		Name:        "linapro-plugin-marketplace-git-metadata-sync",
+		DisplayName: "Marketplace Git metadata sync",
+		Description: "Discover marketplace Git source tags and plugin.yaml metadata without cloning full repositories",
+		Scope:       pluginhost.JobScopeMasterOnly,
+		Concurrency: pluginhost.JobConcurrencySingleton,
+		Handler: func(jobCtx context.Context) error {
 			_, syncErr := marketSvc.DiscoverAllGitSources(jobCtx)
 			return syncErr
 		},
-	)
+	})
 }
