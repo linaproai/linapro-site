@@ -61,7 +61,14 @@ function handleClose() {
 </template>
 
 <style scoped>
+/*
+ * content-class lands on Vben's flex-1 overflow pane. Keep it a flex column so
+ * MarketplaceDetail can stretch when the dialog is maximized (size-full).
+ */
 :deep(.marketplace-detail-modal-content) {
+  display: flex;
+  min-height: min(72vh, 820px);
+  flex-direction: column;
   padding-top: 8px;
 }
 </style>

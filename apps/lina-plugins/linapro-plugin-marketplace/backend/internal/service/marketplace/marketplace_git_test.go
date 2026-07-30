@@ -1,9 +1,12 @@
 package marketplace
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io"
 	"net/http"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -521,8 +524,19 @@ func TestBuildGitResourceSummariesFromTree(t *testing.T) {
 	if len(selected) == 0 {
 		t.Fatal("expected doc paths for indexing")
 	}
-	if selected[0] != "README.md" {
-		t.Fatalf("expected README.md first, got %#v", selected)
+	// Marketplace docs UI prioritizes manifest/docs over package-root README.
+	if selected[0] != "manifest/docs/zh-CN/index.md" {
+		t.Fatalf("expected manifest docs first, got %#v", selected)
+	}
+	hasReadme := false
+	for _, pathValue := range selected {
+		if pathValue == "README.md" {
+			hasReadme = true
+			break
+		}
+	}
+	if !hasReadme {
+		t.Fatalf("expected README still indexed after docs budget, got %#v", selected)
 	}
 }
 
@@ -705,4 +719,218 @@ func TestNormalizeGitRepoPathAndJoin(t *testing.T) {
 	if got := gitPathJoin("", "plugin.yaml"); got != "plugin.yaml" {
 		t.Fatalf("join root: %q", got)
 	}
+}
+
+// memoryArtifactStore is an in-memory ArtifactStore used by Git docs indexing tests.
+type memoryArtifactStore struct {
+	objects map[string][]byte
+}
+
+func newMemoryArtifactStore() *memoryArtifactStore {
+	return &memoryArtifactStore{objects: make(map[string][]byte)}
+}
+
+func (s *memoryArtifactStore) Put(_ context.Context, key string, body io.Reader) error {
+	if s.objects == nil {
+		s.objects = make(map[string][]byte)
+	}
+	payload, err := io.ReadAll(body)
+	if err != nil {
+		return err
+	}
+	s.objects[key] = payload
+	return nil
+}
+
+func (s *memoryArtifactStore) PutFile(ctx context.Context, key string, localPath string) error {
+	payload, err := os.ReadFile(localPath)
+	if err != nil {
+		return err
+	}
+	return s.Put(ctx, key, bytes.NewReader(payload))
+}
+
+func (s *memoryArtifactStore) Open(_ context.Context, key string) (io.ReadCloser, error) {
+	payload, ok := s.objects[key]
+	if !ok {
+		return nil, os.ErrNotExist
+	}
+	return io.NopCloser(bytes.NewReader(payload)), nil
+}
+
+func (s *memoryArtifactStore) LocalPath(context.Context, string) (string, error) {
+	return "", errors.New("memory store has no local path")
+}
+
+func TestIndexGitReleaseDocumentsWritesSnapshot(t *testing.T) {
+	t.Parallel()
+	store := newMemoryArtifactStore()
+	svc := &serviceImpl{artifacts: store}
+	client := stubGitClient{
+		tree: []string{
+			"demo/README.md",
+			"demo/manifest/docs/zh-CN/index.md",
+			"demo/manifest/docs/zh-CN/configuration.md",
+			"demo/manifest/docs/zh-CN/changelog.md",
+			"other/README.md",
+		},
+		files: map[string][]byte{
+			"main:demo/README.md":                                  []byte("# Demo README\n\nHello.\n"),
+			"main:demo/manifest/docs/zh-CN/index.md":               []byte("# 智能中心\n\n概述。\n"),
+			"main:demo/manifest/docs/zh-CN/configuration.md":       []byte("# 配置说明\n\nenabled: true\n"),
+			"main:demo/manifest/docs/zh-CN/changelog.md":           []byte("# 更新日志\n\nv0.1.0\n"),
+			"deadbeef:demo/README.md":                             []byte("# Demo README\n\nHello.\n"),
+			"deadbeef:demo/manifest/docs/zh-CN/index.md":          []byte("# 智能中心\n\n概述。\n"),
+			"deadbeef:demo/manifest/docs/zh-CN/configuration.md":  []byte("# 配置说明\n\nenabled: true\n"),
+			"deadbeef:demo/manifest/docs/zh-CN/changelog.md":      []byte("# 更新日志\n\nv0.1.0\n"),
+		},
+	}
+	release := &ReleaseRecord{
+		PluginID: "demo-plugin",
+		Version:  "v0.1.0",
+	}
+	// Stale caller tree only lists README; live ListTreePaths on the content ref
+	// must still discover the full manifest/docs set.
+	staleTree := []string{
+		"demo/README.md",
+		"other/README.md",
+	}
+	if err := svc.indexGitReleaseDocuments(
+		context.Background(),
+		client,
+		gitRepoRef{},
+		"main",
+		"",
+		"demo",
+		release,
+		staleTree,
+	); err != nil {
+		t.Fatalf("indexGitReleaseDocuments: %v", err)
+	}
+	manifestKey := docsSnapshotManifestKey("demo-plugin", "v0.1.0")
+	if _, ok := store.objects[manifestKey]; !ok {
+		t.Fatalf("expected docs snapshot manifest at %s, objects=%v", manifestKey, keysOf(store.objects))
+	}
+	items, err := svc.loadDocumentIndexItemsFromGitSnapshot(context.Background(), &entity.PluginMarketplaceRelease{
+		PluginId:       "demo-plugin",
+		ReleaseVersion: "v0.1.0",
+	})
+	if err != nil {
+		t.Fatalf("load snapshot: %v", err)
+	}
+	// README is still indexed, but marketplace catalog prioritizes manifest docs.
+	titleByPath := map[string]string{}
+	for _, item := range items {
+		if item == nil || item.SourceKind != documentSourceKindManifestDocs {
+			continue
+		}
+		titleByPath[item.DocPath] = item.Title
+	}
+	if titleByPath["index.md"] != "智能中心" {
+		t.Fatalf("expected index title from first heading, got %#v", titleByPath)
+	}
+	if titleByPath["configuration.md"] != "配置说明" {
+		t.Fatalf("expected configuration title from first heading, got %#v", titleByPath)
+	}
+	if titleByPath["changelog.md"] != "更新日志" {
+		t.Fatalf("expected changelog title from first heading, got %#v", titleByPath)
+	}
+	records := make([]*DocumentRecord, 0, len(items))
+	for _, item := range items {
+		records = append(records, &DocumentRecord{
+			Path:       item.DocPath,
+			Locale:     item.Locale,
+			SourceKind: item.SourceKind,
+			Title:      item.Title,
+		})
+	}
+	catalog := buildMarketplaceDocumentCatalog(records, "zh-CN")
+	if len(catalog) != 3 {
+		t.Fatalf("expected 3 catalog paths without README, got %#v", catalog)
+	}
+	if catalog[0].Path != "index.md" || catalog[0].Title != "智能中心" {
+		t.Fatalf("expected preferred index first with heading title, got %#v", catalog[0])
+	}
+	for _, entry := range catalog {
+		if entry.Title == entry.Path || strings.HasSuffix(entry.Title, ".md") {
+			t.Fatalf("catalog title must use first heading, not filename: %#v", entry)
+		}
+	}
+}
+
+func TestIndexGitReleaseDocumentsFailsWhenAllCandidatesUnreadable(t *testing.T) {
+	t.Parallel()
+	store := newMemoryArtifactStore()
+	svc := &serviceImpl{artifacts: store}
+	// Tree lists documentation paths, but ReadFile has no matching bodies.
+	client := stubGitClient{
+		tree: []string{
+			"demo/README.md",
+			"demo/manifest/docs/zh-CN/index.md",
+		},
+		files: map[string][]byte{},
+	}
+	err := svc.indexGitReleaseDocuments(
+		context.Background(),
+		client,
+		gitRepoRef{},
+		"main",
+		"",
+		"demo",
+		&ReleaseRecord{PluginID: "demo-plugin", Version: "v0.1.0"},
+		[]string{
+			"demo/README.md",
+			"demo/manifest/docs/zh-CN/index.md",
+		},
+	)
+	if err == nil {
+		t.Fatal("expected indexing failure when remote docs cannot be read")
+	}
+	if len(store.objects) != 0 {
+		t.Fatalf("failed indexing must not write snapshot objects: %#v", keysOf(store.objects))
+	}
+}
+
+func TestSelectGitDocPathsForIndexingIncludesAllManifestDocs(t *testing.T) {
+	t.Parallel()
+	tree := []string{
+		"demo/README.md",
+		"demo/README.zh-CN.md",
+		"demo/manifest/docs/zh-CN/index.md",
+		"demo/manifest/docs/zh-CN/configuration.md",
+		"demo/manifest/docs/zh-CN/changelog.md",
+		"demo/manifest/docs/en-US/index.md",
+		"demo/manifest/docs/en-US/configuration.md",
+		"demo/manifest/docs/en-US/changelog.md",
+		"other/manifest/docs/zh-CN/index.md",
+	}
+	selected := selectGitDocPathsForIndexing(tree, "demo")
+	if len(selected) < 8 {
+		t.Fatalf("expected all locale docs plus README, got %#v", selected)
+	}
+	// Prefer index.md within manifest/docs before other paths.
+	if selected[0] != "manifest/docs/en-US/index.md" && selected[0] != "manifest/docs/zh-CN/index.md" {
+		t.Fatalf("expected an index.md docs path first, got %#v", selected)
+	}
+	hasConfiguration := false
+	hasChangelog := false
+	for _, pathValue := range selected {
+		if strings.HasSuffix(pathValue, "/configuration.md") {
+			hasConfiguration = true
+		}
+		if strings.HasSuffix(pathValue, "/changelog.md") {
+			hasChangelog = true
+		}
+	}
+	if !hasConfiguration || !hasChangelog {
+		t.Fatalf("expected configuration and changelog docs in indexing set: %#v", selected)
+	}
+}
+
+func keysOf(m map[string][]byte) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
 }

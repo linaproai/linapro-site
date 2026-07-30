@@ -142,6 +142,29 @@ describe("marketplace frontend composition logic", () => {
     assert.match(source, /keyword:\s*trimOptional\(formValues\.keyword\)/);
     assert.match(source, /formOptions:/);
     assert.match(source, /rowClassName:\s*["']cursor-pointer["']/);
+    // Remote sort: pluginId / marketStatus / downloadCount / updatedAt; default pluginId asc.
+    assert.match(source, /sortConfig:\s*\{/);
+    assert.match(source, /defaultSort:\s*\{\s*field:\s*["']pluginId["']\s*,\s*order:\s*["']asc["']/);
+    assert.match(source, /remote:\s*true/);
+    assert.match(source, /sort:\s*true/);
+    assert.match(source, /orderBy:\s*sort\?\.field\s*\|\|\s*["']pluginId["']/);
+    assert.match(source, /orderDirection:/);
+    assert.match(
+      source,
+      /field:\s*["']pluginId["'][\s\S]*?sortable:\s*true/,
+    );
+    assert.match(
+      source,
+      /field:\s*["']marketStatus["'][\s\S]*?sortable:\s*true/,
+    );
+    assert.match(
+      source,
+      /field:\s*["']downloadCount["'][\s\S]*?sortable:\s*true/,
+    );
+    assert.match(
+      source,
+      /field:\s*["']updatedAt["'][\s\S]*?sortable:\s*true/,
+    );
     assert.match(source, /mine\.columns\.pluginId/);
     assert.match(source, /mine\.columns\.name/);
     assert.match(source, /mine\.columns\.summary/);
@@ -249,6 +272,10 @@ describe("marketplace frontend composition logic", () => {
     assert.match(detail, /handleSelectDocumentLocale/);
     assert.match(detail, /Segmented/);
     assert.match(detail, /chooseDocumentFromBundle/);
+    assert.match(
+      detail,
+      /renderMarketplaceMarkdown\(document\.markdown\)\s*\|\|\s*document\.content/,
+    );
     assert.doesNotMatch(detail, /marketplaceReleaseDocument\(/);
     assert.doesNotMatch(detail, /pending_fetch|pendingFetch/);
     assert.doesNotMatch(admin, /pending_fetch|pendingFetch/);
@@ -510,5 +537,129 @@ describe("marketplace dynamic package import bridge", () => {
     assert.match(source, /bytes\[1\] === 0x61/);
     assert.match(source, /bytes\[2\] === 0x73/);
     assert.match(source, /bytes\[3\] === 0x6d/);
+  });
+});
+
+describe("marketplace detail version grid layout", () => {
+  it("sizes the release table by content instead of fill-parent height", () => {
+    const detail = readPluginFile("frontend/pages/detail/index.vue");
+    // height: "auto" is fill-parent in vxe-table and grows blank body space inside
+    // the nested detail modal tabs; the version grid must stay content-sized.
+    const versionGridBlock = detail.match(
+      /useVbenVxeGrid<MarketplaceReleaseItem>\(\{[\s\S]*?id:\s*["']plugin-marketplace-detail-releases["'][\s\S]*?\}\)/,
+    );
+    assert.ok(versionGridBlock, "expected detail VersionGrid configuration");
+    assert.doesNotMatch(
+      versionGridBlock[0],
+      /height:\s*["']auto["']/,
+      "version grid must not use height auto fill-parent mode",
+    );
+    assert.match(versionGridBlock[0], /autoResize:\s*false/);
+    assert.match(versionGridBlock[0], /maxHeight:\s*480/);
+    assert.match(
+      versionGridBlock[0],
+      /pagerConfig:\s*\{\s*enabled:\s*false\s*,?\s*\}/s,
+    );
+    assert.match(versionGridBlock[0], /pageSize:\s*100/);
+    assert.match(
+      versionGridBlock[0],
+      /class:\s*["']marketplace-detail-version-grid h-auto["']/,
+    );
+    assert.match(detail, /\.marketplace-detail-version-grid\s*\{/);
+  });
+});
+
+describe("marketplace markdown helpers", () => {
+  it("detail page uses plugin markdown-it helper and document catalog nav", () => {
+    const detail = readPluginFile("frontend/pages/detail/index.vue");
+    const frontendPackage = JSON.parse(
+      readPluginFile("frontend/package.json"),
+    );
+    assert.match(detail, /from "\.\.\/\.\.\/utils\/markdown"/);
+    assert.match(detail, /renderMarketplaceMarkdown/);
+    assert.match(detail, /enhanceMarketplaceMarkdown/);
+    assert.match(detail, /markdownBodyRef/);
+    assert.match(detail, /documentCatalogOptions/);
+    assert.match(
+      detail,
+      /entry\.sourceKind\s*===\s*["']manifest_docs["'][\s\S]*?entry\.sourceKind\s*===\s*["']readme["']/,
+    );
+    assert.match(
+      detail,
+      /document\.sourceKind\s*===\s*["']manifest_docs["'][\s\S]*?document\.sourceKind\s*===\s*["']readme["']/,
+    );
+    assert.match(detail, /marketplace-markdown-body/);
+    assert.match(detail, /handleSelectDocumentPath/);
+    assert.match(
+      detail,
+      /plugin\.linapro-plugin-marketplace\.detail\.docs\.catalog/,
+    );
+    assert.equal(frontendPackage.dependencies["markdown-it"], "14.1.1");
+    assert.equal(frontendPackage.dependencies["highlight.js"], "11.11.1");
+    assert.equal(frontendPackage.dependencies.mermaid, "11.12.2");
+  });
+
+  it("markdown util rejects unsafe absolute hrefs and resolves relative md paths", async () => {
+    // Lightweight pure-logic copy of resolveRelativeMarkdownPath for unit isolation
+    // without importing TypeScript through the Vite host.
+    function resolveRelativeMarkdownPath(currentPath, href) {
+      const cleaned = href.trim().split("#")[0]?.split("?")[0] ?? "";
+      if (
+        !cleaned ||
+        cleaned.includes("://") ||
+        cleaned.startsWith("//") ||
+        cleaned.startsWith("/") ||
+        cleaned.startsWith("mailto:") ||
+        cleaned.startsWith("data:") ||
+        !cleaned.toLowerCase().endsWith(".md")
+      ) {
+        return null;
+      }
+      const baseDir = currentPath.includes("/")
+        ? currentPath.slice(0, currentPath.lastIndexOf("/") + 1)
+        : "";
+      const joined = `${baseDir}${cleaned}`.replaceAll("\\", "/");
+      const segments = joined.split("/");
+      const resolved = [];
+      for (const segment of segments) {
+        if (!segment || segment === ".") continue;
+        if (segment === "..") {
+          if (resolved.length === 0) return null;
+          resolved.pop();
+          continue;
+        }
+        resolved.push(segment);
+      }
+      return resolved.join("/") || null;
+    }
+    assert.equal(
+      resolveRelativeMarkdownPath("index.md", "configuration.md"),
+      "configuration.md",
+    );
+    assert.equal(
+      resolveRelativeMarkdownPath("guides/index.md", "../changelog.md"),
+      "changelog.md",
+    );
+    assert.equal(
+      resolveRelativeMarkdownPath("index.md", "https://example.com/a.md"),
+      null,
+    );
+  });
+
+  it("markdown util enables highlight, mermaid fence, safe images, and html:false", () => {
+    const markdownUtil = readPluginFile("frontend/utils/markdown.ts");
+    assert.match(markdownUtil, /from "highlight\.js\/lib\/common"/);
+    assert.match(markdownUtil, /from "markdown-it"/);
+    assert.match(markdownUtil, /import\("mermaid"\)/);
+    assert.match(markdownUtil, /html:\s*false/);
+    assert.match(markdownUtil, /securityLevel:\s*["']strict["']/);
+    assert.match(markdownUtil, /lang === ["']mermaid["']/);
+    assert.match(markdownUtil, /class="marketplace-mermaid/);
+    assert.match(markdownUtil, /hljs\.highlight/);
+    assert.match(markdownUtil, /marketplace-md-image/);
+    assert.match(markdownUtil, /isUnsafeImageSrc/);
+    assert.match(markdownUtil, /javascript:/);
+    assert.match(markdownUtil, /data:image\//);
+    assert.match(markdownUtil, /validateLink/);
   });
 });

@@ -69,6 +69,91 @@ func TestListReviewQueueDefaultsToSubmittedAndReviewing(t *testing.T) {
 	}
 }
 
+func TestPluginIdentitySortFieldWhitelist(t *testing.T) {
+	cols := dao.PluginMarketplacePlugin.Columns()
+	cases := []struct {
+		orderBy string
+		want    string
+	}{
+		{orderBy: "pluginId", want: cols.PluginId},
+		{orderBy: "plugin_id", want: cols.PluginId},
+		{orderBy: "marketStatus", want: cols.MarketStatus},
+		{orderBy: "status", want: cols.MarketStatus},
+		{orderBy: "downloadCount", want: cols.DownloadCount},
+		{orderBy: "updatedAt", want: cols.UpdatedAt},
+		{orderBy: "name", want: ""},
+		{orderBy: "id; drop table", want: ""},
+		{orderBy: "", want: ""},
+	}
+	for _, tc := range cases {
+		got := pluginIdentitySortField(tc.orderBy)
+		if got != tc.want {
+			t.Fatalf("orderBy=%q got %q want %q", tc.orderBy, got, tc.want)
+		}
+	}
+}
+
+func TestApplyPluginIdentityListOrderDefaults(t *testing.T) {
+	captured := []capturedSelect{}
+	db := newSelectCaptureDB(t)
+
+	// Owned default: plugin_id ASC
+	owned := applyPluginIdentityListOrder(
+		db.Model(dao.PluginMarketplacePlugin.Table()).Hook(selectCaptureHook(&captured)),
+		"",
+		"",
+		true,
+	)
+	if _, err := owned.All(); err != nil {
+		t.Fatalf("owned default order query: %v", err)
+	}
+	if len(captured) != 1 {
+		t.Fatalf("expected one owned query, got %d", len(captured))
+	}
+	ownedSQL := strings.ToLower(captured[0].sql)
+	if !strings.Contains(ownedSQL, "order by") || !strings.Contains(ownedSQL, "plugin_id") {
+		t.Fatalf("owned default order missing plugin_id: %s", captured[0].sql)
+	}
+
+	captured = nil
+	// Managed default: updated_at DESC
+	managed := applyPluginIdentityListOrder(
+		db.Model(dao.PluginMarketplacePlugin.Table()).Hook(selectCaptureHook(&captured)),
+		"",
+		"",
+		false,
+	)
+	if _, err := managed.All(); err != nil {
+		t.Fatalf("managed default order query: %v", err)
+	}
+	if len(captured) != 1 {
+		t.Fatalf("expected one managed query, got %d", len(captured))
+	}
+	managedSQL := strings.ToLower(captured[0].sql)
+	if !strings.Contains(managedSQL, "updated_at") {
+		t.Fatalf("managed default order missing updated_at: %s", captured[0].sql)
+	}
+
+	captured = nil
+	// Explicit downloadCount desc
+	sorted := applyPluginIdentityListOrder(
+		db.Model(dao.PluginMarketplacePlugin.Table()).Hook(selectCaptureHook(&captured)),
+		"downloadCount",
+		"desc",
+		true,
+	)
+	if _, err := sorted.All(); err != nil {
+		t.Fatalf("explicit sort query: %v", err)
+	}
+	if len(captured) != 1 {
+		t.Fatalf("expected one sorted query, got %d", len(captured))
+	}
+	sortedSQL := strings.ToLower(captured[0].sql)
+	if !strings.Contains(sortedSQL, "download_count") {
+		t.Fatalf("explicit sort missing download_count: %s", captured[0].sql)
+	}
+}
+
 func TestClassifyPluginListStatusFilter(t *testing.T) {
 	cases := []struct {
 		name       string

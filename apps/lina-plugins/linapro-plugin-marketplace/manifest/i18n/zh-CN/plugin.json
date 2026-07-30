@@ -79,6 +79,7 @@
   "plugin.linapro-plugin-marketplace.detail.tabs.versions": "版本",
   "plugin.linapro-plugin-marketplace.detail.tabs.docs": "文档",
   "plugin.linapro-plugin-marketplace.detail.docs.locale": "文档语言",
+  "plugin.linapro-plugin-marketplace.detail.docs.catalog": "文档目录",
   "plugin.linapro-plugin-marketplace.detail.tabs.risks": "风险",
   "plugin.linapro-plugin-marketplace.detail.columns.version": "版本",
   "plugin.linapro-plugin-marketplace.detail.columns.status": "状态",

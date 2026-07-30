@@ -1,9 +1,25 @@
-import {existsSync, readdirSync, readFileSync} from 'node:fs';
-import {createRequire} from 'node:module';
-import {dirname, join, relative, sep} from 'node:path';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { dirname, join, relative } from 'node:path';
 
-import {defineConfig} from '@vben/vite-config';
-import {loadEnv, type ViteDevServer} from 'vite';
+import { defineConfig } from '@vben/vite-config';
+import { loadEnv } from 'vite';
+import type { ViteDevServer } from 'vite';
+
+import {
+  appRequire,
+  collectPluginFrontendDependencies,
+  collectPluginSourceFiles,
+  isBareModuleImport,
+  isPluginFrontendDependencyDeclared,
+  isPluginFrontendEntryFile,
+  isPluginFrontendModuleFile,
+  loadMissingVueStyleBlock,
+  normalizeFsPath,
+  resolveMissingVueStyleBlockId,
+  shouldResolveFromAppFirst,
+  sourcePluginsEnabled,
+  toViteFsPath,
+} from './vite.plugin-source-deps';
 
 // Cache the HTML content to avoid repeated synchronous file reads
 let cachedApidocsHtml: string | undefined;
@@ -13,84 +29,6 @@ const pluginPageModuleId = 'virtual:lina-plugin-pages';
 const pluginSlotModuleId = 'virtual:lina-plugin-slots';
 const appThirdPartyLocaleModuleId = 'virtual:lina-app-third-party-locales';
 const vxeLocaleModuleId = 'virtual:lina-vxe-locales';
-const appRequire = createRequire(import.meta.url);
-const sourcePluginsEnabled = process.env.LINAPRO_SOURCE_PLUGINS === '1';
-
-function collectPluginSourceFiles(pluginRoot: string) {
-  const pageFiles: string[] = [];
-  const slotFiles: string[] = [];
-
-  if (!sourcePluginsEnabled || !existsSync(pluginRoot)) {
-    return { pageFiles, slotFiles };
-  }
-
-  const walk = (currentPath: string) => {
-    for (const entry of readdirSync(currentPath, { withFileTypes: true })) {
-      const fullPath = join(currentPath, entry.name);
-      if (entry.isDirectory()) {
-        walk(fullPath);
-        continue;
-      }
-      if (!entry.isFile() || !entry.name.endsWith('.vue')) {
-        continue;
-      }
-      const normalizedPath = fullPath.split(sep).join('/');
-      if (normalizedPath.includes('/frontend/pages/')) {
-        pageFiles.push(fullPath);
-      }
-      if (normalizedPath.includes('/frontend/slots/')) {
-        slotFiles.push(fullPath);
-      }
-    }
-  };
-
-  walk(pluginRoot);
-  return { pageFiles, slotFiles };
-}
-
-function normalizeFsPath(filePath: string) {
-  return filePath.split(sep).join('/');
-}
-
-function normalizeImporterPath(filePath: string) {
-  return normalizeFsPath(filePath.split('?')[0]?.split('#')[0] || filePath);
-}
-
-function toViteFsPath(filePath: string) {
-  const normalizedPath = normalizeFsPath(filePath);
-  return normalizedPath.startsWith('/@fs/')
-    ? normalizedPath
-    : `/@fs/${normalizedPath}`;
-}
-
-function isPluginFrontendSourceFile(pluginRoot: string, filePath: string) {
-  const normalizedPluginRoot = normalizeFsPath(pluginRoot);
-  const normalizedFilePath = normalizeImporterPath(filePath);
-
-  if (!normalizedFilePath.startsWith(normalizedPluginRoot)) {
-    return false;
-  }
-
-  if (!normalizedFilePath.endsWith('.vue')) {
-    return false;
-  }
-
-  return (
-    normalizedFilePath.includes('/frontend/pages/') ||
-    normalizedFilePath.includes('/frontend/slots/')
-  );
-}
-
-function isBareModuleImport(source: string) {
-  return (
-    !!source &&
-    !source.startsWith('.') &&
-    !source.startsWith('/') &&
-    !source.startsWith('#') &&
-    !source.startsWith('\0') &&
-    !source.startsWith('virtual:')
-  );
-}
 
 function invalidatePluginVirtualModules(server: ViteDevServer) {
   for (const moduleId of [pluginPageModuleId, pluginSlotModuleId]) {
@@ -220,10 +158,7 @@ function resolveWorkspaceStoplightApiDocsPath(base: string) {
 
 function readStoplightApiDocsHtml() {
   if (!cachedApidocsHtml) {
-    const filePath = join(
-      import.meta.dirname,
-      'public/stoplight/apidocs.html',
-    );
+    const filePath = join(import.meta.dirname, 'public/stoplight/apidocs.html');
     cachedApidocsHtml = readFileSync(filePath, 'utf8');
   }
   return cachedApidocsHtml;
@@ -365,6 +300,8 @@ export default defineConfig(async (config) => {
   const pluginRoot = join(import.meta.dirname, '../../../lina-plugins');
   const appDependencyImporter = join(import.meta.dirname, 'src/main.ts');
   const appNodeModulesRoot = join(import.meta.dirname, 'node_modules');
+  const pluginFrontendDependencies =
+    collectPluginFrontendDependencies(pluginRoot);
   const env = loadEnv(config.mode, import.meta.dirname, 'VITE_');
   // linactl/make dev injects LINAPRO_BACKEND_PROXY_TARGET so LINA_CORE_PORT can
   // change without rewriting proxy literals below. Fallback keeps local vite
@@ -372,8 +309,7 @@ export default defineConfig(async (config) => {
   // linactl/make dev 会注入 LINAPRO_BACKEND_PROXY_TARGET，便于用 LINA_CORE_PORT
   // 改后端端口而无需改写下方 proxy 字面量；缺省仍指向默认宿主后端端口。
   const backendProxyTarget =
-    process.env.LINAPRO_BACKEND_PROXY_TARGET?.trim() ||
-    'http://localhost:9120';
+    process.env.LINAPRO_BACKEND_PROXY_TARGET?.trim() || 'http://localhost:9120';
   const workspaceStoplightApiDocsPath = resolveWorkspaceStoplightApiDocsPath(
     env.VITE_BASE || '/',
   );
@@ -401,13 +337,30 @@ export default defineConfig(async (config) => {
     vite: {
       plugins: [
         {
+          name: 'lina-missing-vue-style-block',
+          enforce: 'pre',
+          resolveId(source) {
+            return resolveMissingVueStyleBlockId(source);
+          },
+          load(id) {
+            return loadMissingVueStyleBlock(id);
+          },
+        },
+        {
           name: 'lina-plugin-source-deps',
           enforce: 'pre',
           async resolveId(source, importer) {
             if (
               !importer ||
-              !isPluginFrontendSourceFile(pluginRoot, importer) ||
+              !isPluginFrontendModuleFile(pluginRoot, importer) ||
               !isBareModuleImport(source)
+            ) {
+              return null;
+            }
+
+            if (
+              !shouldResolveFromAppFirst(source) &&
+              isPluginFrontendDependencyDeclared(pluginRoot, importer, source)
             ) {
               return null;
             }
@@ -435,7 +388,7 @@ export default defineConfig(async (config) => {
             server.watcher.add(pluginRoot);
 
             const handlePluginSourceChange = (filePath: string) => {
-              if (!isPluginFrontendSourceFile(pluginRoot, filePath)) {
+              if (!isPluginFrontendEntryFile(pluginRoot, filePath)) {
                 return;
               }
               invalidatePluginVirtualModules(server);
@@ -487,6 +440,9 @@ export default defineConfig(async (config) => {
           },
         },
       ],
+      optimizeDeps: {
+        include: pluginFrontendDependencies,
+      },
       resolve: {
         alias: [
           {

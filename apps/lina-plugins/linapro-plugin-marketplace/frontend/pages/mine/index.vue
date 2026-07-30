@@ -127,15 +127,32 @@ const [Grid, gridApi] = useVbenVxeGrid<MarketplacePluginListItem>({
     height: "auto",
     keepSource: true,
     pagerConfig: {},
+    // Remote sort for pluginId / marketStatus / downloadCount / updatedAt.
+    // Default: pluginId ascending (publisher-friendly stable order).
+    sortConfig: {
+      defaultSort: { field: "pluginId", order: "asc" },
+      remote: true,
+      trigger: "cell",
+    },
     proxyConfig: {
       autoLoad: false,
+      sort: true,
       ajax: {
         query: async (
-          { page }: { page: GridPageInfo },
+          {
+            page,
+            sorts,
+          }: {
+            page: GridPageInfo;
+            sorts?: Array<{ field?: string; order?: null | string }>;
+          },
           formValues: MineFormValues = {},
         ) => {
+          const sort = sorts?.find((item) => item?.field && item?.order);
           return await marketplaceMyPluginList({
             keyword: trimOptional(formValues.keyword),
+            orderBy: sort?.field || "pluginId",
+            orderDirection: (sort?.order as "asc" | "desc" | undefined) || "asc",
             pageNum: page.currentPage,
             pageSize: page.pageSize,
             pluginType: formValues.pluginType,
@@ -393,6 +410,7 @@ function buildColumns(): MineGridOptions["columns"] {
       field: "pluginId",
       headerAlign: "center",
       minWidth: 200,
+      sortable: true,
       title: t("plugin.linapro-plugin-marketplace.mine.columns.pluginId"),
     },
     {
@@ -420,6 +438,7 @@ function buildColumns(): MineGridOptions["columns"] {
       field: "marketStatus",
       showOverflow: "ellipsis",
       slots: { default: "marketStatus" },
+      sortable: true,
       title: t("plugin.linapro-plugin-marketplace.mine.fields.status"),
       // Wide enough for en-US "Pending Review" / zh-CN "待审核" tags.
       width: 124,
@@ -435,6 +454,7 @@ function buildColumns(): MineGridOptions["columns"] {
       field: "downloadCount",
       formatter: ({ cellValue }: { cellValue?: null | number }) =>
         String(cellValue ?? 0),
+      sortable: true,
       title: t("plugin.linapro-plugin-marketplace.catalog.columns.downloads"),
       width: 112,
     },
@@ -456,6 +476,7 @@ function buildColumns(): MineGridOptions["columns"] {
       field: "updatedAt",
       formatter: ({ cellValue }: { cellValue?: null | number | string }) =>
         formatTimestamp(cellValue),
+      sortable: true,
       title: t("plugin.linapro-plugin-marketplace.catalog.columns.updatedAt"),
       width: 184,
     },

@@ -68,6 +68,9 @@ func runBuild(ctx context.Context, a *app, input commandInput) error {
 	if err = os.MkdirAll(options.OutputDir, 0o755); err != nil {
 		return fmt.Errorf("create build output directory: %w", err)
 	}
+	if err = ensureFrontendDeps(ctx, a); err != nil {
+		return err
+	}
 	if err = runHostFrontendBuild(ctx, a, env, options.Verbose); err != nil {
 		return err
 	}
@@ -152,11 +155,17 @@ func runBuildDir(ctx context.Context, a *app, input commandInput, options buildO
 	switch {
 	case sameBuildPath(dir, filepath.Join(a.root, "apps", "lina-vben")):
 		env := plugins.BuildEnv(a.root, a.env, false, "")
+		if err = ensureFrontendDeps(ctx, a); err != nil {
+			return err
+		}
 		return runHostFrontendBuild(ctx, a, env, options.Verbose)
 	case sameBuildPath(dir, filepath.Join(a.root, "apps", "lina-core")):
 		env := plugins.BuildEnv(a.root, a.env, false, "")
 		if err = os.MkdirAll(options.OutputDir, 0o755); err != nil {
 			return fmt.Errorf("create build output directory: %w", err)
+		}
+		if err = ensureFrontendDeps(ctx, a); err != nil {
+			return err
 		}
 		if err = runHostFrontendBuild(ctx, a, env, options.Verbose); err != nil {
 			return err

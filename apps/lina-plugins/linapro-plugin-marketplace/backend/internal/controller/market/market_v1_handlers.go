@@ -41,13 +41,15 @@ func (c *ControllerV1) MyPluginList(ctx context.Context, req *marketv1.MyPluginL
 		return nil, err
 	}
 	out, err := c.marketSvc.ListOwnedPlugins(ctx, marketplacesvc.ListOwnedPluginsInput{
-		PageNum:     req.PageNum,
-		PageSize:    req.PageSize,
-		Keyword:     req.Keyword,
-		PluginType:  req.PluginType,
-		Status:      req.Status,
-		OwnerUserID: userID,
-		Locale:      resolveDocumentLocale(ctx, ""),
+		PageNum:        req.PageNum,
+		PageSize:       req.PageSize,
+		Keyword:        req.Keyword,
+		PluginType:     req.PluginType,
+		Status:         req.Status,
+		OwnerUserID:    userID,
+		Locale:         resolveDocumentLocale(ctx, ""),
+		OrderBy:        req.OrderBy,
+		OrderDirection: req.OrderDirection,
 	})
 	if err != nil {
 		return nil, err
@@ -193,7 +195,11 @@ func (c *ControllerV1) ReleaseDocs(ctx context.Context, req *marketv1.ReleaseDoc
 	if err != nil {
 		return nil, err
 	}
-	return &marketv1.ReleaseDocsRes{Document: out.Document, Documents: out.Documents}, nil
+	return &marketv1.ReleaseDocsRes{
+		Document:  out.Document,
+		Documents: out.Documents,
+		Catalog:   out.Catalog,
+	}, nil
 }
 
 // MyReleaseDocs returns documentation within publisher ownership.
@@ -208,7 +214,11 @@ func (c *ControllerV1) MyReleaseDocs(ctx context.Context, req *marketv1.MyReleas
 	if err != nil {
 		return nil, err
 	}
-	return &marketv1.MyReleaseDocsRes{Document: out.Document, Documents: out.Documents}, nil
+	return &marketv1.MyReleaseDocsRes{
+		Document:  out.Document,
+		Documents: out.Documents,
+		Catalog:   out.Catalog,
+	}, nil
 }
 
 // ManagedReleaseDocs returns documentation for a review operator.
@@ -223,7 +233,11 @@ func (c *ControllerV1) ManagedReleaseDocs(ctx context.Context, req *marketv1.Man
 	if err != nil {
 		return nil, err
 	}
-	return &marketv1.ManagedReleaseDocsRes{Document: out.Document, Documents: out.Documents}, nil
+	return &marketv1.ManagedReleaseDocsRes{
+		Document:  out.Document,
+		Documents: out.Documents,
+		Catalog:   out.Catalog,
+	}, nil
 }
 
 // ReleaseRisks returns paginated scanner risk findings for one release.

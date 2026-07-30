@@ -34,6 +34,7 @@ apps/lina-plugins/<plugin-id>/
 │   ├── pkg/                         # 非标准目录，不承载跨插件领域能力入口
 │   └── plugin.go                    # 插件注册入口
 ├── frontend/                        # 插件前端资源
+│   ├── package.json                 # 可选：源码插件前端私有依赖声明
 │   ├── pages/                       # 插件页面
 │   ├── slots/                       # 插槽页面，可选
 │   └── icons/                       # 可选：侧栏菜单自定义 SVG
@@ -66,6 +67,14 @@ apps/lina-plugins/<plugin-id>/
 - 插件 i18n 资源必须遵守`.agents/rules/i18n.md`。
 - 插件开发期工具配置统一维护在插件根`hack/config.yaml`，包括代码生成、自定义构建等插件本地工具配置。
 - 插件自定义构建指令统一放在插件根`hack/config.yaml`的`build.commands`下，由仓库根`make build`或`linactl build`读取执行。
+
+## 源码插件前端依赖要求
+
+- 源码插件前端源码位于插件自己的`frontend/`目录，插件页面、业务组件、API 适配、工具函数和类型定义必须优先闭环在插件目录内，不得为了引入单插件业务依赖而迁入`apps/lina-vben`。
+- 源码插件仅自身使用的前端业务依赖必须声明在该插件`frontend/package.json`中，例如 Markdown、图表、编辑器扩展或业务 SDK；不得默认写入宿主`apps/lina-vben/apps/web-antd/package.json`。
+- `vue`、`vue-router`、`pinia`、`ant-design-vue`、`@vben/*`等宿主运行期单例或工作台共享能力由宿主提供，插件应以`peerDependencies`或等价 peer 消费方式表达，不得在插件 frontend 中安装第二份运行时实例。
+- 宿主`#/*`入口只承载跨插件或工作台壳相关的稳定共享能力。仅服务单个插件的工具函数不得新增到宿主`#/utils`、`#/adapter`或其他宿主公共目录；确需临时例外时，必须在 OpenSpec、任务记录或审查结论中说明临时原因和迁回计划。
+- 修改源码插件前端依赖声明、宿主 Vite 解析、`linactl`前端依赖准备或宿主`web-antd/package.json`时，必须同时评估开发工具跨平台影响、Vite dev/build 解析路径和测试覆盖。
 
 ## 领域能力使用要求
 

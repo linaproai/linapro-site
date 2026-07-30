@@ -114,18 +114,20 @@ test.describe("TC-3 marketplace English workspace", () => {
     await marketplace.switchDocumentLocale("zh-CN");
     await expect(page.getByText("源码演示指南").first()).toBeVisible();
     await expect(page.getByText("将源码放入 apps/lina-plugins")).toBeVisible();
+    // Locale switches re-fetch the selected path so catalog titles and markdown
+    // stay aligned with the preferred locale from the server.
     expect(
       mockState.inspectionResponses.filter(
         (response) => response.kind === "docs",
       ).length,
-    ).toBe(docsRequestCount);
+    ).toBe(docsRequestCount + 1);
     await marketplace.switchDocumentLocale("en-US");
     await expect(page.getByText("Source Demo Guide").first()).toBeVisible();
     expect(
       mockState.inspectionResponses.filter(
         (response) => response.kind === "docs",
       ).length,
-    ).toBe(docsRequestCount);
+    ).toBe(docsRequestCount + 2);
     await captureMarketplaceScreenshot(page, "english-detail-docs");
 
     await marketplace.openRisksForVersion("v1.0.0");

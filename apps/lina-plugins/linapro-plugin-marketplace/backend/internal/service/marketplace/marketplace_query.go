@@ -9,6 +9,7 @@ package marketplace
 import (
 	"context"
 	"encoding/json"
+	"sort"
 	"strings"
 	"time"
 
@@ -294,27 +295,223 @@ func (s *serviceImpl) ListReleaseRisks(ctx context.Context, in ListReleaseRisksI
 	return &RiskListOutput{List: items, Total: total}, nil
 }
 
-// GetReleaseDocument returns one selected document and same-path language snapshots.
+// GetReleaseDocument returns one selected document, same-path language snapshots,
+// and a catalog of every navigable document path on the release.
 func (s *serviceImpl) GetReleaseDocument(ctx context.Context, in GetReleaseDocumentInput) (*DocumentOutput, error) {
-	records, err := s.loadVisibleReleaseDocumentRecords(ctx, in)
+	release, err := s.requireVisibleRelease(
+		ctx,
+		in.PluginID,
+		in.Version,
+		in.Visibility,
+		marketplaceVisibilityPermissionView,
+	)
 	if err != nil {
 		return nil, err
 	}
-	selected, err := selectMarketplaceDocumentFallback(records, in)
+	items, err := s.loadReleaseDocumentIndexItems(ctx, release)
+	if err != nil {
+		return nil, err
+	}
+	allRecords := make([]*DocumentRecord, 0, len(items))
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+		allRecords = append(allRecords, documentRecordFromIndexItem(release, item))
+	}
+	catalog := buildMarketplaceDocumentCatalog(allRecords, in.Locale)
+	if len(catalog) == 0 {
+		return nil, bizerr.NewCode(CodeMarketplaceDocumentNotFound)
+	}
+
+	requestedPath, err := normalizeMarketplaceDocumentPath(in.Path)
+	if err != nil {
+		return nil, err
+	}
+	// Prefer the requested path; if it is missing (or was a README path), fall
+	// back to the first catalog entry so the full document list remains usable.
+	selected, err := selectMarketplaceDocumentForCatalog(allRecords, in, requestedPath, catalog)
 	if err != nil {
 		return nil, err
 	}
 	if selected == nil {
 		return nil, bizerr.NewCode(CodeMarketplaceDocumentNotFound)
 	}
-	bundle, err := collectMarketplaceDocumentBundle(records, selected, in)
+	pathRecords := filterDocumentRecordsByPath(allRecords, selected.Path)
+	bundle, err := collectMarketplaceDocumentBundle(pathRecords, selected, GetReleaseDocumentInput{
+		PluginID:   in.PluginID,
+		Version:    in.Version,
+		Locale:     in.Locale,
+		Path:       selected.Path,
+		Visibility: in.Visibility,
+	})
 	if err != nil {
 		return nil, err
 	}
 	return &DocumentOutput{
 		Document:  documentItemFromRecord(selected),
 		Documents: documentItemsFromRecords(bundle),
+		Catalog:   catalog,
 	}, nil
+}
+
+// selectMarketplaceDocumentForCatalog resolves the document to show for one
+// request, using catalog order when the requested path is unavailable.
+func selectMarketplaceDocumentForCatalog(
+	allRecords []*DocumentRecord,
+	in GetReleaseDocumentInput,
+	requestedPath string,
+	catalog []*marketv1.MarketplaceDocumentCatalogItem,
+) (*DocumentRecord, error) {
+	tryPaths := make([]string, 0, 1+len(catalog))
+	if !isReadmeDocumentPath(requestedPath) {
+		tryPaths = append(tryPaths, requestedPath)
+	}
+	for _, entry := range catalog {
+		if entry == nil || entry.Path == "" {
+			continue
+		}
+		if entry.Path == requestedPath {
+			continue
+		}
+		tryPaths = append(tryPaths, entry.Path)
+	}
+	seen := make(map[string]struct{}, len(tryPaths))
+	for _, pathValue := range tryPaths {
+		if _, ok := seen[pathValue]; ok {
+			continue
+		}
+		seen[pathValue] = struct{}{}
+		pathRecords := filterDocumentRecordsByPath(allRecords, pathValue)
+		selected, err := selectMarketplaceDocumentFallback(pathRecords, GetReleaseDocumentInput{
+			PluginID:   in.PluginID,
+			Version:    in.Version,
+			Locale:     in.Locale,
+			Path:       pathValue,
+			Visibility: in.Visibility,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if selected != nil {
+			return selected, nil
+		}
+	}
+	return nil, nil
+}
+
+// filterDocumentRecordsByPath keeps display-eligible records for one doc path.
+func filterDocumentRecordsByPath(records []*DocumentRecord, pathValue string) []*DocumentRecord {
+	filtered := make([]*DocumentRecord, 0, len(records))
+	allowReadmeFallback := !hasMarketplaceManifestDocs(records)
+	for _, record := range records {
+		if record == nil || !isMarketplaceDisplayDocument(record, allowReadmeFallback) {
+			continue
+		}
+		if !documentRecordMatchesRequestedPath(record, pathValue, allowReadmeFallback) {
+			continue
+		}
+		filtered = append(filtered, record)
+	}
+	return filtered
+}
+
+// buildMarketplaceDocumentCatalog projects unique document paths for navigation.
+// Marketplace docs UI prioritizes manifest/docs entries. README / README.zh-CN
+// are displayed only as a fallback for README-only releases.
+func buildMarketplaceDocumentCatalog(
+	records []*DocumentRecord,
+	preferredLocale string,
+) []*marketv1.MarketplaceDocumentCatalogItem {
+	if len(records) == 0 {
+		return []*marketv1.MarketplaceDocumentCatalogItem{}
+	}
+	preferredLocale = normalizeDocumentLocale(preferredLocale)
+	allowReadmeFallback := !hasMarketplaceManifestDocs(records)
+	type pathAgg struct {
+		sourceKind string
+		titles     map[string]string
+		locales    []string
+		seenLocale map[string]struct{}
+	}
+	byPath := make(map[string]*pathAgg)
+	pathOrder := make([]string, 0)
+	for _, record := range records {
+		if record == nil || !isMarketplaceDisplayDocument(record, allowReadmeFallback) {
+			continue
+		}
+		pathValue := record.Path
+		sourceKind := documentSourceKindManifestDocs
+		if record.SourceKind == documentSourceKindReadme {
+			pathValue = defaultDocumentPath
+			sourceKind = documentSourceKindReadme
+		}
+		agg := byPath[pathValue]
+		if agg == nil {
+			agg = &pathAgg{
+				sourceKind: sourceKind,
+				titles:     make(map[string]string),
+				locales:    make([]string, 0, 2),
+				seenLocale: make(map[string]struct{}),
+			}
+			byPath[pathValue] = agg
+			pathOrder = append(pathOrder, pathValue)
+		}
+		locale := normalizeDocumentLocale(record.Locale)
+		if title := strings.TrimSpace(record.Title); title != "" {
+			agg.titles[locale] = title
+		}
+		if _, ok := agg.seenLocale[locale]; !ok {
+			agg.seenLocale[locale] = struct{}{}
+			agg.locales = append(agg.locales, locale)
+		}
+	}
+
+	catalog := make([]*marketv1.MarketplaceDocumentCatalogItem, 0, len(pathOrder))
+	for _, pathValue := range pathOrder {
+		agg := byPath[pathValue]
+		if agg == nil {
+			continue
+		}
+		title := agg.titles[preferredLocale]
+		if title == "" {
+			for _, locale := range []string{fallbackEnUSLocale, "en", fallbackZhCNLocale} {
+				if value := agg.titles[locale]; value != "" {
+					title = value
+					break
+				}
+			}
+		}
+		if title == "" {
+			for _, locale := range agg.locales {
+				if value := agg.titles[locale]; value != "" {
+					title = value
+					break
+				}
+			}
+		}
+		if title == "" {
+			title = pathValue
+		}
+		locales := append([]string(nil), agg.locales...)
+		sort.Strings(locales)
+		catalog = append(catalog, &marketv1.MarketplaceDocumentCatalogItem{
+			Path:       pathValue,
+			Title:      title,
+			SourceKind: agg.sourceKind,
+			Locales:    locales,
+		})
+	}
+	sort.SliceStable(catalog, func(i, j int) bool {
+		left, right := catalog[i], catalog[j]
+		leftIndex := isIndexDocumentPath(left.Path)
+		rightIndex := isIndexDocumentPath(right.Path)
+		if leftIndex != rightIndex {
+			return leftIndex
+		}
+		return left.Path < right.Path
+	})
+	return catalog
 }
 
 // documentItemsFromRecords projects indexed document records to API DTOs.
@@ -1113,6 +1310,7 @@ func documentItemFromRecord(record *DocumentRecord) *marketv1.MarketplaceDocumen
 		Title:          record.Title,
 		Summary:        record.Summary,
 		Content:        record.RenderedContent,
+		Markdown:       record.Markdown,
 		ContentHash:    record.ContentHash,
 		FallbackUsed:   record.FallbackUsed,
 		UpdatedAt:      unixMillisPtr(record.UpdatedAt),

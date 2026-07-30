@@ -1051,6 +1051,34 @@ func TestRunBuildRunsPluginConfigCommandsBeforeBackendCompile(t *testing.T) {
 	}
 }
 
+func TestRunBuildInstallsPluginFrontendDepsBeforeHostFrontendBuild(t *testing.T) {
+	root := t.TempDir()
+	writeBuildFixture(t, root)
+	writeFile(t, filepath.Join(root, "apps", "lina-plugins", "john-ai-agentbox", "frontend", "package.json"), "{}\n")
+
+	calls := runBuildWithCapturedCommands(t, root, nil, commandInput{Params: map[string]string{"plugins": "1"}})
+
+	pluginDepsIndex := -1
+	hostFrontendBuildIndex := -1
+	for index, call := range calls {
+		if call.name == "pnpm" && len(call.args) >= 1 && call.args[0] == "install" && call.cmd.Dir == filepath.Join(root, "apps", "lina-plugins", "john-ai-agentbox", "frontend") {
+			pluginDepsIndex = index
+		}
+		if call.name == "pnpm" && len(call.args) >= 2 && call.args[0] == "run" && call.args[1] == "build" && call.cmd.Dir == filepath.Join(root, "apps", "lina-vben") {
+			hostFrontendBuildIndex = index
+		}
+	}
+	if pluginDepsIndex < 0 {
+		t.Fatalf("expected plugin frontend dependency install before build, calls=%#v", calls)
+	}
+	if hostFrontendBuildIndex < 0 {
+		t.Fatalf("expected host frontend build, calls=%#v", calls)
+	}
+	if pluginDepsIndex > hostFrontendBuildIndex {
+		t.Fatalf("plugin frontend deps must install before host frontend build, calls=%#v", calls)
+	}
+}
+
 func TestRunBuildDirBuildsSelectedPluginOnly(t *testing.T) {
 	root := t.TempDir()
 	writeBuildFixture(t, root)
@@ -5121,6 +5149,7 @@ func writeBuildFixture(t *testing.T, root string) {
 	t.Helper()
 	writeFile(t, filepath.Join(root, "go.work"), "go 1.25.0\n\nuse ./apps/lina-core\n")
 	writeFile(t, filepath.Join(root, "hack", "config.yaml"), "build:\n  platforms:\n    - auto\n")
+	writeFrontendDependencySentinel(t, root)
 	writeFile(t, filepath.Join(root, "apps", "lina-vben", "apps", "web-antd", "dist", "index.html"), "host")
 	writeFile(t, filepath.Join(root, "apps", "lina-core", "manifest", "config", "config.template.yaml"), "template: true\n")
 	writeFile(t, filepath.Join(root, "apps", "lina-core", "manifest", "config", "metadata.yaml"), "framework:\n  version: test\n")

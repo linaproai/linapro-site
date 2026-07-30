@@ -75,6 +75,35 @@
 - [x] **FB-14**: 「我的插件」操作列仅保留三个按钮：详情、新版本、下架；新版本请求服务端自动更新版本信息；详情展示插件信息与文档；下架撤回发布状态并在市场不可见
 - [x] **FB-15**: 「我的插件」列表将来源（sourceKind）单独展示为一列，不再作为名称右侧标签
 - [x] **FB-16**: 市场需持久化版本文档语言包正文快照，并让详情页一次读取多语言文档集合后本地快速切换
+- [x] **FB-17**: 「我的插件」点击详情后文档页不应展示为空，应显示当前版本可用的文档正文
+- [x] **FB-18**: 通过 Git 仓库 `https://github.com/linaproai/official-plugins` 添加插件后，「我的插件」详情文档页不应为空，应展示仓库内当前版本可用文档正文
+- [x] **FB-19**: 「我的插件」详情文档左侧目录应列出版本下全部可导航 `manifest/docs` Markdown 文件（而非仅 `index.md`），且目录项标题使用各 md 文件首个标题而非文件名
+- [x] **FB-20**: 插件市场详情文档页 Markdown 渲染样式不美观；应使用成熟 Markdown 渲染链路（对齐 VS Code/GitHub 预览），支持代码高亮、表格、图片等常用语法，并支持 Mermaid 图表渲染
+- [x] **FB-21**: 「我的插件」列表支持按插件标识、状态、下载量、更新时间排序，默认按插件标识升序
+
+## Feedback 影响记录（FB-21）
+
+- [x] 根因：我的插件列表未启用远程排序；后端 `listPluginsFromIdentityTable` 固定 `updated_at DESC`，前端列无 `sortable`
+- [x] 修复：`MyPluginListReq` 增加 `orderBy`/`orderDirection`；拥有列表默认 `pluginId ASC`；白名单字段排序；前端 `sortConfig` + 四列 `sortable`；mock/E2E 同步
+- [x] i18n：有影响；插件 `zh-CN` apidoc 补充 `orderBy`/`orderDirection` 字段说明；无新增运行时 UI 文案键
+- [x] 缓存一致性：无影响
+- [x] 数据权限/可见性：无影响；仍按 owner 过滤，仅改变排序
+- [x] 开发工具跨平台：无影响
+- [x] DI：无新增运行期依赖
+- [x] 外部规则：已读 `plugin.md`、`frontend-ui.md`、`api-contract.md`（DTO 变更）、`backend-go.md`、`testing.md`、`openspec.md`、`i18n.md`
+- [x] 测试：`GOWORK=off go test ./backend/internal/service/marketplace -run PluginIdentity|ApplyPluginIdentity`、`node --test` 前端/apidoc 单测、E2E TC-11、`openspec validate --strict` 通过
+
+## Feedback 影响记录（FB-20）
+
+- [x] 根因：详情文档仅用裸 `markdown-it` + 简易 CSS，无语法高亮、无 Mermaid、样式与 VS Code/GitHub 预览差距大；`data:image` 被 markdown-it 默认 `validateLink` 拦截
+- [x] 修复：插件 `frontend` 引入 `highlight.js` + `mermaid`；`utils/markdown.ts` 增加高亮 fence、Mermaid 围栏、安全图片规则与 `data:image/*` 放行；详情页挂载后 `enhanceMarketplaceMarkdown` 渲染图表；CSS 对齐 VS Code/GitHub Markdown 预览
+- [x] i18n：无新增运行时 UI 文案、菜单、按钮、表格列、API 文档源文本或语言包键；渲染对象为插件文档 Markdown 正文本身
+- [x] 缓存一致性：无影响；不新增缓存、快照或失效策略
+- [x] 数据权限/可见性：无影响；仅前端渲染链路，不改变文档读取或可见性边界
+- [x] 开发工具跨平台：无影响；依赖安装仍走插件 `frontend/pnpm install`，未改 Makefile/linactl/CI 默认入口
+- [x] DI：无新增运行期宿主 DI；`mermaid` 为前端动态 import
+- [x] 外部规则：已读 `plugin.md`、`frontend-ui.md`、`testing.md`、`openspec.md`、`i18n.md`；后端 Go/API/SQL/缓存/数据权限/dev-tooling 无影响
+- [x] 测试：`node --test` 插件前端静态与 markdown 渲染单测通过；`E2E TC-7`（表格/图片/Mermaid/代码高亮）、回归 `TC-9`/`TC-10` 通过；`openspec validate simplify-plugin-marketplace-distribution --strict` 通过
 
 ## 8. 任务完成影响记录
 
@@ -102,3 +131,37 @@
 - [x] 开发工具跨平台：无影响；不新增或修改默认开发工具入口
 - [x] DI：无新增运行期依赖；复用市场服务、文档索引与现有 artifact/Git 发现流程
 - [x] 测试：补充后端文档快照/多语言包单测、前端本地切换静态测试与 E2E 子断言；`GOWORK=off go test ./backend/... -count=1`、插件前端/apidoc i18n 静态测试、`make lint.go dir=apps/lina-plugins/linapro-plugin-marketplace plugins=1`、`make plugins.check`、`openspec validate ... --strict`通过；`db.init`/`dao`因本地数据库既有 schema 缺失和插件表未初始化阻断，浏览器 E2E 未运行
+
+## Feedback 影响记录（FB-17）
+
+- [x] 根因：上传包可接收 `.tar.gz`/`.tgz`，但详情文档读取存储产物时只按 ZIP 打开，导致压缩包内 `manifest/docs` 未被读取；同时前端详情页只使用 `markdown` 渲染结果，后端或测试夹具仅返回安全 HTML `content` 时正文会为空
+- [x] i18n：无新增运行时文案、菜单、按钮、表格列、API 文档源文本或语言包资源；插件市场自身前端 i18n 静态测试通过，全局`make i18n.check`失败于既有宿主 `linapro-content-notice` 缺失键，非 FB-17 引入
+- [x] 缓存一致性：无影响；不新增缓存、快照或失效策略，文档详情仍从当前可见版本的存储产物或既有文档快照读取
+- [x] 数据权限/可见性：无新增读写边界；「我的插件」详情仍复用既有可见版本文档接口与 `requireVisibleRelease` 可见性约束，不扩大跨用户或公开市场可见范围
+- [x] 开发工具跨平台：无影响；不修改 `Makefile`、`linactl`、CI 或脚本入口，`.tar.gz` 转 ZIP 读取复用既有标准库转换路径
+- [x] DI：无新增运行期依赖、构造函数参数或启动装配路径
+- [x] 测试：`GOWORK=off go test ./backend/internal/service/marketplace -count=1`、`node --test hack/tests/unit/marketplace-frontend.test.mjs`、`make lint.go dir=apps/lina-plugins/linapro-plugin-marketplace plugins=1`、`E2E_BASE_URL=http://127.0.0.1:5666 E2E_BACKEND_BASE_URL=http://127.0.0.1:9120 pnpm test:module -- plugin:linapro-plugin-marketplace --grep "TC-9"`、`E2E_BASE_URL=http://127.0.0.1:5666 E2E_BACKEND_BASE_URL=http://127.0.0.1:9120 pnpm test:module -- plugin:linapro-plugin-marketplace --grep "TC-7"`、`openspec validate simplify-plugin-marketplace-distribution --strict`通过
+
+## Feedback 影响记录（FB-18）
+
+- [x] 根因：`official-plugins`中`linapro-tenant-core`当前版本只有仓库根`README.md`/`README.zh-CN.md`，没有`manifest/docs`；Git 发现已索引 README 文档记录，但详情文档接口和前端目录将`sourceKind=readme`全部过滤，导致目录为空并返回`PLUGIN_MARKETPLACE_DOCUMENT_NOT_FOUND`
+- [x] 修复：后端在同一发布版本没有任何`manifest/docs`文档时，将 README 文档作为`index.md`目录项和正文 fallback；同一版本存在`manifest/docs`时继续隐藏 README，保持 manifest 文档优先
+- [x] i18n：有影响；API DTO 的`sourceKind`文档说明新增`readme`返回语义，并同步更新插件`zh-CN`apidoc 翻译；无新增运行时 UI 文案键
+- [x] 缓存一致性：无新增缓存、快照失效或分布式同步策略；详情读取仍以发布版本已有包文档或 Git 文档快照为权威来源，未在 GET 文档接口中引入写入副作用
+- [x] 数据权限/可见性：无新增读写边界；文档详情仍先执行`requireVisibleRelease`，仅对当前可见版本返回 README fallback，不扩大跨用户、跨租户或公开市场可见范围
+- [x] 开发工具跨平台：无影响；不修改`Makefile`、`linactl`、CI、脚本入口或平台相关路径
+- [x] DI：无新增运行期依赖、构造函数参数、启动装配或共享实例路径
+- [x] 截图审查：修复前真实截图`temp/e2e/20260730/20260730-092935-linapro-tenant-core-docs-tab.png`显示“所选版本暂无可用文档”；修复后 E2E 截图`temp/20260730/175937-mine-detail-readme-docs.png`和真实服务截图`temp/e2e/20260730/175500-real-linapro-tenant-core-docs-final.png`均显示 README 文档目录与正文
+- [x] 测试：`GOWORK=off go test ./backend/internal/service/marketplace -count=1`、`node --test hack/tests/unit/marketplace-frontend.test.mjs`、`node --test hack/tests/unit/marketplace-apidoc-i18n.test.mjs`、`make lint.go dir=apps/lina-plugins/linapro-plugin-marketplace plugins=1`、`E2E_BASE_URL=http://127.0.0.1:5666 E2E_BACKEND_BASE_URL=http://127.0.0.1:9120 pnpm --pm-on-fail=ignore -C hack/tests test:module -- plugin:linapro-plugin-marketplace --grep "TC-10"`、`E2E_BASE_URL=http://127.0.0.1:5666 E2E_BACKEND_BASE_URL=http://127.0.0.1:9120 pnpm --pm-on-fail=ignore -C hack/tests test:module -- plugin:linapro-plugin-marketplace --grep "TC-7|TC-9"`、`openspec validate simplify-plugin-marketplace-distribution --strict`通过；`make i18n.check`失败于既有宿主`linapro-content-notice`缺失键，非 FB-18 引入
+
+## Feedback 影响记录（FB-19）
+
+- [x] 根因：Git 文档重索引对已发布版本使用钉扎`source_commit`读取正文，而候选树可能来自较新的发现引用；当`manifest/docs`在钉扎之后才加入仓库时，读正文失败并只剩 README，目录被折叠为单一`index.md`。用户看到的是 README 回退而非完整 md 目录
+- [x] 修复：1）`indexGitReleaseDocuments`按内容引用重新`ListTreePaths`，保证候选与可读 blob 一致；2）已发布版本文档富化改为按当前发现引用（tag/`main`）重索引，安装仍使用`source_commit`钉扎；3）每个发现引用都执行文档富化（不再仅限第一个 ref）
+- [x] i18n：无新增运行时 UI 文案、菜单、按钮或语言包键；目录标题取自各 md 文件首个 ATX 标题文本；无 apidoc 源文本变更
+- [x] 缓存一致性：有影响；Git 同步会替换版本文档磁盘快照（`docs-snapshot/.../manifest.json`与 content），详情 GET 仍只读快照不回源
+- [x] 数据权限/可见性：无新增读写边界；文档仍经`requireVisibleRelease`，不扩大跨用户/公开可见范围
+- [x] 开发工具跨平台：无影响
+- [x] DI：无新增运行期依赖
+- [x] 真实验证：`git-sync`后`linapro-tenant-core`/`linapro-ai-core`/`linapro-demo-source`的`catalog`均返回 3 项且标题为「多租户/智能中心/示例插件-源码插件」「更新日志」「配置说明」
+- [x] 测试：`GOWORK=off go test ./backend/internal/service/marketplace -count=1`、`node --test hack/tests/unit/marketplace-frontend.test.mjs`、`E2E_BASE_URL=... pnpm -C hack/tests test:module -- plugin:linapro-plugin-marketplace --grep "TC-7|TC-9"`、`openspec validate simplify-plugin-marketplace-distribution --strict`通过

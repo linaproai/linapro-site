@@ -79,6 +79,7 @@
   "plugin.linapro-plugin-marketplace.detail.tabs.versions": "Versions",
   "plugin.linapro-plugin-marketplace.detail.tabs.docs": "Docs",
   "plugin.linapro-plugin-marketplace.detail.docs.locale": "Document Language",
+  "plugin.linapro-plugin-marketplace.detail.docs.catalog": "Documents",
   "plugin.linapro-plugin-marketplace.detail.tabs.risks": "Risks",
   "plugin.linapro-plugin-marketplace.detail.columns.version": "Version",
   "plugin.linapro-plugin-marketplace.detail.columns.status": "Status",

@@ -3,8 +3,10 @@
 // from host plugin-management DTOs.
 
 export type MarketplaceArtifactType =
+  | 'dynamic_tar_gz'
   | 'dynamic_zip'
   | 'plugin_wasm'
+  | 'source_tar_gz'
   | 'source_zip';
 
 export type MarketplaceDownloadSessionStatus =
@@ -203,6 +205,8 @@ export interface MarketplaceManagedPluginListParams extends MarketplacePageParam
 
 export interface MarketplaceMyPluginListParams extends MarketplacePageParams {
   keyword?: string;
+  orderBy?: "downloadCount" | "marketStatus" | "pluginId" | "updatedAt" | string;
+  orderDirection?: "asc" | "desc" | string;
   pluginType?: MarketplacePluginType;
   status?: MarketplaceListStatusFilter;
 }
@@ -284,6 +288,8 @@ export interface MarketplaceDocumentItem {
   contentHash: string;
   fallbackUsed: boolean;
   locale: string;
+  /** Raw Markdown source preferred for client-side rendering. */
+  markdown?: string;
   path: string;
   pluginId: string;
   resolvedLocale: string;
@@ -294,7 +300,15 @@ export interface MarketplaceDocumentItem {
   version: string;
 }
 
+export interface MarketplaceDocumentCatalogItem {
+  locales: string[];
+  path: string;
+  sourceKind: string;
+  title: string;
+}
+
 export interface MarketplaceDocumentBundle {
+  catalog: MarketplaceDocumentCatalogItem[];
   document?: MarketplaceDocumentItem | null;
   documents: MarketplaceDocumentItem[];
 }

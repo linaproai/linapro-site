@@ -13,6 +13,7 @@ import type { VxeGridProps } from "#/adapter/vxe-table";
 
 import type {
   MarketplaceArtifactType,
+  MarketplaceDocumentCatalogItem,
   MarketplaceDocumentItem,
   MarketplacePluginDetailItem,
   MarketplaceProcessStatus,
@@ -35,11 +36,15 @@ import { IconifyIcon } from "@vben/icons";
 import { preferences } from "@vben/preferences";
 import { breakpointsTailwind, useBreakpoints } from "@vueuse/core";
 
+import "highlight.js/styles/github.css";
+
 import {
   Alert,
   Descriptions,
   DescriptionsItem,
   Empty,
+  Menu,
+  MenuItem,
   Modal,
   Segmented,
   Space,
@@ -67,15 +72,15 @@ import {
   marketplaceReleaseRisks,
 } from "../../api/marketplace";
 import { marketplaceBackPath } from "../../utils/routes";
+import {
+  enhanceMarketplaceMarkdown,
+  renderMarketplaceMarkdown,
+  resolveRelativeMarkdownPath,
+} from "../../utils/markdown";
 
 type DetailGridOptions = NonNullable<
   VxeGridProps<MarketplaceReleaseItem>["gridOptions"]
 >;
-
-type GridPageInfo = {
-  currentPage: number;
-  pageSize: number;
-};
 
 type DetailTabKey = "docs" | "risks" | "versions";
 
@@ -123,10 +128,7 @@ const readScope = computed<MarketplaceReadScope>(() => {
   if (activeFrom.value === "mine") {
     return "mine";
   }
-  if (
-    activeFrom.value === "admin-list" ||
-    activeFrom.value === "review"
-  ) {
+  if (activeFrom.value === "admin-list" || activeFrom.value === "review") {
     return "managed";
   }
   return "public";
@@ -136,6 +138,8 @@ const { hasAccessByCodes } = useAccess();
 const detail = ref<MarketplacePluginDetailItem | null>(null);
 const currentDocument = ref<MarketplaceDocumentItem | null>(null);
 const availableDocuments = ref<MarketplaceDocumentItem[]>([]);
+const documentCatalog = ref<MarketplaceDocumentCatalogItem[]>([]);
+const activeDocumentPath = ref("");
 const currentRisks = ref<MarketplaceRiskItem[]>([]);
 const selectedRelease = ref<MarketplaceReleaseItem | null>(null);
 const activeTab = ref<DetailTabKey>("versions");
@@ -149,6 +153,7 @@ const documentLoadState = ref<LoadState>("idle");
 const riskLoadState = ref<LoadState>("idle");
 let pageRequestId = 0;
 let releaseContextRequestId = 0;
+let documentRequestId = 0;
 
 const activeDocumentLocale = computed(
   () =>
@@ -169,17 +174,63 @@ const availableDocumentLocaleOptions = computed(() => {
     })
     .map((locale) => ({ label: locale, value: locale }));
 });
+const renderedDocumentHtml = computed(() => {
+  const document = currentDocument.value;
+  if (!document) {
+    return "";
+  }
+  return renderMarketplaceMarkdown(document.markdown) || document.content || "";
+});
+const markdownBodyRef = ref<HTMLElement | null>(null);
 
+function isWorkbenchDarkTheme() {
+  if (typeof globalThis.document === "undefined") {
+    return preferences.theme.mode === "dark";
+  }
+  return globalThis.document.documentElement.classList.contains("dark");
+}
+
+async function enhanceCurrentMarkdownBody() {
+  await nextTick();
+  await enhanceMarketplaceMarkdown(markdownBodyRef.value, {
+    dark: isWorkbenchDarkTheme(),
+  });
+}
+
+watch(renderedDocumentHtml, () => {
+  void enhanceCurrentMarkdownBody();
+});
+
+// Backend only returns README entries when a release has no manifest/docs.
+const documentCatalogOptions = computed(() =>
+  documentCatalog.value.filter(
+    (entry) =>
+      entry?.path &&
+      (entry.sourceKind === "manifest_docs" || entry.sourceKind === "readme"),
+  ),
+);
+
+// Do not use height: "auto" here. In vxe-table that value means fill the parent
+// (style height 100%), and the Vben wrapper also applies h-full. Nested inside the
+// detail modal / tabs scroll container, autoResize + fill-parent creates a
+// ResizeObserver loop that keeps expanding the blank body area.
+//
+// Pager is disabled: a plugin's release history is typically short, and the
+// detail modal is not a full list page. Load one page at the API max (100).
 const [VersionGrid, versionGridApi] = useVbenVxeGrid<MarketplaceReleaseItem>({
+  class: "marketplace-detail-version-grid h-auto",
   gridOptions: {
+    autoResize: false,
     columns: [],
-    height: "auto",
     keepSource: true,
-    pagerConfig: {},
+    maxHeight: 480,
+    pagerConfig: {
+      enabled: false,
+    },
     proxyConfig: {
       autoLoad: false,
       ajax: {
-        query: async ({ page }: { page: GridPageInfo }) => {
+        query: async () => {
           const pluginId = getActivePluginId();
           if (!pluginId) {
             versionLoadState.value = "empty";
@@ -191,8 +242,8 @@ const [VersionGrid, versionGridApi] = useVbenVxeGrid<MarketplaceReleaseItem>({
             const result = await marketplaceReleaseList(
               pluginId,
               {
-                pageNum: page.currentPage,
-                pageSize: page.pageSize,
+                pageNum: 1,
+                pageSize: 100,
               },
               readScope.value,
             );
@@ -234,6 +285,19 @@ function getActivePluginId() {
     return value[0] || "";
   }
   return typeof value === "string" ? value : "";
+}
+
+function isMarketplaceDisplayDocumentItem(document: {
+  path?: string;
+  sourceKind?: string;
+}) {
+  const path = (document.path || "").trim();
+  if (!path) {
+    return false;
+  }
+  return (
+    document.sourceKind === "manifest_docs" || document.sourceKind === "readme"
+  );
 }
 
 function buildVersionColumns(): DetailGridOptions["columns"] {
@@ -322,6 +386,8 @@ async function initializePage() {
   detail.value = null;
   currentDocument.value = null;
   availableDocuments.value = [];
+  documentCatalog.value = [];
+  activeDocumentPath.value = "";
   currentRisks.value = [];
   selectedRelease.value = null;
   activeTab.value = "versions";
@@ -381,6 +447,8 @@ async function loadReleaseContext(row: MarketplaceReleaseItem) {
   const requestId = ++releaseContextRequestId;
   currentDocument.value = null;
   availableDocuments.value = [];
+  documentCatalog.value = [];
+  activeDocumentPath.value = "";
   currentRisks.value = [];
   documentLoading.value = true;
   riskLoading.value = true;
@@ -395,7 +463,9 @@ async function loadReleaseContext(row: MarketplaceReleaseItem) {
 async function loadReleaseDocument(
   row: MarketplaceReleaseItem,
   requestId: number,
+  options?: { locale?: string; path?: string },
 ) {
+  const docRequestId = ++documentRequestId;
   try {
     // Pass the active UI locale so marketplace docs can prefer a matching
     // plugin i18n document; the server still applies single-locale / English
@@ -403,27 +473,57 @@ async function loadReleaseDocument(
     const result = await marketplaceReleaseDocumentBundle(
       row.pluginId,
       row.version,
-      { locale: preferences.app.locale },
+      {
+        locale: options?.locale || preferences.app.locale,
+        path: options?.path || activeDocumentPath.value || undefined,
+      },
       readScope.value,
     );
-    if (!isCurrentReleaseRequest(row, requestId)) {
+    if (
+      !isCurrentReleaseRequest(row, requestId) ||
+      docRequestId !== documentRequestId
+    ) {
       return;
     }
-    availableDocuments.value =
+    documentCatalog.value = result.catalog ?? [];
+    const displayDocuments = (
       result.documents.length > 0
         ? result.documents
         : result.document
           ? [result.document]
-          : [];
-    currentDocument.value =
-      result.document ?? availableDocuments.value[0] ?? null;
-    documentLoadState.value = currentDocument.value ? "ready" : "empty";
+          : []
+    ).filter((document) => isMarketplaceDisplayDocumentItem(document));
+    const displayDocument =
+      (result.document && isMarketplaceDisplayDocumentItem(result.document)
+        ? result.document
+        : null) ??
+      displayDocuments[0] ??
+      null;
+    availableDocuments.value = displayDocuments;
+    currentDocument.value = displayDocument;
+    activeDocumentPath.value =
+      displayDocument?.path ||
+      options?.path ||
+      documentCatalogOptions.value[0]?.path ||
+      "";
+    // Catalog may still list navigable docs even when the requested path is empty.
+    documentLoadState.value =
+      displayDocument || documentCatalogOptions.value.length > 0
+        ? "ready"
+        : "empty";
   } catch (error) {
-    if (!isCurrentReleaseRequest(row, requestId)) {
+    if (
+      !isCurrentReleaseRequest(row, requestId) ||
+      docRequestId !== documentRequestId
+    ) {
       return;
     }
     currentDocument.value = null;
     availableDocuments.value = [];
+    if (!options?.path) {
+      documentCatalog.value = [];
+      activeDocumentPath.value = "";
+    }
     documentLoadState.value = isMarketplaceErrorKey(
       error,
       "error.plugin.marketplace.document.not.found",
@@ -431,7 +531,10 @@ async function loadReleaseDocument(
       ? "empty"
       : "error";
   } finally {
-    if (isCurrentReleaseRequest(row, requestId)) {
+    if (
+      isCurrentReleaseRequest(row, requestId) &&
+      docRequestId === documentRequestId
+    ) {
       documentLoading.value = false;
     }
   }
@@ -440,16 +543,9 @@ async function loadReleaseDocument(
 watch(
   () => preferences.app.locale,
   (locale) => {
-    applyPreferredDocumentLocale(locale);
+    void handleDocumentLocaleChange(locale);
   },
 );
-
-function applyPreferredDocumentLocale(locale: string) {
-  const document = chooseDocumentFromBundle(locale);
-  if (document) {
-    currentDocument.value = document;
-  }
-}
 
 function chooseDocumentFromBundle(locale: string) {
   const documents = availableDocuments.value;
@@ -463,7 +559,8 @@ function chooseDocumentFromBundle(locale: string) {
   if (preferred) {
     const exact = documents.find(
       (document) =>
-        (document.resolvedLocale || document.locale).toLowerCase() === preferred,
+        (document.resolvedLocale || document.locale).toLowerCase() ===
+        preferred,
     );
     if (exact) {
       return exact;
@@ -479,13 +576,54 @@ function chooseDocumentFromBundle(locale: string) {
 }
 
 function handleSelectDocumentLocale(value: string | number) {
-  const locale = String(value);
-  const document = availableDocuments.value.find(
-    (item) => (item.resolvedLocale || item.locale) === locale,
-  );
-  if (document) {
-    currentDocument.value = document;
+  void handleDocumentLocaleChange(String(value));
+}
+
+async function handleDocumentLocaleChange(locale: string) {
+  const release = selectedRelease.value;
+  if (!release) {
+    const document = chooseDocumentFromBundle(locale);
+    if (document) {
+      currentDocument.value = document;
+    }
+    return;
   }
+  documentLoading.value = true;
+  await loadReleaseDocument(release, releaseContextRequestId, {
+    locale,
+    path: activeDocumentPath.value || undefined,
+  });
+}
+
+async function handleSelectDocumentPath(path: string) {
+  const release = selectedRelease.value;
+  if (!release || !path || path === activeDocumentPath.value) {
+    return;
+  }
+  activeDocumentPath.value = path;
+  documentLoading.value = true;
+  await loadReleaseDocument(release, releaseContextRequestId, {
+    locale: preferences.app.locale,
+    path,
+  });
+}
+
+function handleDocumentBodyClick(event: MouseEvent) {
+  const target = event.target as HTMLElement | null;
+  const anchor = target?.closest?.("a");
+  if (!anchor) {
+    return;
+  }
+  const href = anchor.getAttribute("href") || "";
+  const nextPath = resolveRelativeMarkdownPath(
+    activeDocumentPath.value || currentDocument.value?.path || "index.md",
+    href,
+  );
+  if (!nextPath) {
+    return;
+  }
+  event.preventDefault();
+  void handleSelectDocumentPath(nextPath);
 }
 
 async function loadReleaseRisks(
@@ -817,13 +955,15 @@ function formatReleaseSourcePin(row?: MarketplaceReleaseItem | null) {
   if (!commit && !ref) {
     return "";
   }
-  const shortCommit =
-    commit.length > 12 ? `${commit.slice(0, 12)}…` : commit;
+  const shortCommit = commit.length > 12 ? `${commit.slice(0, 12)}…` : commit;
   if (commit && ref) {
-    return t("plugin.linapro-plugin-marketplace.detail.sourcePin.refAndCommit", {
-      ref,
-      commit: shortCommit,
-    });
+    return t(
+      "plugin.linapro-plugin-marketplace.detail.sourcePin.refAndCommit",
+      {
+        ref,
+        commit: shortCommit,
+      },
+    );
   }
   if (commit) {
     return t("plugin.linapro-plugin-marketplace.detail.sourcePin.commitOnly", {
@@ -957,9 +1097,7 @@ function versionsEmptyDescription() {
       );
     }
     case "failed": {
-      return t(
-        "plugin.linapro-plugin-marketplace.detail.empty.versionsFailed",
-      );
+      return t("plugin.linapro-plugin-marketplace.detail.empty.versionsFailed");
     }
     default: {
       return t("plugin.linapro-plugin-marketplace.detail.empty.versions");
@@ -1176,9 +1314,7 @@ function formatBytes(value?: number) {
             {{ formatPluginType(detail.pluginType) }}
           </Tag>
           <Tag
-            :color="
-              getStatusColor(detail.marketStatus, detail.processStatus)
-            "
+            :color="getStatusColor(detail.marketStatus, detail.processStatus)"
           >
             {{ formatStatus(detail.marketStatus, detail.processStatus) }}
           </Tag>
@@ -1194,7 +1330,9 @@ function formatBytes(value?: number) {
                   {{ detail.name || getActivePluginId() || "-" }}
                 </h3>
                 <Space wrap :size="[6, 6]">
-                  <Tag :color="detail.pluginType === 'source' ? 'blue' : 'green'">
+                  <Tag
+                    :color="detail.pluginType === 'source' ? 'blue' : 'green'"
+                  >
                     {{ formatPluginType(detail.pluginType) }}
                   </Tag>
                   <Tag
@@ -1202,7 +1340,9 @@ function formatBytes(value?: number) {
                       getStatusColor(detail.marketStatus, detail.processStatus)
                     "
                   >
-                    {{ formatStatus(detail.marketStatus, detail.processStatus) }}
+                    {{
+                      formatStatus(detail.marketStatus, detail.processStatus)
+                    }}
                   </Tag>
                   <Tag
                     v-if="detail.sourceKind"
@@ -1212,7 +1352,10 @@ function formatBytes(value?: number) {
                   </Tag>
                 </Space>
               </div>
-              <p v-if="detail.summary" class="marketplace-detail-embedded-summary">
+              <p
+                v-if="detail.summary"
+                class="marketplace-detail-embedded-summary"
+              >
                 {{ detail.summary }}
               </p>
             </div>
@@ -1240,7 +1383,9 @@ function formatBytes(value?: number) {
               </DescriptionsItem>
               <DescriptionsItem
                 :label="
-                  $t('plugin.linapro-plugin-marketplace.detail.fields.publisher')
+                  $t(
+                    'plugin.linapro-plugin-marketplace.detail.fields.publisher',
+                  )
                 "
               >
                 {{
@@ -1286,7 +1431,9 @@ function formatBytes(value?: number) {
               </DescriptionsItem>
               <DescriptionsItem
                 :label="
-                  $t('plugin.linapro-plugin-marketplace.detail.fields.downloads')
+                  $t(
+                    'plugin.linapro-plugin-marketplace.detail.fields.downloads',
+                  )
                 "
               >
                 {{ detail.downloadCount }}
@@ -1300,7 +1447,9 @@ function formatBytes(value?: number) {
               </DescriptionsItem>
               <DescriptionsItem
                 :label="
-                  $t('plugin.linapro-plugin-marketplace.detail.fields.updatedAt')
+                  $t(
+                    'plugin.linapro-plugin-marketplace.detail.fields.updatedAt',
+                  )
                 "
               >
                 {{ formatTimestamp(detail.updatedAt) }}
@@ -1330,7 +1479,9 @@ function formatBytes(value?: number) {
                 "
                 :span="2"
               >
-                <span class="marketplace-muted">{{ detail.lastSyncMessage }}</span>
+                <span class="marketplace-muted">{{
+                  detail.lastSyncMessage
+                }}</span>
               </DescriptionsItem>
               <DescriptionsItem
                 :label="
@@ -1341,9 +1492,12 @@ function formatBytes(value?: number) {
                 <Space v-if="hasRiskCounts()" wrap :size="[4, 4]">
                   <Tag v-if="getRiskCounts().high > 0" color="error">
                     {{
-                      $t("plugin.linapro-plugin-marketplace.catalog.risk.high", {
-                        count: getRiskCounts().high,
-                      })
+                      $t(
+                        "plugin.linapro-plugin-marketplace.catalog.risk.high",
+                        {
+                          count: getRiskCounts().high,
+                        },
+                      )
                     }}
                   </Tag>
                   <Tag v-if="getRiskCounts().warning > 0" color="warning">
@@ -1356,14 +1510,19 @@ function formatBytes(value?: number) {
                   </Tag>
                   <Tag v-if="getRiskCounts().info > 0" color="processing">
                     {{
-                      $t("plugin.linapro-plugin-marketplace.catalog.risk.info", {
-                        count: getRiskCounts().info,
-                      })
+                      $t(
+                        "plugin.linapro-plugin-marketplace.catalog.risk.info",
+                        {
+                          count: getRiskCounts().info,
+                        },
+                      )
                     }}
                   </Tag>
                 </Space>
                 <Tag v-else-if="hasRiskAssessment()" color="success">
-                  {{ $t("plugin.linapro-plugin-marketplace.catalog.risk.none") }}
+                  {{
+                    $t("plugin.linapro-plugin-marketplace.catalog.risk.none")
+                  }}
                 </Tag>
                 <Tag v-else>
                   {{
@@ -1380,220 +1539,266 @@ function formatBytes(value?: number) {
               class="marketplace-detail-tabs"
               :class="{ 'marketplace-detail-tabs--embedded': embedded }"
             >
-            <TabPane
-              key="versions"
-              :tab="
-                $t('plugin.linapro-plugin-marketplace.detail.tabs.versions')
-              "
-            >
-              <Alert
-                v-if="versionLoadState === 'error'"
-                show-icon
-                type="error"
-                :message="
-                  $t(
-                    'plugin.linapro-plugin-marketplace.detail.errors.versionsLoad',
-                  )
-                "
-              />
-              <Empty
-                v-else-if="versionLoadState === 'empty'"
-                :description="versionsEmptyDescription()"
-              />
-              <VersionGrid
-                v-else
-                :table-title="
-                  $t(
-                    'plugin.linapro-plugin-marketplace.detail.versionTableTitle',
-                  )
+              <TabPane
+                key="versions"
+                :tab="
+                  $t('plugin.linapro-plugin-marketplace.detail.tabs.versions')
                 "
               >
-                <template #version="{ row }">
-                  <Space direction="vertical" :size="2">
-                    <span class="marketplace-version">{{ row.version }}</span>
-                    <span class="marketplace-muted">
-                      {{ formatPluginType(row.pluginType) }}
-                    </span>
-                    <span
-                      v-if="formatReleaseSourcePin(row)"
-                      class="marketplace-muted marketplace-source-pin"
-                      :title="formatReleaseSourcePin(row)"
-                    >
-                      {{ formatReleaseSourcePin(row) }}
-                    </span>
-                  </Space>
-                </template>
-
-                <template #releaseStatus="{ row }">
-                  <Tag :color="getStatusColor(row.releaseStatus)">
-                    {{ formatStatus(row.releaseStatus) }}
-                  </Tag>
-                </template>
-
-                <template #reviewStatus="{ row }">
-                  <Tag :color="getReviewStatusColor(row.reviewStatus)">
-                    {{ formatReviewStatus(row.reviewStatus) }}
-                  </Tag>
-                </template>
-
-                <template #artifact="{ row }">
-                  <Space direction="vertical" :size="2">
-                    <Tag>{{
-                      formatArtifactType(row.artifact?.artifactType)
-                    }}</Tag>
-                    <Tooltip :title="row.artifact?.sha256">
-                      <span class="marketplace-muted">
-                        {{ formatBytes(row.artifact?.sizeBytes) }}
-                      </span>
-                    </Tooltip>
-                  </Space>
-                </template>
-
-                <template #compatibility="{ row }">
-                  <span class="marketplace-muted">
-                    {{ getCompatibilityLabel(row) }}
-                  </span>
-                </template>
-
-                <template #action="{ row }">
-                  <Space :size="[4, 4]" :wrap="true">
-                    <ghost-button
-                      @click.stop="handleSelectRelease(row, 'docs')"
-                    >
-                      {{
-                        $t(
-                          "plugin.linapro-plugin-marketplace.detail.actions.viewDocs",
-                        )
-                      }}
-                    </ghost-button>
-                    <ghost-button
-                      @click.stop="handleSelectRelease(row, 'risks')"
-                    >
-                      {{
-                        $t(
-                          "plugin.linapro-plugin-marketplace.detail.actions.viewRisks",
-                        )
-                      }}
-                    </ghost-button>
-                    <ghost-button
-                      v-if="canDownloadMarketplacePlugin()"
-                      :loading="isDownloading(row)"
-                      @click.stop="handleConfirmDownload(row)"
-                    >
-                      {{
-                        $t(
-                          "plugin.linapro-plugin-marketplace.detail.actions.download",
-                        )
-                      }}
-                    </ghost-button>
-                  </Space>
-                </template>
-              </VersionGrid>
-            </TabPane>
-
-            <TabPane
-              key="docs"
-              :tab="$t('plugin.linapro-plugin-marketplace.detail.tabs.docs')"
-            >
-              <Spin :spinning="documentLoading">
                 <Alert
-                  v-if="documentLoadState === 'error'"
+                  v-if="versionLoadState === 'error'"
                   show-icon
                   type="error"
                   :message="
                     $t(
-                      'plugin.linapro-plugin-marketplace.detail.errors.documentLoad',
+                      'plugin.linapro-plugin-marketplace.detail.errors.versionsLoad',
                     )
                   "
                 />
-                <div v-else-if="currentDocument" class="marketplace-doc-panel">
-                  <div class="marketplace-doc-title">
-                    <h3>
-                      {{ currentDocument.title || selectedRelease?.version }}
-                    </h3>
-                    <Space wrap :size="[6, 6]">
-                      <Segmented
-                        v-if="availableDocumentLocaleOptions.length > 1"
-                        :aria-label="
-                          $t(
-                            'plugin.linapro-plugin-marketplace.detail.docs.locale',
-                          )
-                        "
-                        :options="availableDocumentLocaleOptions"
-                        size="small"
-                        :value="activeDocumentLocale"
-                        @change="handleSelectDocumentLocale"
-                      />
-                      <Tag>{{ currentDocument.resolvedLocale }}</Tag>
-                      <Tag>{{ currentDocument.path }}</Tag>
-                    </Space>
-                  </div>
-                  <p class="marketplace-muted">{{ currentDocument.summary }}</p>
-                  <div
-                    class="marketplace-doc-body"
-                    v-html="currentDocument.content"
-                  ></div>
-                </div>
                 <Empty
+                  v-else-if="versionLoadState === 'empty'"
+                  :description="versionsEmptyDescription()"
+                />
+                <VersionGrid
                   v-else
-                  :description="
+                  :table-title="
                     $t(
-                      documentLoadState === 'idle'
-                        ? 'plugin.linapro-plugin-marketplace.detail.empty.selectVersion'
-                        : 'plugin.linapro-plugin-marketplace.detail.empty.document',
+                      'plugin.linapro-plugin-marketplace.detail.versionTableTitle',
                     )
                   "
-                />
-              </Spin>
-            </TabPane>
-
-            <TabPane
-              key="risks"
-              :tab="$t('plugin.linapro-plugin-marketplace.detail.tabs.risks')"
-            >
-              <Spin :spinning="riskLoading">
-                <Alert
-                  v-if="riskLoadState === 'error'"
-                  show-icon
-                  type="error"
-                  :message="
-                    $t(
-                      'plugin.linapro-plugin-marketplace.detail.errors.risksLoad',
-                    )
-                  "
-                />
-                <div
-                  v-else-if="currentRisks.length > 0"
-                  class="marketplace-risk-list"
                 >
-                  <div
-                    v-for="risk in currentRisks"
-                    :key="`${risk.type}:${risk.source}:${risk.summary}`"
-                    class="marketplace-risk-item"
-                  >
-                    <Space wrap :size="[6, 6]">
-                      <Tag :color="getRiskSeverityColor(risk.severity)">
-                        {{ formatRiskSeverity(risk.severity) }}
-                      </Tag>
-                      <Tag>{{ formatRiskType(risk.type) }}</Tag>
-                      <span class="marketplace-muted">{{ risk.source }}</span>
+                  <template #version="{ row }">
+                    <Space direction="vertical" :size="2">
+                      <span class="marketplace-version">{{ row.version }}</span>
+                      <span class="marketplace-muted">
+                        {{ formatPluginType(row.pluginType) }}
+                      </span>
+                      <span
+                        v-if="formatReleaseSourcePin(row)"
+                        class="marketplace-muted marketplace-source-pin"
+                        :title="formatReleaseSourcePin(row)"
+                      >
+                        {{ formatReleaseSourcePin(row) }}
+                      </span>
                     </Space>
-                    <p>{{ risk.summary }}</p>
+                  </template>
+
+                  <template #releaseStatus="{ row }">
+                    <Tag :color="getStatusColor(row.releaseStatus)">
+                      {{ formatStatus(row.releaseStatus) }}
+                    </Tag>
+                  </template>
+
+                  <template #reviewStatus="{ row }">
+                    <Tag :color="getReviewStatusColor(row.reviewStatus)">
+                      {{ formatReviewStatus(row.reviewStatus) }}
+                    </Tag>
+                  </template>
+
+                  <template #artifact="{ row }">
+                    <Space direction="vertical" :size="2">
+                      <Tag>{{
+                        formatArtifactType(row.artifact?.artifactType)
+                      }}</Tag>
+                      <Tooltip :title="row.artifact?.sha256">
+                        <span class="marketplace-muted">
+                          {{ formatBytes(row.artifact?.sizeBytes) }}
+                        </span>
+                      </Tooltip>
+                    </Space>
+                  </template>
+
+                  <template #compatibility="{ row }">
+                    <span class="marketplace-muted">
+                      {{ getCompatibilityLabel(row) }}
+                    </span>
+                  </template>
+
+                  <template #action="{ row }">
+                    <Space :size="[4, 4]" :wrap="true">
+                      <ghost-button
+                        @click.stop="handleSelectRelease(row, 'docs')"
+                      >
+                        {{
+                          $t(
+                            "plugin.linapro-plugin-marketplace.detail.actions.viewDocs",
+                          )
+                        }}
+                      </ghost-button>
+                      <ghost-button
+                        @click.stop="handleSelectRelease(row, 'risks')"
+                      >
+                        {{
+                          $t(
+                            "plugin.linapro-plugin-marketplace.detail.actions.viewRisks",
+                          )
+                        }}
+                      </ghost-button>
+                      <ghost-button
+                        v-if="canDownloadMarketplacePlugin()"
+                        :loading="isDownloading(row)"
+                        @click.stop="handleConfirmDownload(row)"
+                      >
+                        {{
+                          $t(
+                            "plugin.linapro-plugin-marketplace.detail.actions.download",
+                          )
+                        }}
+                      </ghost-button>
+                    </Space>
+                  </template>
+                </VersionGrid>
+              </TabPane>
+
+              <TabPane
+                key="docs"
+                :tab="$t('plugin.linapro-plugin-marketplace.detail.tabs.docs')"
+              >
+                <Spin :spinning="documentLoading">
+                  <Alert
+                    v-if="documentLoadState === 'error'"
+                    show-icon
+                    type="error"
+                    :message="
+                      $t(
+                        'plugin.linapro-plugin-marketplace.detail.errors.documentLoad',
+                      )
+                    "
+                  />
+                  <div
+                    v-else-if="
+                      currentDocument || documentCatalogOptions.length > 0
+                    "
+                    class="marketplace-doc-layout"
+                  >
+                    <aside
+                      v-if="documentCatalogOptions.length > 0"
+                      class="marketplace-doc-nav"
+                    >
+                      <div class="marketplace-doc-nav-title">
+                        {{
+                          $t(
+                            "plugin.linapro-plugin-marketplace.detail.docs.catalog",
+                          )
+                        }}
+                      </div>
+                      <Menu
+                        mode="inline"
+                        :selected-keys="
+                          activeDocumentPath ? [activeDocumentPath] : []
+                        "
+                        @click="
+                          ({ key }) => handleSelectDocumentPath(String(key))
+                        "
+                      >
+                        <MenuItem
+                          v-for="entry in documentCatalogOptions"
+                          :key="entry.path"
+                        >
+                          {{ entry.title || entry.path }}
+                        </MenuItem>
+                      </Menu>
+                    </aside>
+                    <div v-if="currentDocument" class="marketplace-doc-panel">
+                      <!--
+                        Title is only rendered inside Markdown body (e.g. first # heading).
+                        Do not repeat currentDocument.title here — it duplicates the body heading.
+                      -->
+                      <div class="marketplace-doc-toolbar">
+                        <Space wrap :size="[6, 6]">
+                          <Segmented
+                            v-if="availableDocumentLocaleOptions.length > 1"
+                            :aria-label="
+                              $t(
+                                'plugin.linapro-plugin-marketplace.detail.docs.locale',
+                              )
+                            "
+                            :options="availableDocumentLocaleOptions"
+                            size="small"
+                            :value="activeDocumentLocale"
+                            @change="handleSelectDocumentLocale"
+                          />
+                          <Tag>{{ currentDocument.resolvedLocale }}</Tag>
+                          <Tag>{{ currentDocument.path }}</Tag>
+                        </Space>
+                      </div>
+                      <div
+                        ref="markdownBodyRef"
+                        class="marketplace-doc-body marketplace-markdown-body markdown-body"
+                        v-html="renderedDocumentHtml"
+                        @click="handleDocumentBodyClick"
+                      ></div>
+                    </div>
+                    <Empty
+                      v-else
+                      class="marketplace-doc-panel"
+                      :description="
+                        $t(
+                          'plugin.linapro-plugin-marketplace.detail.empty.document',
+                        )
+                      "
+                    />
                   </div>
-                </div>
-                <Empty
-                  v-else
-                  :description="
-                    $t(
-                      riskLoadState === 'idle'
-                        ? 'plugin.linapro-plugin-marketplace.detail.empty.selectVersion'
-                        : 'plugin.linapro-plugin-marketplace.detail.empty.risks',
-                    )
-                  "
-                />
-              </Spin>
-            </TabPane>
-          </Tabs>
+                  <Empty
+                    v-else
+                    :description="
+                      $t(
+                        documentLoadState === 'idle'
+                          ? 'plugin.linapro-plugin-marketplace.detail.empty.selectVersion'
+                          : 'plugin.linapro-plugin-marketplace.detail.empty.document',
+                      )
+                    "
+                  />
+                </Spin>
+              </TabPane>
+
+              <TabPane
+                key="risks"
+                :tab="$t('plugin.linapro-plugin-marketplace.detail.tabs.risks')"
+              >
+                <Spin :spinning="riskLoading">
+                  <Alert
+                    v-if="riskLoadState === 'error'"
+                    show-icon
+                    type="error"
+                    :message="
+                      $t(
+                        'plugin.linapro-plugin-marketplace.detail.errors.risksLoad',
+                      )
+                    "
+                  />
+                  <div
+                    v-else-if="currentRisks.length > 0"
+                    class="marketplace-risk-list"
+                  >
+                    <div
+                      v-for="risk in currentRisks"
+                      :key="`${risk.type}:${risk.source}:${risk.summary}`"
+                      class="marketplace-risk-item"
+                    >
+                      <Space wrap :size="[6, 6]">
+                        <Tag :color="getRiskSeverityColor(risk.severity)">
+                          {{ formatRiskSeverity(risk.severity) }}
+                        </Tag>
+                        <Tag>{{ formatRiskType(risk.type) }}</Tag>
+                        <span class="marketplace-muted">{{ risk.source }}</span>
+                      </Space>
+                      <p>{{ risk.summary }}</p>
+                    </div>
+                  </div>
+                  <Empty
+                    v-else
+                    :description="
+                      $t(
+                        riskLoadState === 'idle'
+                          ? 'plugin.linapro-plugin-marketplace.detail.empty.selectVersion'
+                          : 'plugin.linapro-plugin-marketplace.detail.empty.risks',
+                      )
+                    "
+                  />
+                </Spin>
+              </TabPane>
+            </Tabs>
           </div>
         </template>
 
@@ -1618,7 +1823,10 @@ function formatBytes(value?: number) {
 
 <style scoped>
 .marketplace-detail-modal-root {
+  display: flex;
   min-height: 0;
+  flex: 1;
+  flex-direction: column;
 }
 
 .marketplace-detail-shell {
@@ -1629,16 +1837,29 @@ function formatBytes(value?: number) {
 }
 
 .marketplace-detail-shell--embedded {
-  min-height: 0;
-  max-height: min(72vh, 820px);
-  overflow: auto;
+  /* Fill the modal content pane; do not cap at 520/820 so maximize uses space. */
+  flex: 1;
+  min-height: min(72vh, 820px);
+  max-height: none;
+  overflow: hidden;
   padding-right: 2px;
 }
 
 .marketplace-detail-body {
   display: flex;
+  flex: 1;
+  min-height: 0;
   flex-direction: column;
   gap: 14px;
+}
+
+/* Ant Spin must pass flex height through to the detail body. */
+.marketplace-detail-shell--embedded :deep(.ant-spin-nested-loading),
+.marketplace-detail-shell--embedded :deep(.ant-spin-container) {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
 }
 
 .marketplace-detail-header {
@@ -1673,6 +1894,7 @@ function formatBytes(value?: number) {
 
 .marketplace-detail-embedded-heading {
   display: flex;
+  flex-shrink: 0;
   flex-direction: column;
   gap: 8px;
 }
@@ -1706,6 +1928,7 @@ function formatBytes(value?: number) {
 }
 
 .marketplace-detail-descriptions {
+  flex-shrink: 0;
   background: var(--ant-color-bg-container);
 }
 
@@ -1713,8 +1936,53 @@ function formatBytes(value?: number) {
   min-height: 0;
 }
 
+.marketplace-detail-tabs--embedded {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.marketplace-detail-tabs--embedded :deep(.ant-tabs-nav) {
+  flex-shrink: 0;
+  margin-bottom: 8px;
+}
+
 .marketplace-detail-tabs--embedded :deep(.ant-tabs-content-holder) {
-  min-height: 180px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.marketplace-detail-tabs--embedded :deep(.ant-tabs-content),
+.marketplace-detail-tabs--embedded :deep(.ant-tabs-tabpane) {
+  height: 100%;
+}
+
+.marketplace-detail-tabs--embedded :deep(.ant-tabs-tabpane) {
+  display: flex;
+  flex-direction: column;
+  /* Versions/risks may need pane scroll; docs body owns its own overflow. */
+  overflow: auto;
+}
+
+.marketplace-detail-tabs--embedded :deep(.ant-spin-nested-loading),
+.marketplace-detail-tabs--embedded :deep(.ant-spin-container) {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* Content-sized version table: avoid fill-parent height feedback in modal tabs. */
+.marketplace-detail-version-grid {
+  height: auto !important;
+  min-height: 0;
+}
+
+.marketplace-detail-version-grid :deep(.vxe-grid) {
+  height: auto !important;
 }
 
 .marketplace-link {
@@ -1768,34 +2036,319 @@ function formatBytes(value?: number) {
 
 .marketplace-doc-panel {
   display: flex;
+  min-height: 0;
   flex-direction: column;
   gap: 10px;
 }
 
-.marketplace-doc-title {
+.marketplace-doc-layout {
+  display: grid;
+  grid-template-columns: minmax(180px, 220px) minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+  min-height: 280px;
+}
+
+/* In the detail modal, docs layout fills remaining tab height after meta/tabs. */
+.marketplace-detail-shell--embedded .marketplace-doc-layout {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+}
+
+.marketplace-detail-shell--embedded .marketplace-doc-panel {
+  min-height: 0;
+  height: 100%;
+}
+
+.marketplace-detail-shell--embedded .marketplace-doc-nav {
+  overflow: auto;
+  max-height: none;
+  height: 100%;
+}
+
+.marketplace-detail-shell--embedded .marketplace-doc-body {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
+
+.marketplace-doc-nav {
+  overflow: auto;
+  max-height: 520px;
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: 6px;
+  background: var(--ant-color-bg-container);
+}
+
+.marketplace-doc-nav-title {
+  padding: 10px 12px 6px;
+  color: var(--ant-color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.marketplace-doc-nav :deep(.ant-menu) {
+  border-inline-end: none !important;
+}
+
+.marketplace-doc-toolbar {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
+  margin-bottom: 8px;
 }
 
-.marketplace-doc-title h3 {
-  margin: 0;
+/* VS Code / GitHub Markdown preview–inspired body styles. */
+.marketplace-doc-body {
+  overflow: auto;
+  /* Page mode keeps a reasonable cap; modal embedded mode overrides to fill. */
+  max-height: min(70vh, 720px);
+  min-height: 200px;
+  padding: 16px 20px;
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: 8px;
+  background: var(--ant-color-bg-container);
   color: var(--ant-color-text);
-  font-size: 16px;
+  font-size: 14px;
+  line-height: 1.7;
+  word-wrap: break-word;
+}
+
+.marketplace-markdown-body :deep(h1),
+.marketplace-markdown-body :deep(h2),
+.marketplace-markdown-body :deep(h3),
+.marketplace-markdown-body :deep(h4),
+.marketplace-markdown-body :deep(h5),
+.marketplace-markdown-body :deep(h6) {
+  margin: 1.25em 0 0.6em;
+  color: var(--ant-color-text);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.marketplace-markdown-body :deep(h1) {
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--ant-color-border-secondary);
+  font-size: 1.75em;
+}
+
+.marketplace-markdown-body :deep(h2) {
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--ant-color-border-secondary);
+  font-size: 1.4em;
+}
+
+.marketplace-markdown-body :deep(h3) {
+  font-size: 1.2em;
+}
+
+.marketplace-markdown-body :deep(h4) {
+  font-size: 1.05em;
+}
+
+.marketplace-markdown-body :deep(h1:first-child),
+.marketplace-markdown-body :deep(h2:first-child),
+.marketplace-markdown-body :deep(h3:first-child) {
+  margin-top: 0;
+}
+
+.marketplace-markdown-body :deep(p),
+.marketplace-markdown-body :deep(ul),
+.marketplace-markdown-body :deep(ol),
+.marketplace-markdown-body :deep(dl) {
+  margin: 0.7em 0;
+}
+
+.marketplace-markdown-body :deep(ul),
+.marketplace-markdown-body :deep(ol) {
+  padding-left: 1.6em;
+}
+
+.marketplace-markdown-body :deep(li) {
+  margin: 0.3em 0;
+}
+
+.marketplace-markdown-body :deep(li + li) {
+  margin-top: 0.2em;
+}
+
+.marketplace-markdown-body :deep(a) {
+  color: var(--ant-color-primary);
+  text-decoration: none;
+}
+
+.marketplace-markdown-body :deep(a:hover) {
+  text-decoration: underline;
+}
+
+.marketplace-markdown-body :deep(strong) {
   font-weight: 600;
 }
 
-.marketplace-doc-body {
-  overflow: auto;
-  max-height: 520px;
-  padding: 14px;
-  border: 1px solid var(--ant-color-border-secondary);
-  border-radius: 6px;
-  background: var(--ant-color-bg-container);
+.marketplace-markdown-body :deep(code) {
+  margin: 0;
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  background: var(--ant-color-fill-tertiary);
   color: var(--ant-color-text);
-  line-height: 1.7;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  font-size: 0.9em;
+}
+
+.marketplace-markdown-body :deep(pre),
+.marketplace-markdown-body :deep(pre.hljs),
+.marketplace-markdown-body :deep(.marketplace-code-block) {
+  overflow: auto;
+  margin: 1em 0;
+  padding: 14px 16px;
+  border: 1px solid #d0d7de;
+  border-radius: 8px;
+  /* GitHub/VS Code light preview surface — higher contrast than body. */
+  background: #f6f8fa !important;
+  color: #24292f;
+  line-height: 1.55;
+}
+
+.marketplace-markdown-body :deep(pre code),
+.marketplace-markdown-body :deep(pre.hljs code),
+.marketplace-markdown-body :deep(.marketplace-code-block code) {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent !important;
+  color: inherit;
+  font-size: 0.9em;
+  white-space: pre;
+  word-break: normal;
+}
+
+/* Keep highlight.js token colors; neutralize its full-page white panel. */
+.marketplace-markdown-body :deep(.hljs) {
+  background: transparent !important;
+}
+
+:global(html.dark) .marketplace-markdown-body :deep(pre),
+:global(html.dark) .marketplace-markdown-body :deep(pre.hljs),
+:global(html.dark) .marketplace-markdown-body :deep(.marketplace-code-block) {
+  border-color: #30363d;
+  background: #161b22 !important;
+  color: #e6edf3;
+}
+
+.marketplace-markdown-body :deep(table) {
+  width: auto;
+  max-width: 100%;
+  margin: 1em 0;
+  border-collapse: collapse;
+  border-spacing: 0;
+  overflow: auto;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+}
+
+.marketplace-markdown-body :deep(th),
+.marketplace-markdown-body :deep(td) {
+  padding: 8px 13px;
+  border: 1px solid #d0d7de;
+  text-align: left;
+  vertical-align: top;
+}
+
+.marketplace-markdown-body :deep(th) {
+  background: #f6f8fa;
+  font-weight: 600;
+}
+
+.marketplace-markdown-body :deep(tr:nth-child(2n) td) {
+  background: #f6f8fa;
+}
+
+:global(html.dark) .marketplace-markdown-body :deep(table),
+:global(html.dark) .marketplace-markdown-body :deep(th),
+:global(html.dark) .marketplace-markdown-body :deep(td) {
+  border-color: #30363d;
+}
+
+:global(html.dark) .marketplace-markdown-body :deep(th),
+:global(html.dark) .marketplace-markdown-body :deep(tr:nth-child(2n) td) {
+  background: #161b22;
+}
+
+.marketplace-markdown-body :deep(blockquote) {
+  margin: 1em 0;
+  padding: 0 1em;
+  border-left: 0.25em solid var(--ant-color-border);
+  color: var(--ant-color-text-secondary);
+}
+
+.marketplace-markdown-body :deep(blockquote > :first-child) {
+  margin-top: 0;
+}
+
+.marketplace-markdown-body :deep(blockquote > :last-child) {
+  margin-bottom: 0;
+}
+
+.marketplace-markdown-body :deep(hr) {
+  height: 0.2em;
+  margin: 1.5em 0;
+  padding: 0;
+  border: 0;
+  background: var(--ant-color-border-secondary);
+}
+
+.marketplace-markdown-body :deep(img.marketplace-md-image),
+.marketplace-markdown-body :deep(img) {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0.8em 0;
+  border-radius: 6px;
+  background: var(--ant-color-fill-quaternary);
+}
+
+.marketplace-markdown-body :deep(.marketplace-mermaid-wrap) {
+  overflow: auto;
+  margin: 1em 0;
+  padding: 12px;
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: 8px;
+  background: var(--ant-color-bg-container);
+  text-align: center;
+}
+
+.marketplace-markdown-body :deep(pre.mermaid) {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent !important;
+  text-align: center;
+}
+
+.marketplace-markdown-body :deep(pre.mermaid svg) {
+  max-width: 100%;
+  height: auto;
+}
+
+.marketplace-markdown-body :deep(pre.mermaid.marketplace-mermaid-error) {
+  padding: 12px;
+  border: 1px dashed var(--ant-color-warning-border);
+  border-radius: 6px;
+  background: var(--ant-color-warning-bg) !important;
+  color: var(--ant-color-text);
+  text-align: left;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 768px) {
+  .marketplace-doc-layout {
+    grid-template-columns: 1fr;
+  }
 }
 
 .marketplace-risk-list {

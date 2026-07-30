@@ -1,0 +1,54 @@
+{
+  "name": "@lina-plugin/linapro-plugin-marketplace-frontend",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "highlight.js": "11.11.1",
+    "markdown-it": "14.1.1",
+    "mermaid": "11.12.2"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "14.1.2"
+  },
+  "peerDependencies": {
+    "@vben/access": "*",
+    "@vben/common-ui": "*",
+    "@vben/icons": "*",
+    "@vben/preferences": "*",
+    "@vueuse/core": "*",
+    "ant-design-vue": "^4.0.0",
+    "pinia": "^3.0.0",
+    "vue": "^3.5.0",
+    "vue-router": "^4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@vben/access": {
+      "optional": true
+    },
+    "@vben/common-ui": {
+      "optional": true
+    },
+    "@vben/icons": {
+      "optional": true
+    },
+    "@vben/preferences": {
+      "optional": true
+    },
+    "@vueuse/core": {
+      "optional": true
+    },
+    "ant-design-vue": {
+      "optional": true
+    },
+    "pinia": {
+      "optional": true
+    },
+    "vue": {
+      "optional": true
+    },
+    "vue-router": {
+      "optional": true
+    }
+  },
+  "packageManager": "pnpm@11.17.0+sha512.cca3cea332ad254bb84145f966d19f4879615210346fc92c79a047f23a0d7b3cca3c3792f0076ba1f1831d277efbcf0a9119b31a9a60eca7fb3d6231f331ef72"
+}

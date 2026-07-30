@@ -198,6 +198,11 @@ type ListOwnedPluginsInput struct {
 	Status      string
 	OwnerUserID int64  // OwnerUserID is required and filters publishers owned by the user.
 	Locale      string // Locale is the preferred display language for name/summary projection.
+	// OrderBy optionally sorts by pluginId, marketStatus, downloadCount, or updatedAt.
+	// Empty or unsupported values fall back to pluginId ascending.
+	OrderBy string
+	// OrderDirection is asc or desc; defaults to asc for the owned-list default.
+	OrderDirection string
 }
 
 // ListManagedPluginsInput carries reviewer-managed plugin list filters.
@@ -286,6 +291,9 @@ type RiskListOutput struct {
 type DocumentOutput struct {
 	Document  *marketv1.MarketplaceDocumentItem
 	Documents []*marketv1.MarketplaceDocumentItem
+	// Catalog lists every navigable document path on the release (not just the
+	// selected path language bundle).
+	Catalog []*marketv1.MarketplaceDocumentCatalogItem
 }
 
 // DownloadEventType identifies one controlled marketplace download event.
@@ -472,8 +480,10 @@ type DocumentRecord struct {
 	ContentHash     string
 	SearchText      string
 	RenderedContent string
-	FallbackUsed    bool
-	UpdatedAt       *time.Time
+	// Markdown is the raw Markdown source used for client-side rendering.
+	Markdown     string
+	FallbackUsed bool
+	UpdatedAt    *time.Time
 }
 
 // PackageDiagnostic describes one package scanner finding returned to callers.

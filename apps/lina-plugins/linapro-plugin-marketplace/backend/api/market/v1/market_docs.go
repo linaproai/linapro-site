@@ -12,13 +12,14 @@ type ReleaseDocsReq struct {
 	PluginId string `json:"pluginId" v:"required|length:1,64" dc:"Stable plugin ID whose release documentation is read" eg:"linapro-demo-source"`
 	Version  string `json:"version" v:"required|length:1,32" dc:"Release version whose documentation is read" eg:"v0.1.0"`
 	Locale   string `json:"locale" dc:"Preferred document locale; when empty the server uses the request locale and then applies marketplace fallback rules" eg:"en-US"`
-	Path     string `json:"path" dc:"Document path inside manifest/docs or README fallback. The default empty value reads the index document." eg:"index.md"`
+	Path     string `json:"path" dc:"Document path inside manifest/docs. The default empty value reads the first available marketplace document, preferring index.md." eg:"index.md"`
 }
 
 // ReleaseDocsRes is the response for reading marketplace documentation of one release.
 type ReleaseDocsRes struct {
-	Document  *MarketplaceDocumentItem   `json:"document" dc:"Version-scoped marketplace document with safe rendered content and fallback metadata" eg:"{}"`
-	Documents []*MarketplaceDocumentItem `json:"documents" dc:"Same-path marketplace document language bundle with safe rendered content for local switching" eg:"[]"`
+	Document  *MarketplaceDocumentItem          `json:"document" dc:"Version-scoped marketplace document with safe rendered content and fallback metadata" eg:"{}"`
+	Documents []*MarketplaceDocumentItem        `json:"documents" dc:"Same-path marketplace document language bundle with safe rendered content for local switching" eg:"[]"`
+	Catalog   []*MarketplaceDocumentCatalogItem `json:"catalog" dc:"Version-scoped documentation catalog listing every available document path for navigation" eg:"[]"`
 }
 
 // MyReleaseDocsReq is the request for reading documentation of one publisher-owned release.
@@ -32,8 +33,9 @@ type MyReleaseDocsReq struct {
 
 // MyReleaseDocsRes is the response for reading publisher-owned release documentation.
 type MyReleaseDocsRes struct {
-	Document  *MarketplaceDocumentItem   `json:"document" dc:"Publisher-owned version-scoped marketplace document" eg:"{}"`
-	Documents []*MarketplaceDocumentItem `json:"documents" dc:"Publisher-owned same-path marketplace document language bundle" eg:"[]"`
+	Document  *MarketplaceDocumentItem          `json:"document" dc:"Publisher-owned version-scoped marketplace document" eg:"{}"`
+	Documents []*MarketplaceDocumentItem        `json:"documents" dc:"Publisher-owned same-path marketplace document language bundle" eg:"[]"`
+	Catalog   []*MarketplaceDocumentCatalogItem `json:"catalog" dc:"Publisher-owned version documentation catalog for path navigation" eg:"[]"`
 }
 
 // ManagedReleaseDocsReq is the request for reading reviewer-managed release documentation.
@@ -47,8 +49,9 @@ type ManagedReleaseDocsReq struct {
 
 // ManagedReleaseDocsRes is the response for reading reviewer-managed release documentation.
 type ManagedReleaseDocsRes struct {
-	Document  *MarketplaceDocumentItem   `json:"document" dc:"Reviewer-managed version-scoped marketplace document" eg:"{}"`
-	Documents []*MarketplaceDocumentItem `json:"documents" dc:"Reviewer-managed same-path marketplace document language bundle" eg:"[]"`
+	Document  *MarketplaceDocumentItem          `json:"document" dc:"Reviewer-managed version-scoped marketplace document" eg:"{}"`
+	Documents []*MarketplaceDocumentItem        `json:"documents" dc:"Reviewer-managed same-path marketplace document language bundle" eg:"[]"`
+	Catalog   []*MarketplaceDocumentCatalogItem `json:"catalog" dc:"Reviewer-managed version documentation catalog for path navigation" eg:"[]"`
 }
 
 // ReleaseRisksReq is the request for querying risk findings of one release.
@@ -108,14 +111,23 @@ type MarketplaceDocumentItem struct {
 	Version        string `json:"version" dc:"Release version that owns this marketplace document" eg:"v0.1.0"`
 	Locale         string `json:"locale" dc:"Requested or preferred locale used for documentation lookup" eg:"en-US"`
 	ResolvedLocale string `json:"resolvedLocale" dc:"Actual locale selected after applying marketplace documentation fallback rules" eg:"zh-CN"`
-	Path           string `json:"path" dc:"Document path inside manifest/docs or README fallback that was returned" eg:"index.md"`
-	SourceKind     string `json:"sourceKind" dc:"Document source kind: manifest_docs=manifest/docs resource readme=README fallback" eg:"manifest_docs"`
+	Path           string `json:"path" dc:"Document path inside manifest/docs that was returned" eg:"index.md"`
+	SourceKind     string `json:"sourceKind" dc:"Document source kind; marketplace documentation responses return manifest_docs entries, or readme when a release has no manifest docs" eg:"manifest_docs"`
 	Title          string `json:"title" dc:"Document title extracted during indexing or fallback parsing" eg:"Source Plugin Demo"`
 	Summary        string `json:"summary" dc:"Document search summary extracted during indexing" eg:"Learn how to install and use the source plugin demo."`
-	Content        string `json:"content" dc:"Safe rendered document content after script blocking and resource path checks" eg:"<h1>Source Plugin Demo</h1>"`
+	Content        string `json:"content" dc:"Safe rendered HTML after script blocking and resource path checks; clients should prefer markdown for full formatting" eg:"<h1>Source Plugin Demo</h1>"`
+	Markdown       string `json:"markdown" dc:"Raw Markdown source for the selected document; preferred by workbench clients for client-side Markdown rendering" eg:"# Source Plugin Demo\n"`
 	ContentHash    string `json:"contentHash" dc:"Document content hash used by cache keys and stale-content checks" eg:"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"`
-	FallbackUsed   bool   `json:"fallbackUsed" dc:"Whether the response used a fallback locale or README source instead of the requested document" eg:"true"`
+	FallbackUsed   bool   `json:"fallbackUsed" dc:"Whether the response used a fallback locale or another catalog document instead of the requested document" eg:"true"`
 	UpdatedAt      *int64 `json:"updatedAt,omitempty" dc:"Document index last updated time as Unix timestamp in milliseconds" eg:"1767247200000"`
+}
+
+// MarketplaceDocumentCatalogItem is one navigable document path available on a release.
+type MarketplaceDocumentCatalogItem struct {
+	Path       string   `json:"path" dc:"Document path inside manifest/docs" eg:"configuration.md"`
+	Title      string   `json:"title" dc:"Preferred-locale document title for catalog navigation" eg:"Configuration"`
+	SourceKind string   `json:"sourceKind" dc:"Document source kind; catalog entries are manifest_docs documents, or readme when a release has no manifest docs" eg:"manifest_docs"`
+	Locales    []string `json:"locales" dc:"Locales that provide this document path" eg:"[\"zh-CN\",\"en-US\"]"`
 }
 
 // MarketplaceRiskItem is one review risk finding produced by marketplace scanning.

@@ -337,7 +337,7 @@
 
 系统 SHALL 在版本发布包解析或 Git 元数据发现时，将每个可展示的版本文档语言内容保存为版本级文档快照。文档快照 MUST 至少包含插件 ID、版本、文档路径、语言、来源类型、标题、摘要、内容哈希和经过安全渲染后的正文内容。详情页读取文档时，系统 MUST 能在一次请求中返回目标文档路径的可用语言文档集合，使前端可以在本地快速切换语言，而不需要按语言逐个重新请求服务端。
 
-文档语言包读取 MUST 复用既有版本可见性与发布者/审核者边界。对调用方不可见的版本，系统 MUST NOT 返回任意语言的文档快照或语言列表。Git 来源文档快照 MUST 来自发现时读取的钉扎引用内容，不得在普通详情读取路径中重新访问 Git 提供商。上传来源文档快照 MUST 来自包解析时已验证的文档内容，不得要求详情读取路径重新解压产物来恢复正文。
+文档语言包读取 MUST 复用既有版本可见性与发布者/审核者边界。对调用方不可见的版本，系统 MUST NOT 返回任意语言的文档快照或语言列表。Git 来源文档快照 MUST 在元数据发现/同步时按**当前发现引用**（semver tag 或回退的`main`）读取并写入磁盘，不得在普通详情读取路径中重新访问 Git 提供商；安装分发仍使用钉扎的`source_commit`，文档快照刷新 MUST NOT 改写已发布版本的安装钉扎。上传来源文档快照 MUST 来自包解析时已验证的文档内容，不得要求详情读取路径重新解压产物来恢复正文。
 
 #### Scenario: 详情页一次读取多语言文档包
 
@@ -360,6 +360,93 @@
 - **AND** 该版本已经在元数据发现时保存文档快照
 - **THEN** 系统直接从版本文档快照返回正文
 - **AND** 不在详情请求路径中调用 GitHub/Gitee 文件读取接口
+
+#### Scenario: 已发布 Git 版本在同步时刷新文档快照
+
+- **WHEN** 系统对已发布的 Git 来源版本执行元数据同步且开启文档富化
+- **AND** 发现引用（如`main`或版本 tag）上已存在`manifest/docs`下多个 Markdown 文件
+- **THEN** 系统按该发现引用重新索引并替换版本文档快照
+- **AND** 不修改该版本已钉扎的`source_commit`/`source_ref`安装坐标
+
+### Requirement: 市场文档目录必须列出全部可导航 Markdown 并以首标题展示
+
+系统 SHALL 在插件详情「文档」页左侧目录中返回当前版本全部可导航文档路径，而不仅是默认`index.md`。目录来源 MUST 为该版本`manifest/docs`下的 Markdown 文件（按语言去重为路径集合）；当且仅当该版本不存在任何`manifest/docs`文档时，系统 MAY 将包根`README`/`README.zh-CN`折叠为单一`index.md`目录项作为回退。
+
+每个目录项的`title` MUST 取对应 Markdown 文件中第一个 ATX 标题（`#`…`######`）的文本；当文件无可用标题时，系统 MAY 回退到路径或文件名派生文案。详情文档读取响应 MUST 同时包含`catalog`（路径导航）与当前选中路径正文，使前端无需为构建目录再发额外列表请求。
+
+#### Scenario: 多文档版本展示完整目录与首标题
+
+- **WHEN** 用户打开「我的插件」或公开市场中某版本的文档页
+- **AND** 该版本索引到`manifest/docs/<locale>/index.md`、`configuration.md`与`changelog.md`
+- **THEN** 文档响应`catalog`包含上述三个路径
+- **AND** 各目录项`title`分别为对应文件首个 Markdown 标题（例如「智能中心」「配置说明」「更新日志」）
+- **AND** 目录项`title`不得仅因路径存在而展示为`index.md`/`configuration.md`等文件名（除非文件本身无标题且回退到路径）
+
+#### Scenario: 仅 README 时目录回退为单一入口
+
+- **WHEN** 用户打开某版本文档页
+- **AND** 该版本不存在`manifest/docs` Markdown，仅有包根 README
+- **THEN** `catalog`仅包含一项，路径为`index.md`
+- **AND** 该项`title`为 README 首个 Markdown 标题
+
+### Requirement: 市场文档 Markdown 渲染必须支持高亮、表格、图片与 Mermaid
+
+系统 SHALL 在插件市场详情「文档」页优先使用客户端 Markdown 渲染链路展示文档正文。渲染实现 MUST 基于成熟的 Markdown 渲染组件或库（例如`markdown-it`及配套高亮/图表扩展），视觉风格 SHALL 对齐 VS Code / GitHub Markdown 预览的常见外观（清晰标题层级、可读代码块、表格边框与间距、图片自适应）。
+
+客户端渲染 MUST 支持以下常用 Markdown 能力：
+
+1. 标题、段落、列表、链接、引用、分割线
+2. 表格
+3. 图片（`![alt](url)`语法）
+4. 行内代码与围栏代码块，并对带语言标记的代码块做语法高亮
+5. `mermaid`围栏代码块渲染为图表；渲染失败时 MUST 降级为可读代码块，且 MUST NOT 导致整页崩溃
+
+客户端渲染 MUST 默认禁用原始 HTML 注入（`html: false`或等价安全策略），禁止执行文档中的 script 或未消毒 HTML。后端返回的安全 HTML`content`仅可作为`markdown`缺失时的回退，不得替代客户端 Markdown 主渲染路径的能力要求。
+
+#### Scenario: 文档页渲染表格、代码高亮与图片
+
+- **WHEN** 用户打开插件详情「文档」页
+- **AND** 当前文档 Markdown 含表格、带语言标记的代码块与图片语法
+- **THEN** 页面渲染出表格结构、带语法高亮样式的代码块与图片元素
+- **AND** 正文区域不把原始 Markdown 源文作为唯一可见内容展示
+
+#### Scenario: Mermaid 围栏渲染为图表
+
+- **WHEN** 用户打开包含` ```mermaid `围栏的文档
+- **AND** 图源语法合法
+- **THEN** 文档正文中该围栏被渲染为 Mermaid 图表（例如 SVG）
+- **AND** 不在用户界面暴露未处理的` ```mermaid `源围栏作为唯一展示
+
+#### Scenario: Markdown 渲染保持 HTML 安全
+
+- **WHEN** 文档 Markdown 源文包含原始 HTML 标签或 script
+- **THEN** 客户端渲染不执行其中的脚本
+- **AND** 不把未消毒 HTML 直接注入工作台 DOM
+
+### Requirement: 我的插件列表必须支持指定列排序且默认按插件标识升序
+
+系统 SHALL 在「我的插件」列表支持对以下列进行远程排序：
+
+1. 插件标识（`pluginId`）
+2. 状态（`marketStatus`，按市场生命周期状态列排序）
+3. 下载量（`downloadCount`）
+4. 更新时间（`updatedAt`）
+
+列表查询 API（`GET /market/my-plugins`）MUST 接受可选排序参数`orderBy`与`orderDirection`（`asc`/`desc`）。当调用方未提供有效排序字段时，系统 MUST 默认按`pluginId`升序返回。无效或未允许的`orderBy` MUST 回退到该默认排序，且 MUST NOT 产生 SQL 注入或未白名单列排序。
+
+工作台「我的插件」表格 MUST 在上述列表头提供可点击排序交互，并在进入页面时以插件标识升序作为默认排序状态。
+
+#### Scenario: 默认按插件标识升序
+
+- **WHEN** 发布者打开「我的插件」列表且未手动切换排序
+- **THEN** 列表请求以`pluginId`升序排序（或等价默认）
+- **AND** 表格插件标识列表头呈现升序状态
+
+#### Scenario: 点击下载量列切换排序
+
+- **WHEN** 发布者点击「下载量」列表头
+- **THEN** 系统以`downloadCount`及对应方向重新请求分页列表
+- **AND** 列表行顺序反映服务端排序结果
 
 ### Requirement: 我的插件列表操作列仅包含详情、新版本与下架
 

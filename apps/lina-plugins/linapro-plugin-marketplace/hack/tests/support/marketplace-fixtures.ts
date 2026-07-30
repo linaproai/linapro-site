@@ -8,7 +8,12 @@ import { workspacePath } from "@host-tests/fixtures/config";
 import { MainLayout } from "@host-tests/pages/MainLayout";
 import { waitForRouteReady } from "@host-tests/support/ui";
 
-type ArtifactType = "dynamic_zip" | "plugin_wasm" | "source_zip";
+type ArtifactType =
+  | "dynamic_tar_gz"
+  | "dynamic_zip"
+  | "plugin_wasm"
+  | "source_tar_gz"
+  | "source_zip";
 type MarketplaceLocale = "en-US" | "zh-CN";
 type PluginType = "dynamic" | "source";
 type ReviewStatus =
@@ -98,6 +103,9 @@ type PluginItem = {
   publishedAt?: number;
   publisher?: PublisherItem;
   repository?: string;
+  repoPath?: string;
+  repoProvider?: "gitee" | "github";
+  repoUrl?: string;
   riskCounts: {
     high: number;
     info: number;
@@ -122,6 +130,8 @@ type DocumentItem = {
   contentHash: string;
   fallbackUsed: boolean;
   locale: string;
+  /** Raw Markdown preferred by the workbench Markdown renderer. */
+  markdown?: string;
   path: string;
   pluginId: string;
   resolvedLocale: string;
@@ -130,6 +140,13 @@ type DocumentItem = {
   title: string;
   updatedAt?: number;
   version: string;
+};
+
+type DocumentCatalogItem = {
+  locales: string[];
+  path: string;
+  sourceKind: string;
+  title: string;
 };
 
 type RiskItem = {
@@ -192,6 +209,7 @@ const marketplacePluginId = "linapro-plugin-marketplace";
 const sourcePluginId = "linapro-demo-source";
 const dynamicPluginId = "linapro-demo-dynamic";
 const privatePluginId = "linapro-private-reports";
+const readmeOnlyGitPluginId = "linapro-tenant-core";
 const externalPluginId = "acme-observability";
 const zhCNPluginDisplay = new Map<
   string,
@@ -219,6 +237,14 @@ const zhCNPluginDisplay = new Map<
       description: "面向租户范围的私有报表插件。",
       name: "私有报表自动化",
       summary: "面向租户范围的私有报表插件。",
+    },
+  ],
+  [
+    readmeOnlyGitPluginId,
+    {
+      description: "官方仓库中只提供根 README 文档的租户核心插件。",
+      name: "LinaPro 租户核心",
+      summary: "通过官方 Git 仓库分发的租户核心能力插件。",
     },
   ],
   [
@@ -368,6 +394,31 @@ const privateRelease: ReleaseItem = {
   visibility: "private",
 };
 
+const readmeOnlyGitRelease: ReleaseItem = {
+  artifact: {
+    artifactType: "source_zip",
+    contentType: "application/zip",
+    fileName: "linapro-tenant-core-v0.1.0.zip",
+    manifestSha256: "tenant-core-manifest-sha256",
+    sha256: "tenant-core-source-sha256",
+    sizeBytes: 53248,
+  },
+  minHostVersion: "v1.2.0",
+  pluginId: readmeOnlyGitPluginId,
+  pluginType: "source",
+  publishedAt: mockNow,
+  releaseStatus: "published",
+  reviewMessage: "Approved from official plugin repository.",
+  reviewStatus: "approved",
+  reviewedAt: mockNow,
+  sourceCommit: "0123456789abcdef0123456789abcdef01234567",
+  sourceRef: "v0.1.0",
+  submittedAt: mockNow - 180000,
+  updatedAt: mockNow,
+  version: "v0.1.0",
+  visibility: "private",
+};
+
 const externalPendingRelease: ReleaseItem = {
   artifact: {
     artifactType: "source_zip",
@@ -481,6 +532,44 @@ const plugins: PluginItem[] = [
     visibility: "private",
   },
   {
+    description:
+      "Official Git plugin whose current release documents are README-only.",
+    downloadCount: 0,
+    homepage: "https://github.com/linaproai/official-plugins",
+    latestRelease: readmeOnlyGitRelease,
+    latestReviewStatus: readmeOnlyGitRelease.reviewStatus,
+    latestVersion: readmeOnlyGitRelease.version,
+    license: "Apache-2.0",
+    marketStatus: "published",
+    minHostVersion: readmeOnlyGitRelease.minHostVersion,
+    name: "LinaPro Tenant Core",
+    pluginId: readmeOnlyGitPluginId,
+    pluginType: "source",
+    primaryTag: "official",
+    processStatus: "completed",
+    publishedAt: mockNow,
+    publisher: linaPublisher,
+    repository: "https://github.com/linaproai/official-plugins.git",
+    repoPath: "linapro-tenant-core",
+    repoProvider: "github",
+    repoUrl: "https://github.com/linaproai/official-plugins.git",
+    riskCounts: {
+      high: 0,
+      info: 1,
+      warning: 0,
+    },
+    sourceDelivery: "source_rebuild_required",
+    sourceKind: "git",
+    summary: "Tenant core plugin distributed from the official Git repository.",
+    tagCodes: ["official", "source"],
+    tags: [
+      { code: "official", name: "Official", type: "category" },
+      { code: "source", name: "Source", type: "plugin-type" },
+    ],
+    updatedAt: mockNow,
+    visibility: "private",
+  },
+  {
     description: "Independent operations plugin awaiting marketplace review.",
     downloadCount: 0,
     homepage: "https://example.com/acme/observability",
@@ -512,125 +601,222 @@ const baseReleasesByPlugin = new Map<string, ReleaseItem[]>([
   [sourcePluginId, [sourceRelease, sourceHistoricalRelease]],
   [dynamicPluginId, [dynamicPendingRelease, dynamicRelease]],
   [privatePluginId, [privateRelease]],
+  [readmeOnlyGitPluginId, [readmeOnlyGitRelease]],
   [externalPluginId, [externalPendingRelease]],
 ]);
 
-const documents = new Map<string, DocumentItem>([
+function makeDocument(input: {
+  content?: string;
+  contentHash: string;
+  locale: string;
+  markdown?: string;
+  path: string;
+  pluginId: string;
+  summary: string;
+  title: string;
+  updatedAt?: number;
+  version: string;
+}): DocumentItem {
+  return {
+    content: input.content ?? "",
+    contentHash: input.contentHash,
+    fallbackUsed: false,
+    locale: input.locale,
+    markdown: input.markdown,
+    path: input.path,
+    pluginId: input.pluginId,
+    resolvedLocale: input.locale,
+    sourceKind: "manifest_docs",
+    summary: input.summary,
+    title: input.title,
+    updatedAt: input.updatedAt ?? mockNow,
+    version: input.version,
+  };
+}
+
+const sourceIndexEn = makeDocument({
+  contentHash: "source-doc-hash",
+  locale: "en-US",
+  markdown:
+    "# Source Demo Guide\n\nPlace the source under `apps/lina-plugins` and rebuild the host before enabling it.\n\n- [Configuration](configuration.md)\n\n| Field | Value |\n| --- | --- |\n| Type | source |\n\n![Architecture](data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScxODAnIGhlaWdodD0nNTInPjxyZWN0IHdpZHRoPScxODAnIGhlaWdodD0nNTInIHJ4PSc4JyBmaWxsPScjZTZmNGZmJyBzdHJva2U9JyM5MWNhZmYnIHN0cm9rZS13aWR0aD0nMicvPjx0ZXh0IHg9JzkwJyB5PSczMicgdGV4dC1hbmNob3I9J21pZGRsZScgZm9udC1zaXplPScxNicgZmlsbD0nIzE2NzBmZicgZm9udC1mYW1pbHk9J3N5c3RlbS11aSxzYW5zLXNlcmlmJz5BcmNoaXRlY3R1cmU8L3RleHQ+PC9zdmc+)\n\n```mermaid\nflowchart LR\n  A[Workbench] --> B[Marketplace]\n  B --> C[Docs Preview]\n```\n",
+  path: "index.md",
+  pluginId: sourcePluginId,
+  summary: "Source package delivery documentation.",
+  title: "Source Demo Guide",
+  version: sourceRelease.version,
+});
+const sourceIndexZh = makeDocument({
+  contentHash: "source-doc-zh-hash",
+  locale: "zh-CN",
+  markdown:
+    "# 源码演示指南\n\n将源码放入 `apps/lina-plugins` 并重新构建宿主后再启用。\n\n- [配置说明](configuration.md)\n\n| 字段 | 取值 |\n| --- | --- |\n| 类型 | 源码插件 |\n\n![架构示意](data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScxODAnIGhlaWdodD0nNTInPjxyZWN0IHdpZHRoPScxODAnIGhlaWdodD0nNTInIHJ4PSc4JyBmaWxsPScjZTZmNGZmJyBzdHJva2U9JyM5MWNhZmYnIHN0cm9rZS13aWR0aD0nMicvPjx0ZXh0IHg9JzkwJyB5PSczMicgdGV4dC1hbmNob3I9J21pZGRsZScgZm9udC1zaXplPScxNicgZmlsbD0nIzE2NzBmZicgZm9udC1mYW1pbHk9J3N5c3RlbS11aSxzYW5zLXNlcmlmJz7mnrbmnoTnpLrmhI88L3RleHQ+PC9zdmc+)\n\n```mermaid\nflowchart LR\n  A[工作台] --> B[插件市场]\n  B --> C[文档预览]\n```\n",
+  path: "index.md",
+  pluginId: sourcePluginId,
+  summary: "源码包交付中文文档。",
+  title: "源码演示指南",
+  version: sourceRelease.version,
+});
+const sourceConfigEn = makeDocument({
+  contentHash: "source-config-hash",
+  locale: "en-US",
+  markdown:
+    "# Configuration\n\nNo additional runtime configuration is required for the demo source plugin.\n\n```yaml\n# example\nenabled: true\n```\n",
+  path: "configuration.md",
+  pluginId: sourcePluginId,
+  summary: "Source package configuration documentation.",
+  title: "Configuration",
+  version: sourceRelease.version,
+});
+const sourceConfigZh = makeDocument({
+  contentHash: "source-config-zh-hash",
+  locale: "zh-CN",
+  markdown:
+    "# 配置说明\n\n该示例源码插件当前无需额外运行时配置。\n\n```yaml\n# 示例\nenabled: true\n```\n\n```ts\nexport const demo = true;\n```\n",
+  path: "configuration.md",
+  pluginId: sourcePluginId,
+  summary: "源码包配置中文文档。",
+  title: "配置说明",
+  version: sourceRelease.version,
+});
+const sourceChangelogZh = makeDocument({
+  content: "<h1>更新日志</h1>\n<ul><li>v1.0.0 首次发布</li></ul>\n",
+  contentHash: "source-changelog-zh-hash",
+  locale: "zh-CN",
+  path: "changelog.md",
+  pluginId: sourcePluginId,
+  summary: "源码包更新日志。",
+  title: "更新日志",
+  version: sourceRelease.version,
+});
+// Package-root README stays hidden while manifest/docs exists for the release.
+const sourceReadmeEn = makeDocument({
+  contentHash: "source-readme-hash",
+  locale: "en-US",
+  markdown: "# README\n\nPackage root readme should stay hidden from docs tab.\n",
+  path: "README.md",
+  pluginId: sourcePluginId,
+  summary: "Package root readme.",
+  title: "README",
+  version: sourceRelease.version,
+});
+sourceReadmeEn.sourceKind = "readme";
+const readmeOnlyGitReadmeEn = makeDocument({
+  contentHash: "tenant-core-readme-en-hash",
+  locale: "en-US",
+  markdown:
+    "# LinaPro Tenant Core\n\nTenant isolation, tenant-aware routing, and tenant context APIs are documented from the repository README.\n",
+  path: "README.md",
+  pluginId: readmeOnlyGitPluginId,
+  summary: "README-only Git repository documentation.",
+  title: "LinaPro Tenant Core",
+  version: readmeOnlyGitRelease.version,
+});
+readmeOnlyGitReadmeEn.sourceKind = "readme";
+const readmeOnlyGitReadmeZh = makeDocument({
+  contentHash: "tenant-core-readme-zh-hash",
+  locale: "zh-CN",
+  markdown:
+    "# LinaPro 租户核心\n\n租户隔离、租户感知路由和租户上下文 API 来自仓库根 README 文档。\n",
+  path: "README.zh-CN.md",
+  pluginId: readmeOnlyGitPluginId,
+  summary: "仅包含 README 的 Git 仓库中文文档。",
+  title: "LinaPro 租户核心",
+  version: readmeOnlyGitRelease.version,
+});
+readmeOnlyGitReadmeZh.sourceKind = "readme";
+
+// All documents for a release keyed by pluginId:version. Selection by path/locale
+// happens in the docs mock handler.
+const releaseDocuments = new Map<string, DocumentItem[]>([
   [
     releaseKey(sourcePluginId, sourceRelease.version),
-    {
-      content:
-        "<h2>Source Demo Guide</h2><p>Place the source under apps/lina-plugins and rebuild the host before enabling it.</p>",
-      contentHash: "source-doc-hash",
-      fallbackUsed: false,
-      locale: "en-US",
-      path: "index.md",
-      pluginId: sourcePluginId,
-      resolvedLocale: "en-US",
-      sourceKind: "manifest_docs",
-      summary: "Source package delivery documentation.",
-      title: "Source Demo Guide",
-      updatedAt: mockNow,
-      version: sourceRelease.version,
-    },
+    [
+      sourceIndexEn,
+      sourceIndexZh,
+      sourceConfigEn,
+      sourceConfigZh,
+      sourceChangelogZh,
+      sourceReadmeEn,
+    ],
   ],
   [
     releaseKey(sourcePluginId, sourceHistoricalRelease.version),
-    {
-      content:
-        "<h2>Source Demo History</h2><p>Historical release retained for compatibility rollback installs.</p>",
-      contentHash: "source-history-doc-hash",
-      fallbackUsed: false,
-      locale: "en-US",
-      path: "index.md",
-      pluginId: sourcePluginId,
-      resolvedLocale: "en-US",
-      sourceKind: "manifest_docs",
-      summary: "Historical source package documentation.",
-      title: "Source Demo History",
-      updatedAt: mockNow - 86_400_000,
-      version: sourceHistoricalRelease.version,
-    },
+    [
+      makeDocument({
+        contentHash: "source-history-doc-hash",
+        locale: "en-US",
+        markdown:
+          "# Source Demo History\n\nHistorical release retained for compatibility rollback installs.\n",
+        path: "index.md",
+        pluginId: sourcePluginId,
+        summary: "Historical source package documentation.",
+        title: "Source Demo History",
+        updatedAt: mockNow - 86_400_000,
+        version: sourceHistoricalRelease.version,
+      }),
+    ],
+  ],
+  [
+    releaseKey(readmeOnlyGitPluginId, readmeOnlyGitRelease.version),
+    [readmeOnlyGitReadmeEn, readmeOnlyGitReadmeZh],
   ],
   [
     releaseKey(dynamicPluginId, dynamicRelease.version),
-    {
-      content:
-        "<h2>Dynamic Runtime Guide</h2><p>Download the runtime package and let the local host validate plugin.wasm.</p>",
-      contentHash: "dynamic-doc-hash",
-      fallbackUsed: false,
-      locale: "en-US",
-      path: "index.md",
-      pluginId: dynamicPluginId,
-      resolvedLocale: "en-US",
-      sourceKind: "manifest_docs",
-      summary: "Dynamic runtime import documentation.",
-      title: "Dynamic Runtime Guide",
-      updatedAt: mockNow,
-      version: dynamicRelease.version,
-    },
+    [
+      makeDocument({
+        contentHash: "dynamic-doc-hash",
+        locale: "en-US",
+        markdown:
+          "# Dynamic Runtime Guide\n\nDownload the runtime package and let the local host validate `plugin.wasm`.\n",
+        path: "index.md",
+        pluginId: dynamicPluginId,
+        summary: "Dynamic runtime import documentation.",
+        title: "Dynamic Runtime Guide",
+        version: dynamicRelease.version,
+      }),
+    ],
   ],
   [
     releaseKey(dynamicPluginId, dynamicPendingRelease.version),
-    {
-      content:
-        "<h2>Dynamic Runtime Review Guide</h2><p>Review host service and route findings before approval.</p>",
-      contentHash: "dynamic-pending-doc-hash",
-      fallbackUsed: false,
-      locale: "en-US",
-      path: "index.md",
-      pluginId: dynamicPluginId,
-      resolvedLocale: "en-US",
-      sourceKind: "manifest_docs",
-      summary: "Dynamic runtime review documentation.",
-      title: "Dynamic Runtime Review Guide",
-      updatedAt: mockNow + 60_000,
-      version: dynamicPendingRelease.version,
-    },
+    [
+      makeDocument({
+        contentHash: "dynamic-pending-doc-hash",
+        locale: "en-US",
+        markdown:
+          "# Dynamic Runtime Review Guide\n\nReview host service and route findings before approval.\n",
+        path: "index.md",
+        pluginId: dynamicPluginId,
+        summary: "Dynamic runtime review documentation.",
+        title: "Dynamic Runtime Review Guide",
+        updatedAt: mockNow + 60_000,
+        version: dynamicPendingRelease.version,
+      }),
+    ],
   ],
   [
     releaseKey(externalPluginId, externalPendingRelease.version),
-    {
-      content:
-        "<h2>Acme Observability Review Guide</h2><p>Confirm menu permissions before publishing this package.</p>",
-      contentHash: "acme-observability-doc-hash",
-      fallbackUsed: false,
-      locale: "en-US",
-      path: "index.md",
-      pluginId: externalPluginId,
-      resolvedLocale: "en-US",
-      sourceKind: "manifest_docs",
-      summary: "Independent publisher review documentation.",
-      title: "Acme Observability Review Guide",
-      updatedAt: mockNow + 30_000,
-      version: externalPendingRelease.version,
-    },
+    [
+      makeDocument({
+        contentHash: "acme-observability-doc-hash",
+        locale: "en-US",
+        markdown:
+          "# Acme Observability Review Guide\n\nConfirm menu permissions before publishing this package.\n",
+        path: "index.md",
+        pluginId: externalPluginId,
+        summary: "Independent publisher review documentation.",
+        title: "Acme Observability Review Guide",
+        updatedAt: mockNow + 30_000,
+        version: externalPendingRelease.version,
+      }),
+    ],
   ],
 ]);
 
-const sourceReleaseZhDocument: DocumentItem = {
-  content:
-    "<h2>源码演示指南</h2><p>将源码放入 apps/lina-plugins 并重新构建宿主后再启用。</p>",
-  contentHash: "source-doc-zh-hash",
-  fallbackUsed: false,
-  locale: "zh-CN",
-  path: "index.md",
-  pluginId: sourcePluginId,
-  resolvedLocale: "zh-CN",
-  sourceKind: "manifest_docs",
-  summary: "源码包交付中文文档。",
-  title: "源码演示指南",
-  updatedAt: mockNow,
-  version: sourceRelease.version,
-};
-
-const documentBundles = new Map<string, DocumentItem[]>(
-  [...documents.entries()].map(([key, document]) => [key, [document]]),
+// Backward-compatible alias used by older helpers that looked up a single doc.
+const documents = new Map<string, DocumentItem>(
+  [...releaseDocuments.entries()].map(([key, items]) => [key, items[0]!]),
 );
-documentBundles.set(releaseKey(sourcePluginId, sourceRelease.version), [
-  documents.get(releaseKey(sourcePluginId, sourceRelease.version))!,
-  sourceReleaseZhDocument,
-]);
+const documentBundles = new Map<string, DocumentItem[]>(releaseDocuments);
 
 const risks = new Map<string, RiskItem[]>([
   [
@@ -820,6 +1006,10 @@ export function marketplaceDynamicPluginId() {
 
 export function marketplacePrivatePluginId() {
   return privatePluginId;
+}
+
+export function marketplaceReadmeOnlyGitPluginId() {
+  return readmeOnlyGitPluginId;
 }
 
 export function marketplaceExternalPluginId() {
@@ -1287,16 +1477,53 @@ async function handleMarketplaceRoute(
       segments[4],
     );
     const key = releaseKey(segments[2], segments[4]);
-    const bundle = documentBundles.get(key) ?? [];
-    await fulfillData(route, {
-      document:
+    const allDocs = releaseDocuments.get(key) ?? documentBundles.get(key) ?? [];
+    const catalog = buildDocumentCatalog(
+      allDocs,
+      requestURL.searchParams.get("locale") ?? "",
+    );
+    if (catalog.length === 0) {
+      await fulfillError(
+        route,
+        "error.plugin.marketplace.document.not.found",
+      );
+      return;
+    }
+    const requestedPath = (
+      requestURL.searchParams.get("path") || "index.md"
+    ).trim();
+    const tryPaths = [
+      requestedPath,
+      ...catalog.map((entry) => entry.path),
+    ].filter((pathValue, index, values) => {
+      if (!pathValue || isReadmeDocumentPath(pathValue)) {
+        return false;
+      }
+      return values.indexOf(pathValue) === index;
+    });
+    let selected: DocumentItem | null = null;
+    let localeBundle: DocumentItem[] = [];
+    for (const pathValue of tryPaths) {
+      const pathDocs = allDocs
+        .filter((item) => isDisplayDocumentForPath(allDocs, item, pathValue))
+        .map((item) => displayDocumentItem(item, pathValue));
+      if (pathDocs.length === 0) {
+        continue;
+      }
+      localeBundle = pathDocs;
+      selected =
         selectDocumentBundleItem(
-          bundle,
+          pathDocs,
           requestURL.searchParams.get("locale") ?? "",
-        ) ??
-        documents.get(key) ??
-        null,
-      documents: bundle,
+        ) ?? pathDocs[0] ?? null;
+      if (selected) {
+        break;
+      }
+    }
+    await fulfillData(route, {
+      catalog,
+      document: selected,
+      documents: localeBundle,
     });
     state.inspectionResponses.push({
       kind: "docs",
@@ -1435,6 +1662,46 @@ function listPlugins(
     }
     return true;
   });
+
+  // My-plugins supports remote sort (pluginId / marketStatus / downloadCount /
+  // updatedAt). Default matches backend: pluginId ascending.
+  if (apiPath === "market/my-plugins") {
+    const orderBy = searchParams.get("orderBy")?.trim() || "pluginId";
+    const orderDirection =
+      searchParams.get("orderDirection")?.trim().toLowerCase() === "desc"
+        ? "desc"
+        : "asc";
+    const direction = orderDirection === "desc" ? -1 : 1;
+    const sorted = [...filtered].sort((left, right) => {
+      let cmp = 0;
+      switch (orderBy) {
+        case "marketStatus":
+        case "status":
+          cmp = String(left.marketStatus ?? "").localeCompare(
+            String(right.marketStatus ?? ""),
+          );
+          break;
+        case "downloadCount":
+          cmp = (left.downloadCount ?? 0) - (right.downloadCount ?? 0);
+          break;
+        case "updatedAt":
+          cmp = Number(left.updatedAt ?? 0) - Number(right.updatedAt ?? 0);
+          break;
+        case "pluginId":
+        default:
+          cmp = String(left.pluginId ?? "").localeCompare(
+            String(right.pluginId ?? ""),
+          );
+          break;
+      }
+      if (cmp !== 0) {
+        return cmp * direction;
+      }
+      return String(left.pluginId ?? "").localeCompare(String(right.pluginId ?? ""));
+    });
+    return pageResult(sorted);
+  }
+
   return pageResult(filtered);
 }
 
@@ -1501,6 +1768,103 @@ function selectDocumentBundleItem(
       ),
     ) ?? bundle[0]
   );
+}
+
+function buildDocumentCatalog(
+  items: DocumentItem[],
+  preferredLocale: string,
+): DocumentCatalogItem[] {
+  const preferred = preferredLocale.trim().toLowerCase();
+  const byPath = new Map<string, DocumentCatalogItem>();
+  const allowReadmeFallback = !hasManifestDocumentItems(items);
+  for (const item of items) {
+    if (!isDisplayDocumentItem(items, item)) {
+      continue;
+    }
+    const path =
+      item.sourceKind === "readme" && allowReadmeFallback
+        ? "index.md"
+        : item.path;
+    const sourceKind =
+      item.sourceKind === "readme" && allowReadmeFallback
+        ? "readme"
+        : item.sourceKind;
+    const existing = byPath.get(path);
+    if (!existing) {
+      byPath.set(path, {
+        locales: [item.resolvedLocale || item.locale],
+        path,
+        sourceKind,
+        title: item.title,
+      });
+      continue;
+    }
+    const locale = item.resolvedLocale || item.locale;
+    if (!existing.locales.includes(locale)) {
+      existing.locales.push(locale);
+    }
+    if (
+      preferred &&
+      (item.resolvedLocale || item.locale).toLowerCase() === preferred
+    ) {
+      existing.title = item.title;
+    }
+  }
+  return [...byPath.values()].sort((left, right) => {
+    if (left.path === "index.md") {
+      return -1;
+    }
+    if (right.path === "index.md") {
+      return 1;
+    }
+    return left.path.localeCompare(right.path);
+  });
+}
+
+function hasManifestDocumentItems(items: DocumentItem[]) {
+  return items.some(
+    (item) =>
+      item.sourceKind === "manifest_docs" && !isReadmeDocumentPath(item.path),
+  );
+}
+
+function isReadmeDocumentPath(path: string) {
+  return /^readme(\.zh-cn)?\.md$/iu.test(path.trim());
+}
+
+function isDisplayDocumentItem(items: DocumentItem[], item: DocumentItem) {
+  if (item.sourceKind === "manifest_docs") {
+    return !isReadmeDocumentPath(item.path);
+  }
+  return (
+    !hasManifestDocumentItems(items) &&
+    item.sourceKind === "readme" &&
+    isReadmeDocumentPath(item.path)
+  );
+}
+
+function isDisplayDocumentForPath(
+  items: DocumentItem[],
+  item: DocumentItem,
+  path: string,
+) {
+  if (!isDisplayDocumentItem(items, item)) {
+    return false;
+  }
+  if (item.sourceKind === "readme") {
+    return path === "index.md";
+  }
+  return item.path === path;
+}
+
+function displayDocumentItem(item: DocumentItem, path: string): DocumentItem {
+  if (item.sourceKind !== "readme") {
+    return item;
+  }
+  return {
+    ...item,
+    path,
+  };
 }
 
 function publicFrontendSettings() {

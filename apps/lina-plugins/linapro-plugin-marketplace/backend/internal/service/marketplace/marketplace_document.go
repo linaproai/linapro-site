@@ -57,6 +57,8 @@ type marketplaceDocumentIndexItem struct {
 	ContentHash     string
 	SearchText      string
 	RenderedContent string
+	// Markdown keeps the original Markdown body for client-side rendering.
+	Markdown string
 }
 
 // ResolveReleaseDocumentIndex returns one document selected by fallback rules.
@@ -104,6 +106,13 @@ func (s *serviceImpl) loadVisibleReleaseDocumentRecords(
 	if err != nil {
 		return nil, err
 	}
+	hasManifestDocs := false
+	for _, item := range items {
+		if item != nil && item.SourceKind == documentSourceKindManifestDocs && !isReadmeDocumentPath(item.DocPath) {
+			hasManifestDocs = true
+			break
+		}
+	}
 	records := make([]*DocumentRecord, 0, len(items))
 	allowedPaths := make(map[string]struct{}, len(candidatePaths))
 	for _, candidatePath := range candidatePaths {
@@ -111,6 +120,9 @@ func (s *serviceImpl) loadVisibleReleaseDocumentRecords(
 	}
 	for _, item := range items {
 		if item == nil {
+			continue
+		}
+		if hasManifestDocs && item.SourceKind == documentSourceKindReadme {
 			continue
 		}
 		if _, ok := allowedPaths[item.DocPath]; !ok {
@@ -122,6 +134,8 @@ func (s *serviceImpl) loadVisibleReleaseDocumentRecords(
 }
 
 // documentCandidatePaths returns doc paths considered for one request path.
+// README files are included as candidates so README-only Git releases can still
+// render a useful docs tab. Manifest docs stay preferred by the selection layer.
 func documentCandidatePaths(requestedPath string) []string {
 	candidatePaths := []string{requestedPath}
 	if isIndexDocumentPath(requestedPath) {
@@ -154,6 +168,13 @@ func (s *serviceImpl) loadReleaseDocumentIndexItems(
 	if len(items) > 0 {
 		return items, nil
 	}
+	items, err = s.loadDocumentIndexItemsFromGitSnapshot(ctx, release)
+	if err != nil {
+		return nil, err
+	}
+	if len(items) > 0 {
+		return items, nil
+	}
 	return s.loadDocumentIndexItemsFromGitSnapshot(ctx, release)
 }
 
@@ -162,7 +183,7 @@ func (s *serviceImpl) loadReleaseDocumentIndexItems(
 func (s *serviceImpl) loadDocumentIndexItemsFromPackageArtifact(
 	ctx context.Context,
 	release *entity.PluginMarketplaceRelease,
-) ([]*marketplaceDocumentIndexItem, error) {
+) (items []*marketplaceDocumentIndexItem, err error) {
 	if s == nil || s.artifacts == nil || release == nil {
 		return nil, nil
 	}
@@ -177,12 +198,14 @@ func (s *serviceImpl) loadDocumentIndexItemsFromPackageArtifact(
 	if err != nil {
 		return nil, err
 	}
-	reader, err := zip.OpenReader(localPath)
+	reader, cleanup, err := openPackageDocumentArchive(localPath, artifact.FileName)
 	if err != nil {
-		return nil, bizerr.WrapCode(err, CodeMarketplaceStorageFailed)
+		return nil, err
 	}
 	defer func() {
-		_ = reader.Close()
+		if closeErr := cleanup(); err == nil && closeErr != nil {
+			err = bizerr.WrapCode(closeErr, CodeMarketplaceStorageFailed)
+		}
 	}()
 	fileIndex, err := indexSourceZipFiles(reader.File)
 	if err != nil {
@@ -207,6 +230,27 @@ func (s *serviceImpl) loadDocumentIndexItemsFromPackageArtifact(
 		}
 	}
 	return buildZipDocumentIndex(defaultLocale, fileIndex, rootPrefix)
+}
+
+// openPackageDocumentArchive returns a ZIP reader for stored package docs.
+// Stored uploads may be zip or tar.gz; tar.gz reuses the same bounded
+// conversion path as upload scanning so detail reads understand both formats.
+func openPackageDocumentArchive(localPath string, fileName string) (*zip.ReadCloser, func() error, error) {
+	scanPath, cleanupTemp, err := materializeZipPackagePath(localPath, fileName)
+	if err != nil {
+		return nil, nil, err
+	}
+	reader, err := zip.OpenReader(scanPath)
+	if err != nil {
+		cleanupTemp()
+		return nil, nil, bizerr.WrapCode(err, CodeMarketplaceStorageFailed)
+	}
+	cleanup := func() error {
+		closeErr := reader.Close()
+		cleanupTemp()
+		return closeErr
+	}
+	return reader, cleanup, nil
 }
 
 // selectPackageArtifactForDocuments returns the package ZIP preferred for docs.
@@ -389,10 +433,13 @@ func documentRecordFromIndexItem(
 		ContentHash:     item.ContentHash,
 		SearchText:      item.SearchText,
 		RenderedContent: item.RenderedContent,
+		Markdown:        item.Markdown,
 	}
 }
 
-// buildZipDocumentIndex extracts manifest/docs and README Markdown from ZIP files.
+// buildZipDocumentIndex extracts manifest/docs and package-root README metadata
+// from ZIP files. README records stay available to package scanning and become
+// marketplace docs output only when a release has no manifest docs.
 func buildZipDocumentIndex(
 	defaultLocale string,
 	files map[string]*zip.File,
@@ -475,6 +522,7 @@ func indexMarketplaceDocument(
 		ContentHash:     sha256Hex([]byte(content)),
 		SearchText:      searchText,
 		RenderedContent: rendered,
+		Markdown:        content,
 	}, nil
 }
 
@@ -607,14 +655,13 @@ func validateMarketplaceDocumentAssetPath(
 	return documentDiagnosticError("document image path must stay under manifest/docs/assets or the document directory")
 }
 
-// selectMarketplaceDocumentFallback applies locale and README fallback rules to index records.
+// selectMarketplaceDocumentFallback applies locale fallback rules to index records.
 // Selection order for version-scoped marketplace docs:
-//  1. When only one manifest_docs language exists for the path, return that language.
-//  2. When multiple languages exist, prefer an exact match to the user locale.
-//  3. Otherwise prefer English (en-US / en).
-//  4. For the index path only, apply the same requested-locale / English
-//     fallback order to README.zh-CN.md / README.md.
-//  5. As a last resort, return any remaining manifest_docs candidate for the path.
+//  1. Prefer manifest/docs entries; README is eligible only when no manifest docs exist.
+//  2. When only one language exists for the path, return that language.
+//  3. When multiple languages exist, prefer an exact match to the user locale.
+//  4. Otherwise prefer English (en-US / en).
+//  5. As a last resort, return any remaining candidate for the path.
 func selectMarketplaceDocumentFallback(
 	records []*DocumentRecord,
 	in GetReleaseDocumentInput,
@@ -624,18 +671,19 @@ func selectMarketplaceDocumentFallback(
 		return nil, err
 	}
 	requestedLocale := normalizeDocumentLocale(in.Locale)
+	allowReadmeFallback := !hasMarketplaceManifestDocs(records)
 
 	byKey := make(map[string]*DocumentRecord, len(records))
 	pathLocales := make([]string, 0, 4)
 	seenPathLocales := make(map[string]struct{}, 4)
 	for _, record := range records {
-		if record == nil {
+		if record == nil || !isMarketplaceDisplayDocument(record, allowReadmeFallback) {
 			continue
 		}
-		byKey[documentLookupKey(record.SourceKind, record.Locale, record.Path)] = record
-		if record.SourceKind != documentSourceKindManifestDocs || record.Path != requestedPath {
+		if !documentRecordMatchesRequestedPath(record, requestedPath, allowReadmeFallback) {
 			continue
 		}
+		byKey[documentLookupKey(record.SourceKind, record.Locale, requestedPath)] = record
 		locale := normalizeDocumentLocale(record.Locale)
 		if _, ok := seenPathLocales[locale]; ok {
 			continue
@@ -646,7 +694,7 @@ func selectMarketplaceDocumentFallback(
 
 	// Single available language: always show it regardless of the request locale.
 	if len(pathLocales) == 1 {
-		if record := byKey[documentLookupKey(documentSourceKindManifestDocs, pathLocales[0], requestedPath)]; record != nil {
+		if record := selectDocumentRecordByLocale(byKey, pathLocales[0], requestedPath); record != nil {
 			return markDocumentFallback(record, requestedLocale, requestedPath), nil
 		}
 	}
@@ -667,53 +715,17 @@ func selectMarketplaceDocumentFallback(
 		filteredCandidates = append(filteredCandidates, locale)
 	}
 	for _, locale := range filteredCandidates {
-		if record := byKey[documentLookupKey(documentSourceKindManifestDocs, locale, requestedPath)]; record != nil {
+		if record := selectDocumentRecordByLocale(byKey, locale, requestedPath); record != nil {
 			return markDocumentFallback(record, requestedLocale, requestedPath), nil
 		}
 	}
-	if isIndexDocumentPath(requestedPath) {
-		if record := selectReadmeDocumentFallback(byKey, filteredCandidates); record != nil {
-			return markDocumentFallback(record, requestedLocale, requestedPath), nil
-		}
-	}
-	// Last resort: any remaining manifest_docs language for the path.
+	// Last resort: any remaining language for the path.
 	for _, locale := range pathLocales {
-		if record := byKey[documentLookupKey(documentSourceKindManifestDocs, locale, requestedPath)]; record != nil {
+		if record := selectDocumentRecordByLocale(byKey, locale, requestedPath); record != nil {
 			return markDocumentFallback(record, requestedLocale, requestedPath), nil
 		}
 	}
 	return nil, nil
-}
-
-// selectReadmeDocumentFallback applies locale fallback to README entry docs.
-func selectReadmeDocumentFallback(
-	byKey map[string]*DocumentRecord,
-	candidateLocales []string,
-) *DocumentRecord {
-	if len(byKey) == 0 {
-		return nil
-	}
-	readmeRecords := []*DocumentRecord{
-		byKey[documentLookupKey(documentSourceKindReadme, fallbackZhCNLocale, readmeCNDocumentPath)],
-		byKey[documentLookupKey(documentSourceKindReadme, fallbackEnUSLocale, readmeDocumentPath)],
-	}
-	available := make([]*DocumentRecord, 0, len(readmeRecords))
-	for _, record := range readmeRecords {
-		if record != nil {
-			available = append(available, record)
-		}
-	}
-	if len(available) == 1 {
-		return available[0]
-	}
-	for _, locale := range candidateLocales {
-		for _, record := range available {
-			if normalizeDocumentLocale(record.Locale) == locale {
-				return record
-			}
-		}
-	}
-	return nil
 }
 
 // collectMarketplaceDocumentBundle returns same-path language alternatives for the selected document.
@@ -730,30 +742,91 @@ func collectMarketplaceDocumentBundle(
 		return nil, err
 	}
 	requestedLocale := normalizeDocumentLocale(in.Locale)
+	allowReadmeFallback := !hasMarketplaceManifestDocs(records)
+	if !isMarketplaceDisplayDocument(selected, allowReadmeFallback) {
+		return nil, nil
+	}
 	bundle := make([]*DocumentRecord, 0, len(records))
 	for _, record := range records {
-		if record == nil {
+		if record == nil || !isMarketplaceDisplayDocument(record, allowReadmeFallback) {
 			continue
 		}
-		switch selected.SourceKind {
-		case documentSourceKindManifestDocs:
-			if record.SourceKind != documentSourceKindManifestDocs || record.Path != requestedPath {
-				continue
-			}
-		case documentSourceKindReadme:
-			if record.SourceKind != documentSourceKindReadme || !isIndexDocumentPath(requestedPath) {
-				continue
-			}
-		default:
+		if !documentRecordMatchesRequestedPath(record, requestedPath, allowReadmeFallback) {
 			continue
 		}
 		cloned := *record
 		cloned.RequestedLocale = requestedLocale
 		cloned.ResolvedLocale = record.Locale
 		cloned.FallbackUsed = false
+		if record.SourceKind == documentSourceKindReadme && isIndexDocumentPath(requestedPath) {
+			cloned.Path = requestedPath
+		}
 		bundle = append(bundle, &cloned)
 	}
 	return bundle, nil
+}
+
+// isMarketplaceDisplayDocument reports whether a record is eligible for the
+// marketplace docs tab catalog and content panel.
+func isMarketplaceDisplayDocument(record *DocumentRecord, allowReadmeFallback bool) bool {
+	if record == nil {
+		return false
+	}
+	if record.SourceKind == documentSourceKindManifestDocs {
+		return true
+	}
+	return allowReadmeFallback &&
+		record.SourceKind == documentSourceKindReadme &&
+		isReadmeDocumentPath(record.Path)
+}
+
+// hasMarketplaceManifestDocs reports whether manifest/docs provides at least
+// one displayable document. README fallback is only allowed when this is false.
+func hasMarketplaceManifestDocs(records []*DocumentRecord) bool {
+	for _, record := range records {
+		if record != nil && record.SourceKind == documentSourceKindManifestDocs && !isReadmeDocumentPath(record.Path) {
+			return true
+		}
+	}
+	return false
+}
+
+// documentRecordMatchesRequestedPath maps README fallback records to index.md
+// when no manifest docs exist, while keeping manifest/docs exact by path.
+func documentRecordMatchesRequestedPath(record *DocumentRecord, requestedPath string, allowReadmeFallback bool) bool {
+	if record == nil {
+		return false
+	}
+	if record.Path == requestedPath {
+		return true
+	}
+	return allowReadmeFallback &&
+		record.SourceKind == documentSourceKindReadme &&
+		isIndexDocumentPath(requestedPath) &&
+		isReadmeDocumentPath(record.Path)
+}
+
+// selectDocumentRecordByLocale keeps manifest/docs ahead of README whenever
+// both source kinds are present in a filtered candidate set.
+func selectDocumentRecordByLocale(
+	byKey map[string]*DocumentRecord,
+	locale string,
+	requestedPath string,
+) *DocumentRecord {
+	for _, sourceKind := range []string{documentSourceKindManifestDocs, documentSourceKindReadme} {
+		if record := byKey[documentLookupKey(sourceKind, locale, requestedPath)]; record != nil {
+			return record
+		}
+	}
+	return nil
+}
+
+// isReadmeDocumentPath reports package-root README paths used as docs fallback
+// when manifest docs are absent.
+func isReadmeDocumentPath(value string) bool {
+	normalized := normalizeKey(value)
+	return normalized == normalizeKey(readmeDocumentPath) ||
+		normalized == normalizeKey(readmeCNDocumentPath)
 }
 
 // markDocumentFallback clones one record and annotates fallback metadata.
@@ -761,6 +834,9 @@ func markDocumentFallback(record *DocumentRecord, requestedLocale string, reques
 	cloned := *record
 	cloned.RequestedLocale = requestedLocale
 	cloned.ResolvedLocale = record.Locale
+	if record.SourceKind == documentSourceKindReadme && isIndexDocumentPath(requestedPath) {
+		cloned.Path = requestedPath
+	}
 	cloned.FallbackUsed = record.SourceKind != documentSourceKindManifestDocs ||
 		record.Locale != requestedLocale ||
 		record.Path != requestedPath
@@ -782,7 +858,7 @@ func parseManifestDocsPath(relativePath string, defaultLocale string) (locale st
 	return locale, docPath, err
 }
 
-// normalizeMarketplaceDocumentPath validates a document path inside docs or README fallback.
+// normalizeMarketplaceDocumentPath validates a relative marketplace document path.
 func normalizeMarketplaceDocumentPath(value string) (string, error) {
 	trimmed := strings.ReplaceAll(normalizeKey(value), "\\", "/")
 	trimmed = strings.TrimPrefix(trimmed, marketplaceDocsPrefix)
@@ -840,7 +916,7 @@ func looksLikeLocale(value string) bool {
 	return strings.Contains(trimmed, "-") || len(trimmed) == 2
 }
 
-// isIndexDocumentPath reports whether README fallback should apply.
+// isIndexDocumentPath reports whether a path is the default marketplace docs entry.
 func isIndexDocumentPath(value string) bool {
 	return normalizeKey(value) == "" || value == defaultDocumentPath
 }

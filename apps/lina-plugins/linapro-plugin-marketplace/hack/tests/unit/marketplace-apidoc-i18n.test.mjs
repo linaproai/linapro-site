@@ -160,7 +160,8 @@ describe("marketplace apidoc i18n", () => {
     }
 
     assert.equal(new Set(requiredKeys).size, requiredKeys.length);
-    assert.equal(requiredKeys.length, 78);
+    // My/Managed docs responses include document, documents, and catalog fields.
+    assert.equal(requiredKeys.length, 80);
     for (const key of requiredKeys) {
       assert.equal(typeof zh[key], "string", `missing zh-CN key ${key}`);
       assert.match(

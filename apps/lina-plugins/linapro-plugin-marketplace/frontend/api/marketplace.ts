@@ -373,6 +373,7 @@ export async function marketplaceReleaseDocumentBundle(
     { params, silentErrorMessage: true },
   );
   return {
+    catalog: res.catalog ?? [],
     document: res.document ?? null,
     documents: res.documents ?? [],
   };

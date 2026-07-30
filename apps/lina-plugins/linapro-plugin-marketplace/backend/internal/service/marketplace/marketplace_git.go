@@ -690,10 +690,10 @@ func (s *serviceImpl) discoverGitMetadataForPlugin(
 	failures := 0
 	skippedImmutable := 0
 	var firstFailure string
-	for index, ref := range refs {
-		// Full docs/sql/i18n enrichment is applied to every discovered ref, but
-		// remote doc body reads are bounded inside enrichGitReleaseMetadata.
-		outcome, discoverErr := s.discoverOneGitRef(ctx, plugin, repo, ref, token, client, treePaths, index == 0)
+	for _, ref := range refs {
+		// Enrich docs for every discovered ref. Remote body reads stay bounded by
+		// maxGitDocsIndexed inside indexGitReleaseDocuments.
+		outcome, discoverErr := s.discoverOneGitRef(ctx, plugin, repo, ref, token, client, treePaths, true)
 		if discoverErr != nil {
 			failures++
 			if firstFailure == "" {
@@ -845,6 +845,30 @@ func (s *serviceImpl) discoverOneGitRef(
 		return gitDiscoverRefNone, err
 	}
 	if existing != nil && immutableRelease(existing) {
+		// Submitted/published releases must not rewrite draft metadata, but
+		// documentation snapshots are disk-only and may be incomplete after a
+		// monorepo import, storage wipe, or when manifest/docs was added after
+		// the install pin was frozen. Re-index docs against the current
+		// discovery ref (tag/main) so marketplace catalogs pick up all Markdown
+		// files and first-heading titles, while install still uses source_commit.
+		if enrichDocs {
+			release, releaseErr := s.getReleaseRecordByID(ctx, existing.Id)
+			if releaseErr != nil {
+				return gitDiscoverRefNone, releaseErr
+			}
+			docsRef := strings.TrimSpace(ref.Name)
+			if docsRef == "" {
+				docsRef = firstNonEmpty(normalizeKey(existing.SourceCommit), gitFallbackBranchMain)
+			}
+			if docsErr := s.indexGitReleaseDocuments(ctx, client, repo, docsRef, token, repoPath, release, treePaths); docsErr != nil {
+				_ = s.updateGitSyncStatus(
+					ctx,
+					plugin.Id,
+					gitSyncStatusPartial,
+					"immutable release kept; documentation indexing incomplete: "+gitPublicErrorMessage(docsErr),
+				)
+			}
+		}
 		return gitDiscoverRefImmutable, nil
 	}
 
@@ -1217,6 +1241,8 @@ func loadGitDisplayI18nCatalogs(
 
 // indexGitReleaseDocuments reads remote Markdown docs under the plugin root and
 // writes a disk snapshot under ArtifactStore for later language-aware reads.
+// Tree paths are refreshed from the same content ref whenever possible so
+// candidates always match blobs that ReadFile can resolve.
 func (s *serviceImpl) indexGitReleaseDocuments(
 	ctx context.Context,
 	client gitRemoteClient,
@@ -1230,29 +1256,56 @@ func (s *serviceImpl) indexGitReleaseDocuments(
 	if release == nil {
 		return bizerr.NewCode(CodeMarketplaceInvalidInput)
 	}
+	// Prefer a live tree at the content ref. Callers may pass a shared monorepo
+	// tree from another ref; using a mismatched tree would either miss docs or
+	// list candidates that fail to read and collapse the catalog to README-only.
+	if client != nil && strings.TrimSpace(ref) != "" {
+		if liveTree, listErr := client.ListTreePaths(ctx, repo, ref, token); listErr == nil && len(liveTree) > 0 {
+			treePaths = liveTree
+		}
+	}
 	candidates := selectGitDocPathsForIndexing(treePaths, repoPath)
 	if len(candidates) == 0 {
 		return nil
 	}
 	items := make([]*marketplaceDocumentIndexItem, 0, len(candidates))
 	rawBodies := make(map[string][]byte, len(candidates))
+	var firstIndexFailure string
 	for _, relPath := range candidates {
 		body, readErr := client.ReadFile(ctx, repo, ref, gitPathJoin(repoPath, relPath), token)
 		if readErr != nil {
+			if firstIndexFailure == "" {
+				firstIndexFailure = gitPublicErrorMessage(readErr)
+			}
 			continue
 		}
 		if len(body) == 0 || len(body) > maxGitDocBytes {
+			if firstIndexFailure == "" {
+				firstIndexFailure = "documentation body empty or exceeds size limit"
+			}
 			continue
 		}
 		sourceKind, locale, docPath := resolveGitDocumentIdentity(relPath)
 		item, indexErr := indexMarketplaceDocument(locale, docPath, sourceKind, string(body))
 		if indexErr != nil {
+			if firstIndexFailure == "" {
+				firstIndexFailure = gitPublicErrorMessage(indexErr)
+			}
 			continue
 		}
 		items = append(items, item)
 		rawBodies[documentIndexKey(item.Locale, item.DocPath)] = body
 	}
 	if len(items) == 0 {
+		// Surface total indexing failure so callers can mark partial sync instead
+		// of treating a docs-bearing tree as a successful empty snapshot.
+		if len(candidates) > 0 {
+			diagnostic := "documentation candidates were found but none could be indexed"
+			if firstIndexFailure != "" {
+				diagnostic = diagnostic + ": " + firstIndexFailure
+			}
+			return bizerr.NewCode(CodeMarketplaceGitDiscoveryFailed, bizerr.P("diagnostic", diagnostic))
+		}
 		return nil
 	}
 	return s.replaceReleaseGitDocumentSnapshot(ctx, release, items, rawBodies)
@@ -1293,20 +1346,21 @@ func selectGitDocPathsForIndexing(treePaths []string, repoPath string) []string 
 	if len(docs) == 0 {
 		return nil
 	}
-	// Prefer README + manifest/docs index files first.
+	// Prefer marketplace manifest/docs over package-root README so the index
+	// budget is spent on navigable docs. README is still indexed when budget
+	// remains and becomes the docs entry only when no manifest docs exist.
 	priority := func(pathValue string) int {
 		lower := strings.ToLower(pathValue)
 		switch {
-		case lower == "readme.zh-cn.md":
+		case strings.HasPrefix(lower, "manifest/docs/") &&
+			(strings.HasSuffix(lower, "/index.md") || lower == "manifest/docs/index.md"):
 			return 0
-		case lower == "readme.md":
+		case strings.HasPrefix(lower, "manifest/docs/") && strings.HasSuffix(lower, ".md"):
 			return 1
-		case strings.HasSuffix(lower, "/index.md") || lower == "manifest/docs/index.md":
-			return 2
-		case strings.Contains(lower, "readme"):
+		case lower == "readme.zh-cn.md" || lower == "readme.md" || strings.Contains(lower, "readme"):
 			return 3
 		default:
-			return 4
+			return 2
 		}
 	}
 	sort.SliceStable(docs, func(i, j int) bool {

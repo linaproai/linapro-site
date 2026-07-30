@@ -6,10 +6,12 @@ package marketplace
 
 import (
 	"context"
+	"strings"
 
 	"github.com/gogf/gf/v2/database/gdb"
 
 	"lina-core/pkg/bizerr"
+	"lina-core/pkg/listorder"
 	marketv1 "linapro-plugin-marketplace/backend/api/market/v1"
 	"linapro-plugin-marketplace/backend/internal/dao"
 	"linapro-plugin-marketplace/backend/internal/model/do"
@@ -22,13 +24,16 @@ func (s *serviceImpl) ListOwnedPlugins(ctx context.Context, in ListOwnedPluginsI
 		return nil, bizerr.NewCode(CodeMarketplaceInvalidInput)
 	}
 	return s.listPluginsFromIdentityTable(ctx, pluginIdentityListFilter{
-		PageNum:     in.PageNum,
-		PageSize:    in.PageSize,
-		Keyword:     in.Keyword,
-		PluginType:  in.PluginType,
-		Status:      in.Status,
-		OwnerUserID: in.OwnerUserID,
-		Locale:      in.Locale,
+		PageNum:            in.PageNum,
+		PageSize:           in.PageSize,
+		Keyword:            in.Keyword,
+		PluginType:         in.PluginType,
+		Status:             in.Status,
+		OwnerUserID:        in.OwnerUserID,
+		Locale:             in.Locale,
+		OrderBy:            in.OrderBy,
+		OrderDirection:     in.OrderDirection,
+		DefaultOrderPlugin: true, // owned list defaults to plugin_id ASC
 	})
 }
 
@@ -177,6 +182,12 @@ type pluginIdentityListFilter struct {
 	PublisherIDs       []int
 	MatchPublisherName bool
 	Locale             string
+	// OrderBy / OrderDirection are optional remote-sort inputs for owned lists.
+	OrderBy        string
+	OrderDirection string
+	// DefaultOrderPlugin selects plugin_id ASC when no valid order is provided.
+	// When false, the legacy managed-list default (updated_at DESC) is kept.
+	DefaultOrderPlugin bool
 }
 
 func (s *serviceImpl) listPluginsFromIdentityTable(
@@ -225,7 +236,7 @@ func (s *serviceImpl) listPluginsFromIdentityTable(
 		return nil, bizerr.WrapCode(err, CodeMarketplaceStorageFailed)
 	}
 	var rows []*entity.PluginMarketplacePlugin
-	err = model.Clone().
+	query := model.Clone().
 		Fields(
 			cols.Id,
 			cols.PublisherId,
@@ -247,9 +258,9 @@ func (s *serviceImpl) listPluginsFromIdentityTable(
 			cols.LastSyncAt,
 			cols.PublishedAt,
 			cols.UpdatedAt,
-		).
-		OrderDesc(cols.UpdatedAt).
-		OrderDesc(cols.Id).
+		)
+	query = applyPluginIdentityListOrder(query, in.OrderBy, in.OrderDirection, in.DefaultOrderPlugin)
+	err = query.
 		Page(pageNum, pageSize).
 		Scan(&rows)
 	if err != nil {
@@ -343,6 +354,49 @@ func applyOwnerPublisherFilter(model, publisherModel *gdb.Model, ownerUserID int
 		Fields(publisherCols.Id).
 		Where(publisherCols.OwnerUserId, ownerUserID)
 	return model.WhereIn(dao.PluginMarketplacePlugin.Columns().PublisherId, publisherModel)
+}
+
+// pluginIdentitySortField maps workbench/API sort keys to identity-table columns.
+// Only whitelisted fields are accepted to avoid dynamic SQL injection.
+func pluginIdentitySortField(orderBy string) string {
+	cols := dao.PluginMarketplacePlugin.Columns()
+	switch strings.ToLower(strings.TrimSpace(orderBy)) {
+	case "pluginid", "plugin_id":
+		return cols.PluginId
+	case "marketstatus", "market_status", "status":
+		return cols.MarketStatus
+	case "downloadcount", "download_count":
+		return cols.DownloadCount
+	case "updatedat", "updated_at":
+		return cols.UpdatedAt
+	default:
+		return ""
+	}
+}
+
+// applyPluginIdentityListOrder applies remote sort for owned lists and keeps the
+// managed-list default (updated_at DESC) when DefaultOrderPlugin is false.
+func applyPluginIdentityListOrder(
+	model *gdb.Model,
+	orderBy string,
+	orderDirection string,
+	defaultOrderPlugin bool,
+) *gdb.Model {
+	cols := dao.PluginMarketplacePlugin.Columns()
+	field := pluginIdentitySortField(orderBy)
+	if field == "" {
+		if defaultOrderPlugin {
+			return model.OrderAsc(cols.PluginId).OrderAsc(cols.Id)
+		}
+		return model.OrderDesc(cols.UpdatedAt).OrderDesc(cols.Id)
+	}
+
+	direction := listorder.NormalizeOrDefault(orderDirection, listorder.ASC)
+	// Tie-break on id so pagination stays stable across equal sort keys.
+	if direction == listorder.DESC {
+		return model.OrderDesc(field).OrderDesc(cols.Id)
+	}
+	return model.OrderAsc(field).OrderAsc(cols.Id)
 }
 
 func reviewQueueStatuses(requested marketv1.MarketplaceReviewStatus) []string {

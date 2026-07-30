@@ -26,12 +26,14 @@ type PluginListRes struct {
 
 // MyPluginListReq is the request for listing marketplace plugins owned by the current publisher.
 type MyPluginListReq struct {
-	g.Meta     `path:"/market/my-plugins" method:"get" tags:"Plugin Marketplace" summary:"Query my marketplace plugins" permission:"market:plugin:publish" dc:"Return paginated marketplace plugins owned by publishers bound to the current user. Draft and unpublished plugins are included so publishers can manage their own catalog entries."`
-	PageNum    int                   `json:"pageNum" d:"1" v:"min:1" dc:"Page number starting from 1" eg:"1"`
-	PageSize   int                   `json:"pageSize" d:"20" v:"min:1|max:100" dc:"Page size, default 20 and maximum 100" eg:"20"`
-	Keyword    string                `json:"keyword" dc:"Optional fuzzy search against plugin ID, name, and summary; match all owned plugins when empty" eg:"workflow"`
-	PluginType MarketplacePluginType `json:"pluginType" dc:"Optional plugin type filter: source=source-code plugin or dynamic=WASM runtime plugin; include all plugin types when empty" eg:"source"`
-	Status     string                `json:"status" dc:"Optional list status filter. Accepts marketplace lifecycle values (draft, published, delisted, deprecated) or process pipeline values shown in publisher UI (pending_verify, pending_review, completed, failed); include all statuses when empty" eg:"pending_verify"`
+	g.Meta         `path:"/market/my-plugins" method:"get" tags:"Plugin Marketplace" summary:"Query my marketplace plugins" permission:"market:plugin:publish" dc:"Return paginated marketplace plugins owned by publishers bound to the current user. Draft and unpublished plugins are included so publishers can manage their own catalog entries."`
+	PageNum        int                   `json:"pageNum" d:"1" v:"min:1" dc:"Page number starting from 1" eg:"1"`
+	PageSize       int                   `json:"pageSize" d:"20" v:"min:1|max:100" dc:"Page size, default 20 and maximum 100" eg:"20"`
+	Keyword        string                `json:"keyword" dc:"Optional fuzzy search against plugin ID, name, and summary; match all owned plugins when empty" eg:"workflow"`
+	PluginType     MarketplacePluginType `json:"pluginType" dc:"Optional plugin type filter: source=source-code plugin or dynamic=WASM runtime plugin; include all plugin types when empty" eg:"source"`
+	Status         string                `json:"status" dc:"Optional list status filter. Accepts marketplace lifecycle values (draft, published, delisted, deprecated) or process pipeline values shown in publisher UI (pending_verify, pending_review, completed, failed); include all statuses when empty" eg:"pending_verify"`
+	OrderBy        string                `json:"orderBy" dc:"Optional sort field: pluginId, marketStatus, downloadCount, or updatedAt; defaults to pluginId ascending when empty or unsupported" eg:"pluginId"`
+	OrderDirection string                `json:"orderDirection" d:"asc" dc:"Sort direction: asc=ascending or desc=descending; defaults to asc" eg:"asc"`
 }
 
 // MyPluginListRes is the response for listing marketplace plugins owned by the current publisher.

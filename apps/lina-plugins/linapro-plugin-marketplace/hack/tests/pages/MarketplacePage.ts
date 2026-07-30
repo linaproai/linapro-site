@@ -141,6 +141,55 @@ export class MarketplacePage {
     ).toBeVisible();
   }
 
+  mineColumnHeader(title: RegExp | string) {
+    return this.page
+      .locator(`${mineTableSelector} .vxe-header--column`)
+      .filter({ hasText: title })
+      .first();
+  }
+
+  async expectMineColumnSortable(title: RegExp | string) {
+    const header = this.mineColumnHeader(title);
+    await expect(header).toBeVisible();
+    // vxe-table marks sortable headers with sort icons / is--sortable class.
+    await expect(
+      header.locator(".vxe-cell--sort, .vxe-sort--asc-btn, .vxe-sort--desc-btn").first(),
+    ).toBeVisible();
+  }
+
+  async expectMineColumnSorted(title: RegExp | string, order: "asc" | "desc") {
+    const header = this.mineColumnHeader(title);
+    await expect(header).toBeVisible();
+    // Active sort state is commonly on the header column class.
+    const orderClass =
+      order === "asc" ? /sort--asc|is--sort-asc|asc/u : /sort--desc|is--sort-desc|desc/u;
+    await expect(header).toHaveClass(orderClass);
+  }
+
+  async clickMineColumnSort(title: RegExp | string) {
+    const header = this.mineColumnHeader(title);
+    await expect(header).toBeVisible();
+    // Prefer the title/sort control so we do not hit resize handles.
+    const titleEl = header.locator(".vxe-cell--title, .vxe-cell").first();
+    await titleEl.click();
+  }
+
+  async mineBodyPluginIds() {
+    const rows = this.page.locator(
+      `${mineTableSelector} .vxe-table--body-wrapper tbody tr, ${mineTableSelector} .vxe-body--row`,
+    );
+    const count = await rows.count();
+    const ids: string[] = [];
+    for (let index = 0; index < count; index += 1) {
+      const text = (await rows.nth(index).innerText()).trim();
+      const match = text.match(/linapro-[a-z0-9-]+/u);
+      if (match?.[0]) {
+        ids.push(match[0]);
+      }
+    }
+    return ids;
+  }
+
   async expectColumnHeaderFits(
     table: "admin" | "mine" | "review",
     title: string,
@@ -745,6 +794,65 @@ export class MarketplacePage {
     ).toHaveAttribute("aria-selected", "true");
   }
 
+  documentPanel() {
+    return this.detailShell().locator(".marketplace-doc-panel").first();
+  }
+
+  documentCatalogNav() {
+    return this.detailShell().locator(".marketplace-doc-nav").first();
+  }
+
+  documentMarkdownBody() {
+    return this.detailShell()
+      .locator(".marketplace-markdown-body")
+      .first();
+  }
+
+  async expectDocumentCatalogEntries(titles: string[]) {
+    const nav = this.documentCatalogNav();
+    await expect(nav).toBeVisible();
+    for (const title of titles) {
+      await expect(nav.getByText(title, { exact: true })).toBeVisible();
+    }
+  }
+
+  async selectDocumentCatalogEntry(title: string) {
+    await this.documentCatalogNav()
+      .getByText(title, { exact: true })
+      .click();
+  }
+
+  async expectRenderedMarkdownHeading(text: string | RegExp) {
+    const body = this.documentMarkdownBody();
+    await expect(body).toBeVisible();
+    await expect(body.locator("h1, h2, h3").filter({ hasText: text })).toBeVisible();
+  }
+
+  async expectRenderedMarkdownTable() {
+    const body = this.documentMarkdownBody();
+    await expect(body.locator("table")).toBeVisible();
+    await expect(body.locator("th, td").first()).toBeVisible();
+  }
+
+  async expectRenderedMarkdownCodeHighlight() {
+    const body = this.documentMarkdownBody();
+    // highlight.js marks fenced blocks with .hljs / language-* classes.
+    await expect(body.locator("pre.hljs code.hljs, pre code.hljs").first()).toBeVisible();
+  }
+
+  async expectRenderedMarkdownImage() {
+    const body = this.documentMarkdownBody();
+    await expect(body.locator("img.marketplace-md-image, img").first()).toBeVisible();
+  }
+
+  async expectRenderedMermaidDiagram() {
+    const body = this.documentMarkdownBody();
+    // Successful mermaid.run replaces the pre with an SVG diagram.
+    await expect(body.locator(".marketplace-mermaid-wrap svg, pre.mermaid svg").first()).toBeVisible({
+      timeout: 15_000,
+    });
+  }
+
   async expectDocumentLocaleOptions(locales: string[]) {
     const segmented = this.detailShell().locator(".ant-segmented").first();
     await expect(segmented).toBeVisible();
@@ -881,6 +989,63 @@ export class MarketplacePage {
     }
     await this.page.getByRole("tab", { name: /版\s*本|Versions/u }).click();
     await waitForTableReady(this.page, detailReleaseTableSelector, 15_000);
+  }
+
+  /**
+   * Measure the detail release table body height after settling, then again
+   * after a short idle window. Used to catch the fill-parent ResizeObserver
+   * loop that kept expanding blank space under the version rows.
+   */
+  async expectVersionTableHeightStable(options?: {
+    samples?: number;
+    settleMs?: number;
+  }) {
+    await this.showVersionTab();
+    const versionGrid = this.page
+      .locator(".marketplace-detail-version-grid")
+      .first();
+    const bodyWrapper = this.page
+      .locator(
+        `${detailReleaseTableSelector} .vxe-table--body-wrapper.body--wrapper`,
+      )
+      .first();
+    const rows = this.page.locator(
+      `${detailReleaseTableSelector} .vxe-table--main-wrapper .vxe-body--row`,
+    );
+    await expect(versionGrid).toBeVisible();
+    await expect(bodyWrapper).toBeVisible();
+    await expect(rows.first()).toBeVisible();
+
+    const samples = options?.samples ?? 4;
+    const settleMs = options?.settleMs ?? 350;
+    const heights: number[] = [];
+    for (let index = 0; index < samples; index += 1) {
+      await this.page.waitForTimeout(settleMs);
+      const height = await bodyWrapper.evaluate(
+        (element) => element.getBoundingClientRect().height,
+      );
+      heights.push(height);
+    }
+
+    const first = heights[0] ?? 0;
+    const max = Math.max(...heights);
+    const min = Math.min(...heights);
+    // Allow 1px sub-pixel jitter; reject continuous expansion.
+    expect(
+      max - min,
+      `version table body height drifted across samples: ${heights.join(", ")}`,
+    ).toBeLessThanOrEqual(2);
+    expect(first).toBeGreaterThan(0);
+
+    const rowCount = await rows.count();
+    const rowBox = await rows.first().boundingBox();
+    const rowHeight = rowBox?.height ?? 48;
+    // Body should not balloon far beyond the rendered rows (blank growth).
+    const generousCap = rowHeight * Math.max(rowCount, 1) + 160;
+    expect(
+      first,
+      `version table body height ${first}px exceeds content cap ${generousCap}px for ${rowCount} rows`,
+    ).toBeLessThanOrEqual(generousCap);
   }
 
   private tableRow(tableSelector: string, rowText: string) {
