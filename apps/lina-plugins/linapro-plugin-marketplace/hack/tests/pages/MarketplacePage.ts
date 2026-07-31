@@ -853,8 +853,24 @@ export class MarketplacePage {
     });
   }
 
+  documentLocaleSwitch() {
+    return this.detailShell()
+      .locator(".marketplace-doc-locale-switch")
+      .first();
+  }
+
+  documentToolbar() {
+    return this.detailShell().locator(".marketplace-doc-toolbar").first();
+  }
+
   async expectDocumentLocaleOptions(locales: string[]) {
-    const segmented = this.detailShell().locator(".ant-segmented").first();
+    const localeSwitch = this.documentLocaleSwitch();
+    await expect(localeSwitch).toBeVisible();
+    // Label uses i18n detail.docs.locale ("文档语言" / "Document Language").
+    await expect(
+      localeSwitch.locator(".marketplace-doc-locale-label"),
+    ).toBeVisible();
+    const segmented = localeSwitch.locator(".ant-segmented").first();
     await expect(segmented).toBeVisible();
     for (const locale of locales) {
       await expect(segmented.getByText(locale, { exact: true })).toBeVisible();
@@ -862,11 +878,66 @@ export class MarketplacePage {
   }
 
   async switchDocumentLocale(locale: string) {
-    await this.detailShell()
+    await this.documentLocaleSwitch()
       .locator(".ant-segmented")
       .first()
       .getByText(locale, { exact: true })
       .click();
+  }
+
+  /**
+   * Locale codes appear only inside Segmented options — not as a separate Tag
+   * next to the switcher (the previous duplicate UI).
+   */
+  async expectNoDuplicateDocumentLocaleTag(locale: string) {
+    const toolbar = this.documentToolbar();
+    await expect(toolbar).toBeVisible();
+    await expect(
+      toolbar.locator(".ant-tag").filter({ hasText: new RegExp(`^${locale}$`) }),
+    ).toHaveCount(0);
+  }
+
+  async expectDocumentLayoutSeparated() {
+    const layout = this.detailShell().locator(".marketplace-doc-layout").first();
+    const nav = this.documentCatalogNav();
+    const panel = this.documentPanel();
+    await expect(layout).toBeVisible();
+    await expect(nav).toBeVisible();
+    await expect(panel).toBeVisible();
+    // Unified card chrome around catalog + content.
+    await expect(layout).toHaveCSS("display", "grid");
+    const width = this.page.viewportSize()?.width ?? 0;
+    if (width <= 768) {
+      return;
+    }
+    // Desktop: catalog pane is visually distinct from the content panel
+    // (background contrast and/or the ::after 1px rail).
+    const separation = await nav.evaluate((el) => {
+      const panelEl = el.parentElement?.querySelector(
+        ".marketplace-doc-panel",
+      ) as HTMLElement | null;
+      const navStyle = getComputedStyle(el);
+      const panelStyle = panelEl ? getComputedStyle(panelEl) : null;
+      const after = getComputedStyle(el, "::after");
+      const afterWidth = Number.parseFloat(after.width || "0");
+      const afterHasPaint =
+        after.backgroundColor !== "rgba(0, 0, 0, 0)" &&
+        after.backgroundColor !== "transparent" &&
+        afterWidth > 0;
+      return {
+        afterHasPaint,
+        afterWidth,
+        backgroundsDiffer:
+          !!panelStyle &&
+          navStyle.backgroundColor !== panelStyle.backgroundColor,
+        navBg: navStyle.backgroundColor,
+        panelBg: panelStyle?.backgroundColor ?? "",
+      };
+    });
+    expect(
+      separation.backgroundsDiffer || separation.afterHasPaint,
+      `docs catalog should separate from content (bgDiffer=${separation.backgroundsDiffer}, after=${separation.afterHasPaint}, nav=${separation.navBg}, panel=${separation.panelBg})`,
+    ).toBe(true);
   }
 
   async openRisksForVersion(version: string) {
@@ -995,6 +1066,53 @@ export class MarketplacePage {
 
   async expectLastSyncMessageAbsent(text: string) {
     await expect(this.detailShell().getByText(text)).toHaveCount(0);
+  }
+
+  /** Pipeline wait/fail banner on the mine detail modal overview. */
+  detailPipelineAlert() {
+    return this.detailShell()
+      .locator(".marketplace-detail-pipeline-alert")
+      .first();
+  }
+
+  /**
+   * Pipeline alert must sit between the overview Descriptions table and the
+   * Tabs chrome (not above the meta table).
+   */
+  async expectPipelineAlertBetweenDescriptionsAndTabs(message: string | RegExp) {
+    const alert = this.detailPipelineAlert();
+    await expect(alert).toBeVisible();
+    await expect(alert).toContainText(message);
+
+    const order = await this.detailShell().evaluate((shell) => {
+      const descriptions = shell.querySelector(
+        ".marketplace-detail-descriptions",
+      );
+      const pipeline = shell.querySelector(
+        ".marketplace-detail-pipeline-alert",
+      );
+      const tabs = shell.querySelector(".marketplace-detail-tabs");
+      if (!descriptions || !pipeline || !tabs) {
+        return {
+          hasAll: false,
+          descriptionsBeforeAlert: false,
+          alertBeforeTabs: false,
+        };
+      }
+      const position = descriptions.compareDocumentPosition(pipeline);
+      const tabsPosition = pipeline.compareDocumentPosition(tabs);
+      return {
+        hasAll: true,
+        descriptionsBeforeAlert:
+          (position & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+        alertBeforeTabs:
+          (tabsPosition & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+      };
+    });
+
+    expect(order.hasAll).toBe(true);
+    expect(order.descriptionsBeforeAlert).toBe(true);
+    expect(order.alertBeforeTabs).toBe(true);
   }
 
   // i18n detail.empty.risks shown when the risks API returns no rows; mirrors

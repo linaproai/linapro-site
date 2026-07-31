@@ -272,6 +272,18 @@ describe("marketplace frontend composition logic", () => {
     assert.match(detail, /handleSelectDocumentLocale/);
     assert.match(detail, /Segmented/);
     assert.match(detail, /chooseDocumentFromBundle/);
+    // Docs chrome: locale switcher is styled; resolvedLocale Tag must not
+    // duplicate the Segmented selection beside the control.
+    assert.match(detail, /marketplace-doc-locale-switch/);
+    assert.match(detail, /marketplace-doc-locale-label/);
+    assert.match(detail, /marketplace-doc-path-tag/);
+    // Catalog/content separation: distinct pane canvas + ::after divider rail.
+    assert.match(detail, /\.marketplace-doc-nav::after/);
+    assert.match(detail, /marketplace-doc-layout/);
+    assert.doesNotMatch(
+      detail,
+      /<Tag>\{\{\s*currentDocument\.resolvedLocale\s*\}\}<\/Tag>/,
+    );
     assert.match(
       detail,
       /renderMarketplaceMarkdown\(document\.markdown\)\s*\|\|\s*document\.content/,
@@ -387,6 +399,33 @@ describe("marketplace frontend composition logic", () => {
     );
     assert.match(types, /sourceCommit\?:/);
     assert.match(types, /sourceRef\?:/);
+  });
+
+  it("places the mine-detail pipeline alert between descriptions and tabs", () => {
+    const detail = readPluginFile("frontend/pages/detail/index.vue");
+    // Order in template source: Descriptions block → pipeline Alert → Tabs.
+    const descriptionsIdx = detail.indexOf(
+      'class="marketplace-detail-descriptions"',
+    );
+    const pipelineIdx = detail.indexOf(
+      'class="marketplace-detail-pipeline-alert"',
+    );
+    const tabsIdx = detail.indexOf('class="marketplace-detail-tabs"');
+    assert.notEqual(descriptionsIdx, -1, "descriptions class missing");
+    assert.notEqual(pipelineIdx, -1, "pipeline alert class missing");
+    assert.notEqual(tabsIdx, -1, "tabs class missing");
+    assert.ok(
+      descriptionsIdx < pipelineIdx && pipelineIdx < tabsIdx,
+      "pipeline alert must sit between descriptions and tabs",
+    );
+    assert.match(
+      detail,
+      /v-if="embedded && processPipelineMessage\(\)"[\s\S]*?marketplace-detail-pipeline-alert/,
+    );
+    assert.match(
+      detail,
+      /plugin\.linapro-plugin-marketplace\.detail\.pipeline\.pendingReviewHint/,
+    );
   });
 
   it("returns unscoped public details to an accessible host page", () => {

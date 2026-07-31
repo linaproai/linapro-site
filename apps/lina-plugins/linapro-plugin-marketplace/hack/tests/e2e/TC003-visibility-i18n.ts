@@ -107,13 +107,18 @@ test.describe("TC-3 marketplace English workspace", () => {
     await expect(
       page.getByText("Place the source under apps/lina-plugins"),
     ).toBeVisible();
+    await marketplace.expectDocumentLayoutSeparated();
     await marketplace.expectDocumentLocaleOptions(["en-US", "zh-CN"]);
+    // Segmented already shows the locale code; no extra Tag with the same code.
+    await marketplace.expectNoDuplicateDocumentLocaleTag("en-US");
+    await marketplace.expectNoDuplicateDocumentLocaleTag("zh-CN");
     const docsRequestCount = mockState.inspectionResponses.filter(
       (response) => response.kind === "docs",
     ).length;
     await marketplace.switchDocumentLocale("zh-CN");
     await expect(page.getByText("源码演示指南").first()).toBeVisible();
     await expect(page.getByText("将源码放入 apps/lina-plugins")).toBeVisible();
+    await marketplace.expectNoDuplicateDocumentLocaleTag("zh-CN");
     // Locale switches re-fetch the selected path so catalog titles and markdown
     // stay aligned with the preferred locale from the server.
     expect(
@@ -123,6 +128,7 @@ test.describe("TC-3 marketplace English workspace", () => {
     ).toBe(docsRequestCount + 1);
     await marketplace.switchDocumentLocale("en-US");
     await expect(page.getByText("Source Demo Guide").first()).toBeVisible();
+    await marketplace.expectNoDuplicateDocumentLocaleTag("en-US");
     expect(
       mockState.inspectionResponses.filter(
         (response) => response.kind === "docs",

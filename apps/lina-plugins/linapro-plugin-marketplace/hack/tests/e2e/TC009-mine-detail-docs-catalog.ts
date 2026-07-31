@@ -37,6 +37,7 @@ test.describe("TC-9 mine detail docs catalog completeness", () => {
     await expect(detailDialog).toBeVisible();
 
     await marketplace.openDocsForVersion("v1.0.0");
+    await marketplace.expectDocumentLayoutSeparated();
     await marketplace.expectDocumentCatalogEntries([
       "源码演示指南",
       "配置说明",
@@ -47,6 +48,15 @@ test.describe("TC-9 mine detail docs catalog completeness", () => {
     ).toHaveCount(0);
     await expect(marketplace.documentPanel()).not.toContainText("README.md");
     await marketplace.expectRenderedMarkdownHeading(/源码演示指南/u);
+
+    // Locale switcher chrome (label + Segmented) when multiple locales exist;
+    // resolved locale must not also appear as a standalone toolbar Tag.
+    await marketplace.expectDocumentLocaleOptions(["zh-CN", "en-US"]);
+    await marketplace.expectNoDuplicateDocumentLocaleTag("zh-CN");
+    await marketplace.expectNoDuplicateDocumentLocaleTag("en-US");
+    await expect(
+      marketplace.documentToolbar().locator(".marketplace-doc-path-tag"),
+    ).toBeVisible();
 
     await marketplace.selectDocumentCatalogEntry("更新日志");
     await marketplace.expectRenderedMarkdownHeading(/更新日志/u);

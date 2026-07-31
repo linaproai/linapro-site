@@ -1474,14 +1474,6 @@ function formatBytes(value?: number) {
               </p>
             </div>
 
-            <Alert
-              v-if="embedded && processPipelineMessage()"
-              show-icon
-              class="marketplace-detail-pipeline-alert"
-              :type="processPipelineAlertType()"
-              :message="processPipelineMessage()"
-            />
-
             <Descriptions
               :column="{ xs: 1, sm: 2 }"
               bordered
@@ -1645,6 +1637,16 @@ function formatBytes(value?: number) {
                 </Tag>
               </DescriptionsItem>
             </Descriptions>
+
+            <!-- Pipeline status sits between overview table and tab body so
+                 publish/review wait state does not push meta fields down. -->
+            <Alert
+              v-if="embedded && processPipelineMessage()"
+              show-icon
+              class="marketplace-detail-pipeline-alert"
+              :type="processPipelineAlertType()"
+              :message="processPipelineMessage()"
+            />
 
             <Tabs
               v-model:active-key="activeTab"
@@ -1815,11 +1817,26 @@ function formatBytes(value?: number) {
                       <!--
                         Title is only rendered inside Markdown body (e.g. first # heading).
                         Do not repeat currentDocument.title here — it duplicates the body heading.
+                        Locale is only shown via the Segmented control (no extra Tag).
                       -->
                       <div class="marketplace-doc-toolbar">
-                        <Space wrap :size="[6, 6]">
+                        <div
+                          v-if="availableDocumentLocaleOptions.length > 1"
+                          class="marketplace-doc-locale-switch"
+                        >
+                          <span class="marketplace-doc-locale-label">
+                            <IconifyIcon
+                              class="marketplace-doc-locale-icon"
+                              icon="ant-design:global-outlined"
+                            />
+                            {{
+                              $t(
+                                "plugin.linapro-plugin-marketplace.detail.docs.locale",
+                              )
+                            }}
+                          </span>
                           <Segmented
-                            v-if="availableDocumentLocaleOptions.length > 1"
+                            class="marketplace-doc-locale-segmented"
                             :aria-label="
                               $t(
                                 'plugin.linapro-plugin-marketplace.detail.docs.locale',
@@ -1830,9 +1847,13 @@ function formatBytes(value?: number) {
                             :value="activeDocumentLocale"
                             @change="handleSelectDocumentLocale"
                           />
-                          <Tag>{{ currentDocument.resolvedLocale }}</Tag>
-                          <Tag>{{ currentDocument.path }}</Tag>
-                        </Space>
+                        </div>
+                        <Tag
+                          v-if="currentDocument.path"
+                          class="marketplace-doc-path-tag"
+                        >
+                          {{ currentDocument.path }}
+                        </Tag>
                       </div>
                       <div
                         ref="markdownBodyRef"
@@ -2332,6 +2353,7 @@ function formatBytes(value?: number) {
 }
 
 .marketplace-detail-pipeline-alert {
+  flex-shrink: 0;
   margin: 0;
 }
 
@@ -2443,18 +2465,29 @@ function formatBytes(value?: number) {
 }
 
 .marketplace-doc-panel {
+  position: relative;
+  z-index: 0;
   display: flex;
+  min-width: 0;
   min-height: 0;
+  flex: 1;
   flex-direction: column;
-  gap: 10px;
+  background: var(--ant-color-bg-container);
 }
 
+/* Unified docs shell: catalog (left) and content (right) share one card with a
+   clear vertical divider so the two panes read as intentional layout regions. */
 .marketplace-doc-layout {
   display: grid;
-  grid-template-columns: minmax(180px, 220px) minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: minmax(196px, 240px) minmax(0, 1fr);
+  gap: 0;
   align-items: stretch;
   min-height: 280px;
+  overflow: hidden;
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: 10px;
+  background: var(--ant-color-bg-container);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 3%);
 }
 
 /* In the detail modal, docs layout fills remaining tab height after meta/tabs. */
@@ -2482,31 +2515,134 @@ function formatBytes(value?: number) {
 }
 
 .marketplace-doc-nav {
+  position: relative;
+  z-index: 1;
   overflow: auto;
   max-height: 520px;
-  border: 1px solid var(--ant-color-border-secondary);
-  border-radius: 6px;
-  background: var(--ant-color-bg-container);
+  border: none;
+  border-radius: 0;
+  /* Distinct canvas so the catalog reads as its own pane. */
+  background: var(--ant-color-fill-quaternary, rgb(0 0 0 / 3.5%));
+}
+
+/* Dedicated 1px rail — more reliable than border vars that some themes omit. */
+.marketplace-doc-nav::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  width: 1px;
+  pointer-events: none;
+  background: var(--ant-color-border-secondary, rgb(5 5 5 / 6%));
 }
 
 .marketplace-doc-nav-title {
-  padding: 10px 12px 6px;
+  padding: 12px 14px 8px;
+  border-bottom: 1px solid var(--ant-color-border-secondary);
   color: var(--ant-color-text-secondary);
   font-size: 12px;
   font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
 }
 
 .marketplace-doc-nav :deep(.ant-menu) {
   border-inline-end: none !important;
+  background: transparent !important;
+}
+
+.marketplace-doc-nav :deep(.ant-menu-item) {
+  margin-inline: 6px;
+  width: calc(100% - 12px);
+  border-radius: 6px;
 }
 
 .marketplace-doc-toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px 12px;
   align-items: center;
   justify-content: flex-end;
-  margin-bottom: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--ant-color-border-secondary);
+  background: linear-gradient(
+    180deg,
+    var(--ant-color-fill-quaternary, rgb(0 0 0 / 2%)) 0%,
+    transparent 100%
+  );
+}
+
+.marketplace-doc-locale-switch {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 3px 4px 3px 10px;
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: 999px;
+  background: var(--ant-color-bg-container);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+}
+
+.marketplace-doc-locale-label {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  color: var(--ant-color-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.marketplace-doc-locale-icon {
+  font-size: 13px;
+  color: var(--ant-color-primary);
+}
+
+/* class is applied on the Segmented root (.ant-segmented). */
+.marketplace-doc-locale-segmented {
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--ant-color-fill-quaternary, rgb(0 0 0 / 4%));
+}
+
+.marketplace-doc-locale-segmented :deep(.ant-segmented-item) {
+  min-width: 4.25rem;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.marketplace-doc-locale-segmented :deep(.ant-segmented-item-selected) {
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
+}
+
+.marketplace-doc-path-tag {
+  margin-inline-end: 0 !important;
+  max-width: min(100%, 28rem);
+  overflow: hidden;
+  border-radius: 999px;
+  color: var(--ant-color-text-secondary);
+  font-family: var(
+    --font-family-mono,
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    "Liberation Mono",
+    "Courier New",
+    monospace
+  );
+  font-size: 11px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* VS Code / GitHub Markdown preview–inspired body styles. */
@@ -2515,9 +2651,9 @@ function formatBytes(value?: number) {
   /* Page mode keeps a reasonable cap; modal embedded mode overrides to fill. */
   max-height: min(70vh, 720px);
   min-height: 200px;
-  padding: 16px 20px;
-  border: 1px solid var(--ant-color-border-secondary);
-  border-radius: 8px;
+  padding: 18px 22px 22px;
+  border: none;
+  border-radius: 0;
   background: var(--ant-color-bg-container);
   color: var(--ant-color-text);
   font-size: 14px;
@@ -2756,6 +2892,28 @@ function formatBytes(value?: number) {
 @media (max-width: 768px) {
   .marketplace-doc-layout {
     grid-template-columns: 1fr;
+  }
+
+  .marketplace-doc-nav {
+    max-height: 220px;
+    border-bottom: 1px solid var(--ant-color-border-secondary, rgb(5 5 5 / 6%));
+  }
+
+  .marketplace-doc-nav::after {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: auto;
+    height: 1px;
+  }
+
+  .marketplace-doc-toolbar {
+    justify-content: flex-start;
+  }
+
+  .marketplace-doc-locale-switch {
+    max-width: 100%;
   }
 }
 

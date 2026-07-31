@@ -182,6 +182,12 @@ type MockOptions = {
   includePrivatePlugins?: boolean;
   inspectionDelayMsByRelease?: Record<string, number>;
   menuRole?: "both" | "publish-only" | "review-only";
+  /**
+   * Shallow-merge patches onto seeded plugins (by pluginId) before routes
+   * serve list/detail payloads. Used to force pipeline states such as
+   * pending_review without forking the whole catalog fixture set.
+   */
+  pluginPatches?: Record<string, Partial<PluginItem>>;
 };
 
 type MarketplaceMockData = {
@@ -929,6 +935,21 @@ export async function installMarketplaceApiMocks(
     const plugin = data.pluginsById.get(readmeOnlyGitPluginId);
     if (plugin) {
       plugin.riskCounts = riskCountsFromItems(options.gitSourceRisks);
+    }
+  }
+  if (options.pluginPatches) {
+    for (const [pluginId, patch] of Object.entries(options.pluginPatches)) {
+      const plugin = data.pluginsById.get(pluginId);
+      if (!plugin) {
+        continue;
+      }
+      data.pluginsById.set(pluginId, {
+        ...plugin,
+        ...patch,
+        riskCounts: patch.riskCounts
+          ? { ...patch.riskCounts }
+          : { ...plugin.riskCounts },
+      });
     }
   }
   const state: MarketplaceMockState = {
