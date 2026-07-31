@@ -19,9 +19,27 @@ Uploaded packages, Git documentation snapshots, and controlled download bytes ar
 
 | Config key | Purpose | Default |
 |------------|---------|---------|
-| `storage.root` | Artifact and docs-snapshot root | `temp/plugin-marketplace/artifacts` |
+| `storage.root` | Artifact and documentation snapshot root | `temp/plugin-marketplace/artifacts` |
 
-Relative paths resolve against the host process working directory (`make dev` usually runs under `apps/lina-core`, so development data lands in `apps/lina-core/temp/`, which is gitignored). Do **not** point this path into tracked source trees such as `apps/lina-core/data/`. Production deployments should use an absolute path outside the repository.
+Relative paths resolve against the host **workspace root** via the shared `lina-core/pkg/runtimepath` contract (same anchoring as upload and dynamic-plugin storage). They do **not** depend on the process working directory. `make dev` injects `LINAPRO_WORKSPACE_ROOT` (repo root) and `LINAPRO_DATA_ROOT` (`<repo>/temp`), so the default location is:
+
+```text
+<repo>/temp/plugin-marketplace/artifacts/
+  <plugin-id>/
+    <version>/
+      docs/
+        <locale>/
+          index.md
+          ...
+      meta/
+        docs-manifest.json
+```
+
+Git documentation snapshots keep original relative file names under `docs/<locale>/`. On each sync the service compares content hashes and overwrites only when the body changes; documents removed upstream are deleted locally. Package bytes still use `source/` and `dynamic/` key prefixes under the same root.
+
+not `apps/lina-core/temp/...`. Absolute configured paths are used as-is. Production should use an absolute path outside the repository.
+
+If you still have snapshots under `apps/lina-core/temp/plugin-marketplace/` or the legacy `docs-snapshot/.../content/<hash>.md` layout, re-run Git metadata sync (or delete the old tree). Dual-read compatibility is not provided.
 
 ## Git Platform Token Configuration
 

@@ -13,6 +13,7 @@ import (
 
 	"github.com/gogf/gf/v2/container/gvar"
 
+	"lina-core/pkg/runtimepath"
 	marketv1 "linapro-plugin-marketplace/backend/api/market/v1"
 	"linapro-plugin-marketplace/backend/internal/model/entity"
 )
@@ -263,6 +264,10 @@ func (s stubPluginConfig) Int(ctx context.Context, key string, defaultValue int)
 
 func (s stubPluginConfig) Duration(ctx context.Context, key string, defaultValue time.Duration) (time.Duration, error) {
 	return defaultValue, nil
+}
+
+func (s stubPluginConfig) ResolvePath(_ context.Context, path string) (string, error) {
+	return runtimepath.Resolve(path), nil
 }
 
 func TestResolveGitAccessTokenPrefersUserTokenThenPlatformConfig(t *testing.T) {
@@ -723,7 +728,8 @@ func TestNormalizeGitRepoPathAndJoin(t *testing.T) {
 
 // memoryArtifactStore is an in-memory ArtifactStore used by Git docs indexing tests.
 type memoryArtifactStore struct {
-	objects map[string][]byte
+	objects  map[string][]byte
+	putCount int
 }
 
 func newMemoryArtifactStore() *memoryArtifactStore {
@@ -739,6 +745,7 @@ func (s *memoryArtifactStore) Put(_ context.Context, key string, body io.Reader)
 		return err
 	}
 	s.objects[key] = payload
+	s.putCount++
 	return nil
 }
 
@@ -762,6 +769,14 @@ func (s *memoryArtifactStore) LocalPath(context.Context, string) (string, error)
 	return "", errors.New("memory store has no local path")
 }
 
+func (s *memoryArtifactStore) Delete(_ context.Context, key string) error {
+	if s.objects == nil {
+		return nil
+	}
+	delete(s.objects, key)
+	return nil
+}
+
 func TestIndexGitReleaseDocumentsWritesSnapshot(t *testing.T) {
 	t.Parallel()
 	store := newMemoryArtifactStore()
@@ -775,14 +790,14 @@ func TestIndexGitReleaseDocumentsWritesSnapshot(t *testing.T) {
 			"other/README.md",
 		},
 		files: map[string][]byte{
-			"main:demo/README.md":                                  []byte("# Demo README\n\nHello.\n"),
-			"main:demo/manifest/docs/zh-CN/index.md":               []byte("# 智能中心\n\n概述。\n"),
-			"main:demo/manifest/docs/zh-CN/configuration.md":       []byte("# 配置说明\n\nenabled: true\n"),
-			"main:demo/manifest/docs/zh-CN/changelog.md":           []byte("# 更新日志\n\nv0.1.0\n"),
-			"deadbeef:demo/README.md":                             []byte("# Demo README\n\nHello.\n"),
-			"deadbeef:demo/manifest/docs/zh-CN/index.md":          []byte("# 智能中心\n\n概述。\n"),
-			"deadbeef:demo/manifest/docs/zh-CN/configuration.md":  []byte("# 配置说明\n\nenabled: true\n"),
-			"deadbeef:demo/manifest/docs/zh-CN/changelog.md":      []byte("# 更新日志\n\nv0.1.0\n"),
+			"main:demo/README.md":                                []byte("# Demo README\n\nHello.\n"),
+			"main:demo/manifest/docs/zh-CN/index.md":             []byte("# 智能中心\n\n概述。\n"),
+			"main:demo/manifest/docs/zh-CN/configuration.md":     []byte("# 配置说明\n\nenabled: true\n"),
+			"main:demo/manifest/docs/zh-CN/changelog.md":         []byte("# 更新日志\n\nv0.1.0\n"),
+			"deadbeef:demo/README.md":                            []byte("# Demo README\n\nHello.\n"),
+			"deadbeef:demo/manifest/docs/zh-CN/index.md":         []byte("# 智能中心\n\n概述。\n"),
+			"deadbeef:demo/manifest/docs/zh-CN/configuration.md": []byte("# 配置说明\n\nenabled: true\n"),
+			"deadbeef:demo/manifest/docs/zh-CN/changelog.md":     []byte("# 更新日志\n\nv0.1.0\n"),
 		},
 	}
 	release := &ReleaseRecord{
@@ -810,6 +825,18 @@ func TestIndexGitReleaseDocumentsWritesSnapshot(t *testing.T) {
 	manifestKey := docsSnapshotManifestKey("demo-plugin", "v0.1.0")
 	if _, ok := store.objects[manifestKey]; !ok {
 		t.Fatalf("expected docs snapshot manifest at %s, objects=%v", manifestKey, keysOf(store.objects))
+	}
+	contentKey, err := docsContentKey("demo-plugin", "v0.1.0", "zh-CN", "index.md")
+	if err != nil {
+		t.Fatalf("docsContentKey: %v", err)
+	}
+	if _, ok := store.objects[contentKey]; !ok {
+		t.Fatalf("expected docs body at %s, objects=%v", contentKey, keysOf(store.objects))
+	}
+	for key := range store.objects {
+		if strings.Contains(key, "docs-snapshot") || strings.Contains(key, "/content/") {
+			t.Fatalf("unexpected legacy docs layout key %q", key)
+		}
 	}
 	items, err := svc.loadDocumentIndexItemsFromGitSnapshot(context.Background(), &entity.PluginMarketplaceRelease{
 		PluginId:       "demo-plugin",
@@ -888,6 +915,92 @@ func TestIndexGitReleaseDocumentsFailsWhenAllCandidatesUnreadable(t *testing.T) 
 	}
 	if len(store.objects) != 0 {
 		t.Fatalf("failed indexing must not write snapshot objects: %#v", keysOf(store.objects))
+	}
+}
+
+func TestReplaceReleaseGitDocumentSnapshotHashUpdateAndOrphanDelete(t *testing.T) {
+	t.Parallel()
+	store := newMemoryArtifactStore()
+	svc := &serviceImpl{artifacts: store}
+	release := &ReleaseRecord{PluginID: "demo-plugin", Version: "v0.1.0"}
+	ctx := context.Background()
+
+	indexKey := documentIndexKey("zh-CN", "index.md")
+	oldBody := []byte("# 旧标题\n\n旧内容。\n")
+	oldItem, err := indexMarketplaceDocument("zh-CN", "index.md", documentSourceKindManifestDocs, string(oldBody))
+	if err != nil {
+		t.Fatalf("index old: %v", err)
+	}
+	orphanBody := []byte("# 将被删除\n")
+	orphanItem, err := indexMarketplaceDocument("zh-CN", "orphan.md", documentSourceKindManifestDocs, string(orphanBody))
+	if err != nil {
+		t.Fatalf("index orphan: %v", err)
+	}
+	if err = svc.replaceReleaseGitDocumentSnapshot(ctx, release, []*marketplaceDocumentIndexItem{oldItem, orphanItem}, map[string][]byte{
+		documentIndexKey("zh-CN", "index.md"):  oldBody,
+		documentIndexKey("zh-CN", "orphan.md"): orphanBody,
+	}); err != nil {
+		t.Fatalf("initial snapshot: %v", err)
+	}
+	indexKeyPath, err := docsContentKey("demo-plugin", "v0.1.0", "zh-CN", "index.md")
+	if err != nil {
+		t.Fatalf("docsContentKey index: %v", err)
+	}
+	orphanKey, err := docsContentKey("demo-plugin", "v0.1.0", "zh-CN", "orphan.md")
+	if err != nil {
+		t.Fatalf("docsContentKey orphan: %v", err)
+	}
+	if !bytes.Equal(store.objects[indexKeyPath], oldBody) {
+		t.Fatalf("expected old body stored, got %q", store.objects[indexKeyPath])
+	}
+	if _, ok := store.objects[orphanKey]; !ok {
+		t.Fatal("expected orphan key after first sync")
+	}
+
+	// Same path + same body: content must remain; Put is still allowed but body unchanged.
+	putsBeforeUnchanged := store.putCount
+	if err = svc.replaceReleaseGitDocumentSnapshot(ctx, release, []*marketplaceDocumentIndexItem{oldItem}, map[string][]byte{
+		indexKey: oldBody,
+	}); err != nil {
+		t.Fatalf("unchanged snapshot: %v", err)
+	}
+	if store.putCount != putsBeforeUnchanged {
+		// Manifest is rewritten once; document body Put must be skipped.
+		// putCount includes manifest Put, so body skip means exactly +1.
+		if store.putCount != putsBeforeUnchanged+1 {
+			t.Fatalf("unchanged body should only rewrite manifest: putCount %d -> %d", putsBeforeUnchanged, store.putCount)
+		}
+	}
+	if !bytes.Equal(store.objects[indexKeyPath], oldBody) {
+		t.Fatalf("unchanged sync must keep body, got %q", store.objects[indexKeyPath])
+	}
+	if _, ok := store.objects[orphanKey]; ok {
+		t.Fatal("orphan doc must be deleted when absent from remote set")
+	}
+
+	// Same path + different body: must overwrite even though filename exists.
+	newBody := []byte("# 新标题\n\n新内容。\n")
+	newItem, err := indexMarketplaceDocument("zh-CN", "index.md", documentSourceKindManifestDocs, string(newBody))
+	if err != nil {
+		t.Fatalf("index new: %v", err)
+	}
+	if err = svc.replaceReleaseGitDocumentSnapshot(ctx, release, []*marketplaceDocumentIndexItem{newItem}, map[string][]byte{
+		indexKey: newBody,
+	}); err != nil {
+		t.Fatalf("updated snapshot: %v", err)
+	}
+	if !bytes.Equal(store.objects[indexKeyPath], newBody) {
+		t.Fatalf("expected updated body, got %q", store.objects[indexKeyPath])
+	}
+	loaded, err := svc.loadDocumentIndexItemsFromGitSnapshot(ctx, &entity.PluginMarketplaceRelease{
+		PluginId:       "demo-plugin",
+		ReleaseVersion: "v0.1.0",
+	})
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if len(loaded) != 1 || loaded[0].Title != "新标题" {
+		t.Fatalf("expected reloaded title 新标题, got %#v", loaded)
 	}
 }
 

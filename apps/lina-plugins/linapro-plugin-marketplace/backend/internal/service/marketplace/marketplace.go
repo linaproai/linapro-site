@@ -203,8 +203,8 @@ type serviceImpl struct {
 // New creates a marketplace domain service. artifacts is required for package
 // upload persistence, document body reads, and controlled download streaming.
 // When artifacts is nil, New creates a local filesystem store under
-// storage.root from pluginConfig, or temp/plugin-marketplace/artifacts when
-// that config is empty, so development data stays outside tracked source trees.
+// storage.root from pluginConfig (resolved via runtimepath workspace root), or
+// temp/plugin-marketplace/artifacts when that config is empty.
 // pluginConfig is the current plugin's static configuration reader from
 // Plugins().Config(); it may be nil in unit tests. When present, Git metadata
 // discovery falls back to github.accessToken / gitee.accessToken when a

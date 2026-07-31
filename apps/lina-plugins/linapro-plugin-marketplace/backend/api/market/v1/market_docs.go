@@ -132,10 +132,12 @@ type MarketplaceDocumentCatalogItem struct {
 
 // MarketplaceRiskItem is one review risk finding produced by marketplace scanning.
 type MarketplaceRiskItem struct {
-	Type      MarketplaceRiskType     `json:"type" dc:"Risk type: host_service, dynamic_route, menu_permission, external_network, data_table, install_sql, uninstall_sql, mock_sql, dependency, multi_tenant, or docs" eg:"host_service"`
-	Severity  MarketplaceRiskSeverity `json:"severity" dc:"Risk severity: info, warning, or high" eg:"warning"`
-	Source    string                  `json:"source" dc:"Scanner, manifest section, or package resource that produced this risk finding" eg:"plugin.yaml hostServices"`
-	Summary   string                  `json:"summary" dc:"Human-readable risk summary produced by marketplace review scanning" eg:"The plugin requests storage read access under reports/."`
-	Payload   map[string]any          `json:"payload" dc:"Structured scanner payload for review UI details; shape depends on the risk type" eg:"{}"`
-	CreatedAt *int64                  `json:"createdAt,omitempty" dc:"Risk finding creation time as Unix timestamp in milliseconds" eg:"1767240000000"`
+	Type        MarketplaceRiskType        `json:"type" dc:"Risk type: host_service, dynamic_route, menu_permission, external_network, data_table, install_sql, uninstall_sql, mock_sql, dependency, multi_tenant, or docs" eg:"host_service"`
+	Severity    MarketplaceRiskSeverity    `json:"severity" dc:"Risk severity: info, warning, or high" eg:"warning"`
+	Disposition MarketplaceRiskDisposition `json:"disposition" dc:"Publisher/reviewer disposition: need_fix=must fix before submit, need_attention=disclosure for review awareness, info_only=informational" eg:"need_fix"`
+	Blocking    bool                       `json:"blocking" dc:"Whether this finding blocks review submission until resolved" eg:"true"`
+	Source      string                     `json:"source" dc:"Scanner, manifest section, or package resource that produced this risk finding" eg:"plugin.yaml hostServices"`
+	Summary     string                     `json:"summary" dc:"Human-readable risk summary produced by marketplace review scanning" eg:"The plugin requests storage read access under reports/."`
+	Payload     map[string]any             `json:"payload" dc:"Structured scanner payload with stable code, disposition, blocking, and bounded evidence such as files/services/routes" eg:"{}"`
+	CreatedAt   *int64                     `json:"createdAt,omitempty" dc:"Risk finding creation time as Unix timestamp in milliseconds" eg:"1767240000000"`
 }

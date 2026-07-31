@@ -265,28 +265,81 @@ func TestRiskItemFromEntityParsesPayload(t *testing.T) {
 	if item.Payload["code"] != "dynamic_host_services_present" {
 		t.Fatalf("unexpected risk payload: %#v", item.Payload)
 	}
+	if item.Disposition != marketv1.MarketplaceRiskDispositionNeedAttention {
+		t.Fatalf("expected need_attention disposition, got %s", item.Disposition)
+	}
+	if item.Blocking {
+		t.Fatalf("host services finding must not block submit")
+	}
 	if item.CreatedAt == nil || *item.CreatedAt != now.UnixMilli() {
 		t.Fatalf("unexpected createdAt: %#v", item.CreatedAt)
 	}
+
+	framework := riskItemFromEntity(&entity.PluginMarketplaceRisk{
+		RiskType: marketv1.MarketplaceRiskTypeDependency.String(),
+		Severity: marketv1.MarketplaceRiskSeverityWarning.String(),
+		Source:   "plugin.yaml",
+		Summary:  "Framework compatibility dependency is not declared.",
+		// Legacy payload may still embed blocking=true; policy must win on read.
+		Payload: `{"code":"framework_dependency_missing","blocking":true,"disposition":"need_fix"}`,
+	})
+	if framework.Disposition != marketv1.MarketplaceRiskDispositionNeedAttention || framework.Blocking {
+		t.Fatalf("expected non-blocking framework finding, got disposition=%s blocking=%v", framework.Disposition, framework.Blocking)
+	}
+
+	blocking := riskItemFromEntity(&entity.PluginMarketplaceRisk{
+		RiskType: marketv1.MarketplaceRiskTypeMultiTenant.String(),
+		Severity: marketv1.MarketplaceRiskSeverityWarning.String(),
+		Source:   "manifest/i18n",
+		Summary:  "Plugin declares i18n.enabled but no manifest i18n JSON files were detected.",
+		Payload:  `{"code":"i18n_files_missing"}`,
+	})
+	if blocking.Disposition != marketv1.MarketplaceRiskDispositionNeedFix || !blocking.Blocking {
+		t.Fatalf("expected need_fix blocking finding, got disposition=%s blocking=%v", blocking.Disposition, blocking.Blocking)
+	}
 }
 
-// TestSortMarketplaceRiskItemsBySeverity pins the owner/review risk list order:
-// high impact first, then warning, then info. API rows are stored and often
-// returned in insertion/id order; presentation must still surface high first.
+// TestSortMarketplaceRiskItemsBySeverity pins presentation order:
+// blocking/need_fix first, then disposition, then severity within the same bucket.
 func TestSortMarketplaceRiskItemsBySeverity(t *testing.T) {
 	t.Parallel()
 
 	items := []*marketv1.MarketplaceRiskItem{
-		{Severity: marketv1.MarketplaceRiskSeverityInfo, Summary: "info-a"},
-		{Severity: marketv1.MarketplaceRiskSeverityHigh, Summary: "high-a"},
-		{Severity: marketv1.MarketplaceRiskSeverityWarning, Summary: "warning-a"},
-		{Severity: marketv1.MarketplaceRiskSeverityInfo, Summary: "info-b"},
-		{Severity: marketv1.MarketplaceRiskSeverityHigh, Summary: "high-b"},
-		{Severity: marketv1.MarketplaceRiskSeverityWarning, Summary: "warning-b"},
+		{
+			Severity: marketv1.MarketplaceRiskSeverityInfo,
+			Summary:  "info-a",
+			Payload:  map[string]any{"code": "source_docs_indexed"},
+		},
+		{
+			Severity: marketv1.MarketplaceRiskSeverityHigh,
+			Summary:  "high-attention",
+			Payload:  map[string]any{"code": "dynamic_host_services_present"},
+		},
+		{
+			Severity: marketv1.MarketplaceRiskSeverityWarning,
+			Summary:  "fix-a",
+			Payload:  map[string]any{"code": "i18n_files_missing"},
+		},
+		{
+			Severity: marketv1.MarketplaceRiskSeverityInfo,
+			Summary:  "info-b",
+			Payload:  map[string]any{"code": "dynamic_runtime_detected"},
+		},
+		{
+			Severity: marketv1.MarketplaceRiskSeverityWarning,
+			Summary:  "attention-a",
+			Payload:  map[string]any{"code": "source_sql_present"},
+		},
+		{
+			Severity: marketv1.MarketplaceRiskSeverityWarning,
+			Summary:  "framework-attention",
+			Payload:  map[string]any{"code": "framework_dependency_missing"},
+		},
 	}
 	sortMarketplaceRiskItemsBySeverity(items)
 
-	want := []string{"high-a", "high-b", "warning-a", "warning-b", "info-a", "info-b"}
+	// need_fix first, then need_attention by severity, then info_only.
+	want := []string{"fix-a", "high-attention", "attention-a", "framework-attention", "info-a", "info-b"}
 	got := make([]string, 0, len(items))
 	for _, item := range items {
 		got = append(got, item.Summary)
@@ -305,6 +358,90 @@ func TestSortMarketplaceRiskItemsBySeverity(t *testing.T) {
 	sortMarketplaceRiskItemsBySeverity([]*marketv1.MarketplaceRiskItem{
 		{Severity: marketv1.MarketplaceRiskSeverityInfo, Summary: "only"},
 	})
+}
+
+func TestBuildPackageDiagnosticRiskPayloadIncludesEvidence(t *testing.T) {
+	t.Parallel()
+
+	payload := buildPackageDiagnosticRiskPayload(&PackageDiagnostic{
+		Code:     "source_sql_present",
+		Severity: marketv1.MarketplaceRiskSeverityWarning,
+		Source:   "manifest/sql",
+		Message:  "SQL present",
+		Evidence: &PackageDiagnosticEvidence{
+			Files:      []string{"manifest/sql/001-init.sql"},
+			TotalCount: 1,
+		},
+	})
+	if payload.Code != "source_sql_present" {
+		t.Fatalf("unexpected code: %s", payload.Code)
+	}
+	if payload.Disposition != marketv1.MarketplaceRiskDispositionNeedAttention.String() {
+		t.Fatalf("unexpected disposition: %s", payload.Disposition)
+	}
+	if payload.Blocking {
+		t.Fatalf("SQL finding must not be blocking")
+	}
+	if len(payload.Files) != 1 || payload.Files[0] != "manifest/sql/001-init.sql" {
+		t.Fatalf("unexpected files: %#v", payload.Files)
+	}
+
+	frameworkPayload := buildPackageDiagnosticRiskPayload(&PackageDiagnostic{
+		Code: "framework_dependency_missing",
+		Evidence: &PackageDiagnosticEvidence{
+			ExpectedPath:  "plugin.yaml",
+			ExpectedField: "dependencies.framework.version",
+			Example:       ">=1.0.0 <2.0.0",
+		},
+	})
+	if frameworkPayload.Blocking || frameworkPayload.Disposition != marketv1.MarketplaceRiskDispositionNeedAttention.String() {
+		t.Fatalf("unexpected framework payload: %#v", frameworkPayload)
+	}
+
+	fixPayload := buildPackageDiagnosticRiskPayload(&PackageDiagnostic{
+		Code: "i18n_files_missing",
+		Evidence: &PackageDiagnosticEvidence{
+			ExpectedPath:  "manifest/i18n",
+			ExpectedField: "i18n.enabled / locale JSON bundles",
+			Example:       "manifest/i18n/zh-CN/plugin.json",
+		},
+	})
+	if !fixPayload.Blocking || fixPayload.Disposition != marketv1.MarketplaceRiskDispositionNeedFix.String() {
+		t.Fatalf("unexpected fix payload: %#v", fixPayload)
+	}
+}
+
+func TestSourcePackageDiagnosticsCarryEvidence(t *testing.T) {
+	t.Parallel()
+
+	diagnostics := sourcePackageDiagnostics(
+		&sourcePackageManifest{ID: "demo", Name: "Demo", Version: "0.1.0"},
+		[]*sourcePackageResourceSummary{{Path: "manifest/sql/001.sql", Kind: "sql"}},
+		nil,
+		[]*sourcePackageResourceSummary{{Path: "manifest/docs/zh-CN/index.md", Kind: "marketplace_doc"}},
+	)
+	byCode := map[string]*PackageDiagnostic{}
+	for _, item := range diagnostics {
+		byCode[item.Code] = item
+	}
+	if byCode["source_sql_present"] == nil || byCode["source_sql_present"].Evidence == nil {
+		t.Fatalf("expected SQL evidence, got %#v", byCode["source_sql_present"])
+	}
+	if len(byCode["source_sql_present"].Evidence.Files) != 1 {
+		t.Fatalf("expected one SQL path, got %#v", byCode["source_sql_present"].Evidence)
+	}
+	if byCode["framework_dependency_missing"] == nil {
+		t.Fatalf("expected framework dependency finding")
+	}
+	if resolveRiskDispositionPolicy("framework_dependency_missing").Blocking {
+		t.Fatalf("framework dependency finding must not block submit")
+	}
+	if resolveRiskDispositionPolicy("framework_dependency_missing").Disposition != marketv1.MarketplaceRiskDispositionNeedAttention {
+		t.Fatalf("framework dependency finding must be need_attention")
+	}
+	if byCode["source_docs_indexed"] == nil || byCode["source_docs_indexed"].Evidence == nil {
+		t.Fatalf("expected docs evidence")
+	}
 }
 
 func TestDocumentItemFromRecordUsesRenderedContentSnapshot(t *testing.T) {

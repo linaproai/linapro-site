@@ -14,6 +14,8 @@ import (
 	"github.com/gogf/gf/v2/encoding/gjson"
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/os/gfile"
+
+	"lina-core/pkg/runtimepath"
 )
 
 // configReader is the narrow internal read shape shared by file, artifact, and
@@ -142,6 +144,12 @@ func (s *serviceAdapter) Duration(ctx context.Context, key string, defaultValue 
 		return 0, gerror.Wrapf(err, "parse plugin config %s duration failed", key)
 	}
 	return duration, nil
+}
+
+// ResolvePath resolves a configured filesystem path against the host workspace
+// root contract so plugins do not depend on the process working directory.
+func (s *serviceAdapter) ResolvePath(_ context.Context, path string) (string, error) {
+	return runtimepath.Resolve(path), nil
 }
 
 // isMissing reports whether a GoFrame config lookup returned no concrete value.

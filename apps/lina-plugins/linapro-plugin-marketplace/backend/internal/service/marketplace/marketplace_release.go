@@ -5,6 +5,7 @@ package marketplace
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/gogf/gf/v2/database/gdb"
@@ -15,6 +16,62 @@ import (
 	"linapro-plugin-marketplace/backend/internal/model/do"
 	"linapro-plugin-marketplace/backend/internal/model/entity"
 )
+
+// rejectSubmitWhenBlockingRisks blocks review submission when the release still
+// has scanner findings marked as blocking (need_fix policy).
+func (s *serviceImpl) rejectSubmitWhenBlockingRisks(
+	ctx context.Context,
+	release *entity.PluginMarketplaceRelease,
+) error {
+	if release == nil {
+		return bizerr.NewCode(CodeMarketplaceInvalidInput)
+	}
+	var rows []*entity.PluginMarketplaceRisk
+	if err := dao.PluginMarketplaceRisk.Ctx(ctx).
+		Where(do.PluginMarketplaceRisk{ReleaseId: release.Id}).
+		Fields(
+			dao.PluginMarketplaceRisk.Columns().Payload,
+			dao.PluginMarketplaceRisk.Columns().Summary,
+		).
+		Scan(&rows); err != nil {
+		return bizerr.WrapCode(err, CodeMarketplaceStorageFailed)
+	}
+	blockingCodes := make([]string, 0)
+	for _, row := range rows {
+		if row == nil {
+			continue
+		}
+		item := riskItemFromEntity(row)
+		if item == nil || !item.Blocking {
+			continue
+		}
+		code := riskCodeFromPayload(item.Payload)
+		if code == "" {
+			code = normalizeKey(row.Summary)
+		}
+		blockingCodes = append(blockingCodes, code)
+	}
+	if len(blockingCodes) == 0 {
+		return nil
+	}
+	// Deduplicate while preserving order for stable diagnostics.
+	seen := make(map[string]struct{}, len(blockingCodes))
+	unique := make([]string, 0, len(blockingCodes))
+	for _, code := range blockingCodes {
+		if code == "" {
+			continue
+		}
+		if _, ok := seen[code]; ok {
+			continue
+		}
+		seen[code] = struct{}{}
+		unique = append(unique, code)
+	}
+	return bizerr.NewCode(
+		CodeMarketplaceRiskBlocking,
+		bizerr.P("diagnostic", strings.Join(unique, ", ")),
+	)
+}
 
 // SaveReleaseDraft creates or replaces a mutable marketplace release draft.
 func (s *serviceImpl) SaveReleaseDraft(ctx context.Context, in SaveReleaseDraftInput) (*ReleaseRecord, error) {
@@ -63,6 +120,9 @@ func (s *serviceImpl) SubmitReleaseReview(ctx context.Context, in SubmitReleaseR
 	}
 	if !canSubmitReview(release) {
 		return nil, bizerr.NewCode(CodeMarketplaceReviewStateInvalid)
+	}
+	if err = s.rejectSubmitWhenBlockingRisks(ctx, release); err != nil {
+		return nil, err
 	}
 
 	now := time.Now()

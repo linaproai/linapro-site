@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"html"
 	"io"
+	"os"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -310,14 +311,20 @@ type docsSnapshotManifest struct {
 }
 
 // docsSnapshotManifestItem points at one Markdown body stored under ArtifactStore.
+// Content lives at ContentKey using the original relative doc path under locale.
 type docsSnapshotManifestItem struct {
-	Locale     string `json:"locale"`
-	DocPath    string `json:"docPath"`
-	SourceKind string `json:"sourceKind"`
-	ContentKey string `json:"contentKey"`
+	Locale      string `json:"locale"`
+	DocPath     string `json:"docPath"`
+	SourceKind  string `json:"sourceKind"`
+	ContentKey  string `json:"contentKey"`
+	ContentHash string `json:"contentHash"`
 }
 
-// replaceReleaseGitDocumentSnapshot writes rendered Git docs to artifact disk.
+// replaceReleaseGitDocumentSnapshot writes Git docs under
+// <plugin>/<version>/docs/<locale>/<docPath>, comparing content hashes so
+// same-path updates overwrite while unchanged bodies skip Put. Orphan keys from
+// the previous snapshot (and residual files under the version docs tree) are
+// deleted so the local set matches the remote document set.
 func (s *serviceImpl) replaceReleaseGitDocumentSnapshot(
 	ctx context.Context,
 	release *ReleaseRecord,
@@ -327,27 +334,50 @@ func (s *serviceImpl) replaceReleaseGitDocumentSnapshot(
 	if s == nil || s.artifacts == nil || release == nil {
 		return bizerr.NewCode(CodeMarketplaceInvalidInput)
 	}
-	root := docsSnapshotRoot(release.PluginID, release.Version)
+	previousKeys := s.loadDocsSnapshotContentKeys(ctx, release.PluginID, release.Version)
+	desiredKeys := make(map[string]struct{}, len(items))
 	manifest := &docsSnapshotManifest{Items: make([]*docsSnapshotManifestItem, 0, len(items))}
 	for _, item := range items {
 		if item == nil {
 			continue
 		}
-		key := documentIndexKey(item.Locale, item.DocPath)
-		body := rawBodies[key]
+		indexKey := documentIndexKey(item.Locale, item.DocPath)
+		body := rawBodies[indexKey]
 		if len(body) == 0 {
 			continue
 		}
-		contentKey := path.Join(root, "content", item.ContentHash+".md")
-		if err := s.artifacts.Put(ctx, contentKey, bytes.NewReader(body)); err != nil {
-			return err
+		contentKey, keyErr := docsContentKey(release.PluginID, release.Version, item.Locale, item.DocPath)
+		if keyErr != nil {
+			return keyErr
+		}
+		desiredKeys[contentKey] = struct{}{}
+		remoteHash := strings.TrimSpace(item.ContentHash)
+		if remoteHash == "" {
+			remoteHash = sha256Hex(body)
+		}
+		if existingHash, ok := s.readArtifactContentHash(ctx, contentKey); !ok || existingHash != remoteHash {
+			if err := s.artifacts.Put(ctx, contentKey, bytes.NewReader(body)); err != nil {
+				return err
+			}
 		}
 		manifest.Items = append(manifest.Items, &docsSnapshotManifestItem{
-			Locale:     item.Locale,
-			DocPath:    item.DocPath,
-			SourceKind: item.SourceKind,
-			ContentKey: contentKey,
+			Locale:      item.Locale,
+			DocPath:     item.DocPath,
+			SourceKind:  item.SourceKind,
+			ContentKey:  contentKey,
+			ContentHash: remoteHash,
 		})
+	}
+	for previousKey := range previousKeys {
+		if _, keep := desiredKeys[previousKey]; keep {
+			continue
+		}
+		if err := s.artifacts.Delete(ctx, previousKey); err != nil {
+			return err
+		}
+	}
+	if err := s.reconcileLocalReleaseDocsTree(ctx, release.PluginID, release.Version, desiredKeys); err != nil {
+		return err
 	}
 	payload, err := json.Marshal(manifest)
 	if err != nil {
@@ -404,12 +434,143 @@ func (s *serviceImpl) loadDocumentIndexItemsFromGitSnapshot(
 	return dedupeMarketplaceDocumentIndex(items), nil
 }
 
-func docsSnapshotRoot(pluginID string, version string) string {
-	return path.Join("docs-snapshot", normalizeKey(pluginID), normalizeKey(version))
+// loadDocsSnapshotContentKeys returns content keys recorded in the version
+// docs manifest. Missing manifests yield an empty set.
+func (s *serviceImpl) loadDocsSnapshotContentKeys(
+	ctx context.Context,
+	pluginID string,
+	version string,
+) map[string]struct{} {
+	keys := make(map[string]struct{})
+	if s == nil || s.artifacts == nil {
+		return keys
+	}
+	reader, err := s.artifacts.Open(ctx, docsSnapshotManifestKey(pluginID, version))
+	if err != nil {
+		return keys
+	}
+	defer func() {
+		_ = reader.Close()
+	}()
+	payload, err := io.ReadAll(reader)
+	if err != nil {
+		return keys
+	}
+	var manifest docsSnapshotManifest
+	if err = json.Unmarshal(payload, &manifest); err != nil {
+		return keys
+	}
+	for _, entry := range manifest.Items {
+		if entry == nil {
+			continue
+		}
+		if contentKey := strings.TrimSpace(entry.ContentKey); contentKey != "" {
+			keys[contentKey] = struct{}{}
+		}
+	}
+	return keys
 }
 
+// readArtifactContentHash returns the sha256 hex of one stored object when it
+// exists and is readable.
+func (s *serviceImpl) readArtifactContentHash(ctx context.Context, key string) (string, bool) {
+	if s == nil || s.artifacts == nil || strings.TrimSpace(key) == "" {
+		return "", false
+	}
+	reader, err := s.artifacts.Open(ctx, key)
+	if err != nil {
+		return "", false
+	}
+	defer func() {
+		_ = reader.Close()
+	}()
+	body, err := io.ReadAll(reader)
+	if err != nil || len(body) == 0 {
+		return "", false
+	}
+	return sha256Hex(body), true
+}
+
+// reconcileLocalReleaseDocsTree deletes residual files under the version docs
+// tree that are not in the desired key set. Non-local stores skip the walk.
+func (s *serviceImpl) reconcileLocalReleaseDocsTree(
+	ctx context.Context,
+	pluginID string,
+	version string,
+	desiredKeys map[string]struct{},
+) error {
+	local, ok := s.artifacts.(*LocalArtifactStore)
+	if !ok || local == nil {
+		return nil
+	}
+	docsPrefix := releaseDocsDir(pluginID, version)
+	docsAbs, err := local.LocalPath(ctx, docsPrefix)
+	if err != nil {
+		return err
+	}
+	info, statErr := os.Stat(docsAbs)
+	if statErr != nil {
+		if os.IsNotExist(statErr) {
+			return nil
+		}
+		return bizerr.WrapCode(statErr, CodeMarketplaceStorageFailed)
+	}
+	if !info.IsDir() {
+		return nil
+	}
+	walkErr := filepath.WalkDir(docsAbs, func(absPath string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return bizerr.WrapCode(err, CodeMarketplaceStorageFailed)
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		rel, relErr := filepath.Rel(local.Root(), absPath)
+		if relErr != nil {
+			return bizerr.WrapCode(relErr, CodeMarketplaceStorageFailed)
+		}
+		storageKey := path.Clean(filepath.ToSlash(rel))
+		if _, keep := desiredKeys[storageKey]; keep {
+			return nil
+		}
+		return local.Delete(ctx, storageKey)
+	})
+	if walkErr != nil {
+		return walkErr
+	}
+	return nil
+}
+
+// releaseArtifactRoot returns <plugin-id>/<version> under the artifact store.
+func releaseArtifactRoot(pluginID string, version string) string {
+	return path.Join(normalizeKey(pluginID), normalizeKey(version))
+}
+
+// releaseDocsDir returns <plugin-id>/<version>/docs.
+func releaseDocsDir(pluginID string, version string) string {
+	return path.Join(releaseArtifactRoot(pluginID, version), "docs")
+}
+
+// docsContentKey builds the storage key for one locale document body using the
+// original relative doc path. Path traversal segments are rejected.
+func docsContentKey(pluginID string, version string, locale string, docPath string) (string, error) {
+	normalizedPath, err := normalizeMarketplaceDocumentPath(docPath)
+	if err != nil {
+		return "", err
+	}
+	normalizedLocale := normalizeKey(locale)
+	if normalizedLocale == "" {
+		normalizedLocale = defaultDocumentLocale
+	}
+	if strings.Contains(normalizedLocale, "..") || strings.Contains(normalizedLocale, "/") || strings.Contains(normalizedLocale, "\\") {
+		return "", bizerr.NewCode(CodeMarketplaceInvalidInput)
+	}
+	return path.Join(releaseDocsDir(pluginID, version), normalizedLocale, normalizedPath), nil
+}
+
+// docsSnapshotManifestKey returns the version-level docs index key.
 func docsSnapshotManifestKey(pluginID string, version string) string {
-	return path.Join(docsSnapshotRoot(pluginID, version), "manifest.json")
+	return path.Join(releaseArtifactRoot(pluginID, version), "meta", "docs-manifest.json")
 }
 
 // documentRecordFromIndexItem projects an in-memory index item for one release.

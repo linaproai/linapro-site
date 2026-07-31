@@ -643,7 +643,7 @@ func (s *serviceImpl) replaceReleaseRisks(
 			if diagnostic == nil {
 				continue
 			}
-			payload, err := packageJSONString(packageDiagnosticRiskPayload{Code: diagnostic.Code})
+			payload, err := packageJSONString(buildPackageDiagnosticRiskPayload(diagnostic))
 			if err != nil {
 				return err
 			}
@@ -1293,7 +1293,7 @@ func riskItemFromEntity(row *entity.PluginMarketplaceRisk) *marketv1.Marketplace
 	if row == nil {
 		return nil
 	}
-	return &marketv1.MarketplaceRiskItem{
+	item := &marketv1.MarketplaceRiskItem{
 		Type:      marketv1.MarketplaceRiskType(row.RiskType),
 		Severity:  marketv1.MarketplaceRiskSeverity(row.Severity),
 		Source:    row.Source,
@@ -1301,6 +1301,8 @@ func riskItemFromEntity(row *entity.PluginMarketplaceRisk) *marketv1.Marketplace
 		Payload:   gjson.New(row.Payload).Map(),
 		CreatedAt: unixMillisPtr(row.CreatedAt),
 	}
+	applyRiskGuidanceToItem(item)
+	return item
 }
 
 // riskSeverityRank returns the display priority for one severity value.
@@ -1316,28 +1318,6 @@ func riskSeverityRank(severity marketv1.MarketplaceRiskSeverity) int {
 	default:
 		return 3
 	}
-}
-
-// sortMarketplaceRiskItemsBySeverity orders findings high → warning → info while
-// preserving original relative order within the same severity (stable sort).
-func sortMarketplaceRiskItemsBySeverity(items []*marketv1.MarketplaceRiskItem) {
-	if len(items) < 2 {
-		return
-	}
-	sort.SliceStable(items, func(i, j int) bool {
-		left := items[i]
-		right := items[j]
-		if left == nil && right == nil {
-			return false
-		}
-		if left == nil {
-			return false
-		}
-		if right == nil {
-			return true
-		}
-		return riskSeverityRank(left.Severity) < riskSeverityRank(right.Severity)
-	})
 }
 
 // documentItemFromRecord projects indexed document metadata to API DTO.
@@ -1556,11 +1536,6 @@ func uniqueStrings(values []string) []string {
 		out = append(out, normalized)
 	}
 	return out
-}
-
-// packageDiagnosticRiskPayload stores a stable scanner code in risk rows.
-type packageDiagnosticRiskPayload struct {
-	Code string `json:"code"`
 }
 
 // diagnosticRiskType classifies package diagnostics into review risk types.

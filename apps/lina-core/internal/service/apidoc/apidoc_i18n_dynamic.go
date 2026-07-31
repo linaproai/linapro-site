@@ -19,6 +19,7 @@ import (
 	"lina-core/pkg/i18nresource"
 	"lina-core/pkg/logger"
 	bridgeartifact "lina-core/pkg/plugin/pluginbridge/protocol"
+	"lina-core/pkg/runtimepath"
 	"lina-core/pkg/statusflag"
 )
 
@@ -178,6 +179,7 @@ func (s *serviceImpl) loadOpenAPIDynamicPluginBundle(ctx context.Context, plugin
 
 // resolveOpenAPIDynamicPluginPackagePath converts a release package path into
 // an absolute filesystem path using the configured dynamic plugin storage root.
+// GetPluginDynamicStoragePath already anchors relative roots at the workspace root.
 func (s *serviceImpl) resolveOpenAPIDynamicPluginPackagePath(ctx context.Context, packagePath string) (string, error) {
 	trimmedPath := strings.TrimSpace(packagePath)
 	if trimmedPath == "" {
@@ -194,67 +196,9 @@ func (s *serviceImpl) resolveOpenAPIDynamicPluginPackagePath(ctx context.Context
 	if storagePath == "" {
 		return filepath.Clean(trimmedPath), nil
 	}
-	if filepath.IsAbs(storagePath) {
-		return filepath.Clean(filepath.Join(storagePath, filepath.FromSlash(trimmedPath))), nil
-	}
-
-	workingDir, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-	storageRoot := resolveOpenAPIDynamicPluginStorageRoot(workingDir, storagePath)
-	return filepath.Clean(filepath.Join(storageRoot, filepath.FromSlash(trimmedPath))), nil
-}
-
-// resolveOpenAPIDynamicPluginStorageRoot resolves relative dynamic-plugin
-// storage paths against the repository root when the backend runs from a
-// subdirectory such as apps/lina-core.
-func resolveOpenAPIDynamicPluginStorageRoot(workingDir string, storagePath string) string {
-	trimmedStoragePath := strings.TrimSpace(storagePath)
-	if trimmedStoragePath == "" {
-		return filepath.Clean(workingDir)
-	}
-	if filepath.IsAbs(trimmedStoragePath) {
-		return filepath.Clean(trimmedStoragePath)
-	}
-
-	candidates := make([]string, 0, 4)
-	if repoRoot, err := findRepoRootForOpenAPIDynamicPlugin(workingDir); err == nil {
-		candidates = append(candidates, filepath.Join(repoRoot, trimmedStoragePath))
-	}
-	candidates = append(
-		candidates,
-		filepath.Join(workingDir, trimmedStoragePath),
-		filepath.Join(workingDir, "..", trimmedStoragePath),
-		filepath.Join(workingDir, "..", "..", trimmedStoragePath),
-	)
-	for _, candidate := range candidates {
-		cleanPath := filepath.Clean(candidate)
-		if _, err := os.Stat(cleanPath); err == nil {
-			return cleanPath
-		}
-	}
-	return filepath.Clean(candidates[0])
-}
-
-// findRepoRootForOpenAPIDynamicPlugin walks upward until it finds the go.work
-// marker used by the monorepo root.
-func findRepoRootForOpenAPIDynamicPlugin(startDir string) (string, error) {
-	currentDir, err := filepath.Abs(startDir)
-	if err != nil {
-		return "", err
-	}
-	for {
-		if _, statErr := os.Stat(filepath.Join(currentDir, "go.work")); statErr == nil {
-			return currentDir, nil
-		}
-		parentDir := filepath.Dir(currentDir)
-		if parentDir == currentDir {
-			break
-		}
-		currentDir = parentDir
-	}
-	return "", gerror.Newf("repository root not found: %s", startDir)
+	// Normalize through runtimepath so relative storage roots stay workspace-anchored.
+	storagePath = runtimepath.Resolve(storagePath)
+	return filepath.Clean(filepath.Join(storagePath, filepath.FromSlash(trimmedPath))), nil
 }
 
 // parseOpenAPIDynamicPluginI18NAssets extracts apidoc i18n asset snapshots from

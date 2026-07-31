@@ -43,6 +43,11 @@ func (*uploadOwnershipArtifactStore) LocalPath(context.Context, string) (string,
 	return "", nil
 }
 
+// Delete is unused by upload ownership tests.
+func (*uploadOwnershipArtifactStore) Delete(context.Context, string) error {
+	return nil
+}
+
 func TestUploadSourcePackageRequiresOwnerBeforeArtifactStorage(t *testing.T) {
 	store := &uploadOwnershipArtifactStore{}
 	service := &serviceImpl{artifacts: store}

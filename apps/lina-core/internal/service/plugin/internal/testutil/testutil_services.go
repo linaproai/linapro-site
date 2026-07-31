@@ -1259,6 +1259,10 @@ func (testPluginConfigService) Duration(_ context.Context, _ string, defaultValu
 	return defaultValue, nil
 }
 
+func (testPluginConfigService) ResolvePath(context.Context, string) (string, error) {
+	return "", nil
+}
+
 // SetTenantPluginEnabled accepts enablement changes without mutating test state.
 func (testPluginsService) SetTenantPluginEnabled(context.Context, capabilityplugincap.PluginID, bool) error {
 	return nil

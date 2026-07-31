@@ -161,7 +161,9 @@ type DocumentCatalogItem = {
 };
 
 type RiskItem = {
+  blocking?: boolean;
   createdAt?: number;
+  disposition?: "info_only" | "need_attention" | "need_fix";
   payload: Record<string, unknown>;
   severity: RiskSeverity;
   source: string;

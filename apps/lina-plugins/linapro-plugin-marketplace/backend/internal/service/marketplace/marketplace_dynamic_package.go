@@ -1225,27 +1225,80 @@ func dynamicPackageDiagnostics(spec *dynamicPackageWasmSpec) []*PackageDiagnosti
 		if dynamicHostServicesIncludeHighRisk(spec.hostServices) {
 			severity = marketv1.MarketplaceRiskSeverityHigh
 		}
+		services := make([]DiagnosticServiceEvidence, 0, len(spec.hostServices))
+		for _, item := range spec.hostServices {
+			if item == nil {
+				continue
+			}
+			services = append(services, DiagnosticServiceEvidence{
+				Service: item.Service,
+				Methods: append([]string{}, item.Methods...),
+				Tables:  append([]string{}, item.Tables...),
+				Paths:   append([]string{}, item.Paths...),
+				Keys:    append([]string{}, item.Keys...),
+			})
+		}
+		bounded, total, truncated := boundServiceEvidence(services)
 		diagnostics = append(diagnostics, &PackageDiagnostic{
 			Code:     "dynamic_host_services_present",
 			Severity: severity,
 			Source:   protocol.WasmSectionBackendHostServices,
 			Message:  "Dynamic package requests host service authorization.",
+			Evidence: &PackageDiagnosticEvidence{
+				Services:   bounded,
+				TotalCount: total,
+				Truncated:  truncated,
+			},
 		})
 	}
 	if len(spec.routes) > 0 {
+		routes := make([]DiagnosticRouteEvidence, 0, len(spec.routes))
+		for _, route := range spec.routes {
+			if route == nil {
+				continue
+			}
+			routes = append(routes, DiagnosticRouteEvidence{
+				Method:     route.Method,
+				Path:       route.Path,
+				Permission: route.Permission,
+				Access:     route.Access,
+			})
+		}
+		bounded, total, truncated := boundRouteEvidence(routes)
 		diagnostics = append(diagnostics, &PackageDiagnostic{
 			Code:     "dynamic_routes_present",
 			Severity: marketv1.MarketplaceRiskSeverityWarning,
 			Source:   protocol.WasmSectionBackendRoutes,
 			Message:  "Dynamic package exposes runtime routes.",
+			Evidence: &PackageDiagnosticEvidence{
+				Routes:     bounded,
+				TotalCount: total,
+				Truncated:  truncated,
+			},
 		})
 	}
 	if len(spec.installSQL)+len(spec.uninstallSQL)+len(spec.mockSQL) > 0 {
+		files := make([]string, 0, 3)
+		if len(spec.installSQL) > 0 {
+			files = append(files, "wasm:"+protocol.WasmSectionInstallSQL)
+		}
+		if len(spec.uninstallSQL) > 0 {
+			files = append(files, "wasm:"+protocol.WasmSectionUninstallSQL)
+		}
+		if len(spec.mockSQL) > 0 {
+			files = append(files, "wasm:"+protocol.WasmSectionMockSQL)
+		}
+		bounded, total, truncated := boundStringEvidence(files)
 		diagnostics = append(diagnostics, &PackageDiagnostic{
 			Code:     "dynamic_sql_present",
 			Severity: marketv1.MarketplaceRiskSeverityWarning,
 			Source:   "plugin.wasm sql sections",
 			Message:  "Dynamic package contains SQL resources that require reviewer inspection.",
+			Evidence: &PackageDiagnosticEvidence{
+				Files:      bounded,
+				TotalCount: total,
+				Truncated:  truncated,
+			},
 		})
 	}
 	if len(spec.mockSQL) > 0 {
@@ -1254,6 +1307,10 @@ func dynamicPackageDiagnostics(spec *dynamicPackageWasmSpec) []*PackageDiagnosti
 			Severity: marketv1.MarketplaceRiskSeverityWarning,
 			Source:   protocol.WasmSectionMockSQL,
 			Message:  "Dynamic package includes optional mock SQL resources.",
+			Evidence: &PackageDiagnosticEvidence{
+				Files:      []string{"wasm:" + protocol.WasmSectionMockSQL},
+				TotalCount: 1,
+			},
 		})
 	}
 	if len(spec.resources) == 0 {
@@ -1262,6 +1319,10 @@ func dynamicPackageDiagnostics(spec *dynamicPackageWasmSpec) []*PackageDiagnosti
 			Severity: marketv1.MarketplaceRiskSeverityWarning,
 			Source:   protocol.WasmSectionManifestResources,
 			Message:  "Dynamic package does not embed manifest resources.",
+			Evidence: &PackageDiagnosticEvidence{
+				ExpectedPath:  "plugin.wasm",
+				ExpectedField: protocol.WasmSectionManifestResources,
+			},
 		})
 	}
 	return diagnostics

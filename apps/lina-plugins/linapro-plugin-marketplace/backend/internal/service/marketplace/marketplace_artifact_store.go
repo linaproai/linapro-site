@@ -16,6 +16,7 @@ import (
 
 	"lina-core/pkg/bizerr"
 	"lina-core/pkg/plugin/capability/plugincap"
+	"lina-core/pkg/runtimepath"
 )
 
 // ArtifactStore persists marketplace package bytes keyed by storage key.
@@ -29,6 +30,8 @@ type ArtifactStore interface {
 	// LocalPath returns a filesystem path suitable for zip.OpenReader when the
 	// store is local. Remote-backed implementations may return an error.
 	LocalPath(ctx context.Context, key string) (string, error)
+	// Delete removes one object by key. Missing keys MUST succeed (idempotent).
+	Delete(ctx context.Context, key string) error
 }
 
 // LocalArtifactStore stores marketplace artifacts under one root directory.
@@ -37,9 +40,9 @@ type LocalArtifactStore struct {
 }
 
 // defaultArtifactStoreRoot is the relative filesystem root used when no
-// storage.root config or constructor argument is provided. It stays under the
-// process working directory's temp tree so development artifacts are not written
-// into tracked source paths such as apps/lina-core/data/.
+// storage.root config or constructor argument is provided. Relative paths are
+// resolved against the monorepo workspace root (via runtimepath), not the
+// process working directory, so make dev data lands under <repo>/temp/.
 const defaultArtifactStoreRoot = "temp/plugin-marketplace/artifacts"
 
 // configKeyStorageRoot is the plugin-scoped config key for the local artifact
@@ -47,35 +50,40 @@ const defaultArtifactStoreRoot = "temp/plugin-marketplace/artifacts"
 const configKeyStorageRoot = "storage.root"
 
 // NewLocalArtifactStore creates a local-disk artifact store rooted at rootDir.
-// Empty rootDir defaults to temp/plugin-marketplace/artifacts under the process
-// working directory (typically apps/lina-core/temp when the host starts there).
+// Empty rootDir defaults to temp/plugin-marketplace/artifacts under the
+// workspace root. Relative paths use runtimepath.Resolve; absolute paths are
+// cleaned only.
 func NewLocalArtifactStore(rootDir string) (*LocalArtifactStore, error) {
 	root := strings.TrimSpace(rootDir)
 	if root == "" {
 		root = defaultArtifactStoreRoot
 	}
-	absRoot, err := filepath.Abs(root)
-	if err != nil {
-		return nil, gerror.Wrapf(err, "resolve marketplace artifact root %q", root)
+	absRoot := runtimepath.Resolve(root)
+	if absRoot == "" {
+		return nil, gerror.Newf("resolve marketplace artifact root %q", root)
 	}
-	if err = os.MkdirAll(absRoot, 0o755); err != nil {
+	if err := os.MkdirAll(absRoot, 0o755); err != nil {
 		return nil, gerror.Wrapf(err, "create marketplace artifact root %q", absRoot)
 	}
 	return &LocalArtifactStore{root: absRoot}, nil
 }
 
-// resolveArtifactStoreRoot returns the configured local artifact root, or the
-// default temp path when storage.root is unset or blank.
+// resolveArtifactStoreRoot returns the configured local artifact root after
+// workspace-root resolution, or the default temp path when storage.root is
+// unset or blank.
 func resolveArtifactStoreRoot(ctx context.Context, pluginConfig plugincap.ConfigService) string {
+	configured := defaultArtifactStoreRoot
 	if pluginConfig != nil {
-		configured, err := pluginConfig.String(ctx, configKeyStorageRoot, "")
-		if err == nil {
-			if root := strings.TrimSpace(configured); root != "" {
-				return root
+		if value, err := pluginConfig.String(ctx, configKeyStorageRoot, ""); err == nil {
+			if root := strings.TrimSpace(value); root != "" {
+				configured = root
 			}
 		}
+		if resolved, err := pluginConfig.ResolvePath(ctx, configured); err == nil && strings.TrimSpace(resolved) != "" {
+			return resolved
+		}
 	}
-	return defaultArtifactStoreRoot
+	return runtimepath.Resolve(configured)
 }
 
 // Root returns the absolute filesystem root used by this store. Tests and
@@ -151,6 +159,21 @@ func (s *LocalArtifactStore) Open(_ context.Context, key string) (io.ReadCloser,
 // LocalPath returns the absolute filesystem path for one storage key.
 func (s *LocalArtifactStore) LocalPath(_ context.Context, key string) (string, error) {
 	return s.resolvePath(key)
+}
+
+// Delete removes one stored object. Missing objects succeed without error.
+func (s *LocalArtifactStore) Delete(_ context.Context, key string) error {
+	target, err := s.resolvePath(key)
+	if err != nil {
+		return err
+	}
+	if err = os.Remove(target); err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return bizerr.WrapCode(err, CodeMarketplaceStorageFailed)
+	}
+	return nil
 }
 
 // resolvePath maps a storage key to a path under the store root and rejects

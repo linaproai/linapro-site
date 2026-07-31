@@ -93,13 +93,20 @@ func Services(root string, backendPort int, frontendPort int) []Config {
 			Port:        backendPort,
 			PIDPath:     filepath.Join(pidDir, "lina-core.pid"),
 			LogPath:     filepath.Join(tempDir, "lina-core.log"),
-			WorkDir:     filepath.Join(root, "apps", "lina-core"),
+			// WorkDir stays at the host module so GoFrame local config layout
+			// (manifest/config) continues to resolve. Writable paths are
+			// anchored via LINAPRO_WORKSPACE_ROOT / LINAPRO_DATA_ROOT instead.
+			WorkDir: filepath.Join(root, "apps", "lina-core"),
 			Env: []string{
 				// Override config server.address so the binary listens on the
 				// requested port regardless of manifest defaults.
 				// 覆盖 config 中的 server.address，使后端监听请求端口。
 				fmt.Sprintf("LINAPRO_SERVER_ADDRESS=:%d", backendPort),
 				fmt.Sprintf("LINAPRO_FRONTEND_DEV_SERVER_URL=http://127.0.0.1:%d", frontendPort),
+				// Pin workspace/data roots so relative temp/* paths land under
+				// the monorepo temp tree rather than apps/lina-core/temp.
+				fmt.Sprintf("LINAPRO_WORKSPACE_ROOT=%s", root),
+				fmt.Sprintf("LINAPRO_DATA_ROOT=%s", tempDir),
 			},
 		},
 		{

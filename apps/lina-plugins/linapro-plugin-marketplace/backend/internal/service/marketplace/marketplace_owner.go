@@ -403,6 +403,9 @@ func (s *serviceImpl) submitDelistedReleaseForReview(
 	if plugin == nil || release == nil {
 		return nil, bizerr.NewCode(CodeMarketplaceInvalidInput)
 	}
+	if err := s.rejectSubmitWhenBlockingRisks(ctx, release); err != nil {
+		return nil, err
+	}
 	now := time.Now()
 	if err := dao.PluginMarketplaceRelease.Transaction(ctx, func(ctx context.Context, _ gdb.TX) error {
 		if _, updateErr := dao.PluginMarketplaceRelease.Ctx(ctx).

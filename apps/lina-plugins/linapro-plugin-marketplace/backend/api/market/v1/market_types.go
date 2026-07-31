@@ -177,6 +177,22 @@ const (
 // String returns the serialized marketplace risk severity value.
 func (value MarketplaceRiskSeverity) String() string { return string(value) }
 
+// MarketplaceRiskDisposition identifies how a publisher or reviewer should treat one finding.
+type MarketplaceRiskDisposition string
+
+// Marketplace review risk dispositions.
+const (
+	// MarketplaceRiskDispositionNeedFix means the publisher should fix the package before submit.
+	MarketplaceRiskDispositionNeedFix MarketplaceRiskDisposition = "need_fix"
+	// MarketplaceRiskDispositionNeedAttention means the finding is a disclosure requiring review awareness.
+	MarketplaceRiskDispositionNeedAttention MarketplaceRiskDisposition = "need_attention"
+	// MarketplaceRiskDispositionInfoOnly means the finding is informational only.
+	MarketplaceRiskDispositionInfoOnly MarketplaceRiskDisposition = "info_only"
+)
+
+// String returns the serialized marketplace risk disposition value.
+func (value MarketplaceRiskDisposition) String() string { return string(value) }
+
 // MarketplaceDownloadSessionStatus identifies one short-lived download session state.
 type MarketplaceDownloadSessionStatus string
 

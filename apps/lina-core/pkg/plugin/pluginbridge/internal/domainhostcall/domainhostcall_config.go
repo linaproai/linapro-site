@@ -20,6 +20,7 @@ import (
 	"lina-core/pkg/plugin/capability/manifestcap"
 	"lina-core/pkg/plugin/capability/plugincap"
 	"lina-core/pkg/plugin/pluginbridge/protocol"
+	"lina-core/pkg/runtimepath"
 )
 
 // pluginConfigService adapts plugins.config.get host calls to plugincap.ConfigService.
@@ -428,6 +429,13 @@ func (s *pluginConfigService) Duration(_ context.Context, key string, defaultVal
 		return 0, gerror.Wrapf(err, "parse config %s duration failed", key)
 	}
 	return parsed, nil
+}
+
+// ResolvePath resolves a configured filesystem path against the host workspace
+// root. Dynamic plugins resolve paths on the host side via runtimepath so WASM
+// guests never depend on process CWD.
+func (s *pluginConfigService) ResolvePath(_ context.Context, path string) (string, error) {
+	return runtimepath.Resolve(path), nil
 }
 
 // Get reads one manifest resource as bytes.

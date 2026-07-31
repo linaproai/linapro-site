@@ -6,7 +6,10 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"lina-core/pkg/runtimepath"
 )
 
 // TestResolveRuntimePathFromWorkingDirAnchorsAtRepositoryRoot verifies relative
@@ -16,11 +19,12 @@ func TestResolveRuntimePathFromWorkingDirAnchorsAtRepositoryRoot(t *testing.T) {
 	repoRoot := newTestRepoRoot(t)
 	backendWorkingDir := filepath.Join(repoRoot, "apps", "lina-core")
 
-	resolvedPath := resolveRuntimePathFromWorkingDir("temp/output", backendWorkingDir)
+	resolvedPath := runtimepath.ResolveFrom("temp/output", backendWorkingDir)
 	expectedPath := filepath.Join(repoRoot, "temp", "output")
-	if resolvedPath != expectedPath {
-		t.Fatalf("expected path %q, got %q", expectedPath, resolvedPath)
+	if sameFilesystemPath(t, resolvedPath, expectedPath) {
+		return
 	}
+	t.Fatalf("expected path %q, got %q", expectedPath, resolvedPath)
 }
 
 // TestConfigRuntimePathGettersAnchorRelativePathsAtRepositoryRoot verifies upload
@@ -45,11 +49,13 @@ plugin:
 	})
 
 	svc := New()
-	if path := svc.GetUploadPath(context.Background()); path != filepath.Join(expectedRepoRoot, "temp", "upload") {
-		t.Fatalf("expected upload path under repo temp, got %q", path)
+	uploadPath := svc.GetUploadPath(context.Background())
+	if !sameFilesystemPath(t, uploadPath, filepath.Join(expectedRepoRoot, "temp", "upload")) {
+		t.Fatalf("expected upload path under repo temp, got %q", uploadPath)
 	}
-	if path := svc.GetPluginDynamicStoragePath(context.Background()); path != filepath.Join(expectedRepoRoot, "temp", "output") {
-		t.Fatalf("expected plugin storage path under repo temp, got %q", path)
+	pluginPath := svc.GetPluginDynamicStoragePath(context.Background())
+	if !sameFilesystemPath(t, pluginPath, filepath.Join(expectedRepoRoot, "temp", "output")) {
+		t.Fatalf("expected plugin storage path under repo temp, got %q", pluginPath)
 	}
 }
 
@@ -83,6 +89,39 @@ func realTestPath(t *testing.T, targetPath string) string {
 		t.Fatalf("resolve real test path %s: %v", targetPath, err)
 	}
 	return realPath
+}
+
+// sameFilesystemPath compares paths after Clean and optional EvalSymlinks of
+// existing ancestors so macOS /var vs /private/var does not fail tests for
+// paths that do not exist yet.
+func sameFilesystemPath(t *testing.T, left string, right string) bool {
+	t.Helper()
+	if filepath.Clean(left) == filepath.Clean(right) {
+		return true
+	}
+	return canonicalizePath(left) == canonicalizePath(right)
+}
+
+func canonicalizePath(pathValue string) string {
+	cleaned := filepath.Clean(pathValue)
+	current := cleaned
+	for {
+		if real, err := filepath.EvalSymlinks(current); err == nil {
+			suffix, err := filepath.Rel(current, cleaned)
+			if err != nil || strings.HasPrefix(suffix, "..") {
+				return cleaned
+			}
+			if suffix == "." {
+				return real
+			}
+			return filepath.Join(real, suffix)
+		}
+		parent := filepath.Dir(current)
+		if parent == current {
+			return cleaned
+		}
+		current = parent
+	}
 }
 
 // withWorkingDir changes the process working directory for one test and

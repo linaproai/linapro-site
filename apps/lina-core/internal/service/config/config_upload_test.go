@@ -7,6 +7,8 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	"lina-core/pkg/runtimepath"
 )
 
 // TestGetUploadUsesDefaultWhenUnset verifies upload config falls back to its
@@ -47,7 +49,7 @@ upload:
 	withRuntimeParamAbsent(t, RuntimeParamKeyUploadMaxSize)
 
 	svc := New()
-	if path := svc.GetUploadPath(context.Background()); path != resolveRuntimePath("runtime/uploads") {
+	if path := svc.GetUploadPath(context.Background()); path != runtimepath.Resolve("runtime/uploads") {
 		t.Fatalf("expected upload path to be runtime/uploads, got %s", path)
 	}
 

@@ -492,6 +492,8 @@ type PackageDiagnostic struct {
 	Severity marketv1.MarketplaceRiskSeverity
 	Source   string
 	Message  string
+	// Evidence holds bounded scanner details (files, services, routes, expected fields).
+	Evidence *PackageDiagnosticEvidence
 }
 
 // SourcePackageUploadResult returns the draft release and source artifact scan result.

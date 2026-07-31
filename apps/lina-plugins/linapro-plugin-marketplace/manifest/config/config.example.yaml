@@ -13,9 +13,11 @@
 # are not written into per-publisher credential rows.
 
 # Local filesystem root for marketplace package bytes, Git documentation
-# snapshots, and controlled download content. Relative paths resolve from the
-# host process working directory. Development default stays under temp/; use an
-# absolute path in production (for example /var/lib/linapro/plugin-marketplace).
+# snapshots, and controlled download content. Relative paths resolve against the
+# monorepo workspace root via runtimepath (make dev injects
+# LINAPRO_WORKSPACE_ROOT), not the process working directory. Development
+# default stays under <repo>/temp/; use an absolute path in production
+# (for example /var/lib/linapro/plugin-marketplace).
 storage:
   root: "temp/plugin-marketplace/artifacts"
 

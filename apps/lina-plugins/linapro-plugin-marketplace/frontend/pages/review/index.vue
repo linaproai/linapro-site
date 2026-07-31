@@ -32,6 +32,7 @@ import { preferences } from "@vben/preferences";
 
 import {
   Alert,
+  Button,
   Descriptions,
   DescriptionsItem,
   Spin,
@@ -51,7 +52,13 @@ import {
   marketplaceReviewQueueList,
 } from "../../api/marketplace";
 import {
+  formatMarketplaceRiskDisposition,
+  formatMarketplaceRiskFindingGuidance,
   formatMarketplaceRiskFindingSummary,
+  marketplaceRiskBlocking,
+  marketplaceRiskDisposition,
+  marketplaceRiskEvidence,
+  marketplaceRiskHasEvidence,
   sortMarketplaceRiskFindingsBySeverity,
 } from "../../utils/risk";
 import DetailModalContent from "../detail/detail-modal.vue";
@@ -83,6 +90,7 @@ const [DetailModal, detailModalApi] = useVbenModal({
 
 const selectedRelease = ref<MarketplaceReviewQueueItem | null>(null);
 const reviewRisks = ref<MarketplaceRiskItem[]>([]);
+const expandedReviewRiskKeys = ref<Record<string, boolean>>({});
 const reviewDocument = ref<MarketplaceDocumentItem | null>(null);
 const reviewLoading = ref(false);
 const reviewRisksReady = ref(false);
@@ -155,6 +163,66 @@ function t(key: string, params?: Record<string, number | string>) {
 /** Localize scanner finding body text via payload.code; English summary is fallback. */
 function formatRiskFindingSummary(risk: MarketplaceRiskItem) {
   return formatMarketplaceRiskFindingSummary(t, risk);
+}
+
+function reviewRiskKey(risk: MarketplaceRiskItem) {
+  const code =
+    typeof risk.payload?.code === "string" ? risk.payload.code : risk.summary;
+  return `${risk.type}:${risk.source}:${code}:${risk.severity}`;
+}
+
+function isReviewRiskExpanded(risk: MarketplaceRiskItem) {
+  return !!expandedReviewRiskKeys.value[reviewRiskKey(risk)];
+}
+
+function toggleReviewRiskExpanded(risk: MarketplaceRiskItem) {
+  const key = reviewRiskKey(risk);
+  expandedReviewRiskKeys.value = {
+    ...expandedReviewRiskKeys.value,
+    [key]: !expandedReviewRiskKeys.value[key],
+  };
+}
+
+function formatReviewRiskDisposition(risk: MarketplaceRiskItem) {
+  return formatMarketplaceRiskDisposition(t, marketplaceRiskDisposition(risk));
+}
+
+function getReviewDispositionColor(risk: MarketplaceRiskItem) {
+  switch (marketplaceRiskDisposition(risk)) {
+    case "need_fix": {
+      return "error";
+    }
+    case "need_attention": {
+      return "warning";
+    }
+    default: {
+      return "default";
+    }
+  }
+}
+
+function reviewRiskReason(risk: MarketplaceRiskItem) {
+  return formatMarketplaceRiskFindingGuidance(t, risk, "reason");
+}
+
+function reviewRiskRemediation(risk: MarketplaceRiskItem) {
+  return formatMarketplaceRiskFindingGuidance(t, risk, "remediation");
+}
+
+function reviewRiskAcceptance(risk: MarketplaceRiskItem) {
+  return formatMarketplaceRiskFindingGuidance(t, risk, "acceptance");
+}
+
+function reviewRiskHasEvidence(risk: MarketplaceRiskItem) {
+  return marketplaceRiskHasEvidence(marketplaceRiskEvidence(risk));
+}
+
+function reviewRiskEvidence(risk: MarketplaceRiskItem) {
+  return marketplaceRiskEvidence(risk);
+}
+
+function isReviewRiskBlocking(risk: MarketplaceRiskItem) {
+  return marketplaceRiskBlocking(risk);
 }
 
 function trimOptional(value?: string) {
@@ -517,6 +585,7 @@ async function handleInspect(row: MarketplaceReviewQueueItem) {
   const requestId = ++inspectionRequestId;
   selectedRelease.value = row;
   reviewRisks.value = [];
+  expandedReviewRiskKeys.value = {};
   reviewDocument.value = null;
   reviewRisksReady.value = false;
   reviewRiskLoadFailed.value = false;
@@ -551,6 +620,15 @@ async function handleInspect(row: MarketplaceReviewQueueItem) {
     reviewRisks.value = sortMarketplaceRiskFindingsBySeverity(
       riskResult.value.items,
     );
+    expandedReviewRiskKeys.value = {};
+    for (const risk of reviewRisks.value) {
+      if (
+        marketplaceRiskBlocking(risk) ||
+        marketplaceRiskDisposition(risk) === "need_fix"
+      ) {
+        expandedReviewRiskKeys.value[reviewRiskKey(risk)] = true;
+      }
+    }
     reviewRisksReady.value = true;
   } else {
     reviewRiskLoadFailed.value = true;
@@ -607,6 +685,7 @@ function resetInspection() {
   inspectionRequestId += 1;
   selectedRelease.value = null;
   reviewRisks.value = [];
+  expandedReviewRiskKeys.value = {};
   reviewDocument.value = null;
   reviewLoading.value = false;
   reviewRisksReady.value = false;
@@ -798,10 +877,24 @@ function getReviewDrawerTitle() {
               >
                 <div
                   v-for="risk in reviewRisks"
-                  :key="`${risk.type}:${risk.source}:${risk.summary}`"
+                  :key="reviewRiskKey(risk)"
                   class="marketplace-review-risk-item"
+                  :class="{
+                    'marketplace-review-risk-item--blocking':
+                      isReviewRiskBlocking(risk),
+                  }"
                 >
                   <div class="marketplace-review-risk-meta">
+                    <Tag v-if="isReviewRiskBlocking(risk)" color="error">
+                      {{
+                        $t(
+                          'plugin.linapro-plugin-marketplace.detail.riskGuide.blockingTag',
+                        )
+                      }}
+                    </Tag>
+                    <Tag :color="getReviewDispositionColor(risk)">
+                      {{ formatReviewRiskDisposition(risk) }}
+                    </Tag>
                     <Tag :color="getRiskSeverityColor(risk.severity)">
                       {{ formatRiskSeverity(risk.severity) }}
                     </Tag>
@@ -809,6 +902,106 @@ function getReviewDrawerTitle() {
                     <span>{{ risk.source }}</span>
                   </div>
                   <p>{{ formatRiskFindingSummary(risk) }}</p>
+                  <Button
+                    type="link"
+                    size="small"
+                    class="marketplace-review-risk-toggle"
+                    @click="toggleReviewRiskExpanded(risk)"
+                  >
+                    {{
+                      isReviewRiskExpanded(risk)
+                        ? $t(
+                            'plugin.linapro-plugin-marketplace.detail.riskGuide.collapse',
+                          )
+                        : $t(
+                            'plugin.linapro-plugin-marketplace.detail.riskGuide.expand',
+                          )
+                    }}
+                  </Button>
+                  <div
+                    v-if="isReviewRiskExpanded(risk)"
+                    class="marketplace-review-risk-guidance"
+                  >
+                    <div v-if="reviewRiskReason(risk)">
+                      <strong>{{
+                        $t(
+                          'plugin.linapro-plugin-marketplace.detail.riskGuide.reason',
+                        )
+                      }}</strong>
+                      <p>{{ reviewRiskReason(risk) }}</p>
+                    </div>
+                    <div v-if="reviewRiskRemediation(risk)">
+                      <strong>{{
+                        $t(
+                          'plugin.linapro-plugin-marketplace.detail.riskGuide.remediation',
+                        )
+                      }}</strong>
+                      <p>{{ reviewRiskRemediation(risk) }}</p>
+                    </div>
+                    <div v-if="reviewRiskAcceptance(risk)">
+                      <strong>{{
+                        $t(
+                          'plugin.linapro-plugin-marketplace.detail.riskGuide.acceptance',
+                        )
+                      }}</strong>
+                      <p>{{ reviewRiskAcceptance(risk) }}</p>
+                    </div>
+                    <div
+                      v-if="reviewRiskHasEvidence(risk)"
+                      class="marketplace-review-risk-evidence"
+                    >
+                      <strong>{{
+                        $t(
+                          'plugin.linapro-plugin-marketplace.detail.riskGuide.evidence',
+                        )
+                      }}</strong>
+                      <ul v-if="reviewRiskEvidence(risk).files.length > 0">
+                        <li
+                          v-for="file in reviewRiskEvidence(risk).files"
+                          :key="file"
+                        >
+                          <code>{{ file }}</code>
+                        </li>
+                      </ul>
+                      <ul v-if="reviewRiskEvidence(risk).services.length > 0">
+                        <li
+                          v-for="(svc, idx) in reviewRiskEvidence(risk)
+                            .services"
+                          :key="`${svc.service}-${idx}`"
+                        >
+                          <code>{{ svc.service }}</code>
+                        </li>
+                      </ul>
+                      <ul v-if="reviewRiskEvidence(risk).routes.length > 0">
+                        <li
+                          v-for="(routeItem, idx) in reviewRiskEvidence(risk)
+                            .routes"
+                          :key="`${routeItem.method}-${routeItem.path}-${idx}`"
+                        >
+                          <code
+                            >{{ routeItem.method }} {{ routeItem.path }}</code
+                          >
+                        </li>
+                      </ul>
+                      <p
+                        v-if="
+                          reviewRiskEvidence(risk).expectedPath ||
+                          reviewRiskEvidence(risk).expectedField
+                        "
+                      >
+                        <code>
+                          {{
+                            [
+                              reviewRiskEvidence(risk).expectedPath,
+                              reviewRiskEvidence(risk).expectedField,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")
+                          }}
+                        </code>
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -891,6 +1084,11 @@ function getReviewDrawerTitle() {
   background: var(--ant-color-bg-container);
 }
 
+.marketplace-review-risk-item--blocking {
+  border-color: var(--ant-color-error-border);
+  background: var(--ant-color-error-bg);
+}
+
 .marketplace-review-risk-meta {
   display: flex;
   flex-wrap: wrap;
@@ -903,6 +1101,28 @@ function getReviewDrawerTitle() {
 .marketplace-review-risk-item p {
   margin: 8px 0 0;
   color: var(--ant-color-text);
+}
+
+.marketplace-review-risk-toggle {
+  padding-left: 0;
+  margin-top: 4px;
+}
+
+.marketplace-review-risk-guidance {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--ant-color-border-secondary);
+}
+
+.marketplace-review-risk-evidence ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.marketplace-review-risk-evidence code {
+  word-break: break-all;
 }
 
 @media (max-width: 640px) {

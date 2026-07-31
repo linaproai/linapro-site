@@ -919,8 +919,8 @@ export class MarketplacePage {
       );
   }
 
-  // Risk list rows must present high → warning → info (left-to-right of the
-  // first severity Tag in each .marketplace-risk-item).
+  // Risk list rows: severity Tag order within each .marketplace-risk-item.
+  // Disposition/blocking tags may appear before severity; match severity labels.
   async expectRiskListSeverityOrder(
     expected: Array<"high" | "info" | "warning">,
   ) {
@@ -928,9 +928,43 @@ export class MarketplacePage {
     const items = this.detailShell().locator(".marketplace-risk-item");
     await expect(items).toHaveCount(expected.length);
     for (let index = 0; index < expected.length; index += 1) {
-      const severityTag = items.nth(index).locator(".ant-tag").first();
-      await expect(severityTag).toHaveText(labels[expected[index]]);
+      const severityTag = items
+        .nth(index)
+        .locator(".ant-tag")
+        .filter({ hasText: new RegExp(`^${labels[expected[index]]}$`, "u") });
+      await expect(severityTag.first()).toBeVisible();
     }
+  }
+
+  async expectRiskListDispositionOrder(
+    expected: Array<"info_only" | "need_attention" | "need_fix">,
+  ) {
+    const labels = {
+      info_only: "仅提示",
+      need_attention: "需说明",
+      need_fix: "需修复",
+    } as const;
+    const items = this.detailShell().locator(".marketplace-risk-item");
+    await expect(items).toHaveCount(expected.length);
+    for (let index = 0; index < expected.length; index += 1) {
+      const tag = items
+        .nth(index)
+        .locator(".ant-tag")
+        .filter({ hasText: new RegExp(`^${labels[expected[index]]}$`, "u") });
+      await expect(tag.first()).toBeVisible();
+    }
+  }
+
+  async expectRiskGuidanceVisible(text: string) {
+    await expect(this.detailShell().getByText(text).first()).toBeVisible();
+  }
+
+  async expandFirstRiskGuidance() {
+    const toggle = this.detailShell()
+      .locator(".marketplace-risk-item")
+      .first()
+      .getByRole("button", { name: /查看处理指引|收起指引|Show guidance|Hide guidance/u });
+    await toggle.click();
   }
 
   // Risk summary Tags in the overview Descriptions must keep high → warning →

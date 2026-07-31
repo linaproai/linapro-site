@@ -26,6 +26,11 @@ export type MarketplaceReviewStatus =
 
 export type MarketplaceRiskSeverity = 'high' | 'info' | 'warning';
 
+export type MarketplaceRiskDisposition =
+  | 'info_only'
+  | 'need_attention'
+  | 'need_fix';
+
 export type MarketplaceRiskType =
   | 'data_table'
   | 'dependency'
@@ -319,7 +324,9 @@ export interface MarketplaceRiskListParams extends MarketplacePageParams {
 }
 
 export interface MarketplaceRiskItem {
+  blocking?: boolean;
   createdAt?: null | number;
+  disposition?: MarketplaceRiskDisposition;
   payload: Record<string, unknown>;
   severity: MarketplaceRiskSeverity;
   source: string;

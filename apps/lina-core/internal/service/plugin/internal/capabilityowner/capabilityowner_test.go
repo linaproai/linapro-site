@@ -128,3 +128,7 @@ func (s recordingConfigService) Duration(ctx context.Context, key string, defaul
 	}
 	return time.ParseDuration(value.String())
 }
+
+func (s recordingConfigService) ResolvePath(context.Context, string) (string, error) {
+	return "", nil
+}

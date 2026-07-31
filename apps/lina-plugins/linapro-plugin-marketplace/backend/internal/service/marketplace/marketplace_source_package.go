@@ -902,19 +902,45 @@ func sourcePackageDiagnostics(
 ) []*PackageDiagnostic {
 	diagnostics := make([]*PackageDiagnostic, 0)
 	if len(sqlFiles) > 0 {
+		paths := make([]string, 0, len(sqlFiles))
+		for _, item := range sqlFiles {
+			if item == nil || strings.TrimSpace(item.Path) == "" {
+				continue
+			}
+			paths = append(paths, item.Path)
+		}
+		files, total, truncated := boundStringEvidence(paths)
 		diagnostics = append(diagnostics, &PackageDiagnostic{
 			Code:     "source_sql_present",
 			Severity: marketv1.MarketplaceRiskSeverityWarning,
 			Source:   "manifest/sql",
 			Message:  "Source package contains SQL resources that require reviewer inspection.",
+			Evidence: &PackageDiagnosticEvidence{
+				Files:      files,
+				TotalCount: total,
+				Truncated:  truncated,
+			},
 		})
 	}
 	if len(docs) > 0 {
+		paths := make([]string, 0, len(docs))
+		for _, item := range docs {
+			if item == nil || strings.TrimSpace(item.Path) == "" {
+				continue
+			}
+			paths = append(paths, item.Path)
+		}
+		files, total, truncated := boundStringEvidence(paths)
 		diagnostics = append(diagnostics, &PackageDiagnostic{
 			Code:     "source_docs_indexed",
 			Severity: marketv1.MarketplaceRiskSeverityInfo,
 			Source:   "manifest/docs",
 			Message:  "Marketplace documentation entries were detected.",
+			Evidence: &PackageDiagnosticEvidence{
+				Files:      files,
+				TotalCount: total,
+				Truncated:  truncated,
+			},
 		})
 	}
 	if manifest.Dependencies == nil || manifest.Dependencies.Framework == nil || manifest.Dependencies.Framework.Version == "" {
@@ -923,6 +949,11 @@ func sourcePackageDiagnostics(
 			Severity: marketv1.MarketplaceRiskSeverityWarning,
 			Source:   "plugin.yaml",
 			Message:  "Framework compatibility dependency is not declared.",
+			Evidence: &PackageDiagnosticEvidence{
+				ExpectedPath:  "plugin.yaml",
+				ExpectedField: "dependencies.framework.version",
+				Example:       ">=1.0.0 <2.0.0",
+			},
 		})
 	}
 	if manifest.I18N != nil && manifest.I18N.Enabled && len(i18nFiles) == 0 {
@@ -931,6 +962,11 @@ func sourcePackageDiagnostics(
 			Severity: marketv1.MarketplaceRiskSeverityWarning,
 			Source:   "manifest/i18n",
 			Message:  "Plugin declares i18n.enabled but no manifest i18n JSON files were detected.",
+			Evidence: &PackageDiagnosticEvidence{
+				ExpectedPath:  "manifest/i18n",
+				ExpectedField: "i18n.enabled / locale JSON bundles",
+				Example:       "manifest/i18n/zh-CN/plugin.json",
+			},
 		})
 	}
 	return diagnostics

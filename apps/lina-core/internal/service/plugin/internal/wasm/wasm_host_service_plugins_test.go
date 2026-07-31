@@ -109,6 +109,10 @@ func (s *trackingConfigService) Duration(context.Context, string, time.Duration)
 	return 15 * time.Second, nil
 }
 
+func (s *trackingConfigService) ResolvePath(context.Context, string) (string, error) {
+	return "", nil
+}
+
 // TestHandleHostServiceInvokeConfigReadsValues verifies dynamic plugins read
 // plugin-scoped config values through plugins.config.get only.
 func TestHandleHostServiceInvokeConfigReadsValues(t *testing.T) {

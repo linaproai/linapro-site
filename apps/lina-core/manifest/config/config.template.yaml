@@ -162,6 +162,8 @@ cluster:
 upload:
   # Upload file storage directory
   # 上传文件保存目录
+  # Relative paths resolve against the monorepo workspace root (runtimepath),
+  # not the process working directory. make dev injects LINAPRO_WORKSPACE_ROOT.
   path: "temp/upload"
   # Maximum size of a single uploaded file in MB
   # 单个上传文件大小上限（MB）
@@ -178,6 +180,7 @@ plugin:
   dynamic:
     # Storage directory for dynamic plugin build artifacts
     # 动态插件构建产物存储目录
+    # Relative paths resolve against the monorepo workspace root (runtimepath).
     storagePath: "temp/output"
   # Plugin entries to automatically install and enable at startup. Each entry
   # is a structured object `{id, withMockData}`. `withMockData` defaults to

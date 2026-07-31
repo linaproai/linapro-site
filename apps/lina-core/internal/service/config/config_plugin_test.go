@@ -7,6 +7,8 @@ import (
 	"context"
 	"fmt"
 	"testing"
+
+	"lina-core/pkg/runtimepath"
 )
 
 // TestGetPluginUsesDefaultStoragePathAndClonesCachedConfig verifies callers
@@ -79,7 +81,7 @@ plugin:
 	if cfg.Dynamic.StoragePath != "temp/output" {
 		t.Fatalf("expected unsupported runtime storage path to be ignored, got %q", cfg.Dynamic.StoragePath)
 	}
-	if path := svc.GetPluginDynamicStoragePath(context.Background()); path != resolveRuntimePath("temp/output") {
+	if path := svc.GetPluginDynamicStoragePath(context.Background()); path != runtimepath.Resolve("temp/output") {
 		t.Fatalf("expected default dynamic storage path, got %q", path)
 	}
 }
@@ -94,12 +96,12 @@ func TestGetPluginDynamicStoragePathUsesDefaultAndOverride(t *testing.T) {
 	})
 
 	svc := New()
-	if path := svc.GetPluginDynamicStoragePath(context.Background()); path != resolveRuntimePath("temp/output") {
+	if path := svc.GetPluginDynamicStoragePath(context.Background()); path != runtimepath.Resolve("temp/output") {
 		t.Fatalf("expected default plugin storage path temp/output, got %q", path)
 	}
 
 	setPluginDynamicStoragePathOverride(" ./temp/output/../plugin-bundles ")
-	if path := svc.GetPluginDynamicStoragePath(context.Background()); path != resolveRuntimePath("./temp/output/../plugin-bundles") {
+	if path := svc.GetPluginDynamicStoragePath(context.Background()); path != runtimepath.Resolve("./temp/output/../plugin-bundles") {
 		t.Fatalf("expected override storage path to win, got %q", path)
 	}
 }

@@ -757,6 +757,10 @@ func (rootNoopPluginConfig) Duration(_ context.Context, _ string, defaultValue t
 	return defaultValue, nil
 }
 
+func (rootNoopPluginConfig) ResolvePath(context.Context, string) (string, error) {
+	return "", nil
+}
+
 // SetTenantPluginEnabled accepts enablement changes without mutating shared test state.
 func (rootNoopPlugins) SetTenantPluginEnabled(context.Context, capabilityplugincap.PluginID, bool) error {
 	return nil

@@ -40,6 +40,7 @@ import "highlight.js/styles/github.css";
 
 import {
   Alert,
+  Button,
   Descriptions,
   DescriptionsItem,
   Empty,
@@ -78,7 +79,15 @@ import {
   resolveRelativeMarkdownPath,
 } from "../../utils/markdown";
 import {
+  countMarketplaceRiskDispositions,
+  filterMarketplaceRiskFindingsByDisposition,
+  formatMarketplaceRiskDisposition,
+  formatMarketplaceRiskFindingGuidance,
   formatMarketplaceRiskFindingSummary,
+  marketplaceRiskBlocking,
+  marketplaceRiskDisposition,
+  marketplaceRiskEvidence,
+  marketplaceRiskHasEvidence,
   sortMarketplaceRiskFindingsBySeverity,
 } from "../../utils/risk";
 import { formatMarketplaceLastSyncMessage } from "../../utils/sync-message";
@@ -146,6 +155,10 @@ const availableDocuments = ref<MarketplaceDocumentItem[]>([]);
 const documentCatalog = ref<MarketplaceDocumentCatalogItem[]>([]);
 const activeDocumentPath = ref("");
 const currentRisks = ref<MarketplaceRiskItem[]>([]);
+const riskDispositionFilter = ref<"all" | "info_only" | "need_attention" | "need_fix">(
+  "all",
+);
+const expandedRiskKeys = ref<Record<string, boolean>>({});
 const selectedRelease = ref<MarketplaceReleaseItem | null>(null);
 const activeTab = ref<DetailTabKey>("versions");
 const loading = ref(false);
@@ -394,6 +407,8 @@ async function initializePage() {
   documentCatalog.value = [];
   activeDocumentPath.value = "";
   currentRisks.value = [];
+  riskDispositionFilter.value = "all";
+  expandedRiskKeys.value = {};
   selectedRelease.value = null;
   activeTab.value = "versions";
   detailLoadState.value = "idle";
@@ -648,21 +663,103 @@ async function loadReleaseRisks(
     if (!isCurrentReleaseRequest(row, requestId)) {
       return;
     }
-    // Always present high-severity findings first, even if the API returns
-    // insertion order or an unsorted page (mocks and legacy rows).
+    // Blocking and need_fix first, then severity within the same disposition.
     currentRisks.value = sortMarketplaceRiskFindingsBySeverity(result.items);
+    riskDispositionFilter.value = "all";
+    expandedRiskKeys.value = {};
+    // Auto-expand blocking / need_fix so publishers see remediation immediately.
+    for (const risk of currentRisks.value) {
+      if (
+        marketplaceRiskBlocking(risk) ||
+        marketplaceRiskDisposition(risk) === "need_fix"
+      ) {
+        expandedRiskKeys.value[riskItemKey(risk)] = true;
+      }
+    }
     riskLoadState.value = result.items.length > 0 ? "ready" : "empty";
   } catch {
     if (!isCurrentReleaseRequest(row, requestId)) {
       return;
     }
     currentRisks.value = [];
+    expandedRiskKeys.value = {};
     riskLoadState.value = "error";
   } finally {
     if (isCurrentReleaseRequest(row, requestId)) {
       riskLoading.value = false;
     }
   }
+}
+
+const riskDispositionCounts = computed(() =>
+  countMarketplaceRiskDispositions(currentRisks.value),
+);
+
+const filteredRisks = computed(() =>
+  filterMarketplaceRiskFindingsByDisposition(
+    currentRisks.value,
+    riskDispositionFilter.value,
+  ),
+);
+
+function riskItemKey(risk: MarketplaceRiskItem) {
+  const code =
+    typeof risk.payload?.code === "string" ? risk.payload.code : risk.summary;
+  return `${risk.type}:${risk.source}:${code}:${risk.severity}`;
+}
+
+function isRiskExpanded(risk: MarketplaceRiskItem) {
+  return !!expandedRiskKeys.value[riskItemKey(risk)];
+}
+
+function toggleRiskExpanded(risk: MarketplaceRiskItem) {
+  const key = riskItemKey(risk);
+  expandedRiskKeys.value = {
+    ...expandedRiskKeys.value,
+    [key]: !expandedRiskKeys.value[key],
+  };
+}
+
+function formatRiskDispositionLabel(risk: MarketplaceRiskItem) {
+  return formatMarketplaceRiskDisposition(t, marketplaceRiskDisposition(risk));
+}
+
+function getRiskDispositionColor(risk: MarketplaceRiskItem) {
+  switch (marketplaceRiskDisposition(risk)) {
+    case "need_fix": {
+      return "error";
+    }
+    case "need_attention": {
+      return "warning";
+    }
+    default: {
+      return "default";
+    }
+  }
+}
+
+function riskFindingReason(risk: MarketplaceRiskItem) {
+  return formatMarketplaceRiskFindingGuidance(t, risk, "reason");
+}
+
+function riskFindingRemediation(risk: MarketplaceRiskItem) {
+  return formatMarketplaceRiskFindingGuidance(t, risk, "remediation");
+}
+
+function riskFindingAcceptance(risk: MarketplaceRiskItem) {
+  return formatMarketplaceRiskFindingGuidance(t, risk, "acceptance");
+}
+
+function riskEvidence(risk: MarketplaceRiskItem) {
+  return marketplaceRiskEvidence(risk);
+}
+
+function riskHasEvidence(risk: MarketplaceRiskItem) {
+  return marketplaceRiskHasEvidence(marketplaceRiskEvidence(risk));
+}
+
+function isRiskBlocking(risk: MarketplaceRiskItem) {
+  return marketplaceRiskBlocking(risk);
 }
 
 function isCurrentReleaseRequest(
@@ -1784,22 +1881,324 @@ function formatBytes(value?: number) {
                   />
                   <div
                     v-else-if="currentRisks.length > 0"
-                    class="marketplace-risk-list"
+                    class="marketplace-risk-panel"
                   >
-                    <div
-                      v-for="risk in currentRisks"
-                      :key="`${risk.type}:${risk.source}:${risk.summary}`"
-                      class="marketplace-risk-item"
-                    >
-                      <Space wrap :size="[6, 6]">
-                        <Tag :color="getRiskSeverityColor(risk.severity)">
-                          {{ formatRiskSeverity(risk.severity) }}
-                        </Tag>
-                        <Tag>{{ formatRiskType(risk.type) }}</Tag>
-                        <span class="marketplace-muted">{{ risk.source }}</span>
-                      </Space>
-                      <p>{{ formatRiskFindingSummary(risk) }}</p>
+                    <Alert
+                      show-icon
+                      type="info"
+                      :message="
+                        $t(
+                          'plugin.linapro-plugin-marketplace.detail.riskGuide.intro',
+                        )
+                      "
+                    />
+                    <Alert
+                      v-if="riskDispositionCounts.blocking > 0"
+                      show-icon
+                      type="error"
+                      :message="
+                        $t(
+                          'plugin.linapro-plugin-marketplace.detail.riskGuide.blockingBanner',
+                          { count: riskDispositionCounts.blocking },
+                        )
+                      "
+                    />
+                    <div class="marketplace-risk-summary">
+                      {{
+                        $t(
+                          'plugin.linapro-plugin-marketplace.detail.riskGuide.summaryLine',
+                          {
+                            needFix: riskDispositionCounts.needFix,
+                            needAttention: riskDispositionCounts.needAttention,
+                            infoOnly: riskDispositionCounts.infoOnly,
+                          },
+                        )
+                      }}
                     </div>
+                    <Space wrap :size="[8, 8]" class="marketplace-risk-filters">
+                      <Button
+                        size="small"
+                        :type="
+                          riskDispositionFilter === 'all' ? 'primary' : 'default'
+                        "
+                        @click="riskDispositionFilter = 'all'"
+                      >
+                        {{
+                          $t(
+                            'plugin.linapro-plugin-marketplace.detail.riskGuide.filterAll',
+                          )
+                        }}
+                      </Button>
+                      <Button
+                        size="small"
+                        :type="
+                          riskDispositionFilter === 'need_fix'
+                            ? 'primary'
+                            : 'default'
+                        "
+                        @click="riskDispositionFilter = 'need_fix'"
+                      >
+                        {{
+                          $t(
+                            'plugin.linapro-plugin-marketplace.detail.riskGuide.filterNeedFix',
+                            { count: riskDispositionCounts.needFix },
+                          )
+                        }}
+                      </Button>
+                      <Button
+                        size="small"
+                        :type="
+                          riskDispositionFilter === 'need_attention'
+                            ? 'primary'
+                            : 'default'
+                        "
+                        @click="riskDispositionFilter = 'need_attention'"
+                      >
+                        {{
+                          $t(
+                            'plugin.linapro-plugin-marketplace.detail.riskGuide.filterNeedAttention',
+                            { count: riskDispositionCounts.needAttention },
+                          )
+                        }}
+                      </Button>
+                      <Button
+                        size="small"
+                        :type="
+                          riskDispositionFilter === 'info_only'
+                            ? 'primary'
+                            : 'default'
+                        "
+                        @click="riskDispositionFilter = 'info_only'"
+                      >
+                        {{
+                          $t(
+                            'plugin.linapro-plugin-marketplace.detail.riskGuide.filterInfoOnly',
+                            { count: riskDispositionCounts.infoOnly },
+                          )
+                        }}
+                      </Button>
+                    </Space>
+                    <div class="marketplace-risk-list">
+                      <div
+                        v-for="risk in filteredRisks"
+                        :key="riskItemKey(risk)"
+                        class="marketplace-risk-item"
+                        :class="{
+                          'marketplace-risk-item--blocking': isRiskBlocking(risk),
+                        }"
+                      >
+                        <Space wrap :size="[6, 6]">
+                          <Tag
+                            v-if="isRiskBlocking(risk)"
+                            color="error"
+                          >
+                            {{
+                              $t(
+                                'plugin.linapro-plugin-marketplace.detail.riskGuide.blockingTag',
+                              )
+                            }}
+                          </Tag>
+                          <Tag :color="getRiskDispositionColor(risk)">
+                            {{ formatRiskDispositionLabel(risk) }}
+                          </Tag>
+                          <Tag :color="getRiskSeverityColor(risk.severity)">
+                            {{ formatRiskSeverity(risk.severity) }}
+                          </Tag>
+                          <Tag>{{ formatRiskType(risk.type) }}</Tag>
+                          <span class="marketplace-muted">{{ risk.source }}</span>
+                        </Space>
+                        <p class="marketplace-risk-title">
+                          {{ formatRiskFindingSummary(risk) }}
+                        </p>
+                        <Button
+                          type="link"
+                          size="small"
+                          class="marketplace-risk-toggle"
+                          @click="toggleRiskExpanded(risk)"
+                        >
+                          {{
+                            isRiskExpanded(risk)
+                              ? $t(
+                                  'plugin.linapro-plugin-marketplace.detail.riskGuide.collapse',
+                                )
+                              : $t(
+                                  'plugin.linapro-plugin-marketplace.detail.riskGuide.expand',
+                                )
+                          }}
+                        </Button>
+                        <div
+                          v-if="isRiskExpanded(risk)"
+                          class="marketplace-risk-guidance"
+                        >
+                          <div v-if="riskFindingReason(risk)">
+                            <strong>{{
+                              $t(
+                                'plugin.linapro-plugin-marketplace.detail.riskGuide.reason',
+                              )
+                            }}</strong>
+                            <p>{{ riskFindingReason(risk) }}</p>
+                          </div>
+                          <div v-if="riskFindingRemediation(risk)">
+                            <strong>{{
+                              $t(
+                                'plugin.linapro-plugin-marketplace.detail.riskGuide.remediation',
+                              )
+                            }}</strong>
+                            <p>{{ riskFindingRemediation(risk) }}</p>
+                          </div>
+                          <div v-if="riskFindingAcceptance(risk)">
+                            <strong>{{
+                              $t(
+                                'plugin.linapro-plugin-marketplace.detail.riskGuide.acceptance',
+                              )
+                            }}</strong>
+                            <p>{{ riskFindingAcceptance(risk) }}</p>
+                          </div>
+                          <div
+                            v-if="riskHasEvidence(risk)"
+                            class="marketplace-risk-evidence"
+                          >
+                            <strong>{{
+                              $t(
+                                'plugin.linapro-plugin-marketplace.detail.riskGuide.evidence',
+                              )
+                            }}</strong>
+                            <div
+                              v-if="riskEvidence(risk).expectedPath || riskEvidence(risk).expectedField"
+                              class="marketplace-risk-evidence-block"
+                            >
+                              <span class="marketplace-muted">{{
+                                $t(
+                                  'plugin.linapro-plugin-marketplace.detail.riskGuide.evidenceExpected',
+                                )
+                              }}</span>
+                              <code>
+                                {{
+                                  [
+                                    riskEvidence(risk).expectedPath,
+                                    riskEvidence(risk).expectedField,
+                                  ]
+                                    .filter(Boolean)
+                                    .join(" · ")
+                                }}
+                              </code>
+                            </div>
+                            <div
+                              v-if="riskEvidence(risk).example"
+                              class="marketplace-risk-evidence-block"
+                            >
+                              <span class="marketplace-muted">{{
+                                $t(
+                                  'plugin.linapro-plugin-marketplace.detail.riskGuide.evidenceExample',
+                                )
+                              }}</span>
+                              <code>{{ riskEvidence(risk).example }}</code>
+                            </div>
+                            <div
+                              v-if="riskEvidence(risk).files.length > 0"
+                              class="marketplace-risk-evidence-block"
+                            >
+                              <span class="marketplace-muted">{{
+                                $t(
+                                  'plugin.linapro-plugin-marketplace.detail.riskGuide.evidenceFiles',
+                                )
+                              }}</span>
+                              <ul>
+                                <li
+                                  v-for="file in riskEvidence(risk).files"
+                                  :key="file"
+                                >
+                                  <code>{{ file }}</code>
+                                </li>
+                              </ul>
+                            </div>
+                            <div
+                              v-if="riskEvidence(risk).services.length > 0"
+                              class="marketplace-risk-evidence-block"
+                            >
+                              <span class="marketplace-muted">{{
+                                $t(
+                                  'plugin.linapro-plugin-marketplace.detail.riskGuide.evidenceServices',
+                                )
+                              }}</span>
+                              <ul>
+                                <li
+                                  v-for="(svc, idx) in riskEvidence(risk).services"
+                                  :key="`${svc.service}-${idx}`"
+                                >
+                                  <code>{{ svc.service }}</code>
+                                  <span
+                                    v-if="svc.methods && svc.methods.length"
+                                    class="marketplace-muted"
+                                  >
+                                    · {{ svc.methods.join(", ") }}
+                                  </span>
+                                  <span
+                                    v-if="svc.tables && svc.tables.length"
+                                    class="marketplace-muted"
+                                  >
+                                    · tables: {{ svc.tables.join(", ") }}
+                                  </span>
+                                </li>
+                              </ul>
+                            </div>
+                            <div
+                              v-if="riskEvidence(risk).routes.length > 0"
+                              class="marketplace-risk-evidence-block"
+                            >
+                              <span class="marketplace-muted">{{
+                                $t(
+                                  'plugin.linapro-plugin-marketplace.detail.riskGuide.evidenceRoutes',
+                                )
+                              }}</span>
+                              <ul>
+                                <li
+                                  v-for="(routeItem, idx) in riskEvidence(risk)
+                                    .routes"
+                                  :key="`${routeItem.method}-${routeItem.path}-${idx}`"
+                                >
+                                  <code
+                                    >{{ routeItem.method }}
+                                    {{ routeItem.path }}</code
+                                  >
+                                  <span
+                                    v-if="routeItem.permission"
+                                    class="marketplace-muted"
+                                  >
+                                    · {{ routeItem.permission }}
+                                  </span>
+                                </li>
+                              </ul>
+                            </div>
+                            <div
+                              v-if="riskEvidence(risk).truncated"
+                              class="marketplace-muted"
+                            >
+                              {{
+                                $t(
+                                  'plugin.linapro-plugin-marketplace.detail.riskGuide.evidenceTruncated',
+                                  {
+                                    shown:
+                                      riskEvidence(risk).files.length ||
+                                      riskEvidence(risk).services.length ||
+                                      riskEvidence(risk).routes.length,
+                                    total: riskEvidence(risk).totalCount,
+                                  },
+                                )
+                              }}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <Empty
+                      v-if="filteredRisks.length === 0"
+                      :description="
+                        $t(
+                          'plugin.linapro-plugin-marketplace.detail.empty.risks',
+                        )
+                      "
+                    />
                   </div>
                   <Empty
                     v-else
@@ -2366,6 +2765,20 @@ function formatBytes(value?: number) {
   }
 }
 
+.marketplace-risk-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.marketplace-risk-summary {
+  color: var(--ant-color-text-secondary);
+  font-size: 13px;
+}
+
+.marketplace-risk-filters {
+  margin-bottom: 2px;
+}
+
 .marketplace-risk-list {
   display: grid;
   gap: 10px;
@@ -2378,9 +2791,53 @@ function formatBytes(value?: number) {
   background: var(--ant-color-bg-container);
 }
 
-.marketplace-risk-item p {
+.marketplace-risk-item--blocking {
+  border-color: var(--ant-color-error-border);
+  background: var(--ant-color-error-bg);
+}
+
+.marketplace-risk-title {
   margin: 8px 0 0;
   color: var(--ant-color-text);
+  font-weight: 500;
+}
+
+.marketplace-risk-toggle {
+  padding-left: 0;
+  margin-top: 4px;
+}
+
+.marketplace-risk-guidance {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--ant-color-border-secondary);
+}
+
+.marketplace-risk-guidance p {
+  margin: 4px 0 0;
+  color: var(--ant-color-text);
+  line-height: 1.55;
+}
+
+.marketplace-risk-evidence {
+  display: grid;
+  gap: 8px;
+}
+
+.marketplace-risk-evidence-block {
+  display: grid;
+  gap: 4px;
+}
+
+.marketplace-risk-evidence-block ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.marketplace-risk-evidence-block code {
+  word-break: break-all;
 }
 
 :global(.marketplace-download-confirm) {

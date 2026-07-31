@@ -46,6 +46,11 @@ type ConfigService interface {
 	Int(ctx context.Context, key string, defaultValue int) (int, error)
 	// Duration reads a time.Duration value or returns defaultValue when the key is absent or blank.
 	Duration(ctx context.Context, key string, defaultValue time.Duration) (time.Duration, error)
+	// ResolvePath resolves a configured filesystem path using the host runtime
+	// workspace-root contract. Absolute paths are cleaned; relative paths are
+	// anchored at the monorepo/workspace root (not the process working
+	// directory). Empty path returns an empty string without error.
+	ResolvePath(ctx context.Context, path string) (string, error)
 }
 
 // RegistryService defines read-oriented plugin registry capability methods.

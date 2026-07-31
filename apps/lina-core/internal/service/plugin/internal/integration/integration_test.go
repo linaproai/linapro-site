@@ -1049,6 +1049,10 @@ func (scopedCapabilityPluginConfig) Duration(_ context.Context, _ string, defaul
 	return defaultValue, nil
 }
 
+func (scopedCapabilityPluginConfig) ResolvePath(context.Context, string) (string, error) {
+	return "", nil
+}
+
 // emptySourceServicesDirectory is a minimal capability services test double.
 type emptySourceServicesDirectory struct{}
 

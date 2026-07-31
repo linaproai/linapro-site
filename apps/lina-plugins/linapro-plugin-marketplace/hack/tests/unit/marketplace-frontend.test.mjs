@@ -563,6 +563,34 @@ describe("marketplace risk severity ordering", () => {
           return 3;
       }
     }
+    function marketplaceRiskDispositionRank(disposition) {
+      switch ((disposition || "").trim().toLowerCase()) {
+        case "need_fix":
+          return 0;
+        case "need_attention":
+          return 1;
+        case "info_only":
+          return 2;
+        default:
+          return 3;
+      }
+    }
+    function marketplaceRiskDisposition(risk) {
+      const policy = {
+        i18n_files_missing: "need_fix",
+        framework_dependency_missing: "need_attention",
+        dynamic_host_services_present: "need_attention",
+        source_docs_indexed: "info_only",
+      };
+      const code =
+        risk?.payload && typeof risk.payload.code === "string"
+          ? risk.payload.code
+          : "";
+      return policy[code] || "need_attention";
+    }
+    function marketplaceRiskBlocking(risk) {
+      return marketplaceRiskDisposition(risk) === "need_fix";
+    }
     function sortMarketplaceRiskFindingsBySeverity(items) {
       if (!items || items.length === 0) {
         return [];
@@ -570,6 +598,21 @@ describe("marketplace risk severity ordering", () => {
       return items
         .map((item, index) => ({ index, item }))
         .sort((left, right) => {
+          const leftBlocking = marketplaceRiskBlocking(left.item) ? 0 : 1;
+          const rightBlocking = marketplaceRiskBlocking(right.item) ? 0 : 1;
+          if (leftBlocking !== rightBlocking) {
+            return leftBlocking - rightBlocking;
+          }
+          const dispositionDiff =
+            marketplaceRiskDispositionRank(
+              marketplaceRiskDisposition(left.item),
+            ) -
+            marketplaceRiskDispositionRank(
+              marketplaceRiskDisposition(right.item),
+            );
+          if (dispositionDiff !== 0) {
+            return dispositionDiff;
+          }
           const rankDiff =
             marketplaceRiskSeverityRank(left.item.severity) -
             marketplaceRiskSeverityRank(right.item.severity);
@@ -582,15 +625,35 @@ describe("marketplace risk severity ordering", () => {
     }
 
     const sorted = sortMarketplaceRiskFindingsBySeverity([
-      { severity: "info", summary: "info-a" },
-      { severity: "high", summary: "high-a" },
-      { severity: "warning", summary: "warning-a" },
-      { severity: "info", summary: "info-b" },
-      { severity: "high", summary: "high-b" },
+      {
+        payload: { code: "source_docs_indexed" },
+        severity: "info",
+        summary: "info-a",
+      },
+      {
+        payload: { code: "dynamic_host_services_present" },
+        severity: "high",
+        summary: "high-attention",
+      },
+      {
+        payload: { code: "i18n_files_missing" },
+        severity: "warning",
+        summary: "fix-a",
+      },
+      {
+        payload: { code: "framework_dependency_missing" },
+        severity: "warning",
+        summary: "framework-attention",
+      },
+      {
+        payload: { code: "source_docs_indexed" },
+        severity: "info",
+        summary: "info-b",
+      },
     ]);
     assert.deepEqual(
       sorted.map((item) => item.summary),
-      ["high-a", "high-b", "warning-a", "info-a", "info-b"],
+      ["fix-a", "high-attention", "framework-attention", "info-a", "info-b"],
     );
 
     const detail = readPluginFile("frontend/pages/detail/index.vue");
@@ -613,6 +676,8 @@ describe("marketplace risk finding i18n", () => {
   it("localizes known scanner codes and falls back to English summary", () => {
     const riskUtil = readPluginFile("frontend/utils/risk.ts");
     assert.match(riskUtil, /formatMarketplaceRiskFindingSummary/);
+    assert.match(riskUtil, /formatMarketplaceRiskFindingGuidance/);
+    assert.match(riskUtil, /marketplaceRiskDisposition/);
     assert.match(riskUtil, /MARKETPLACE_RISK_FINDING_CODES/);
     assert.match(riskUtil, /source_docs_indexed/);
     assert.match(riskUtil, /framework_dependency_missing/);
@@ -621,12 +686,15 @@ describe("marketplace risk finding i18n", () => {
     const review = readPluginFile("frontend/pages/review/index.vue");
     assert.match(detail, /formatMarketplaceRiskFindingSummary/);
     assert.match(detail, /formatRiskFindingSummary\(risk\)/);
+    assert.match(detail, /riskGuide\.remediation/);
+    assert.match(detail, /riskDispositionFilter/);
     assert.doesNotMatch(
       detail,
       /class="marketplace-risk-item"[\s\S]{0,400}<p>\{\{\s*risk\.summary\s*\}\}/,
     );
     assert.match(review, /formatMarketplaceRiskFindingSummary/);
     assert.match(review, /formatRiskFindingSummary\(risk\)/);
+    assert.match(review, /riskGuide\.reason/);
 
     const en = JSON.parse(readPluginFile("manifest/i18n/en-US/plugin.json"));
     const zh = JSON.parse(readPluginFile("manifest/i18n/zh-CN/plugin.json"));
@@ -643,21 +711,63 @@ describe("marketplace risk finding i18n", () => {
       "dynamic_manifest_resources_missing",
     ];
     for (const code of findingCodes) {
-      const key = `plugin.linapro-plugin-marketplace.detail.riskFinding.${code}`;
-      assert.ok(en[key], `missing en-US risk finding key ${key}`);
-      assert.ok(zh[key], `missing zh-CN risk finding key ${key}`);
-      assert.notEqual(en[key], zh[key], `${key} must differ across locales`);
+      const base = `plugin.linapro-plugin-marketplace.detail.riskFinding.${code}`;
+      const titleKey = `${base}.title`;
+      assert.ok(en[titleKey], `missing en-US risk finding key ${titleKey}`);
+      assert.ok(zh[titleKey], `missing zh-CN risk finding key ${titleKey}`);
+      assert.notEqual(
+        en[titleKey],
+        zh[titleKey],
+        `${titleKey} must differ across locales`,
+      );
+      // Nested runtime trees break when a bare leaf shares the path of child keys.
+      assert.equal(
+        en[base],
+        undefined,
+        `bare title leaf ${base} conflicts with nested guidance keys`,
+      );
+      assert.equal(
+        zh[base],
+        undefined,
+        `bare title leaf ${base} conflicts with nested guidance keys`,
+      );
+      for (const suffix of ["reason", "remediation", "acceptance"]) {
+        const guidanceKey = `${base}.${suffix}`;
+        assert.ok(en[guidanceKey], `missing en-US ${guidanceKey}`);
+        assert.ok(zh[guidanceKey], `missing zh-CN ${guidanceKey}`);
+        assert.notEqual(
+          en[guidanceKey],
+          zh[guidanceKey],
+          `${guidanceKey} must differ across locales`,
+        );
+      }
     }
     assert.equal(
-      zh["plugin.linapro-plugin-marketplace.detail.riskFinding.framework_dependency_missing"],
+      zh[
+        "plugin.linapro-plugin-marketplace.detail.riskFinding.framework_dependency_missing.title"
+      ],
       "未声明框架兼容性依赖。",
     );
     assert.equal(
-      zh["plugin.linapro-plugin-marketplace.detail.riskFinding.source_docs_indexed"],
+      zh[
+        "plugin.linapro-plugin-marketplace.detail.riskFinding.source_docs_indexed.title"
+      ],
       "已检测到可用于市场展示的文档条目。",
     );
+    assert.equal(
+      zh[
+        "plugin.linapro-plugin-marketplace.detail.riskFinding.source_sql_present.title"
+      ],
+      "源码包包含需审核关注的 SQL 资源。",
+    );
+    assert.ok(
+      zh["plugin.linapro-plugin-marketplace.detail.riskDisposition.need_fix"],
+    );
+    assert.ok(
+      en["error.plugin.marketplace.risk.blocking"]?.includes("{diagnostic}"),
+    );
 
-    // Pure helper behavior without Vue: mirror the util's code → key → translate path.
+    // Pure helper behavior without Vue: mirror the util's code → .title key path.
     function formatRiskFindingSummary(t, risk) {
       const code =
         risk?.payload && typeof risk.payload.code === "string"
@@ -666,7 +776,7 @@ describe("marketplace risk finding i18n", () => {
       if (!code) {
         return (risk?.summary || "").trim();
       }
-      const key = `plugin.linapro-plugin-marketplace.detail.riskFinding.${code}`;
+      const key = `plugin.linapro-plugin-marketplace.detail.riskFinding.${code}.title`;
       const translated = t(key);
       if (!translated || translated === key) {
         return (risk?.summary || "").trim();
@@ -683,11 +793,30 @@ describe("marketplace risk finding i18n", () => {
     );
     assert.equal(
       formatRiskFindingSummary(t, {
+        payload: { code: "source_sql_present" },
+        summary:
+          "Source package contains SQL resources that require reviewer inspection.",
+      }),
+      "源码包包含需审核关注的 SQL 资源。",
+    );
+    assert.equal(
+      formatRiskFindingSummary(t, {
         payload: { code: "unknown_legacy_code" },
         summary: "Legacy English summary remains as fallback.",
       }),
       "Legacy English summary remains as fallback.",
     );
+    assert.match(
+      zh[
+        "plugin.linapro-plugin-marketplace.detail.riskFinding.framework_dependency_missing.remediation"
+      ],
+      /plugin\.yaml/,
+    );
+    assert.match(
+      riskUtil,
+      /marketplaceRiskFindingMessageKey[\s\S]*?\.title/,
+    );
+    assert.match(riskUtil, /blocking:\s*false,\s*disposition:\s*"need_attention"/);
   });
 });
 

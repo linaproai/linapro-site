@@ -77,6 +77,7 @@ func marketplaceErrorCodesForTest() []*bizerr.Code {
 		CodeMarketplaceDownloadSessionExpired,
 		CodeMarketplaceDownloadSessionUnavailable,
 		CodeMarketplaceReviewStateInvalid,
+		CodeMarketplaceRiskBlocking,
 		CodeMarketplaceStatusInvalid,
 		CodeMarketplaceStorageFailed,
 	}

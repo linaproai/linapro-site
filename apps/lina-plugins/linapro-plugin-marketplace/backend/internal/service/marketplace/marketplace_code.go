@@ -137,6 +137,12 @@ var (
 		"Marketplace release review state does not allow this transition",
 		gcode.CodeInvalidParameter,
 	)
+	// CodeMarketplaceRiskBlocking reports that blocking scanner findings prevent review submission.
+	CodeMarketplaceRiskBlocking = bizerr.MustDefine(
+		"PLUGIN_MARKETPLACE_RISK_BLOCKING",
+		"Marketplace release has blocking risk findings that must be fixed before review: {diagnostic}",
+		gcode.CodeInvalidParameter,
+	)
 	// CodeMarketplaceStatusInvalid reports an unsupported marketplace status transition.
 	CodeMarketplaceStatusInvalid = bizerr.MustDefine(
 		"PLUGIN_MARKETPLACE_STATUS_INVALID",

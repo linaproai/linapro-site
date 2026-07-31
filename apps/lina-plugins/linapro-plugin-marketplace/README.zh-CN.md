@@ -21,7 +21,25 @@
 |--------|------|--------|
 | `storage.root` | 制品与文档快照根目录 | `temp/plugin-marketplace/artifacts` |
 
-相对路径相对宿主进程工作目录解析（`make dev` 通常为 `apps/lina-core`，因此开发数据落在 `apps/lina-core/temp/`，已被 gitignore）。**不要**把该路径指到仓库源码树（例如 `apps/lina-core/data/`）。生产环境建议使用仓库外的绝对路径。
+相对路径按宿主 **工作区根（WorkspaceRoot）** 解析，与上传目录、动态插件产物等可写路径共用 `lina-core/pkg/runtimepath` 契约，**不**依赖进程 CWD。`make dev` 会注入 `LINAPRO_WORKSPACE_ROOT`（仓库根）与 `LINAPRO_DATA_ROOT`（`<仓库根>/temp`），因此默认落点为：
+
+```text
+<repo>/temp/plugin-marketplace/artifacts/
+  <plugin-id>/
+    <version>/
+      docs/
+        <locale>/
+          index.md
+          ...
+      meta/
+        docs-manifest.json
+```
+
+Git 文档快照在 `docs/<locale>/` 下保留原始相对文件名。每次同步会对比 content hash：内容变化才覆盖写盘；远端已删除的文档会清理本地文件。包体仍使用同一根下的 `source/`、`dynamic/` 前缀。
+
+而不是 `apps/lina-core/temp/...`。绝对路径配置保持原样。生产环境建议使用仓库外的绝对路径。
+
+若本地仍有旧版快照在 `apps/lina-core/temp/plugin-marketplace/`，或仍是 `docs-snapshot/.../content/<hash>.md` 布局，请重新执行 Git 元数据同步（或删除旧目录）。不提供双读兼容。
 
 ## Git 平台 Token 配置
 

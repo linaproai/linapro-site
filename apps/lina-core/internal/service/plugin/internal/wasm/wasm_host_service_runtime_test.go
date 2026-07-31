@@ -426,6 +426,10 @@ func (noopTestConfigService) Duration(context.Context, string, time.Duration) (t
 	return 0, nil
 }
 
+func (noopTestConfigService) ResolvePath(context.Context, string) (string, error) {
+	return "", nil
+}
+
 type noopTestHostConfigService struct{}
 
 func (noopTestHostConfigService) Get(context.Context, string, any) (*gvar.Var, error) {
