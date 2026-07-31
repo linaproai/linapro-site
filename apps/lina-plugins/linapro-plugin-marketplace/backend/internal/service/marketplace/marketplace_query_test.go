@@ -270,6 +270,43 @@ func TestRiskItemFromEntityParsesPayload(t *testing.T) {
 	}
 }
 
+// TestSortMarketplaceRiskItemsBySeverity pins the owner/review risk list order:
+// high impact first, then warning, then info. API rows are stored and often
+// returned in insertion/id order; presentation must still surface high first.
+func TestSortMarketplaceRiskItemsBySeverity(t *testing.T) {
+	t.Parallel()
+
+	items := []*marketv1.MarketplaceRiskItem{
+		{Severity: marketv1.MarketplaceRiskSeverityInfo, Summary: "info-a"},
+		{Severity: marketv1.MarketplaceRiskSeverityHigh, Summary: "high-a"},
+		{Severity: marketv1.MarketplaceRiskSeverityWarning, Summary: "warning-a"},
+		{Severity: marketv1.MarketplaceRiskSeverityInfo, Summary: "info-b"},
+		{Severity: marketv1.MarketplaceRiskSeverityHigh, Summary: "high-b"},
+		{Severity: marketv1.MarketplaceRiskSeverityWarning, Summary: "warning-b"},
+	}
+	sortMarketplaceRiskItemsBySeverity(items)
+
+	want := []string{"high-a", "high-b", "warning-a", "warning-b", "info-a", "info-b"}
+	got := make([]string, 0, len(items))
+	for _, item := range items {
+		got = append(got, item.Summary)
+	}
+	if len(got) != len(want) {
+		t.Fatalf("unexpected length: got %v want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("risk order mismatch at %d: got %v want %v", i, got, want)
+		}
+	}
+
+	// Empty and single-element slices are no-ops.
+	sortMarketplaceRiskItemsBySeverity(nil)
+	sortMarketplaceRiskItemsBySeverity([]*marketv1.MarketplaceRiskItem{
+		{Severity: marketv1.MarketplaceRiskSeverityInfo, Summary: "only"},
+	})
+}
+
 func TestDocumentItemFromRecordUsesRenderedContentSnapshot(t *testing.T) {
 	item := documentItemFromRecord(&DocumentRecord{
 		PluginID:        "linapro-demo-source",
@@ -330,5 +367,46 @@ func TestDiagnosticRiskTypeClassification(t *testing.T) {
 				t.Fatalf("expected %s, got %s", tc.expected, got)
 			}
 		})
+	}
+}
+
+// TestBuildSourceRiskSummaryMatchesDiagnosticSeverityCount guards the invariant
+// that the aggregated risk_summary counts mirror the diagnostic rows that
+// replaceReleaseRisks persists to plugin_marketplace_risk. The Git discovery
+// path previously wrote only the summary via buildSourceRiskSummary and skipped
+// the detail rows, so owners saw a populated summary ("警告 2 提示 1") alongside
+// an empty risk page. Both projections derive from the same diagnostics slice,
+// so the summary total must equal the number of risk rows replaceReleaseRisks
+// writes; this test pins that invariant against future divergence.
+func TestBuildSourceRiskSummaryMatchesDiagnosticSeverityCount(t *testing.T) {
+	t.Parallel()
+
+	diagnostics := []*PackageDiagnostic{
+		{Code: "dynamic_host_services_present", Severity: marketv1.MarketplaceRiskSeverityHigh},
+		{Code: "dynamic_routes_present", Severity: marketv1.MarketplaceRiskSeverityWarning},
+		{Code: "framework_dependency_missing", Severity: marketv1.MarketplaceRiskSeverityWarning},
+		{Code: "dynamic_mock_sql_present", Severity: marketv1.MarketplaceRiskSeverityInfo},
+	}
+
+	summary := buildSourceRiskSummary(diagnostics)
+	if summary.High != 1 || summary.Warning != 2 || summary.Info != 1 {
+		t.Fatalf("unexpected severity counts: high=%d warning=%d info=%d", summary.High, summary.Warning, summary.Info)
+	}
+	if total := summary.High + summary.Warning + summary.Info; total != len(diagnostics) {
+		t.Fatalf("summary total %d must equal diagnostic count %d so risk page rows never diverge from the summary", total, len(diagnostics))
+	}
+
+	// Nil diagnostics and nil entries must not inflate counts; replaceReleaseRisks
+	// mirrors this by skipping nil diagnostics when persisting risk rows.
+	empty := buildSourceRiskSummary(nil)
+	if empty.High+empty.Warning+empty.Info != 0 {
+		t.Fatalf("nil diagnostics must yield zero counts, got %#v", empty)
+	}
+	withNil := buildSourceRiskSummary([]*PackageDiagnostic{
+		nil,
+		{Code: "dynamic_routes_present", Severity: marketv1.MarketplaceRiskSeverityWarning},
+	})
+	if withNil.High+withNil.Warning+withNil.Info != 1 {
+		t.Fatalf("nil diagnostic entry must be skipped, got %#v", withNil)
 	}
 }

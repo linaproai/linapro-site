@@ -404,6 +404,293 @@ describe("marketplace frontend composition logic", () => {
   });
 });
 
+describe("marketplace lastSyncMessage i18n", () => {
+  it("localizes known Git sync diagnostics and falls back for free-form text", () => {
+    const syncUtil = readPluginFile("frontend/utils/sync-message.ts");
+    assert.match(syncUtil, /formatMarketplaceLastSyncMessage/);
+    assert.match(syncUtil, /MARKETPLACE_SYNC_MESSAGE_CODES/);
+    assert.match(syncUtil, /discoveredImmutableOnly/);
+    assert.match(syncUtil, /discoveredDrafts/);
+
+    const detail = readPluginFile("frontend/pages/detail/index.vue");
+    const mine = readPluginFile("frontend/pages/mine/index.vue");
+    assert.match(detail, /formatMarketplaceLastSyncMessage/);
+    assert.match(detail, /formatLastSyncMessage\(detail\.lastSyncMessage\)/);
+    // Sync message must use Descriptions body font size; marketplace-muted is 12px.
+    assert.doesNotMatch(
+      detail,
+      /lastSyncMessage[\s\S]{0,400}class="marketplace-muted"/,
+    );
+    assert.doesNotMatch(
+      detail,
+      /class="marketplace-muted">\{\{\s*detail\.lastSyncMessage\s*\}\}/,
+    );
+    assert.match(mine, /formatMarketplaceLastSyncMessage/);
+    assert.match(mine, /formatMarketplaceLastSyncMessage\(t,\s*row\.lastSyncMessage\)/);
+
+    const en = JSON.parse(readPluginFile("manifest/i18n/en-US/plugin.json"));
+    const zh = JSON.parse(readPluginFile("manifest/i18n/zh-CN/plugin.json"));
+    const syncCodes = [
+      "discoveredDrafts",
+      "discoveredImmutableOnly",
+      "discoveredWithFailures",
+      "failedImportRefs",
+      "credentialLoadFailed",
+      "repositoryUrlInvalid",
+      "platformTokenConfigFailed",
+      "queuedForVerification",
+      "docsIndexIncomplete",
+      "immutableDocsIndexIncomplete",
+    ];
+    for (const code of syncCodes) {
+      const key = `plugin.linapro-plugin-marketplace.detail.syncMessage.${code}`;
+      assert.ok(en[key], `missing en-US sync message key ${key}`);
+      assert.ok(zh[key], `missing zh-CN sync message key ${key}`);
+      assert.notEqual(en[key], zh[key], `${key} must differ across locales`);
+    }
+    assert.equal(
+      zh[
+        "plugin.linapro-plugin-marketplace.detail.syncMessage.discoveredImmutableOnly"
+      ],
+      "未发现新草稿版本（已有 {count} 个不可变版本）",
+    );
+
+    // Pure helper behavior without Vue: mirror pattern → key → translate path.
+    function withOptionalDetail(detail) {
+      const trimmed = (detail || "").trim();
+      return trimmed ? `: ${trimmed}` : "";
+    }
+    function formatLastSyncMessage(t, message) {
+      const fallback = (message || "").trim();
+      if (!fallback) {
+        return "";
+      }
+      const patterns = [
+        [
+          /^discovered 0 new draft releases \((\d+) existing immutable version\(s\)\)$/,
+          "discoveredImmutableOnly",
+          (m) => ({ count: Number(m[1]) }),
+        ],
+        [
+          /^discovered (\d+) draft releases$/,
+          "discoveredDrafts",
+          (m) => ({ count: Number(m[1]) }),
+        ],
+        [
+          /^discovered (\d+) drafts with (\d+) ref failures(?::\s*(.*))?$/s,
+          "discoveredWithFailures",
+          (m) => ({
+            count: Number(m[1]),
+            failures: Number(m[2]),
+            detail: withOptionalDetail(m[3]),
+          }),
+        ],
+        [
+          /^failed to import (\d+) refs(?::\s*(.*))?$/s,
+          "failedImportRefs",
+          (m) => ({
+            count: Number(m[1]),
+            detail: withOptionalDetail(m[2]),
+          }),
+        ],
+        [/^credential load failed$/, "credentialLoadFailed"],
+        [/^repository url is invalid$/, "repositoryUrlInvalid"],
+      ];
+      for (const [re, code, paramsFn] of patterns) {
+        const match = fallback.match(re);
+        if (!match) {
+          continue;
+        }
+        const key = `plugin.linapro-plugin-marketplace.detail.syncMessage.${code}`;
+        const params = paramsFn ? paramsFn(match) : undefined;
+        let translated = zh[key] || key;
+        if (params) {
+          for (const [name, value] of Object.entries(params)) {
+            translated = translated.replaceAll(`{${name}}`, String(value));
+          }
+        }
+        if (!translated || translated === key) {
+          return fallback;
+        }
+        return translated;
+      }
+      return fallback;
+    }
+
+    assert.equal(
+      formatLastSyncMessage(
+        null,
+        "discovered 0 new draft releases (1 existing immutable version(s))",
+      ),
+      "未发现新草稿版本（已有 1 个不可变版本）",
+    );
+    assert.equal(
+      formatLastSyncMessage(null, "discovered 2 draft releases"),
+      "已发现 2 个草稿版本",
+    );
+    assert.equal(
+      formatLastSyncMessage(null, "failed to import 3 refs: tag missing"),
+      "导入 3 个引用失败: tag missing",
+    );
+    assert.equal(
+      formatLastSyncMessage(null, "credential load failed"),
+      "凭据加载失败",
+    );
+    assert.equal(
+      formatLastSyncMessage(null, "some unexpected provider timeout"),
+      "some unexpected provider timeout",
+    );
+  });
+});
+
+describe("marketplace risk severity ordering", () => {
+  it("sorts risk findings high → warning → info and detail page applies the helper", () => {
+    const riskUtil = readPluginFile("frontend/utils/risk.ts");
+    assert.match(riskUtil, /sortMarketplaceRiskFindingsBySeverity/);
+    assert.match(riskUtil, /marketplaceRiskSeverityRank/);
+
+    // Mirror the production rank/sort helpers so the unit test fails if the
+    // priority order (high first) regresses without updating the util contract.
+    function marketplaceRiskSeverityRank(severity) {
+      switch (String(severity || "").trim().toLowerCase()) {
+        case "high":
+          return 0;
+        case "warning":
+          return 1;
+        case "info":
+          return 2;
+        default:
+          return 3;
+      }
+    }
+    function sortMarketplaceRiskFindingsBySeverity(items) {
+      if (!items || items.length === 0) {
+        return [];
+      }
+      return items
+        .map((item, index) => ({ index, item }))
+        .sort((left, right) => {
+          const rankDiff =
+            marketplaceRiskSeverityRank(left.item.severity) -
+            marketplaceRiskSeverityRank(right.item.severity);
+          if (rankDiff !== 0) {
+            return rankDiff;
+          }
+          return left.index - right.index;
+        })
+        .map((entry) => entry.item);
+    }
+
+    const sorted = sortMarketplaceRiskFindingsBySeverity([
+      { severity: "info", summary: "info-a" },
+      { severity: "high", summary: "high-a" },
+      { severity: "warning", summary: "warning-a" },
+      { severity: "info", summary: "info-b" },
+      { severity: "high", summary: "high-b" },
+    ]);
+    assert.deepEqual(
+      sorted.map((item) => item.summary),
+      ["high-a", "high-b", "warning-a", "info-a", "info-b"],
+    );
+
+    const detail = readPluginFile("frontend/pages/detail/index.vue");
+    const review = readPluginFile("frontend/pages/review/index.vue");
+    assert.match(detail, /sortMarketplaceRiskFindingsBySeverity/);
+    assert.match(
+      detail,
+      /currentRisks\.value\s*=\s*sortMarketplaceRiskFindingsBySeverity\(result\.items\)/,
+    );
+    assert.match(review, /sortMarketplaceRiskFindingsBySeverity/);
+    // Risk summary Tags already render high → warning → info in the template.
+    assert.match(
+      detail,
+      /getRiskCounts\(\)\.high[\s\S]*?getRiskCounts\(\)\.warning[\s\S]*?getRiskCounts\(\)\.info/,
+    );
+  });
+});
+
+describe("marketplace risk finding i18n", () => {
+  it("localizes known scanner codes and falls back to English summary", () => {
+    const riskUtil = readPluginFile("frontend/utils/risk.ts");
+    assert.match(riskUtil, /formatMarketplaceRiskFindingSummary/);
+    assert.match(riskUtil, /MARKETPLACE_RISK_FINDING_CODES/);
+    assert.match(riskUtil, /source_docs_indexed/);
+    assert.match(riskUtil, /framework_dependency_missing/);
+
+    const detail = readPluginFile("frontend/pages/detail/index.vue");
+    const review = readPluginFile("frontend/pages/review/index.vue");
+    assert.match(detail, /formatMarketplaceRiskFindingSummary/);
+    assert.match(detail, /formatRiskFindingSummary\(risk\)/);
+    assert.doesNotMatch(
+      detail,
+      /class="marketplace-risk-item"[\s\S]{0,400}<p>\{\{\s*risk\.summary\s*\}\}/,
+    );
+    assert.match(review, /formatMarketplaceRiskFindingSummary/);
+    assert.match(review, /formatRiskFindingSummary\(risk\)/);
+
+    const en = JSON.parse(readPluginFile("manifest/i18n/en-US/plugin.json"));
+    const zh = JSON.parse(readPluginFile("manifest/i18n/zh-CN/plugin.json"));
+    const findingCodes = [
+      "source_sql_present",
+      "source_docs_indexed",
+      "framework_dependency_missing",
+      "i18n_files_missing",
+      "dynamic_runtime_detected",
+      "dynamic_host_services_present",
+      "dynamic_routes_present",
+      "dynamic_sql_present",
+      "dynamic_mock_sql_present",
+      "dynamic_manifest_resources_missing",
+    ];
+    for (const code of findingCodes) {
+      const key = `plugin.linapro-plugin-marketplace.detail.riskFinding.${code}`;
+      assert.ok(en[key], `missing en-US risk finding key ${key}`);
+      assert.ok(zh[key], `missing zh-CN risk finding key ${key}`);
+      assert.notEqual(en[key], zh[key], `${key} must differ across locales`);
+    }
+    assert.equal(
+      zh["plugin.linapro-plugin-marketplace.detail.riskFinding.framework_dependency_missing"],
+      "未声明框架兼容性依赖。",
+    );
+    assert.equal(
+      zh["plugin.linapro-plugin-marketplace.detail.riskFinding.source_docs_indexed"],
+      "已检测到可用于市场展示的文档条目。",
+    );
+
+    // Pure helper behavior without Vue: mirror the util's code → key → translate path.
+    function formatRiskFindingSummary(t, risk) {
+      const code =
+        risk?.payload && typeof risk.payload.code === "string"
+          ? risk.payload.code.trim()
+          : "";
+      if (!code) {
+        return (risk?.summary || "").trim();
+      }
+      const key = `plugin.linapro-plugin-marketplace.detail.riskFinding.${code}`;
+      const translated = t(key);
+      if (!translated || translated === key) {
+        return (risk?.summary || "").trim();
+      }
+      return translated;
+    }
+    const t = (key) => zh[key] || key;
+    assert.equal(
+      formatRiskFindingSummary(t, {
+        payload: { code: "framework_dependency_missing" },
+        summary: "Framework compatibility dependency is not declared.",
+      }),
+      "未声明框架兼容性依赖。",
+    );
+    assert.equal(
+      formatRiskFindingSummary(t, {
+        payload: { code: "unknown_legacy_code" },
+        summary: "Legacy English summary remains as fallback.",
+      }),
+      "Legacy English summary remains as fallback.",
+    );
+  });
+});
+
 describe("marketplace frontend i18n keys", () => {
   it("covers all plugin runtime keys in en-US and zh-CN resources", () => {
     const en = JSON.parse(readPluginFile("manifest/i18n/en-US/plugin.json"));

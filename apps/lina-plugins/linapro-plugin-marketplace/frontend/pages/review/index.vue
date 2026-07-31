@@ -50,6 +50,10 @@ import {
   marketplaceReleaseRisks,
   marketplaceReviewQueueList,
 } from "../../api/marketplace";
+import {
+  formatMarketplaceRiskFindingSummary,
+  sortMarketplaceRiskFindingsBySeverity,
+} from "../../utils/risk";
 import DetailModalContent from "../detail/detail-modal.vue";
 
 type GridPageInfo = {
@@ -146,6 +150,11 @@ const [ReviewDrawer, reviewDrawerApi] = useVbenDrawer({
 
 function t(key: string, params?: Record<string, number | string>) {
   return params ? $t(key, params) : $t(key);
+}
+
+/** Localize scanner finding body text via payload.code; English summary is fallback. */
+function formatRiskFindingSummary(risk: MarketplaceRiskItem) {
+  return formatMarketplaceRiskFindingSummary(t, risk);
 }
 
 function trimOptional(value?: string) {
@@ -539,7 +548,9 @@ async function handleInspect(row: MarketplaceReviewQueueItem) {
   }
 
   if (riskResult.status === "fulfilled") {
-    reviewRisks.value = riskResult.value.items;
+    reviewRisks.value = sortMarketplaceRiskFindingsBySeverity(
+      riskResult.value.items,
+    );
     reviewRisksReady.value = true;
   } else {
     reviewRiskLoadFailed.value = true;
@@ -797,7 +808,7 @@ function getReviewDrawerTitle() {
                     <Tag>{{ formatRiskType(risk.type) }}</Tag>
                     <span>{{ risk.source }}</span>
                   </div>
-                  <p>{{ risk.summary }}</p>
+                  <p>{{ formatRiskFindingSummary(risk) }}</p>
                 </div>
               </div>
 

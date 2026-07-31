@@ -80,6 +80,68 @@
 - [x] **FB-19**: 「我的插件」详情文档左侧目录应列出版本下全部可导航 `manifest/docs` Markdown 文件（而非仅 `index.md`），且目录项标题使用各 md 文件首个标题而非文件名
 - [x] **FB-20**: 插件市场详情文档页 Markdown 渲染样式不美观；应使用成熟 Markdown 渲染链路（对齐 VS Code/GitHub 预览），支持代码高亮、表格、图片等常用语法，并支持 Mermaid 图表渲染
 - [x] **FB-21**: 「我的插件」列表支持按插件标识、状态、下载量、更新时间排序，默认按插件标识升序
+- [x] **FB-22**: 「我的插件」详情风险摘要显示「警告/提示」计数，但风险页内容为空；Git 发现路径应与上传路径一致，将 scanner diagnostics 持久化为 plugin_marketplace_risk 明细行
+- [x] **FB-23**: 插件详情风险摘要相关展示与风险 Tab 中 scanner 风险说明文案为英文源文本，缺少运行时 i18n；应按 diagnostic code 映射中英文语言包
+- [x] **FB-24**: 插件详情「同步信息」字段直接展示 Git 发现写入的英文 lastSyncMessage（如 discovered 0 new draft releases...），缺少运行时 i18n；应按已知诊断模式映射中英文语言包，并覆盖我的插件状态 tooltip 与失败流水线提示
+- [x] **FB-25**: 「我的插件」详情风险 Tab 列表未按风险等级排序；应按 high → warning → info 展示，高风险在前
+- [x] **FB-26**: 审查「风险摘要」字段 Tag 是否按风险等级排序（高风险在前）；若已正确则记录审查结论，无需改代码
+- [x] **FB-27**: 插件详情「同步信息」字段值使用 marketplace-muted 导致字号 12px，与 Descriptions 其它字段默认字号不一致；应与表格/描述列表正文对齐
+
+## Feedback 影响记录（FB-25 ~ FB-27）
+
+- [x] 根因（FB-25）：`ListReleaseRisks` 仅 `OrderDesc(id)`，前端原样渲染 `currentRisks`/`reviewRisks`，未按 severity 排序
+- [x] 修复（FB-25）：后端按 severity CASE 排序 + 页内稳定排序；前端 `sortMarketplaceRiskFindingsBySeverity` 在详情/审核页加载后排序
+- [x] 审查（FB-26）：风险摘要 Tag 模板已按 `high → warning → info` 顺序渲染（`getRiskCounts().high/warning/info`）；无代码缺陷；E2E TC-15a 固化摘要顺序断言
+- [x] 根因（FB-27）：`lastSyncMessage` 包了 `marketplace-muted`（`font-size: 12px`），与 Descriptions 正文默认字号不一致
+- [x] 修复（FB-27）：去掉同步信息字段的 `marketplace-muted`，继承 Descriptions 正文样式
+- [x] i18n：无新增文案/语言包键；仅展示顺序与样式
+- [x] 缓存一致性：无影响
+- [x] 数据权限/可见性：无影响
+- [x] 开发工具跨平台：无影响
+- [x] DI：无新增运行期依赖
+- [x] 外部规则：已读 `plugin.md`、`frontend-ui.md`、`backend-go.md`、`testing.md`、`i18n.md`、`openspec.md`；API 契约无变更
+- [x] 截图：`temp/20260731/145625-risk-list-severity-order.png`（风险 Tab 高危在前）、`temp/20260731/145625-risk-summary-severity-order.png`（摘要 高危→警告→提示）、`temp/20260731/145617-last-sync-message-i18n-zh.png`（同步信息字号对齐）
+- [x] 测试：后端 `TestSortMarketplaceRiskItemsBySeverity`、前端 unit severity ordering、E2E TC-15a；回归 TC-12/TC-13/TC-14；`make lint.go dir=apps/lina-plugins/linapro-plugin-marketplace plugins=1`、`openspec validate --strict` 通过
+
+## Feedback 影响记录（FB-24）
+
+- [x] 根因：Git 发现与流水线将英文诊断写入 `last_sync_message`；详情「同步信息」、失败流水线提示与我的插件状态 tooltip 原样渲染，未走运行时语言包。用户反馈中的 `discovered 0 new draft releases...` 对应「同步信息」字段（风险摘要标签本身已 i18n）
+- [x] 修复：新增 `frontend/utils/sync-message.ts` 的 `formatMarketplaceLastSyncMessage`；按后端已知英文源文本模式映射 `detail.syncMessage.*`；详情页、失败提示与我的插件 tooltip 接入；补齐 en-US/zh-CN 10 个键
+- [x] i18n：有影响；插件 `manifest/i18n/zh-CN|en-US/plugin.json` 新增 syncMessage 键；未知自由文本诊断保留英文 fallback
+- [x] 缓存一致性：无影响；翻译在前端求值，不改 last_sync_message 权威数据
+- [x] 数据权限/可见性：无影响
+- [x] 开发工具跨平台：无影响
+- [x] DI：无新增运行期依赖
+- [x] 外部规则：已读 `plugin.md`、`frontend-ui.md`、`i18n.md`、`testing.md`、`openspec.md`；后端 Go/API/SQL 无契约变更
+- [x] 截图：修复前 `temp/e2e/20260731/03-risk-summary-field.png` 同步信息为英文；修复后 `temp/20260731/143944-last-sync-message-i18n-zh.png` 为「未发现新草稿版本（已有 1 个不可变版本）」
+- [x] 测试：`node --test marketplace-frontend.test.mjs`、E2E TC-14a、回归 TC-12/TC-13、`openspec validate --strict` 通过
+- [x] 生效说明：需加载新增 i18n 资源与前端代码（重启宿主/刷新前端）；历史 last_sync_message 英文行无需重扫，前端模式匹配即可
+
+## Feedback 影响记录（FB-23）
+
+- [x] 根因：scanner 将英文 `summary` 与稳定 `payload.code` 写入 `plugin_marketplace_risk`；详情/审核页直接渲染 `risk.summary`，未按 code 走运行时语言包；严重级别/类型标签已有 i18n，正文未覆盖
+- [x] 修复：新增 `frontend/utils/risk.ts` 的 `formatMarketplaceRiskFindingSummary`；详情与审核风险列表按 `payload.code` 映射 `detail.riskFinding.*`；补齐 en-US/zh-CN 全部已知 diagnostic code 文案
+- [x] i18n：有影响；插件 `manifest/i18n/zh-CN|en-US/plugin.json` 新增 10 个 riskFinding 键；运行时以英文源文本为 fallback
+- [x] 缓存一致性：无影响；翻译在前端求值，不改风险明细权威数据
+- [x] 数据权限/可见性：无影响
+- [x] 开发工具跨平台：无影响
+- [x] DI：无新增运行期依赖
+- [x] 外部规则：已读 `plugin.md`、`frontend-ui.md`、`i18n.md`、`testing.md`、`openspec.md`；后端 Go/API/SQL 无契约变更
+- [x] 测试：`node --test marketplace-frontend.test.mjs`、E2E TC-12b/TC-13a（zh-CN 正文、摘要计数一致）通过；`openspec validate --strict` 通过
+- [x] 生效说明：需重启宿主/插件以加载新增 i18n 资源与前端代码；历史风险行已有 `payload.code` 无需重扫
+
+## Feedback 影响记录（FB-22）
+
+- [x] 根因：`discoverOneGitRef` 仅通过 `buildSourceRiskSummary` 写入 `release.risk_summary` 聚合计数，未像源码包/动态包上传路径那样调用 `replaceReleaseRisks` 写入 `plugin_marketplace_risk` 明细行；风险页 API 只读明细表，故摘要有「警告 2 提示 1」而风险 Tab 为空
+- [x] 修复：草稿发现路径在 display i18n 之后调用 `replaceReleaseRisks(ctx, release, diagnostics)`；已发布/不可变版本在 re-discovery 时回填风险明细（不改动冻结的 `risk_summary`）
+- [x] i18n：无影响；无新增运行时 UI 文案、菜单、API 文档源文本或语言包键
+- [x] 缓存一致性：无影响；风险明细仍以 `plugin_marketplace_risk` 为权威数据源，发现时整体替换
+- [x] 数据权限/可见性：无影响；风险列表仍走 `requireVisibleRelease`，不扩大可见范围
+- [x] 开发工具跨平台：无影响
+- [x] DI：无新增运行期依赖
+- [x] 外部规则：已读 `plugin.md`、`backend-go.md`、`testing.md`、`openspec.md`、`i18n.md`；API/SQL/前端 UI/缓存/数据权限/dev-tooling 无契约级变更
+- [x] 测试：`GOWORK=off go test ./backend/internal/service/marketplace -count=1`、`make lint.go dir=apps/lina-plugins/linapro-plugin-marketplace plugins=1`、E2E TC-12（复现空列表 + 修复后明细与摘要一致）、回归 TC-9/TC-10、`openspec validate --strict` 通过
+- [x] 既有数据：已登记的 Git 插件需等待下次 Git 元数据发现（定时任务或「新版本」同步）回填风险明细行
 
 ## Feedback 影响记录（FB-21）
 

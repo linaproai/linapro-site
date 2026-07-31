@@ -280,8 +280,15 @@ func (s *serviceImpl) ListReleaseRisks(ctx context.Context, in ListReleaseRisksI
 	}
 	var rows []*entity.PluginMarketplaceRisk
 	cols := dao.PluginMarketplaceRisk.Columns()
+	// Order by severity rank first so paginated pages still surface high-impact
+	// findings before warnings/info. CASE WHEN is portable across MySQL and
+	// PostgreSQL; in-process stable sort below keeps same-page order correct
+	// even if a driver rewrites the ORDER BY clause.
+	severityOrder := "CASE LOWER(" + cols.Severity + ") WHEN 'high' THEN 0 " +
+		"WHEN 'warning' THEN 1 WHEN 'info' THEN 2 ELSE 3 END ASC"
 	err = model.Clone().
 		Fields(cols.RiskType, cols.Severity, cols.Source, cols.Summary, cols.Payload, cols.CreatedAt).
+		Order(severityOrder).
 		OrderDesc(cols.Id).
 		Page(pageNum, pageSize).
 		Scan(&rows)
@@ -292,6 +299,7 @@ func (s *serviceImpl) ListReleaseRisks(ctx context.Context, in ListReleaseRisksI
 	for _, row := range rows {
 		items = append(items, riskItemFromEntity(row))
 	}
+	sortMarketplaceRiskItemsBySeverity(items)
 	return &RiskListOutput{List: items, Total: total}, nil
 }
 
@@ -1293,6 +1301,43 @@ func riskItemFromEntity(row *entity.PluginMarketplaceRisk) *marketv1.Marketplace
 		Payload:   gjson.New(row.Payload).Map(),
 		CreatedAt: unixMillisPtr(row.CreatedAt),
 	}
+}
+
+// riskSeverityRank returns the display priority for one severity value.
+// Lower values sort first: high → warning → info → unknown.
+func riskSeverityRank(severity marketv1.MarketplaceRiskSeverity) int {
+	switch marketv1.MarketplaceRiskSeverity(strings.ToLower(strings.TrimSpace(severity.String()))) {
+	case marketv1.MarketplaceRiskSeverityHigh:
+		return 0
+	case marketv1.MarketplaceRiskSeverityWarning:
+		return 1
+	case marketv1.MarketplaceRiskSeverityInfo:
+		return 2
+	default:
+		return 3
+	}
+}
+
+// sortMarketplaceRiskItemsBySeverity orders findings high → warning → info while
+// preserving original relative order within the same severity (stable sort).
+func sortMarketplaceRiskItemsBySeverity(items []*marketv1.MarketplaceRiskItem) {
+	if len(items) < 2 {
+		return
+	}
+	sort.SliceStable(items, func(i, j int) bool {
+		left := items[i]
+		right := items[j]
+		if left == nil && right == nil {
+			return false
+		}
+		if left == nil {
+			return false
+		}
+		if right == nil {
+			return true
+		}
+		return riskSeverityRank(left.Severity) < riskSeverityRank(right.Severity)
+	})
 }
 
 // documentItemFromRecord projects indexed document metadata to API DTO.

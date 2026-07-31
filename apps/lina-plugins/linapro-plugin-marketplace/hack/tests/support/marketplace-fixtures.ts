@@ -24,11 +24,17 @@ type ReviewStatus =
   | "submitted";
 type RiskSeverity = "high" | "info" | "warning";
 type RiskType =
+  | "data_table"
+  | "dependency"
   | "docs"
   | "dynamic_route"
+  | "external_network"
   | "host_service"
   | "install_sql"
-  | "menu_permission";
+  | "menu_permission"
+  | "mock_sql"
+  | "multi_tenant"
+  | "uninstall_sql";
 type Visibility = "private" | "public" | "reserved";
 
 type PublisherItem = {
@@ -114,6 +120,11 @@ type PluginItem = {
   sourceDelivery: "dynamic_upload_required" | "source_rebuild_required";
   /** Publish channel shown as a dedicated Mine list column. */
   sourceKind?: "git" | "upload";
+  /**
+   * English source diagnostic from Git discovery / pipeline. Detail UI must
+   * localize known patterns via detail.syncMessage.* i18n keys.
+   */
+  lastSyncMessage?: string;
   summary: string;
   tagCodes: string[];
   tags: Array<{
@@ -160,6 +171,12 @@ type RiskItem = {
 
 type MockOptions = {
   failDownloadsFor?: string[];
+  /**
+   * Overrides the risk detail rows returned for the Git-sourced tenant-core
+   * release, so E2E can model either the pre-fix state (empty rows while the
+   * summary reports counts) or the post-fix state (rows matching the summary).
+   */
+  gitSourceRisks?: RiskItem[];
   includePrivatePlugins?: boolean;
   inspectionDelayMsByRelease?: Record<string, number>;
   menuRole?: "both" | "publish-only" | "review-only";
@@ -560,6 +577,8 @@ const plugins: PluginItem[] = [
     },
     sourceDelivery: "source_rebuild_required",
     sourceKind: "git",
+    lastSyncMessage:
+      "discovered 0 new draft releases (1 existing immutable version(s))",
     summary: "Tenant core plugin distributed from the official Git repository.",
     tagCodes: ["official", "source"],
     tags: [
@@ -902,6 +921,14 @@ export async function installMarketplaceApiMocks(
   options: MockOptions = {},
 ): Promise<MarketplaceMockState> {
   const data = createMarketplaceMockData();
+  // Keep the Git-sourced plugin risk_summary tags consistent with overridden
+  // detail rows so risk-page E2E can assert both projections together.
+  if (options.gitSourceRisks) {
+    const plugin = data.pluginsById.get(readmeOnlyGitPluginId);
+    if (plugin) {
+      plugin.riskCounts = riskCountsFromItems(options.gitSourceRisks);
+    }
+  }
   const state: MarketplaceMockState = {
     deniedRequests: [],
     downloadRequests: [],
@@ -952,6 +979,7 @@ export async function installMarketplaceApiMocks(
   await page.route("**/x/linapro-plugin-marketplace/**", async (route) => {
     await handleMarketplaceRoute(route, state, data, {
       failedDownloads,
+      gitSourceRisks: options.gitSourceRisks,
       includePrivatePlugins: options.includePrivatePlugins === true,
       inspectionDelayMsByRelease: options.inspectionDelayMsByRelease ?? {},
       menuRole: options.menuRole ?? "both",
@@ -1010,6 +1038,10 @@ export function marketplacePrivatePluginId() {
 
 export function marketplaceReadmeOnlyGitPluginId() {
   return readmeOnlyGitPluginId;
+}
+
+export function marketplaceReadmeOnlyGitVersion() {
+  return readmeOnlyGitRelease.version;
 }
 
 export function marketplaceExternalPluginId() {
@@ -1087,6 +1119,8 @@ async function handleMarketplaceRoute(
   data: MarketplaceMockData,
   options: {
     failedDownloads: Set<string>;
+    /** Optional override for Git-sourced tenant-core risk detail rows. */
+    gitSourceRisks?: RiskItem[];
     includePrivatePlugins: boolean;
     inspectionDelayMsByRelease: Record<string, number>;
     menuRole: "both" | "publish-only" | "review-only";
@@ -1546,10 +1580,11 @@ async function handleMarketplaceRoute(
       segments[2],
       segments[4],
     );
-    await fulfillData(
-      route,
-      pageResult(risks.get(releaseKey(segments[2], segments[4])) ?? []),
-    );
+    const releaseRisks =
+      segments[2] === readmeOnlyGitPluginId && options.gitSourceRisks
+        ? options.gitSourceRisks
+        : (risks.get(releaseKey(segments[2], segments[4])) ?? []);
+    await fulfillData(route, pageResult(releaseRisks));
     state.inspectionResponses.push({
       kind: "risks",
       pluginId: segments[2],
@@ -2206,6 +2241,21 @@ function clonePlugin(plugin: PluginItem): PluginItem {
     tagCodes: [...plugin.tagCodes],
     tags: plugin.tags.map((tag) => ({ ...tag })),
   };
+}
+
+/** Aggregate risk severity counts the same way the backend summary does. */
+function riskCountsFromItems(items: RiskItem[]): PluginItem["riskCounts"] {
+  const counts = { high: 0, info: 0, warning: 0 };
+  for (const item of items) {
+    if (item.severity === "high") {
+      counts.high += 1;
+    } else if (item.severity === "warning") {
+      counts.warning += 1;
+    } else {
+      counts.info += 1;
+    }
+  }
+  return counts;
 }
 
 function cloneRelease(release: ReleaseItem): ReleaseItem {

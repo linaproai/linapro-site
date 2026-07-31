@@ -77,6 +77,11 @@ import {
   renderMarketplaceMarkdown,
   resolveRelativeMarkdownPath,
 } from "../../utils/markdown";
+import {
+  formatMarketplaceRiskFindingSummary,
+  sortMarketplaceRiskFindingsBySeverity,
+} from "../../utils/risk";
+import { formatMarketplaceLastSyncMessage } from "../../utils/sync-message";
 
 type DetailGridOptions = NonNullable<
   VxeGridProps<MarketplaceReleaseItem>["gridOptions"]
@@ -643,7 +648,9 @@ async function loadReleaseRisks(
     if (!isCurrentReleaseRequest(row, requestId)) {
       return;
     }
-    currentRisks.value = result.items;
+    // Always present high-severity findings first, even if the API returns
+    // insertion order or an unsorted page (mocks and legacy rows).
+    currentRisks.value = sortMarketplaceRiskFindingsBySeverity(result.items);
     riskLoadState.value = result.items.length > 0 ? "ready" : "empty";
   } catch {
     if (!isCurrentReleaseRequest(row, requestId)) {
@@ -1074,7 +1081,7 @@ function processPipelineMessage() {
     }
     case "failed": {
       return (
-        detail.value.lastSyncMessage ||
+        formatLastSyncMessage(detail.value.lastSyncMessage) ||
         t("plugin.linapro-plugin-marketplace.detail.pipeline.failedHint")
       );
     }
@@ -1198,6 +1205,16 @@ function formatRiskSeverity(severity: MarketplaceRiskSeverity) {
       return t("plugin.linapro-plugin-marketplace.detail.riskSeverity.warning");
     }
   }
+}
+
+/** Localize scanner finding body text via payload.code; English summary is fallback. */
+function formatRiskFindingSummary(risk: MarketplaceRiskItem) {
+  return formatMarketplaceRiskFindingSummary(t, risk);
+}
+
+/** Localize Git/pipeline lastSyncMessage; English source text is fallback. */
+function formatLastSyncMessage(message?: null | string) {
+  return formatMarketplaceLastSyncMessage(t, message);
 }
 
 function getRiskSeverityColor(severity: MarketplaceRiskSeverity) {
@@ -1479,9 +1496,7 @@ function formatBytes(value?: number) {
                 "
                 :span="2"
               >
-                <span class="marketplace-muted">{{
-                  detail.lastSyncMessage
-                }}</span>
+                {{ formatLastSyncMessage(detail.lastSyncMessage) }}
               </DescriptionsItem>
               <DescriptionsItem
                 :label="
@@ -1783,7 +1798,7 @@ function formatBytes(value?: number) {
                         <Tag>{{ formatRiskType(risk.type) }}</Tag>
                         <span class="marketplace-muted">{{ risk.source }}</span>
                       </Space>
-                      <p>{{ risk.summary }}</p>
+                      <p>{{ formatRiskFindingSummary(risk) }}</p>
                     </div>
                   </div>
                   <Empty

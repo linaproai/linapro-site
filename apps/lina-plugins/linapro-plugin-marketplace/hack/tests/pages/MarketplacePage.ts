@@ -882,6 +882,97 @@ export class MarketplacePage {
     ).toHaveAttribute("aria-selected", "true");
   }
 
+  // Detail risk summary Tag renders i18n catalog.risk.<severity> with {count},
+  // e.g. "提示 1". The severity label plus count disambiguates the summary Tag
+  // from the per-row severity Tag (which shows the label without a count).
+  async expectRiskSummaryTag(
+    severity: "high" | "info" | "warning",
+    count: number,
+  ) {
+    const labels = { high: "高危", info: "提示", warning: "警告" } as const;
+    await expect(
+      this.detailShell()
+        .locator(".ant-tag")
+        .filter({ hasText: `${labels[severity]} ${count}` })
+        .first(),
+    ).toBeVisible();
+  }
+
+  async expectRiskListCount(count: number) {
+    await expect(
+      this.detailShell().locator(".marketplace-risk-item"),
+    ).toHaveCount(count);
+  }
+
+  /**
+   * Locate one Descriptions content cell by its label text. Works for both
+   * bordered (label/content sibling cells) and non-bordered (sibling spans
+   * under the item container) Ant Design layouts.
+   */
+  detailDescriptionsContentByLabel(label: RegExp): Locator {
+    return this.detailShell()
+      .locator(".ant-descriptions-item-label")
+      .filter({ hasText: label })
+      .first()
+      .locator(
+        "xpath=following-sibling::*[contains(@class,'ant-descriptions-item-content')][1]",
+      );
+  }
+
+  // Risk list rows must present high → warning → info (left-to-right of the
+  // first severity Tag in each .marketplace-risk-item).
+  async expectRiskListSeverityOrder(
+    expected: Array<"high" | "info" | "warning">,
+  ) {
+    const labels = { high: "高危", info: "提示", warning: "警告" } as const;
+    const items = this.detailShell().locator(".marketplace-risk-item");
+    await expect(items).toHaveCount(expected.length);
+    for (let index = 0; index < expected.length; index += 1) {
+      const severityTag = items.nth(index).locator(".ant-tag").first();
+      await expect(severityTag).toHaveText(labels[expected[index]]);
+    }
+  }
+
+  // Risk summary Tags in the overview Descriptions must keep high → warning →
+  // info visual order among the severity-count tags that are present.
+  async expectRiskSummarySeverityOrder(
+    expected: Array<"high" | "info" | "warning">,
+  ) {
+    const labels = { high: "高危", info: "提示", warning: "警告" } as const;
+    const tags = this.detailDescriptionsContentByLabel(
+      /风险摘要|Risk Summary/u,
+    ).locator(".ant-tag");
+    await expect(tags).toHaveCount(expected.length);
+    for (let index = 0; index < expected.length; index += 1) {
+      await expect(tags.nth(index)).toContainText(labels[expected[index]]);
+    }
+  }
+
+  // Risk body text must use locale-specific riskFinding i18n, not the English
+  // source summary persisted by the package scanner.
+  async expectRiskFindingText(text: string) {
+    await expect(this.detailShell().getByText(text).first()).toBeVisible();
+  }
+
+  // Detail "同步信息" field localizes known English lastSyncMessage patterns.
+  async expectLastSyncMessageText(text: string) {
+    await expect(this.detailShell().getByText(text).first()).toBeVisible();
+  }
+
+  async expectLastSyncMessageAbsent(text: string) {
+    await expect(this.detailShell().getByText(text)).toHaveCount(0);
+  }
+
+  // i18n detail.empty.risks shown when the risks API returns no rows; mirrors
+  // the pre-fix state where the Git path wrote only the summary, not risk rows.
+  async expectRiskListEmptyState() {
+    await expect(
+      this.detailShell()
+        .getByText("扫描已完成，所选版本未发现风险条目。")
+        .first(),
+    ).toBeVisible();
+  }
+
   async confirmDownloadForVersion(version: string) {
     await this.showVersionTab();
     const downloadButton = await this.rowActionButton(

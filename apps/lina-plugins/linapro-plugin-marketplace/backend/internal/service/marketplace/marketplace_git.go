@@ -846,16 +846,24 @@ func (s *serviceImpl) discoverOneGitRef(
 	}
 	if existing != nil && immutableRelease(existing) {
 		// Submitted/published releases must not rewrite draft metadata, but
-		// documentation snapshots are disk-only and may be incomplete after a
-		// monorepo import, storage wipe, or when manifest/docs was added after
-		// the install pin was frozen. Re-index docs against the current
-		// discovery ref (tag/main) so marketplace catalogs pick up all Markdown
-		// files and first-heading titles, while install still uses source_commit.
+		// derived review projections (risk detail rows, documentation snapshots)
+		// may be incomplete after earlier discovery bugs, monorepo import,
+		// storage wipe, or when manifest/docs was added after the install pin
+		// was frozen. Re-derive those projections against the current discovery
+		// ref while install still uses source_commit.
+		release, releaseErr := s.getReleaseRecordByID(ctx, existing.Id)
+		if releaseErr != nil {
+			return gitDiscoverRefNone, releaseErr
+		}
+		// Heal Git releases that previously stored only risk_summary counts
+		// without plugin_marketplace_risk rows, so the owner risk page matches
+		// the summary after re-discovery. Risk_summary itself stays frozen.
+		sqlSummary, i18nSummary, docsSummary := buildGitResourceSummariesFromTree(treePaths, repoPath)
+		diagnostics := sourcePackageDiagnostics(manifestAsSource(manifest), sqlSummary, i18nSummary, docsSummary)
+		if err = s.replaceReleaseRisks(ctx, release, diagnostics); err != nil {
+			return gitDiscoverRefNone, err
+		}
 		if enrichDocs {
-			release, releaseErr := s.getReleaseRecordByID(ctx, existing.Id)
-			if releaseErr != nil {
-				return gitDiscoverRefNone, releaseErr
-			}
 			docsRef := strings.TrimSpace(ref.Name)
 			if docsRef == "" {
 				docsRef = firstNonEmpty(normalizeKey(existing.SourceCommit), gitFallbackBranchMain)
@@ -952,6 +960,13 @@ func (s *serviceImpl) discoverOneGitRef(
 	displayItems = mergePackageI18nDisplayItems(plugin.PluginId, displayItems, localeCatalogs)
 	if displayErr := s.replaceReleaseDisplayI18n(ctx, release, displayItems); displayErr != nil {
 		return gitDiscoverRefNone, displayErr
+	}
+	// Persist structured scanner risk findings for the discovered draft so the
+	// owner risk page stays consistent with the aggregated risk_summary counts.
+	// Mirrors the source-package and dynamic-package import paths, which write
+	// plugin_marketplace_risk rows from the same diagnostics used for the summary.
+	if err = s.replaceReleaseRisks(ctx, release, diagnostics); err != nil {
+		return gitDiscoverRefNone, err
 	}
 
 	if enrichDocs {

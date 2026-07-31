@@ -44,6 +44,7 @@ import { useVbenVxeGrid } from "#/adapter/vxe-table";
 import { $t } from "#/locales";
 import { formatTimestamp } from "#/utils/time";
 
+import { formatMarketplaceLastSyncMessage } from "../../utils/sync-message";
 import {
   marketplaceGitSourceRegister,
   marketplaceGitSourceSync,
@@ -817,7 +818,7 @@ function buildStatusTooltip(row: MarketplacePluginListItem) {
     row.latestReviewStatus
       ? `${t("plugin.linapro-plugin-marketplace.detail.columns.reviewStatus")}: ${formatReviewStatus(row.latestReviewStatus)}`
       : "",
-    row.lastSyncMessage || "",
+    formatMarketplaceLastSyncMessage(t, row.lastSyncMessage),
   ].filter(Boolean);
   return parts.join(" · ");
 }
