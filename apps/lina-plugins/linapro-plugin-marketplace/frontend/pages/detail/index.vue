@@ -80,6 +80,7 @@ import {
 } from "../../utils/markdown";
 import {
   countMarketplaceRiskDispositions,
+  filterMarketplaceRiskFindingsActionable,
   filterMarketplaceRiskFindingsByDisposition,
   formatMarketplaceRiskDisposition,
   formatMarketplaceRiskFindingGuidance,
@@ -88,7 +89,6 @@ import {
   marketplaceRiskDisposition,
   marketplaceRiskEvidence,
   marketplaceRiskHasEvidence,
-  sortMarketplaceRiskFindingsBySeverity,
 } from "../../utils/risk";
 import { formatMarketplaceLastSyncMessage } from "../../utils/sync-message";
 
@@ -155,7 +155,7 @@ const availableDocuments = ref<MarketplaceDocumentItem[]>([]);
 const documentCatalog = ref<MarketplaceDocumentCatalogItem[]>([]);
 const activeDocumentPath = ref("");
 const currentRisks = ref<MarketplaceRiskItem[]>([]);
-const riskDispositionFilter = ref<"all" | "info_only" | "need_attention" | "need_fix">(
+const riskDispositionFilter = ref<"all" | "need_attention" | "need_fix">(
   "all",
 );
 const expandedRiskKeys = ref<Record<string, boolean>>({});
@@ -663,8 +663,8 @@ async function loadReleaseRisks(
     if (!isCurrentReleaseRequest(row, requestId)) {
       return;
     }
-    // Blocking and need_fix first, then severity within the same disposition.
-    currentRisks.value = sortMarketplaceRiskFindingsBySeverity(result.items);
+    // Actionable findings only (exclude info_only tips that confuse publishers).
+    currentRisks.value = filterMarketplaceRiskFindingsActionable(result.items);
     riskDispositionFilter.value = "all";
     expandedRiskKeys.value = {};
     // Auto-expand blocking / need_fix so publishers see remediation immediately.
@@ -676,7 +676,7 @@ async function loadReleaseRisks(
         expandedRiskKeys.value[riskItemKey(risk)] = true;
       }
     }
-    riskLoadState.value = result.items.length > 0 ? "ready" : "empty";
+    riskLoadState.value = currentRisks.value.length > 0 ? "ready" : "empty";
   } catch {
     if (!isCurrentReleaseRequest(row, requestId)) {
       return;
@@ -1903,18 +1903,7 @@ function formatBytes(value?: number) {
                         )
                       "
                     />
-                    <div class="marketplace-risk-summary">
-                      {{
-                        $t(
-                          'plugin.linapro-plugin-marketplace.detail.riskGuide.summaryLine',
-                          {
-                            needFix: riskDispositionCounts.needFix,
-                            needAttention: riskDispositionCounts.needAttention,
-                            infoOnly: riskDispositionCounts.infoOnly,
-                          },
-                        )
-                      }}
-                    </div>
+                    <!-- Counts live on filter chips only; avoid a second summary line. -->
                     <Space wrap :size="[8, 8]" class="marketplace-risk-filters">
                       <Button
                         size="small"
@@ -1961,22 +1950,6 @@ function formatBytes(value?: number) {
                           )
                         }}
                       </Button>
-                      <Button
-                        size="small"
-                        :type="
-                          riskDispositionFilter === 'info_only'
-                            ? 'primary'
-                            : 'default'
-                        "
-                        @click="riskDispositionFilter = 'info_only'"
-                      >
-                        {{
-                          $t(
-                            'plugin.linapro-plugin-marketplace.detail.riskGuide.filterInfoOnly',
-                            { count: riskDispositionCounts.infoOnly },
-                          )
-                        }}
-                      </Button>
                     </Space>
                     <div class="marketplace-risk-list">
                       <div
@@ -1987,82 +1960,103 @@ function formatBytes(value?: number) {
                           'marketplace-risk-item--blocking': isRiskBlocking(risk),
                         }"
                       >
-                        <Space wrap :size="[6, 6]">
-                          <Tag
-                            v-if="isRiskBlocking(risk)"
-                            color="error"
+                        <div class="marketplace-risk-item-header">
+                          <Space wrap :size="[6, 6]" class="marketplace-risk-tags">
+                            <Tag
+                              v-if="isRiskBlocking(risk)"
+                              color="error"
+                            >
+                              {{
+                                $t(
+                                  'plugin.linapro-plugin-marketplace.detail.riskGuide.blockingTag',
+                                )
+                              }}
+                            </Tag>
+                            <Tag :color="getRiskDispositionColor(risk)">
+                              {{ formatRiskDispositionLabel(risk) }}
+                            </Tag>
+                            <Tag :color="getRiskSeverityColor(risk.severity)">
+                              {{ formatRiskSeverity(risk.severity) }}
+                            </Tag>
+                            <Tag>{{ formatRiskType(risk.type) }}</Tag>
+                            <span class="marketplace-muted">{{
+                              risk.source
+                            }}</span>
+                          </Space>
+                          <Button
+                            type="link"
+                            size="small"
+                            class="marketplace-risk-toggle"
+                            @click="toggleRiskExpanded(risk)"
                           >
                             {{
-                              $t(
-                                'plugin.linapro-plugin-marketplace.detail.riskGuide.blockingTag',
-                              )
+                              isRiskExpanded(risk)
+                                ? $t(
+                                    'plugin.linapro-plugin-marketplace.detail.riskGuide.collapse',
+                                  )
+                                : $t(
+                                    'plugin.linapro-plugin-marketplace.detail.riskGuide.expand',
+                                  )
                             }}
-                          </Tag>
-                          <Tag :color="getRiskDispositionColor(risk)">
-                            {{ formatRiskDispositionLabel(risk) }}
-                          </Tag>
-                          <Tag :color="getRiskSeverityColor(risk.severity)">
-                            {{ formatRiskSeverity(risk.severity) }}
-                          </Tag>
-                          <Tag>{{ formatRiskType(risk.type) }}</Tag>
-                          <span class="marketplace-muted">{{ risk.source }}</span>
-                        </Space>
+                          </Button>
+                        </div>
                         <p class="marketplace-risk-title">
                           {{ formatRiskFindingSummary(risk) }}
                         </p>
-                        <Button
-                          type="link"
-                          size="small"
-                          class="marketplace-risk-toggle"
-                          @click="toggleRiskExpanded(risk)"
-                        >
-                          {{
-                            isRiskExpanded(risk)
-                              ? $t(
-                                  'plugin.linapro-plugin-marketplace.detail.riskGuide.collapse',
-                                )
-                              : $t(
-                                  'plugin.linapro-plugin-marketplace.detail.riskGuide.expand',
-                                )
-                          }}
-                        </Button>
                         <div
                           v-if="isRiskExpanded(risk)"
                           class="marketplace-risk-guidance"
                         >
-                          <div v-if="riskFindingReason(risk)">
-                            <strong>{{
-                              $t(
-                                'plugin.linapro-plugin-marketplace.detail.riskGuide.reason',
-                              )
-                            }}</strong>
+                          <div
+                            v-if="riskFindingReason(risk)"
+                            class="marketplace-risk-guidance-section"
+                          >
+                            <div class="marketplace-risk-guidance-label">
+                              {{
+                                $t(
+                                  'plugin.linapro-plugin-marketplace.detail.riskGuide.reason',
+                                )
+                              }}
+                            </div>
                             <p>{{ riskFindingReason(risk) }}</p>
                           </div>
-                          <div v-if="riskFindingRemediation(risk)">
-                            <strong>{{
-                              $t(
-                                'plugin.linapro-plugin-marketplace.detail.riskGuide.remediation',
-                              )
-                            }}</strong>
+                          <div
+                            v-if="riskFindingRemediation(risk)"
+                            class="marketplace-risk-guidance-section"
+                          >
+                            <div class="marketplace-risk-guidance-label">
+                              {{
+                                $t(
+                                  'plugin.linapro-plugin-marketplace.detail.riskGuide.remediation',
+                                )
+                              }}
+                            </div>
                             <p>{{ riskFindingRemediation(risk) }}</p>
                           </div>
-                          <div v-if="riskFindingAcceptance(risk)">
-                            <strong>{{
-                              $t(
-                                'plugin.linapro-plugin-marketplace.detail.riskGuide.acceptance',
-                              )
-                            }}</strong>
+                          <div
+                            v-if="riskFindingAcceptance(risk)"
+                            class="marketplace-risk-guidance-section"
+                          >
+                            <div class="marketplace-risk-guidance-label">
+                              {{
+                                $t(
+                                  'plugin.linapro-plugin-marketplace.detail.riskGuide.acceptance',
+                                )
+                              }}
+                            </div>
                             <p>{{ riskFindingAcceptance(risk) }}</p>
                           </div>
                           <div
                             v-if="riskHasEvidence(risk)"
-                            class="marketplace-risk-evidence"
+                            class="marketplace-risk-guidance-section marketplace-risk-evidence"
                           >
-                            <strong>{{
-                              $t(
-                                'plugin.linapro-plugin-marketplace.detail.riskGuide.evidence',
-                              )
-                            }}</strong>
+                            <div class="marketplace-risk-guidance-label">
+                              {{
+                                $t(
+                                  'plugin.linapro-plugin-marketplace.detail.riskGuide.evidence',
+                                )
+                              }}
+                            </div>
                             <div
                               v-if="riskEvidence(risk).expectedPath || riskEvidence(risk).expectedField"
                               class="marketplace-risk-evidence-block"
@@ -2770,73 +2764,201 @@ function formatBytes(value?: number) {
   gap: 12px;
 }
 
-.marketplace-risk-summary {
-  color: var(--ant-color-text-secondary);
-  font-size: 13px;
-}
-
 .marketplace-risk-filters {
   margin-bottom: 2px;
 }
 
+/* Soft canvas + white cards: multi-finding lists stay clearly separated. */
 .marketplace-risk-list {
   display: grid;
-  gap: 10px;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: 10px;
+  background: var(--ant-color-bg-layout);
 }
 
 .marketplace-risk-item {
-  padding: 12px;
-  border: 1px solid var(--ant-color-border-secondary);
-  border-radius: 6px;
+  position: relative;
+  padding: 14px 16px 14px 18px;
+  border: 1px solid var(--ant-color-border);
+  border-radius: 8px;
   background: var(--ant-color-bg-container);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 4%),
+    0 1px 6px -1px rgb(0 0 0 / 4%);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.marketplace-risk-item::before {
+  content: "";
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 0;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: var(--ant-color-text-quaternary, var(--ant-color-border));
+}
+
+.marketplace-risk-item:hover {
+  border-color: var(--ant-color-primary-border-hover, var(--ant-color-primary));
+  box-shadow:
+    0 2px 4px rgb(0 0 0 / 5%),
+    0 4px 12px -2px rgb(0 0 0 / 8%);
 }
 
 .marketplace-risk-item--blocking {
   border-color: var(--ant-color-error-border);
   background: var(--ant-color-error-bg);
+  box-shadow: none;
+}
+
+.marketplace-risk-item--blocking::before {
+  background: var(--ant-color-error);
+}
+
+.marketplace-risk-item--blocking:hover {
+  border-color: var(--ant-color-error-border);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--ant-color-error) 16%, transparent);
+}
+
+.marketplace-risk-item-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.marketplace-risk-tags {
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .marketplace-risk-title {
   margin: 8px 0 0;
   color: var(--ant-color-text);
   font-weight: 500;
+  line-height: 1.5;
 }
 
 .marketplace-risk-toggle {
-  padding-left: 0;
-  margin-top: 4px;
+  flex: 0 0 auto;
+  height: auto;
+  padding: 0;
+  margin: 0;
+  line-height: 22px;
+  white-space: nowrap;
 }
 
+/*
+ * Nested guidance panel: cool blue inset surface + primary accent rail,
+ * clearly separated from the risk summary title (works on white and error cards).
+ * Hex fallbacks keep contrast if Ant CSS variables are missing in a theme.
+ */
 .marketplace-risk-guidance {
   display: grid;
-  gap: 10px;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px dashed var(--ant-color-border-secondary);
+  gap: 0;
+  margin-top: 12px;
+  overflow: hidden;
+  border: 1px solid #91caff;
+  border: 1px solid var(--ant-color-primary-border, #91caff);
+  border-left: 3px solid #1677ff;
+  border-left-color: var(--ant-color-primary, #1677ff);
+  border-radius: 8px;
+  background: #e6f4ff;
+  background: var(--ant-color-primary-bg, #e6f4ff);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 55%);
+}
+
+.marketplace-risk-guidance-section {
+  padding: 12px 14px;
+}
+
+.marketplace-risk-guidance-section + .marketplace-risk-guidance-section {
+  border-top: 1px solid #bae0ff;
+  border-top-color: var(--ant-color-primary-border, #bae0ff);
+}
+
+.marketplace-risk-guidance-label {
+  margin: 0 0 6px;
+  color: rgba(0, 0, 0, 0.88);
+  color: var(--ant-color-text, rgba(0, 0, 0, 0.88));
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
 }
 
 .marketplace-risk-guidance p {
-  margin: 4px 0 0;
-  color: var(--ant-color-text);
-  line-height: 1.55;
+  margin: 0;
+  color: rgba(0, 0, 0, 0.65);
+  color: var(--ant-color-text-secondary, rgba(0, 0, 0, 0.65));
+  font-size: 13px;
+  line-height: 1.65;
 }
 
 .marketplace-risk-evidence {
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
 .marketplace-risk-evidence-block {
   display: grid;
-  gap: 4px;
+  gap: 6px;
 }
 
+.marketplace-risk-evidence-block .marketplace-muted {
+  font-size: 12px;
+}
+
+/* Single path/example chips (not list rows). */
+.marketplace-risk-evidence-block > code {
+  display: block;
+  max-width: 100%;
+  padding: 6px 10px;
+  border: 1px solid #d9d9d9;
+  border-color: var(--ant-color-border-secondary, #d9d9d9);
+  border-radius: 6px;
+  background: #fff;
+  background: var(--ant-color-bg-container, #fff);
+  color: rgba(0, 0, 0, 0.88);
+  color: var(--ant-color-text, rgba(0, 0, 0, 0.88));
+  font-size: 12px;
+  line-height: 1.5;
+  word-break: break-all;
+}
+
+/* File/service/route lists: one row surface each, no nested code boxes. */
 .marketplace-risk-evidence-block ul {
+  display: grid;
+  gap: 6px;
   margin: 0;
-  padding-left: 18px;
+  padding: 0;
+  list-style: none;
 }
 
-.marketplace-risk-evidence-block code {
+.marketplace-risk-evidence-block li {
+  padding: 6px 10px;
+  border: 1px solid #d9d9d9;
+  border-color: var(--ant-color-border-secondary, #d9d9d9);
+  border-radius: 6px;
+  background: #fff;
+  background: var(--ant-color-bg-container, #fff);
+  line-height: 1.5;
+  word-break: break-all;
+}
+
+.marketplace-risk-evidence-block li code {
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: rgba(0, 0, 0, 0.88);
+  color: var(--ant-color-text, rgba(0, 0, 0, 0.88));
+  font-size: 12px;
   word-break: break-all;
 }
 

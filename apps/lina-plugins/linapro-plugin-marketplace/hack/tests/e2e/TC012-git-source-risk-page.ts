@@ -57,16 +57,17 @@ test.describe("TC-12 git source plugin risk page consistency", () => {
     const page = authenticatedPage;
     await page.setViewportSize({ height: 960, width: 1440 });
     // After the fix the same diagnostics back both projections: supply one
-    // info-severity risk row so the detail list matches the { info: 1 } summary.
+    // actionable risk row so the detail list matches the warning summary count.
     await installMarketplaceApiMocks(page, {
       gitSourceRisks: [
         {
           // Stable diagnostic code drives UI i18n; English summary is fallback only.
-          payload: { code: "source_docs_indexed" },
-          severity: "info",
-          source: "manifest/docs",
-          summary: "Marketplace documentation entries were detected.",
-          type: "docs",
+          payload: { code: "source_sql_present" },
+          severity: "warning",
+          source: "manifest/sql",
+          summary:
+            "Source package contains SQL resources that require reviewer inspection.",
+          type: "install_sql",
         },
       ],
       menuRole: "publish-only",
@@ -79,19 +80,21 @@ test.describe("TC-12 git source plugin risk page consistency", () => {
     await marketplace.openMineDetail(pluginId);
     await marketplace.openRisksForVersion(marketplaceReadmeOnlyGitVersion());
 
-    // Summary and detail now agree: one info finding in both projections.
-    await marketplace.expectRiskSummaryTag("info", 1);
+    // Summary and detail now agree: one warning finding in both projections.
+    await marketplace.expectRiskSummaryTag("warning", 1);
     await marketplace.expectRiskListCount(1);
     // Risk body must render the zh-CN riskFinding translation, not English source.
     await expect(
       marketplace
         .detailShell()
-        .getByText("已检测到可用于市场展示的文档条目。"),
+        .getByText("源码包包含需审核关注的 SQL 资源。"),
     ).toBeVisible();
     await expect(
       marketplace
         .detailShell()
-        .getByText("Marketplace documentation entries were detected."),
+        .getByText(
+          "Source package contains SQL resources that require reviewer inspection.",
+        ),
     ).toHaveCount(0);
     await captureMarketplaceScreenshot(page, "git-risk-consistent-detail");
   });

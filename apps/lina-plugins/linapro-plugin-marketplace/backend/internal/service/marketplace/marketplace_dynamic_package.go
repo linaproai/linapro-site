@@ -1213,13 +1213,9 @@ func buildDynamicRouteSummary(routes []*contract.RouteContract) []*dynamicPackag
 }
 
 // dynamicPackageDiagnostics creates reviewer-facing findings for a valid dynamic package.
+// Successful runtime parse is not emitted as a finding (info-only noise for publishers).
 func dynamicPackageDiagnostics(spec *dynamicPackageWasmSpec) []*PackageDiagnostic {
-	diagnostics := []*PackageDiagnostic{{
-		Code:     "dynamic_runtime_detected",
-		Severity: marketv1.MarketplaceRiskSeverityInfo,
-		Source:   dynamicPackageWasmPath,
-		Message:  "Dynamic runtime artifact was parsed successfully.",
-	}}
+	diagnostics := make([]*PackageDiagnostic, 0)
 	if len(spec.hostServices) > 0 {
 		severity := marketv1.MarketplaceRiskSeverityWarning
 		if dynamicHostServicesIncludeHighRisk(spec.hostServices) {

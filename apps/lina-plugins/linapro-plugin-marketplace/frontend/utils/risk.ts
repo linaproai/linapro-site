@@ -530,7 +530,32 @@ export function countMarketplaceRiskDispositions(
 }
 
 /**
- * Filter findings by disposition chip value (`all` returns everything).
+ * Whether a finding should surface in publisher/reviewer risk workbenches.
+ * info_only rows are omitted so users are not prompted to "handle" pure tips.
+ */
+export function isMarketplaceRiskActionable(
+  risk: MarketplaceRiskFindingLike | null | undefined,
+): boolean {
+  return marketplaceRiskDisposition(risk) !== "info_only";
+}
+
+/**
+ * Drop informational-only findings, then sort for workbench display.
+ */
+export function filterMarketplaceRiskFindingsActionable<
+  T extends MarketplaceRiskFindingLike,
+>(items: readonly T[] | null | undefined): T[] {
+  if (!items || items.length === 0) {
+    return [];
+  }
+  return sortMarketplaceRiskFindingsBySeverity(
+    items.filter((item) => isMarketplaceRiskActionable(item)),
+  );
+}
+
+/**
+ * Filter findings by disposition chip value (`all` returns actionable items).
+ * info_only is never included.
  */
 export function filterMarketplaceRiskFindingsByDisposition<
   T extends MarketplaceRiskFindingLike,
@@ -538,11 +563,14 @@ export function filterMarketplaceRiskFindingsByDisposition<
   items: readonly T[] | null | undefined,
   disposition: "all" | MarketplaceRiskDisposition,
 ): T[] {
-  const sorted = sortMarketplaceRiskFindingsBySeverity(items);
+  const actionable = filterMarketplaceRiskFindingsActionable(items);
   if (!disposition || disposition === "all") {
-    return sorted;
+    return actionable;
   }
-  return sorted.filter(
+  if (disposition === "info_only") {
+    return [];
+  }
+  return actionable.filter(
     (item) => marketplaceRiskDisposition(item) === disposition,
   );
 }

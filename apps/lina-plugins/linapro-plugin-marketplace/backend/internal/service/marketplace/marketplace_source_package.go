@@ -922,27 +922,8 @@ func sourcePackageDiagnostics(
 			},
 		})
 	}
-	if len(docs) > 0 {
-		paths := make([]string, 0, len(docs))
-		for _, item := range docs {
-			if item == nil || strings.TrimSpace(item.Path) == "" {
-				continue
-			}
-			paths = append(paths, item.Path)
-		}
-		files, total, truncated := boundStringEvidence(paths)
-		diagnostics = append(diagnostics, &PackageDiagnostic{
-			Code:     "source_docs_indexed",
-			Severity: marketv1.MarketplaceRiskSeverityInfo,
-			Source:   "manifest/docs",
-			Message:  "Marketplace documentation entries were detected.",
-			Evidence: &PackageDiagnosticEvidence{
-				Files:      files,
-				TotalCount: total,
-				Truncated:  truncated,
-			},
-		})
-	}
+	// Documentation presence is not emitted as a risk finding: info-only
+	// rows confuse publishers into thinking action is required.
 	if manifest.Dependencies == nil || manifest.Dependencies.Framework == nil || manifest.Dependencies.Framework.Version == "" {
 		diagnostics = append(diagnostics, &PackageDiagnostic{
 			Code:     "framework_dependency_missing",

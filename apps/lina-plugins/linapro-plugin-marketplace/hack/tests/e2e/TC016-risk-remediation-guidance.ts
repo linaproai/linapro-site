@@ -72,21 +72,6 @@ test.describe("TC-16 risk remediation guidance", () => {
             "Source package contains SQL resources that require reviewer inspection.",
           type: "install_sql",
         },
-        {
-          blocking: false,
-          disposition: "info_only",
-          payload: {
-            blocking: false,
-            code: "source_docs_indexed",
-            disposition: "info_only",
-            files: ["manifest/docs/zh-CN/index.md"],
-            totalCount: 1,
-          },
-          severity: "info",
-          source: "manifest/docs",
-          summary: "Marketplace documentation entries were detected.",
-          type: "docs",
-        },
       ],
       menuRole: "publish-only",
     });
@@ -97,7 +82,7 @@ test.describe("TC-16 risk remediation guidance", () => {
     await marketplace.openMineDetail(marketplaceReadmeOnlyGitPluginId());
     await marketplace.openRisksForVersion(marketplaceReadmeOnlyGitVersion());
 
-    await marketplace.expectRiskListCount(4);
+    await marketplace.expectRiskListCount(3);
     await expect(
       marketplace.detailShell().getByText("存在 1 条阻塞项，须修复后才能提交审核。"),
     ).toBeVisible();

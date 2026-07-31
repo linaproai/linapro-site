@@ -656,18 +656,66 @@ describe("marketplace risk severity ordering", () => {
       ["fix-a", "high-attention", "framework-attention", "info-a", "info-b"],
     );
 
+    // info_only is stripped from workbench lists.
+    assert.match(riskUtil, /filterMarketplaceRiskFindingsActionable/);
+    assert.match(riskUtil, /isMarketplaceRiskActionable/);
+    assert.match(riskUtil, /!== "info_only"/);
+
     const detail = readPluginFile("frontend/pages/detail/index.vue");
     const review = readPluginFile("frontend/pages/review/index.vue");
-    assert.match(detail, /sortMarketplaceRiskFindingsBySeverity/);
+    assert.match(detail, /filterMarketplaceRiskFindingsActionable/);
     assert.match(
       detail,
-      /currentRisks\.value\s*=\s*sortMarketplaceRiskFindingsBySeverity\(result\.items\)/,
+      /currentRisks\.value\s*=\s*filterMarketplaceRiskFindingsActionable\(result\.items\)/,
     );
-    assert.match(review, /sortMarketplaceRiskFindingsBySeverity/);
+    assert.match(review, /filterMarketplaceRiskFindingsActionable/);
+    assert.doesNotMatch(detail, /filterInfoOnly/);
     // Risk summary Tags already render high → warning → info in the template.
     assert.match(
       detail,
       /getRiskCounts\(\)\.high[\s\S]*?getRiskCounts\(\)\.warning[\s\S]*?getRiskCounts\(\)\.info/,
+    );
+  });
+
+  it("renders multi-item risk rows as separated cards on detail and review", () => {
+    const detail = readPluginFile("frontend/pages/detail/index.vue");
+    const review = readPluginFile("frontend/pages/review/index.vue");
+    // Detail: soft canvas + white cards + left accent between findings.
+    assert.match(
+      detail,
+      /\.marketplace-risk-list\s*\{[\s\S]*?gap:\s*12px[\s\S]*?background:\s*var\(--ant-color-bg-layout\)/,
+    );
+    assert.match(
+      detail,
+      /\.marketplace-risk-item\s*\{[\s\S]*?border:\s*1px solid var\(--ant-color-border\)[\s\S]*?background:\s*var\(--ant-color-bg-container\)/,
+    );
+    assert.match(detail, /\.marketplace-risk-item::before\s*\{/);
+    assert.match(
+      detail,
+      /\.marketplace-risk-item--blocking::before\s*\{[\s\S]*?background:\s*var\(--ant-color-error\)/,
+    );
+    // Expanded guidance is a distinct inset panel, not the same surface as summary.
+    assert.match(detail, /class="marketplace-risk-guidance"/);
+    assert.match(detail, /marketplace-risk-guidance-section/);
+    assert.match(detail, /marketplace-risk-guidance-label/);
+    assert.match(
+      detail,
+      /\.marketplace-risk-guidance\s*\{[\s\S]*?border-left:\s*3px solid #1677ff[\s\S]*?background:\s*#e6f4ff/,
+    );
+    // Review page keeps the same card separation model.
+    assert.match(
+      review,
+      /\.marketplace-review-risk-list\s*\{[\s\S]*?gap:\s*12px[\s\S]*?background:\s*var\(--ant-color-bg-layout\)/,
+    );
+    assert.match(review, /\.marketplace-review-risk-item::before\s*\{/);
+    assert.match(
+      review,
+      /\.marketplace-review-risk-item\s*\{[\s\S]*?border:\s*1px solid var\(--ant-color-border\)[\s\S]*?background:\s*var\(--ant-color-bg-container\)/,
+    );
+    assert.match(review, /marketplace-review-risk-guidance-section/);
+    assert.match(
+      review,
+      /\.marketplace-review-risk-guidance\s*\{[\s\S]*?border-left:\s*3px solid #1677ff[\s\S]*?background:\s*#e6f4ff/,
     );
   });
 });

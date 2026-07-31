@@ -439,8 +439,8 @@ func TestSourcePackageDiagnosticsCarryEvidence(t *testing.T) {
 	if resolveRiskDispositionPolicy("framework_dependency_missing").Disposition != marketv1.MarketplaceRiskDispositionNeedAttention {
 		t.Fatalf("framework dependency finding must be need_attention")
 	}
-	if byCode["source_docs_indexed"] == nil || byCode["source_docs_indexed"].Evidence == nil {
-		t.Fatalf("expected docs evidence")
+	if byCode["source_docs_indexed"] != nil {
+		t.Fatalf("docs index must not emit an info-only risk finding")
 	}
 }
 

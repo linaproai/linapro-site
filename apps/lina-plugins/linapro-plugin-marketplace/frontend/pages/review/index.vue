@@ -53,13 +53,13 @@ import {
 } from "../../api/marketplace";
 import {
   formatMarketplaceRiskDisposition,
+  filterMarketplaceRiskFindingsActionable,
   formatMarketplaceRiskFindingGuidance,
   formatMarketplaceRiskFindingSummary,
   marketplaceRiskBlocking,
   marketplaceRiskDisposition,
   marketplaceRiskEvidence,
   marketplaceRiskHasEvidence,
-  sortMarketplaceRiskFindingsBySeverity,
 } from "../../utils/risk";
 import DetailModalContent from "../detail/detail-modal.vue";
 
@@ -617,7 +617,8 @@ async function handleInspect(row: MarketplaceReviewQueueItem) {
   }
 
   if (riskResult.status === "fulfilled") {
-    reviewRisks.value = sortMarketplaceRiskFindingsBySeverity(
+    // Hide info_only tips; keep need_fix / need_attention for reviewers.
+    reviewRisks.value = filterMarketplaceRiskFindingsActionable(
       riskResult.value.items,
     );
     expandedReviewRiskKeys.value = {};
@@ -884,77 +885,96 @@ function getReviewDrawerTitle() {
                       isReviewRiskBlocking(risk),
                   }"
                 >
-                  <div class="marketplace-review-risk-meta">
-                    <Tag v-if="isReviewRiskBlocking(risk)" color="error">
+                  <div class="marketplace-review-risk-item-header">
+                    <div class="marketplace-review-risk-meta">
+                      <Tag v-if="isReviewRiskBlocking(risk)" color="error">
+                        {{
+                          $t(
+                            'plugin.linapro-plugin-marketplace.detail.riskGuide.blockingTag',
+                          )
+                        }}
+                      </Tag>
+                      <Tag :color="getReviewDispositionColor(risk)">
+                        {{ formatReviewRiskDisposition(risk) }}
+                      </Tag>
+                      <Tag :color="getRiskSeverityColor(risk.severity)">
+                        {{ formatRiskSeverity(risk.severity) }}
+                      </Tag>
+                      <Tag>{{ formatRiskType(risk.type) }}</Tag>
+                      <span>{{ risk.source }}</span>
+                    </div>
+                    <Button
+                      type="link"
+                      size="small"
+                      class="marketplace-review-risk-toggle"
+                      @click="toggleReviewRiskExpanded(risk)"
+                    >
                       {{
-                        $t(
-                          'plugin.linapro-plugin-marketplace.detail.riskGuide.blockingTag',
-                        )
+                        isReviewRiskExpanded(risk)
+                          ? $t(
+                              'plugin.linapro-plugin-marketplace.detail.riskGuide.collapse',
+                            )
+                          : $t(
+                              'plugin.linapro-plugin-marketplace.detail.riskGuide.expand',
+                            )
                       }}
-                    </Tag>
-                    <Tag :color="getReviewDispositionColor(risk)">
-                      {{ formatReviewRiskDisposition(risk) }}
-                    </Tag>
-                    <Tag :color="getRiskSeverityColor(risk.severity)">
-                      {{ formatRiskSeverity(risk.severity) }}
-                    </Tag>
-                    <Tag>{{ formatRiskType(risk.type) }}</Tag>
-                    <span>{{ risk.source }}</span>
+                    </Button>
                   </div>
                   <p>{{ formatRiskFindingSummary(risk) }}</p>
-                  <Button
-                    type="link"
-                    size="small"
-                    class="marketplace-review-risk-toggle"
-                    @click="toggleReviewRiskExpanded(risk)"
-                  >
-                    {{
-                      isReviewRiskExpanded(risk)
-                        ? $t(
-                            'plugin.linapro-plugin-marketplace.detail.riskGuide.collapse',
-                          )
-                        : $t(
-                            'plugin.linapro-plugin-marketplace.detail.riskGuide.expand',
-                          )
-                    }}
-                  </Button>
                   <div
                     v-if="isReviewRiskExpanded(risk)"
                     class="marketplace-review-risk-guidance"
                   >
-                    <div v-if="reviewRiskReason(risk)">
-                      <strong>{{
-                        $t(
-                          'plugin.linapro-plugin-marketplace.detail.riskGuide.reason',
-                        )
-                      }}</strong>
+                    <div
+                      v-if="reviewRiskReason(risk)"
+                      class="marketplace-review-risk-guidance-section"
+                    >
+                      <div class="marketplace-review-risk-guidance-label">
+                        {{
+                          $t(
+                            'plugin.linapro-plugin-marketplace.detail.riskGuide.reason',
+                          )
+                        }}
+                      </div>
                       <p>{{ reviewRiskReason(risk) }}</p>
                     </div>
-                    <div v-if="reviewRiskRemediation(risk)">
-                      <strong>{{
-                        $t(
-                          'plugin.linapro-plugin-marketplace.detail.riskGuide.remediation',
-                        )
-                      }}</strong>
+                    <div
+                      v-if="reviewRiskRemediation(risk)"
+                      class="marketplace-review-risk-guidance-section"
+                    >
+                      <div class="marketplace-review-risk-guidance-label">
+                        {{
+                          $t(
+                            'plugin.linapro-plugin-marketplace.detail.riskGuide.remediation',
+                          )
+                        }}
+                      </div>
                       <p>{{ reviewRiskRemediation(risk) }}</p>
                     </div>
-                    <div v-if="reviewRiskAcceptance(risk)">
-                      <strong>{{
-                        $t(
-                          'plugin.linapro-plugin-marketplace.detail.riskGuide.acceptance',
-                        )
-                      }}</strong>
+                    <div
+                      v-if="reviewRiskAcceptance(risk)"
+                      class="marketplace-review-risk-guidance-section"
+                    >
+                      <div class="marketplace-review-risk-guidance-label">
+                        {{
+                          $t(
+                            'plugin.linapro-plugin-marketplace.detail.riskGuide.acceptance',
+                          )
+                        }}
+                      </div>
                       <p>{{ reviewRiskAcceptance(risk) }}</p>
                     </div>
                     <div
                       v-if="reviewRiskHasEvidence(risk)"
-                      class="marketplace-review-risk-evidence"
+                      class="marketplace-review-risk-guidance-section marketplace-review-risk-evidence"
                     >
-                      <strong>{{
-                        $t(
-                          'plugin.linapro-plugin-marketplace.detail.riskGuide.evidence',
-                        )
-                      }}</strong>
+                      <div class="marketplace-review-risk-guidance-label">
+                        {{
+                          $t(
+                            'plugin.linapro-plugin-marketplace.detail.riskGuide.evidence',
+                          )
+                        }}
+                      </div>
                       <ul v-if="reviewRiskEvidence(risk).files.length > 0">
                         <li
                           v-for="file in reviewRiskEvidence(risk).files"
@@ -1072,28 +1092,78 @@ function getReviewDrawerTitle() {
 
 .marketplace-review-risk-list {
   display: grid;
-  max-height: 260px;
+  max-height: 320px;
   overflow: auto;
-  gap: 8px;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: 10px;
+  background: var(--ant-color-bg-layout);
 }
 
+/* Align with detail risk cards for consistent multi-item separation. */
 .marketplace-review-risk-item {
-  padding: 10px;
-  border: 1px solid var(--ant-color-border-secondary);
-  border-radius: 6px;
+  position: relative;
+  padding: 12px 14px 12px 16px;
+  border: 1px solid var(--ant-color-border);
+  border-radius: 8px;
   background: var(--ant-color-bg-container);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 4%),
+    0 1px 6px -1px rgb(0 0 0 / 4%);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.marketplace-review-risk-item::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 0;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: var(--ant-color-text-quaternary, var(--ant-color-border));
+}
+
+.marketplace-review-risk-item:hover {
+  border-color: var(--ant-color-primary-border-hover, var(--ant-color-primary));
+  box-shadow:
+    0 2px 4px rgb(0 0 0 / 5%),
+    0 4px 12px -2px rgb(0 0 0 / 8%);
 }
 
 .marketplace-review-risk-item--blocking {
   border-color: var(--ant-color-error-border);
   background: var(--ant-color-error-bg);
+  box-shadow: none;
+}
+
+.marketplace-review-risk-item--blocking::before {
+  background: var(--ant-color-error);
+}
+
+.marketplace-review-risk-item--blocking:hover {
+  border-color: var(--ant-color-error-border);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--ant-color-error) 16%, transparent);
+}
+
+.marketplace-review-risk-item-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .marketplace-review-risk-meta {
   display: flex;
+  flex: 1 1 auto;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
+  min-width: 0;
   color: var(--ant-color-text-secondary);
   overflow-wrap: anywhere;
 }
@@ -1101,27 +1171,106 @@ function getReviewDrawerTitle() {
 .marketplace-review-risk-item p {
   margin: 8px 0 0;
   color: var(--ant-color-text);
+  line-height: 1.5;
 }
 
 .marketplace-review-risk-toggle {
-  padding-left: 0;
-  margin-top: 4px;
+  flex: 0 0 auto;
+  height: auto;
+  padding: 0;
+  margin: 0;
+  line-height: 22px;
+  white-space: nowrap;
 }
 
 .marketplace-review-risk-guidance {
   display: grid;
-  gap: 8px;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px dashed var(--ant-color-border-secondary);
+  gap: 0;
+  margin-top: 12px;
+  overflow: hidden;
+  border: 1px solid #91caff;
+  border: 1px solid var(--ant-color-primary-border, #91caff);
+  border-left: 3px solid #1677ff;
+  border-left-color: var(--ant-color-primary, #1677ff);
+  border-radius: 8px;
+  background: #e6f4ff;
+  background: var(--ant-color-primary-bg, #e6f4ff);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 55%);
+}
+
+.marketplace-review-risk-guidance-section {
+  padding: 12px 14px;
+}
+
+.marketplace-review-risk-guidance-section
+  + .marketplace-review-risk-guidance-section {
+  border-top: 1px solid #bae0ff;
+  border-top-color: var(--ant-color-primary-border, #bae0ff);
+}
+
+.marketplace-review-risk-guidance-label {
+  margin: 0 0 6px;
+  color: rgba(0, 0, 0, 0.88);
+  color: var(--ant-color-text, rgba(0, 0, 0, 0.88));
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.marketplace-review-risk-guidance p {
+  margin: 0;
+  color: rgba(0, 0, 0, 0.65);
+  color: var(--ant-color-text-secondary, rgba(0, 0, 0, 0.65));
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.marketplace-review-risk-evidence {
+  display: grid;
+  gap: 10px;
 }
 
 .marketplace-review-risk-evidence ul {
-  margin: 4px 0 0;
-  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.marketplace-review-risk-evidence code {
+.marketplace-review-risk-evidence li {
+  padding: 6px 10px;
+  border: 1px solid #d9d9d9;
+  border-color: var(--ant-color-border-secondary, #d9d9d9);
+  border-radius: 6px;
+  background: #fff;
+  background: var(--ant-color-bg-container, #fff);
+  line-height: 1.5;
+  word-break: break-all;
+}
+
+.marketplace-review-risk-evidence li code {
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: rgba(0, 0, 0, 0.88);
+  color: var(--ant-color-text, rgba(0, 0, 0, 0.88));
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.marketplace-review-risk-evidence > p code,
+.marketplace-review-risk-evidence > code {
+  display: block;
+  max-width: 100%;
+  padding: 6px 10px;
+  border: 1px solid #d9d9d9;
+  border-color: var(--ant-color-border-secondary, #d9d9d9);
+  border-radius: 6px;
+  background: #fff;
+  background: var(--ant-color-bg-container, #fff);
+  font-size: 12px;
   word-break: break-all;
 }
 

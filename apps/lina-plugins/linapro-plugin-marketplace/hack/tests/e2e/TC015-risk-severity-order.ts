@@ -2,8 +2,8 @@
  * TC015: Marketplace risk list orders by blocking/disposition then severity.
  *
  * Owner detail must surface need_fix (blocking) before need_attention and
- * info_only, and still localize finding titles. Overview risk summary Tags
- * remain severity-count ordered high → warning → info.
+ * still localize finding titles. info_only tips are hidden from the risk tab.
+ * Overview risk summary Tags remain severity-count ordered high → warning → info.
  */
 import { expect, test } from "@host-tests/fixtures/auth";
 
@@ -25,13 +25,6 @@ test.describe("TC-15 risk severity order", () => {
     // Deliberately reverse presentation order so UI sort is what assertions exercise.
     await installMarketplaceApiMocks(page, {
       gitSourceRisks: [
-        {
-          payload: { code: "source_docs_indexed" },
-          severity: "info",
-          source: "manifest/docs",
-          summary: "Marketplace documentation entries were detected.",
-          type: "docs",
-        },
         {
           // Framework compatibility is non-blocking need_attention.
           payload: { code: "framework_dependency_missing" },
@@ -56,6 +49,14 @@ test.describe("TC-15 risk severity order", () => {
           summary: "Dynamic package requests host service authorization.",
           type: "host_service",
         },
+        // info_only tip must be hidden from the risk tab list.
+        {
+          payload: { code: "source_docs_indexed" },
+          severity: "info",
+          source: "manifest/docs",
+          summary: "Marketplace documentation entries were detected.",
+          type: "docs",
+        },
       ],
       menuRole: "publish-only",
     });
@@ -65,7 +66,7 @@ test.describe("TC-15 risk severity order", () => {
     await marketplace.gotoMine();
     await marketplace.openMineDetail(marketplaceReadmeOnlyGitPluginId());
 
-    // Overview risk summary Tags: high → warning → info (not API order).
+    // Overview risk summary Tags still reflect API severity counts (including hidden info_only).
     await marketplace.expectRiskSummaryTag("high", 1);
     await marketplace.expectRiskSummaryTag("warning", 2);
     await marketplace.expectRiskSummaryTag("info", 1);
@@ -77,19 +78,17 @@ test.describe("TC-15 risk severity order", () => {
     await captureMarketplaceScreenshot(page, "risk-summary-severity-order");
 
     await marketplace.openRisksForVersion(marketplaceReadmeOnlyGitVersion());
-    await marketplace.expectRiskListCount(4);
-    // need_fix (blocking) → need_attention (by severity) → info_only
+    // Risk tab hides info_only; only need_fix + need_attention remain.
+    await marketplace.expectRiskListCount(3);
     await marketplace.expectRiskListDispositionOrder([
       "need_fix",
       "need_attention",
       "need_attention",
-      "info_only",
     ]);
     await marketplace.expectRiskListSeverityOrder([
       "warning",
       "high",
       "warning",
-      "info",
     ]);
 
     await marketplace.expectRiskFindingText(
@@ -97,9 +96,14 @@ test.describe("TC-15 risk severity order", () => {
     );
     await marketplace.expectRiskFindingText("未声明框架兼容性依赖。");
     await marketplace.expectRiskFindingText("动态包请求宿主服务授权。");
-    await marketplace.expectRiskFindingText(
-      "已检测到可用于市场展示的文档条目。",
-    );
+    await expect(
+      marketplace
+        .detailShell()
+        .getByText("已检测到可用于市场展示的文档条目。"),
+    ).toHaveCount(0);
+    await expect(
+      marketplace.detailShell().getByRole("button", { name: /仅提示/u }),
+    ).toHaveCount(0);
     // Framework compatibility must not show the blocking-submit tag.
     // Use exact match: the intro line also contains the substring "阻塞提交".
     await expect(

@@ -39,13 +39,6 @@ test.describe("TC-13 risk finding i18n", () => {
             "Source package contains SQL resources that require reviewer inspection.",
           type: "install_sql",
         },
-        {
-          payload: { code: "source_docs_indexed" },
-          severity: "info",
-          source: "manifest/docs",
-          summary: "Marketplace documentation entries were detected.",
-          type: "docs",
-        },
       ],
       menuRole: "publish-only",
     });
@@ -58,16 +51,12 @@ test.describe("TC-13 risk finding i18n", () => {
 
     // Risk summary tags remain localized severity counts.
     await marketplace.expectRiskSummaryTag("warning", 2);
-    await marketplace.expectRiskSummaryTag("info", 1);
-    await marketplace.expectRiskListCount(3);
+    await marketplace.expectRiskListCount(2);
 
     // Body text uses zh-CN riskFinding translations, not English source.
     await marketplace.expectRiskFindingText("未声明框架兼容性依赖。");
     await marketplace.expectRiskFindingText(
       "源码包包含需审核关注的 SQL 资源。",
-    );
-    await marketplace.expectRiskFindingText(
-      "已检测到可用于市场展示的文档条目。",
     );
     await expect(
       marketplace
