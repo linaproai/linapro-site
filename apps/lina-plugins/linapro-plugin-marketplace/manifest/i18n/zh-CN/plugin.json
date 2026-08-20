@@ -91,6 +91,7 @@
   "plugin.linapro-plugin-marketplace.detail.sourcePin.refAndCommit": "Git {ref} · {commit}",
   "plugin.linapro-plugin-marketplace.detail.sourcePin.commitOnly": "Commit {commit}",
   "plugin.linapro-plugin-marketplace.detail.sourcePin.refOnly": "Git {ref}",
+  "plugin.linapro-plugin-marketplace.detail.sourcePin.copySuccess": "已复制 Commit SHA",
   "plugin.linapro-plugin-marketplace.detail.fields.pluginId": "插件 ID",
   "plugin.linapro-plugin-marketplace.detail.fields.publisher": "发布者",
   "plugin.linapro-plugin-marketplace.detail.fields.status": "状态",

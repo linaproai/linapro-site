@@ -91,6 +91,7 @@
   "plugin.linapro-plugin-marketplace.detail.sourcePin.refAndCommit": "Git {ref} · {commit}",
   "plugin.linapro-plugin-marketplace.detail.sourcePin.commitOnly": "Commit {commit}",
   "plugin.linapro-plugin-marketplace.detail.sourcePin.refOnly": "Git {ref}",
+  "plugin.linapro-plugin-marketplace.detail.sourcePin.copySuccess": "Commit SHA copied",
   "plugin.linapro-plugin-marketplace.detail.fields.pluginId": "Plugin ID",
   "plugin.linapro-plugin-marketplace.detail.fields.publisher": "Publisher",
   "plugin.linapro-plugin-marketplace.detail.fields.status": "Status",

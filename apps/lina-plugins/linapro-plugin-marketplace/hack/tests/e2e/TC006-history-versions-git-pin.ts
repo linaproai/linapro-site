@@ -40,17 +40,20 @@ test.describe("TC-6 marketplace history versions and git pin", () => {
 
     // Latest git tag pin and historical main-fallback pin must both remain visible.
     // Avoid "@" in copy: vue-i18n treats "@" as linked-message syntax.
+    // Full commit SHA is shown on its own line (no mid-string truncation).
     await expect(latestRow).toContainText("Git v1.0.0");
-    await expect(latestRow).toContainText(
-      marketplaceLatestSourceCommit.slice(0, 12),
-    );
+    await expect(
+      latestRow.locator(".marketplace-source-commit"),
+    ).toHaveText(marketplaceLatestSourceCommit);
     await expect(historyRow).toContainText("Git main");
-    await expect(historyRow).toContainText(
-      marketplaceHistoricalSourceCommit.slice(0, 12),
-    );
-    await expect(historyRow.locator(".marketplace-source-pin")).toContainText(
-      "·",
-    );
+    await expect(
+      historyRow.locator(".marketplace-source-commit"),
+    ).toHaveText(marketplaceHistoricalSourceCommit);
+    await expect(historyRow.locator(".marketplace-source-pin")).toBeVisible();
+    // Artifact column was removed; version tab must not reintroduce it as a header.
+    await expect(
+      marketplace.detailShell().getByRole("columnheader", { name: "产物" }),
+    ).toHaveCount(0);
 
     await marketplace.expectNoRawI18nKeys();
     await captureMarketplaceScreenshot(page, "detail-history-versions-git-pin");

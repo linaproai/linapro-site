@@ -324,7 +324,8 @@ function buildVersionColumns(): DetailGridOptions["columns"] {
       align: "left",
       field: "version",
       headerAlign: "center",
-      minWidth: 160,
+      // Wider so full git commit SHA can wrap without CSS ellipsis clipping.
+      minWidth: 220,
       showOverflow: false,
       slots: { default: "version" },
       title: t("plugin.linapro-plugin-marketplace.detail.columns.version"),
@@ -340,15 +341,6 @@ function buildVersionColumns(): DetailGridOptions["columns"] {
       slots: { default: "reviewStatus" },
       title: t("plugin.linapro-plugin-marketplace.detail.columns.reviewStatus"),
       width: 130,
-    },
-    {
-      align: "left",
-      field: "artifact",
-      headerAlign: "center",
-      minWidth: 190,
-      showOverflow: false,
-      slots: { default: "artifact" },
-      title: t("plugin.linapro-plugin-marketplace.detail.columns.artifact"),
     },
     {
       align: "left",
@@ -1049,34 +1041,60 @@ function formatPluginType(type?: string) {
   return type || "-";
 }
 
-/** Show pinned git coordinates so historical installs stay inspectable. */
+/** Full git pin text for tooltip / a11y (never truncate the commit SHA). */
 function formatReleaseSourcePin(row?: MarketplaceReleaseItem | null) {
   if (!row) {
     return "";
   }
-  const commit = (row.sourceCommit || "").trim();
-  const ref = (row.sourceRef || "").trim();
+  const commit = getReleaseSourceCommit(row);
+  const ref = getReleaseSourceRef(row);
   if (!commit && !ref) {
     return "";
   }
-  const shortCommit = commit.length > 12 ? `${commit.slice(0, 12)}…` : commit;
   if (commit && ref) {
     return t(
       "plugin.linapro-plugin-marketplace.detail.sourcePin.refAndCommit",
       {
         ref,
-        commit: shortCommit,
+        commit,
       },
     );
   }
   if (commit) {
     return t("plugin.linapro-plugin-marketplace.detail.sourcePin.commitOnly", {
-      commit: shortCommit,
+      commit,
     });
   }
   return t("plugin.linapro-plugin-marketplace.detail.sourcePin.refOnly", {
     ref,
   });
+}
+
+function getReleaseSourceRef(row?: MarketplaceReleaseItem | null) {
+  return (row?.sourceRef || "").trim();
+}
+
+function getReleaseSourceCommit(row?: MarketplaceReleaseItem | null) {
+  return (row?.sourceCommit || "").trim();
+}
+
+function hasReleaseSourcePin(row?: MarketplaceReleaseItem | null) {
+  return Boolean(getReleaseSourceRef(row) || getReleaseSourceCommit(row));
+}
+
+async function handleCopyReleaseSourceCommit(row: MarketplaceReleaseItem) {
+  const commit = getReleaseSourceCommit(row);
+  if (!commit || typeof navigator === "undefined" || !navigator.clipboard) {
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(commit);
+    message.success(
+      t("plugin.linapro-plugin-marketplace.detail.sourcePin.copySuccess"),
+    );
+  } catch {
+    // Clipboard can fail in non-secure contexts; keep silent and rely on selection.
+  }
 }
 
 function formatStatus(
@@ -1687,13 +1705,44 @@ function formatBytes(value?: number) {
                       <span class="marketplace-muted">
                         {{ formatPluginType(row.pluginType) }}
                       </span>
-                      <span
-                        v-if="formatReleaseSourcePin(row)"
-                        class="marketplace-muted marketplace-source-pin"
+                      <Tooltip
+                        v-if="hasReleaseSourcePin(row)"
                         :title="formatReleaseSourcePin(row)"
                       >
-                        {{ formatReleaseSourcePin(row) }}
-                      </span>
+                        <span
+                          class="marketplace-muted marketplace-source-pin"
+                          :class="{
+                            'marketplace-source-pin--copyable':
+                              Boolean(getReleaseSourceCommit(row)),
+                          }"
+                          :role="
+                            getReleaseSourceCommit(row) ? 'button' : undefined
+                          "
+                          :tabindex="getReleaseSourceCommit(row) ? 0 : undefined"
+                          @click.stop="handleCopyReleaseSourceCommit(row)"
+                          @keydown.enter.prevent="
+                            handleCopyReleaseSourceCommit(row)
+                          "
+                        >
+                          <span
+                            v-if="getReleaseSourceRef(row)"
+                            class="marketplace-source-ref"
+                          >
+                            {{
+                              $t(
+                                "plugin.linapro-plugin-marketplace.detail.sourcePin.refOnly",
+                                { ref: getReleaseSourceRef(row) },
+                              )
+                            }}
+                          </span>
+                          <span
+                            v-if="getReleaseSourceCommit(row)"
+                            class="marketplace-source-commit"
+                          >
+                            {{ getReleaseSourceCommit(row) }}
+                          </span>
+                        </span>
+                      </Tooltip>
                     </Space>
                   </template>
 
@@ -1707,19 +1756,6 @@ function formatBytes(value?: number) {
                     <Tag :color="getReviewStatusColor(row.reviewStatus)">
                       {{ formatReviewStatus(row.reviewStatus) }}
                     </Tag>
-                  </template>
-
-                  <template #artifact="{ row }">
-                    <Space direction="vertical" :size="2">
-                      <Tag>{{
-                        formatArtifactType(row.artifact?.artifactType)
-                      }}</Tag>
-                      <Tooltip :title="row.artifact?.sha256">
-                        <span class="marketplace-muted">
-                          {{ formatBytes(row.artifact?.sizeBytes) }}
-                        </span>
-                      </Tooltip>
-                    </Space>
                   </template>
 
                   <template #compatibility="{ row }">
@@ -2432,9 +2468,23 @@ function formatBytes(value?: number) {
 }
 
 .marketplace-source-pin {
-  display: block;
+  display: flex;
   max-width: 100%;
-  overflow: hidden;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+}
+
+.marketplace-source-pin--copyable {
+  cursor: pointer;
+}
+
+.marketplace-source-ref {
+  line-height: 1.4;
+}
+
+.marketplace-source-commit {
+  max-width: 100%;
   font-family: var(
     --font-family-mono,
     ui-monospace,
@@ -2446,8 +2496,10 @@ function formatBytes(value?: number) {
     "Courier New",
     monospace
   );
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  word-break: break-all;
 }
 
 .marketplace-mono {
