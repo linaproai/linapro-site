@@ -151,4 +151,27 @@ test.describe('TC005 参数设置管理', () => {
     expect(keyAlign.headerLeft).toBe(true);
     expect(keyAlign.bodyLeft).toBe(true);
   });
+
+  test('TC005k: 参数键值与备注列左对齐', async ({ adminPage }) => {
+    const configPage = new ConfigPage(adminPage);
+    await configPage.goto();
+
+    const rowCount = await configPage.getRowCount();
+    expect(rowCount).toBeGreaterThanOrEqual(1);
+
+    const valueAlign = await configPage.getColumnAlignment('参数键值');
+    expect(valueAlign.headerLeft).toBe(true);
+    expect(valueAlign.bodyLeft).toBe(true);
+
+    const remarkAlign = await configPage.getColumnAlignment('备注');
+    expect(remarkAlign.headerLeft).toBe(true);
+    expect(remarkAlign.bodyLeft).toBe(true);
+
+    const day = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    await adminPage.screenshot({
+      path: `../../temp/${day}/${stamp}-config-value-remark-columns-left.png`,
+      fullPage: false,
+    });
+  });
 });

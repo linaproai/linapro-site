@@ -40,6 +40,7 @@ export const columns: VxeGridProps['columns'] = [
   {
     title: $t('pages.common.remark'),
     field: 'remark',
+    align: 'left',
   },
   {
     field: 'action',

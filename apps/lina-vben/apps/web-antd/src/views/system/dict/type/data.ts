@@ -25,14 +25,18 @@ export const columns: VxeGridProps['columns'] = [
   {
     title: $t('pages.system.dict.type.fields.name'),
     field: 'name',
+    // Text columns stay left-aligned; the global grid default is center.
+    align: 'left',
   },
   {
     title: $t('pages.system.dict.type.fields.type'),
     field: 'type',
+    align: 'left',
   },
   {
     title: $t('pages.common.remark'),
     field: 'remark',
+    align: 'left',
   },
   {
     field: 'action',

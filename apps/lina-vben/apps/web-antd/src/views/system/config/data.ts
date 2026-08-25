@@ -42,10 +42,12 @@ export const columns: VxeGridProps['columns'] = [
   {
     title: $t('pages.system.config.fields.value'),
     field: 'value',
+    align: 'left',
   },
   {
     title: $t('pages.common.remark'),
     field: 'remark',
+    align: 'left',
   },
   {
     title: $t('pages.common.updatedAt'),

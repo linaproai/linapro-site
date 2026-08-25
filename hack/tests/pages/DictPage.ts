@@ -11,14 +11,19 @@ import {
 export class DictPage {
   constructor(private page: Page) {}
 
-  private resolveLocalizedLabel(scope: Locator, label: string) {
+  private localizedHeaderPattern(label: string): RegExp | undefined {
     const labelMap: Record<string, RegExp> = {
       字典名称: /字典名称|Dictionary Name/i,
       字典类型: /字典类型|Dictionary Type/i,
       字典标签: /字典标签|Dictionary Label/i,
       数据标签: /数据标签|Data Label/i,
+      备注: /备注|Remark/i,
     };
-    const localizedLabel = labelMap[label];
+    return labelMap[label];
+  }
+
+  private resolveLocalizedLabel(scope: Locator, label: string) {
+    const localizedLabel = this.localizedHeaderPattern(label);
     if (localizedLabel) {
       return scope.getByLabel(localizedLabel).first();
     }
@@ -289,6 +294,58 @@ export class DictPage {
 
   dataHeader(text: RegExp | string): Locator {
     return this.dataPanel.locator(".vxe-header--column, th", { hasText: text });
+  }
+
+  /**
+   * Resolve a list column in the type or data panel and report whether the
+   * header and first body cell are left-aligned (vxe `col--left`).
+   */
+  async getColumnAlignment(
+    panel: "type" | "data",
+    headerLabel: string,
+  ): Promise<{ headerLeft: boolean; bodyLeft: boolean }> {
+    const scope = panel === "type" ? this.typePanel : this.dataPanel;
+    const headerPattern =
+      this.localizedHeaderPattern(headerLabel) ?? new RegExp(headerLabel, "i");
+    const headerCell = scope
+      .locator(".vxe-header--column")
+      .filter({ hasText: headerPattern })
+      .first();
+    await headerCell.waitFor({ state: "visible", timeout: 5000 });
+
+    const headerLeft = await headerCell
+      .evaluate((el) => el.classList.contains("col--left"))
+      .catch(() => false);
+
+    const colIdClass = await headerCell.evaluate((el) => {
+      const classes = Array.from(el.classList);
+      return (
+        classes.find((name) => /^col_[A-Za-z0-9]+$/.test(name)) ??
+        classes.find(
+          (name) => name.startsWith("col_") && !name.startsWith("col--"),
+        ) ??
+        ""
+      );
+    });
+
+    if (!colIdClass) {
+      return { headerLeft, bodyLeft: false };
+    }
+
+    const bodyCell = scope
+      .locator(`.vxe-body--row .vxe-body--column.${colIdClass}`)
+      .first();
+    const bodyVisible = await bodyCell
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
+    if (!bodyVisible) {
+      return { headerLeft, bodyLeft: false };
+    }
+
+    const bodyLeft = await bodyCell.evaluate((el) =>
+      el.classList.contains("col--left"),
+    );
+    return { headerLeft, bodyLeft };
   }
 
   async clickTypeRow(typeName: string) {
