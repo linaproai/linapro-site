@@ -1,4 +1,5 @@
-// This file implements lock lease renewal for Redis-backed leader election.
+// This file implements lock lease renewal for injected coordination-backed
+// leader election.
 
 package cluster
 

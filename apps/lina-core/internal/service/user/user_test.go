@@ -20,6 +20,7 @@ import (
 	"lina-core/internal/service/datascope"
 	i18nsvc "lina-core/internal/service/i18n"
 	"lina-core/internal/service/kvcache"
+	menusvc "lina-core/internal/service/menu"
 	"lina-core/internal/service/role"
 	"lina-core/internal/service/session"
 	"lina-core/pkg/bizerr"
@@ -422,9 +423,9 @@ func (f userDeleteFailingOrgCap) CleanupUserAssignments(context.Context, int) er
 func newUserTestService(tenantManagersAndRuntimes ...any) Service {
 	var (
 		bizCtxSvc     = bizctx.New()
-		configSvc     = hostconfig.New()
-		clusterSvc    = cluster.New(configSvc.GetCluster(context.Background()))
-		cacheCoordSvc = cachecoord.Default(clusterSvc)
+		configSvc     = hostconfig.New(nil)
+		clusterSvc    = cluster.New(configSvc.GetCluster(context.Background()), nil)
+		cacheCoordSvc = cachecoord.New(clusterSvc, nil)
 		i18nSvc       = i18nsvc.New(bizCtxSvc, configSvc, cacheCoordSvc)
 		sessionStore  = session.NewDBStore()
 		pluginRuntime = userTestPluginRuntime{}
@@ -452,7 +453,7 @@ func newUserTestService(tenantManagersAndRuntimes ...any) Service {
 		}
 		tenantSvc = tenantspi.New(manager, enablement, nil, nil)
 	}
-	roleSvc := role.New(pluginRuntime, bizCtxSvc, configSvc, i18nSvc, orgCapSvc, tenantSvc)
+	roleSvc := role.New(pluginRuntime, bizCtxSvc, configSvc, i18nSvc, orgCapSvc, tenantSvc, cacheCoordSvc)
 	scopeSvc := datascope.New(bizCtxSvc, roleSvc, orgCapSvc.Scope())
 	roleSvc.SetDataScopeService(scopeSvc)
 	var (
@@ -473,7 +474,7 @@ func (userTestPluginRuntime) DispatchHookEvent(_ context.Context, _ pluginhost.E
 }
 
 // FilterPermissionMenus leaves permission menus unchanged in user tests.
-func (userTestPluginRuntime) FilterPermissionMenus(_ context.Context, menus []*entity.SysMenu) []*entity.SysMenu {
+func (userTestPluginRuntime) FilterPermissionMenus(_ context.Context, menus []menusvc.FilterItem) []menusvc.FilterItem {
 	return menus
 }
 

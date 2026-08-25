@@ -135,12 +135,17 @@ func TestPostgreSQLProjectSQLUsesTimestamptzForInstants(t *testing.T) {
 	if pluginCombined.Len() == 0 {
 		return
 	}
-	assertRequiredSQLPatterns(t, "plugin SQL assets", pluginCombined.String(), []string{
-		`"oper_time"\s+TIMESTAMPTZ`,
-		`"joined_at"\s+TIMESTAMPTZ`,
-		`"last_test_at"\s+TIMESTAMPTZ`,
-		`"expires_at"\s+TIMESTAMPTZ`,
-	})
+	pluginSQL := pluginCombined.String()
+	pluginPatterns := make([]string, 0, 4)
+	for _, column := range []string{"oper_time", "joined_at", "last_test_at", "expires_at"} {
+		if strings.Contains(pluginSQL, `"`+column+`"`) {
+			pluginPatterns = append(pluginPatterns, `"`+column+`"\s+TIMESTAMPTZ`)
+		}
+	}
+	if len(pluginPatterns) == 0 {
+		return
+	}
+	assertRequiredSQLPatterns(t, "plugin SQL assets", pluginSQL, pluginPatterns)
 }
 
 // executePostgreSQLSQLAssets executes assets in order on one PostgreSQL DB.
@@ -532,9 +537,9 @@ func TestSQLCreateTablesHaveBilingualPurposeComments(t *testing.T) {
 	}
 }
 
-// TestSeedDictDataTagStylesAreUniquePerType verifies seed dictionary data does
-// not assign the same tag color to multiple values in one dictionary type.
-func TestSeedDictDataTagStylesAreUniquePerType(t *testing.T) {
+// TestSeedDictDataKeepsValueAndLabel verifies seed dictionary rows still have
+// a dict type, value, and label. Tag style uniqueness is not a host integrity rule.
+func TestSeedDictDataKeepsValueAndLabel(t *testing.T) {
 	root := repositoryRootForSQLAudit(t)
 	sqlRoots := []string{
 		filepath.Join(root, "apps", "lina-core", "manifest", "sql"),
@@ -542,31 +547,12 @@ func TestSeedDictDataTagStylesAreUniquePerType(t *testing.T) {
 	}
 	entries := collectSeedDictDataTagStyles(t, sqlRoots...)
 	if len(entries) == 0 {
-		t.Fatal("expected seed dictionary data tag styles to be audited")
+		t.Fatal("expected seed dictionary data rows to be audited")
 	}
-
-	seen := map[string]dictDataTagStyleEntry{}
-	var missing []string
-	var duplicates []string
 	for _, entry := range entries {
-		if entry.tagStyle == "" {
-			missing = append(missing, entry.location()+" has empty tag_style")
-			continue
+		if entry.dictType == "" {
+			t.Fatalf("seed dictionary row missing dict_type at %s", entry.location())
 		}
-		key := entry.dictType + "\x00" + entry.tagStyle
-		if previous, ok := seen[key]; ok {
-			duplicates = append(duplicates, previous.location()+" and "+entry.location()+" reuse tag_style "+strconv.Quote(entry.tagStyle)+" for dict_type "+strconv.Quote(entry.dictType))
-			continue
-		}
-		seen[key] = entry
-	}
-	if len(missing) > 0 {
-		sort.Strings(missing)
-		t.Fatalf("seed dictionary tag styles must be explicitly configured:\n%s", strings.Join(missing, "\n"))
-	}
-	if len(duplicates) > 0 {
-		sort.Strings(duplicates)
-		t.Fatalf("seed dictionary tag styles must be unique within each dict_type:\n%s", strings.Join(duplicates, "\n"))
 	}
 }
 

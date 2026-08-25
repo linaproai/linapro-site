@@ -6,7 +6,7 @@ import (
 	"context"
 
 	v1 "lina-core/api/jobhandler/v1"
-	jobhandlersvc "lina-core/internal/service/jobhandler"
+	jobmgmtsvc "lina-core/internal/service/jobmgmt"
 	"lina-core/pkg/bizerr"
 )
 
@@ -14,7 +14,7 @@ import (
 func (c *ControllerV1) Detail(ctx context.Context, req *v1.DetailReq) (res *v1.DetailRes, err error) {
 	item, ok := c.registry.Lookup(req.Ref)
 	if !ok {
-		return nil, bizerr.NewCode(jobhandlersvc.CodeJobHandlerNotFound)
+		return nil, bizerr.NewCode(jobmgmtsvc.CodeJobHandlerNotFound)
 	}
 	return &v1.DetailRes{
 		Ref:          item.Ref,

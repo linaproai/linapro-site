@@ -1934,7 +1934,6 @@ function publicFrontendSettings() {
     },
     auth: {
       loginSubtitle: "",
-      panelLayout: "panel-right",
       pageDesc: "",
       pageTitle: "",
     },
@@ -1953,7 +1952,6 @@ function publicFrontendSettings() {
       },
     },
     ui: {
-      layout: "sidebar-mixed-nav",
       themeMode: "light",
       watermarkContent: "",
       watermarkEnabled: false,
@@ -2095,44 +2093,42 @@ function marketplaceMenuRoutes(
     {
       children: [
         {
-          component: "dashboard/analytics/index",
-          meta: {
-            icon: "lucide:area-chart",
-            title: "page.dashboard.analytics",
-          },
-          name: "Analytics",
+          icon: "lucide:area-chart",
+          openMode: "page",
           path: "/dashboard/analytics",
+          resource: "dashboard/analytics/index",
+          title: "page.dashboard.analytics",
+          type: "M",
+          visible: 1,
         },
       ],
-      component: "BasicLayout",
-      meta: {
-        icon: "lucide:layout-dashboard",
-        order: -1,
-        title: "page.dashboard.title",
-      },
-      name: "Dashboard",
+      icon: "lucide:layout-dashboard",
+      openMode: "page",
       path: "/dashboard",
+      sort: -1,
+      title: "page.dashboard.title",
+      type: "D",
+      visible: 1,
     },
     {
       children: [
         {
-          component: "system/user/index",
-          meta: {
-            icon: "lucide:users",
-            title: locale === "en-US" ? "Users" : "用户管理",
-          },
-          name: "SystemUser",
+          icon: "lucide:users",
+          openMode: "page",
           path: "/system/user",
+          resource: "system/user/index",
+          title: locale === "en-US" ? "Users" : "用户管理",
+          type: "M",
+          visible: 1,
         },
       ],
-      component: "BasicLayout",
-      meta: {
-        icon: "lucide:settings",
-        order: 7,
-        title: locale === "en-US" ? "Settings" : "设置",
-      },
-      name: "System",
+      icon: "lucide:settings",
+      openMode: "page",
       path: "/system",
+      sort: 7,
+      title: locale === "en-US" ? "Settings" : "设置",
+      type: "D",
+      visible: 1,
     },
     {
       children: [
@@ -2142,28 +2138,27 @@ function marketplaceMenuRoutes(
           name: "SystemPlugin",
           order: 1,
           path: "/system/plugin",
+          resource: "system/plugin/index",
           title: "Plugins",
         }),
       ],
-      component: "BasicLayout",
-      meta: {
-        icon: "lucide:puzzle",
-        order: 9,
-        title: "page.routes.system.extensionCenter",
-      },
-      name: "Extension",
+      icon: "lucide:puzzle",
+      openMode: "page",
       path: "/extension",
+      sort: 9,
+      title: "page.routes.system.extensionCenter",
+      type: "D",
+      visible: 1,
     },
     {
       children: marketplaceChildren,
-      component: "BasicLayout",
-      meta: {
-        icon: "ant-design:shop-outlined",
-        order: 8,
-        title: title.directory,
-      },
-      name: "PluginMarketplaceDirectory",
+      icon: "ant-design:shop-outlined",
+      openMode: "page",
       path: "/plugin-marketplace",
+      sort: 8,
+      title: title.directory,
+      type: "D",
+      visible: 1,
     },
   ];
 }
@@ -2194,19 +2189,19 @@ function marketplaceMenuRoute(options: {
   name: string;
   order: number;
   path: string;
+  resource?: string;
   title: string;
 }) {
   return {
-    component: "system/plugin/dynamic-page",
-    meta: {
-      authority: [options.authority, marketplacePluginId],
-      hideInMenu: options.hidden === true,
-      icon: options.icon,
-      order: options.order,
-      title: options.title,
-    },
-    name: options.name,
+    icon: options.icon,
+    openMode: "page",
     path: options.path,
+    perms: options.authority,
+    ...(options.resource ? { resource: options.resource } : {}),
+    sort: options.order,
+    title: options.title,
+    type: "M",
+    visible: options.hidden === true ? 0 : 1,
   };
 }
 

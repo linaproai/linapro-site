@@ -12,7 +12,6 @@ import (
 
 	"lina-core/internal/model/entity"
 	hostconfig "lina-core/internal/service/config"
-	"lina-core/internal/service/jobhandler"
 	jobmgmtsvc "lina-core/internal/service/jobmgmt"
 	pluginsvc "lina-core/internal/service/plugin"
 )
@@ -93,11 +92,11 @@ type managedPluginCronStub struct {
 // retryRegistryStub fails one registration attempt before accepting handlers.
 type retryRegistryStub struct {
 	registerErr error
-	registered  []jobhandler.HandlerDef
+	registered  []jobmgmtsvc.HandlerDef
 }
 
 // Register records handlers after the configured transient error is consumed.
-func (s *retryRegistryStub) Register(def jobhandler.HandlerDef) error {
+func (s *retryRegistryStub) Register(def jobmgmtsvc.HandlerDef) error {
 	if s.registerErr != nil {
 		err := s.registerErr
 		s.registerErr = nil
@@ -111,15 +110,15 @@ func (s *retryRegistryStub) Register(def jobhandler.HandlerDef) error {
 func (s *retryRegistryStub) Unregister(ref string) {}
 
 // Lookup is unused by managed-handler retry tests.
-func (s *retryRegistryStub) Lookup(ref string) (jobhandler.HandlerDef, bool) {
-	return jobhandler.HandlerDef{}, false
+func (s *retryRegistryStub) Lookup(ref string) (jobmgmtsvc.HandlerDef, bool) {
+	return jobmgmtsvc.HandlerDef{}, false
 }
 
 // List is unused by managed-handler retry tests.
-func (s *retryRegistryStub) List() []jobhandler.HandlerInfo { return nil }
+func (s *retryRegistryStub) List() []jobmgmtsvc.HandlerInfo { return nil }
 
 // SubscribeChanges is unused by managed-handler retry tests.
-func (s *retryRegistryStub) SubscribeChanges(callback jobhandler.ChangeCallback) func() {
+func (s *retryRegistryStub) SubscribeChanges(callback jobmgmtsvc.ChangeCallback) func() {
 	return func() {}
 }
 
@@ -163,8 +162,8 @@ func TestSyncBuiltinScheduledJobsRegistersDeclarationSnapshots(t *testing.T) {
 		scheduler = &managedJobSchedulerStub{}
 	)
 	svc := &serviceImpl{
-		configSvc:           hostconfig.New(),
-		registry:            jobhandler.New(),
+		configSvc:           hostconfig.New(nil),
+		registry:            jobmgmtsvc.NewRegistry(),
 		builtinSyncer:       syncer,
 		persistentScheduler: scheduler,
 	}
@@ -197,9 +196,9 @@ func TestSyncBuiltinScheduledJobsRegistersDeclarationSnapshots(t *testing.T) {
 // expire keys natively.
 func TestManagedHostJobsDoNotProjectKVCacheCleanup(t *testing.T) {
 	ctx := context.Background()
-	registry := jobhandler.New()
+	registry := jobmgmtsvc.NewRegistry()
 	svc := &serviceImpl{
-		configSvc: hostconfig.New(),
+		configSvc: hostconfig.New(nil),
 		registry:  registry,
 	}
 
@@ -240,7 +239,7 @@ func TestBuildPluginBuiltinJobsUsesInstalledDeclarations(t *testing.T) {
 		},
 	}
 	svc := &serviceImpl{
-		configSvc: hostconfig.New(),
+		configSvc: hostconfig.New(nil),
 		pluginSvc: pluginSvc,
 	}
 
@@ -291,7 +290,7 @@ func TestEnsureManagedHandlersRegisteredRetriesAfterFailure(t *testing.T) {
 func TestEffectiveSessionCleanupTimeoutUsesRuntimeSessionTimeout(t *testing.T) {
 	svc := &serviceImpl{
 		configSvc: managedJobConfigStub{
-			Service:         hostconfig.New(),
+			Service:         hostconfig.New(nil),
 			sessionTimeout:  6 * time.Hour,
 			logRetentionDay: 90,
 		},
@@ -311,7 +310,7 @@ func TestEffectiveSessionCleanupTimeoutUsesRuntimeSessionTimeout(t *testing.T) {
 func TestEffectiveSessionCleanupTimeoutUsesStricterLogRetention(t *testing.T) {
 	svc := &serviceImpl{
 		configSvc: managedJobConfigStub{
-			Service:         hostconfig.New(),
+			Service:         hostconfig.New(nil),
 			sessionTimeout:  20 * 24 * time.Hour,
 			logRetentionDay: 7,
 		},

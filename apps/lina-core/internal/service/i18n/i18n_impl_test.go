@@ -94,7 +94,7 @@ func TestRuntimeTranslationsDoNotImplicitlyUseDefaultLocale(t *testing.T) {
 
 	var (
 		ctx      = context.Background()
-		svc      = New(bizctx.New(), config.New(), cachecoord.Default(nil))
+		svc      = New(bizctx.New(), config.New(nil), cachecoord.New(nil, nil))
 		messages = svc.BuildRuntimeMessages(ctx, EnglishLocale)
 	)
 	if value, ok := lookupMessageString(messages, key); ok {
@@ -169,7 +169,7 @@ default_install_mode: global
 	t.Cleanup(cleanupMissingPolicy)
 	resetRuntimeBundleCache()
 
-	messages := New(bizctx.New(), config.New(), cachecoord.Default(nil)).BuildRuntimeMessages(context.Background(), EnglishLocale)
+	messages := New(bizctx.New(), config.New(nil), cachecoord.New(nil, nil)).BuildRuntimeMessages(context.Background(), EnglishLocale)
 	managedKey := "test.policy." + managedPluginID
 	if actual, ok := lookupMessageString(messages, managedKey); !ok || actual != "Runtime Managed" {
 		t.Fatalf("expected managed plugin translation %q, got %q (exists=%v)", "Runtime Managed", actual, ok)
@@ -188,7 +188,7 @@ default_install_mode: global
 func BenchmarkTranslateHotPath(b *testing.B) {
 	resetRuntimeBundleCache()
 
-	svc := New(bizctx.New(), config.New(), cachecoord.Default(nil))
+	svc := New(bizctx.New(), config.New(nil), cachecoord.New(nil, nil))
 	ctx := context.WithValue(context.Background(), gctx.StrKey("BizCtx"), &model.Context{Locale: EnglishLocale})
 
 	// Warm up the merged catalog so the loop measures cache-hit cost only.
@@ -208,7 +208,7 @@ func BenchmarkTranslateHotPath(b *testing.B) {
 func BenchmarkTranslateBatch(b *testing.B) {
 	resetRuntimeBundleCache()
 
-	svc := New(bizctx.New(), config.New(), cachecoord.Default(nil))
+	svc := New(bizctx.New(), config.New(nil), cachecoord.New(nil, nil))
 	ctx := context.WithValue(context.Background(), gctx.StrKey("BizCtx"), &model.Context{Locale: EnglishLocale})
 
 	keys := []string{
@@ -247,7 +247,7 @@ func BenchmarkTranslateBatch(b *testing.B) {
 func BenchmarkTranslateCacheMissRebuild(b *testing.B) {
 	resetRuntimeBundleCache()
 
-	svc := New(bizctx.New(), config.New(), cachecoord.Default(nil))
+	svc := New(bizctx.New(), config.New(nil), cachecoord.New(nil, nil))
 	ctx := context.WithValue(context.Background(), gctx.StrKey("BizCtx"), &model.Context{Locale: EnglishLocale})
 
 	// Warm once so package-level plugin registrations and configuration readers
@@ -268,7 +268,7 @@ func BenchmarkTranslateCacheMissRebuild(b *testing.B) {
 func BenchmarkBuildRuntimeMessages(b *testing.B) {
 	resetRuntimeBundleCache()
 
-	svc := New(bizctx.New(), config.New(), cachecoord.Default(nil))
+	svc := New(bizctx.New(), config.New(nil), cachecoord.New(nil, nil))
 	ctx := context.WithValue(context.Background(), gctx.StrKey("BizCtx"), &model.Context{Locale: EnglishLocale})
 
 	// Warm up so the loop measures the merge + clone + nest cost only.

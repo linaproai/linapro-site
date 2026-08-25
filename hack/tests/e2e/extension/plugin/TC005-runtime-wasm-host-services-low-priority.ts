@@ -556,7 +556,7 @@ menus:
     parent_key: extension
     name: Low Priority Host Services E2E
     path: low-priority-host-services-e2e
-    component: system/plugin/dynamic-page
+    component: ""
     perms: ${successPluginID}:host:view
     icon: lucide:plug
     type: M
@@ -764,7 +764,7 @@ menus:
     parent_key: extension
     name: Low Priority Host Services Denied E2E
     path: low-priority-host-services-denied-e2e
-    component: system/plugin/dynamic-page
+    component: ""
     perms: ${deniedPluginID}:host:view
     icon: lucide:shield-alert
     type: M

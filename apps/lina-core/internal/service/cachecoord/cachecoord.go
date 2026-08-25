@@ -42,7 +42,8 @@ const (
 const (
 	// ConsistencyLocalOnly keeps coordination in the current process.
 	ConsistencyLocalOnly ConsistencyModel = "local-only"
-	// ConsistencySharedRevision uses a persistent shared revision row.
+	// ConsistencySharedRevision uses a shared revision in the injected
+	// coordination backend (Redis in clustered deployments).
 	ConsistencySharedRevision ConsistencyModel = "shared-revision"
 )
 
@@ -139,14 +140,15 @@ var _ Service = (*serviceImpl)(nil)
 
 // serviceImpl implements Service.
 type serviceImpl struct {
-	topologyMu sync.RWMutex
-	topology   cluster.Service
-	coordMu    sync.RWMutex
-	coord      coordination.Service
-	mu         sync.RWMutex
-	domains    map[Domain]DomainSpec
-	observed   map[revisionKey]int64
-	status     map[revisionKey]*coordinationStatus
+	topologyMu     sync.RWMutex
+	topology       cluster.Service
+	coordMu        sync.RWMutex
+	coord          coordination.Service
+	mu             sync.RWMutex
+	domains        map[Domain]DomainSpec
+	observed       map[revisionKey]int64
+	status         map[revisionKey]*coordinationStatus
+	localRevisions map[revisionKey]int64
 }
 
 // coordinationStatus stores local observable state for one domain/scope.
@@ -158,63 +160,15 @@ type coordinationStatus struct {
 	recentErrorAt  time.Time
 }
 
-// processDefaultService stores the host-wide coordinator used by production
-// services that need to share one cache freshness view inside the same process.
-var processDefaultService = struct {
-	sync.Mutex
-	service *serviceImpl
-}{}
-
-// New creates an isolated cache coordination service. Production service
-// constructors should normally use Default so process-local cache freshness
-// state stays shared.
-func New(topology cluster.Service) Service {
-	return newServiceImpl(topology)
-}
-
-// NewWithCoordination creates an isolated cache coordination service that uses
-// the provided coordination backend for clustered shared revisions.
-func NewWithCoordination(topology cluster.Service, coordinationSvc coordination.Service) Service {
+// New creates one cache coordination service bound to topology and the
+// optional coordination backend. A nil topology uses the standalone static
+// view. A nil coordination backend keeps revisions process-local. Callers
+// must pass the startup-owned instance; this constructor does not share
+// process-global state with later New calls.
+func New(topology cluster.Service, coordinationSvc coordination.Service) Service {
 	service := newServiceImpl(topology)
 	service.setCoordination(coordinationSvc)
 	return service
-}
-
-// Default returns the process-wide cache coordination service. When a later
-// startup phase provides a richer topology, the existing coordinator is kept
-// and only its topology view is updated.
-func Default(topology cluster.Service) Service {
-	processDefaultService.Lock()
-	defer processDefaultService.Unlock()
-
-	if processDefaultService.service == nil {
-		processDefaultService.service = newServiceImpl(topology)
-		return processDefaultService.service
-	}
-	if shouldReplaceDefaultTopology(processDefaultService.service.topologySnapshot(), topology) {
-		processDefaultService.service.setTopology(topology)
-	}
-	return processDefaultService.service
-}
-
-// DefaultWithCoordination returns the process-wide cache coordination service
-// and wires the active distributed coordination backend when one is available.
-func DefaultWithCoordination(topology cluster.Service, coordinationSvc coordination.Service) Service {
-	processDefaultService.Lock()
-	defer processDefaultService.Unlock()
-
-	if processDefaultService.service == nil {
-		processDefaultService.service = newServiceImpl(topology)
-		processDefaultService.service.setCoordination(coordinationSvc)
-		return processDefaultService.service
-	}
-	if shouldReplaceDefaultTopology(processDefaultService.service.topologySnapshot(), topology) {
-		processDefaultService.service.setTopology(topology)
-	}
-	if coordinationSvc != nil {
-		processDefaultService.service.setCoordination(coordinationSvc)
-	}
-	return processDefaultService.service
 }
 
 // newServiceImpl allocates one cache coordination implementation.
@@ -223,36 +177,11 @@ func newServiceImpl(topology cluster.Service) *serviceImpl {
 		topology = NewStaticTopology(false)
 	}
 	service := &serviceImpl{
-		topology: topology,
-		domains:  make(map[Domain]DomainSpec),
-		observed: make(map[revisionKey]int64),
-		status:   make(map[revisionKey]*coordinationStatus),
+		topology:       topology,
+		domains:        make(map[Domain]DomainSpec),
+		observed:       make(map[revisionKey]int64),
+		status:         make(map[revisionKey]*coordinationStatus),
+		localRevisions: make(map[revisionKey]int64),
 	}
 	return service
-}
-
-// shouldReplaceDefaultTopology keeps the real cluster topology once it has
-// been wired while still allowing early static placeholders to be upgraded.
-func shouldReplaceDefaultTopology(current cluster.Service, next cluster.Service) bool {
-	if next == nil {
-		return false
-	}
-	if current == nil {
-		return true
-	}
-	_, currentStatic := current.(staticTopology)
-	_, nextStatic := next.(staticTopology)
-	if currentStatic && !nextStatic {
-		return true
-	}
-	if !currentStatic && nextStatic {
-		return false
-	}
-	if current.IsEnabled() && !next.IsEnabled() {
-		return false
-	}
-	if !current.IsEnabled() && next.IsEnabled() {
-		return true
-	}
-	return true
 }

@@ -59,7 +59,7 @@ Plugin manifests and lifecycle callback snapshots include `distribution`, which 
 | --- | --- | --- |
 | `Runtime` | `pluginbridge.Default().Runtime()` or `pluginbridge.New().Runtime()` | Dynamic plugins need a WASI host-service client for logs, state, time, UUIDs, and node identity; source plugins use host-native logging and runtime context directly. |
 | `Network` | `pluginbridge.Default().Network()` or `pluginbridge.New().Network()` | Dynamic plugins need governed outbound HTTP through host-service authorization; source plugins use host-native HTTP clients or injected domain services. |
-| `RecordStore` | `pluginbridge.Default().RecordStore()` or `pluginbridge.New().RecordStore()`, plus `pkg/plugin/pluginbridge/recordstore` | Dynamic plugins need a guest-side facade over the data host-service protocol and typed query plans; source plugins use their own DAO or provider seams. |
+| `RecordStore` | `pluginbridge.Default().RecordStore()` or `pluginbridge.New().RecordStore()`, plus `pkg/plugin/pluginbridge/recordstore` | **Experimental.** Dynamic plugins can reach authorized tables through this facade; no first-party plugin currently uses it as a main path. Do not keep extending the query planner until an official dynamic plugin actually reads tables this way. Source plugins use their own DAO or provider seams. |
 
 New capabilities should enter `capability.Services` only when source plugins and dynamic plugins share the same stable core-owned domain contract. Dynamic-only host-service clients and guest SDKs stay under `pluginbridge`. Plugin-owned non-core capabilities must publish their public contract and guest SDK from the owner plugin's `backend/cap/<domain>cap` boundary instead of adding domain packages, codecs, or dispatch branches in `lina-core`.
 
@@ -151,7 +151,7 @@ The host never auto-installs, auto-enables, auto-disables, or auto-uninstalls de
 
 Declaration-time capabilities are the plugin's static declarations and registration output. The host uses them before business execution to build governance state.
 
-Source plugins express declaration-time contracts through `pluginhost.Declarations`, including `Assets()`, `Lifecycle()`, `Hooks()`, `HTTP()`, `Jobs()`, and `Access()`.
+Source plugins express declaration-time contracts through `pluginhost.Declarations` and register assets, lifecycle callbacks, hooks, HTTP routes, jobs, and access filters on that object directly.
 
 ### Route registration: bind controller objects with `group.Bind`
 
@@ -292,4 +292,7 @@ When plugin public contracts or dynamic `host service` descriptors change, updat
 - New core-owned host-service methods must use the unified JSON envelope (`HostServiceJSONRequest` / `HostServiceJSONResponse` or empty payloads). Do not introduce dedicated binary codecs for new methods.
 - Existing dedicated codec methods are frozen; catalog governance tests reject dedicated expansion outside that allowlist.
 - Service and method wire constants are maintained once in `pluginbridge/protocol/hostservices/wire_constants.go`. The catalog must reference those constants (not string literals); catalog tests enforce this.
+- WASM dispatch registration is built from the catalog plus the per-service handler graph. A published dispatcher method without a handler, or a handler for a service the catalog does not publish, fails registry construction.
+- `DynamicOnly` catalog services (`runtime`, `network`, `data`) stay off `capability.Services`. Dynamic guests reach them through `pluginbridge.Services` (`Runtime`, `Network`, `RecordStore`).
+- Host-service `ResourceKind` is defined only in `pluginbridge/protocol/hostservices`. The capability registry stores the same string values and does not keep a second enum.
 - New WASM JSON host-service methods should reuse the `decodeCapabilityJSONRequest` and `capabilityJSONResponse` helpers.

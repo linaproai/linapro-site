@@ -204,7 +204,7 @@ function writeAuthorizationReviewArtifact() {
             parent_key: "extension",
             name: "授权评审示例",
             path: "host-service-authorization-review",
-            component: "system/plugin/dynamic-page",
+            component: "",
             perms: routePermission,
             icon: "lucide:shield-check",
             type: "M",

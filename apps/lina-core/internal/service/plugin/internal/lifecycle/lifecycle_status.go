@@ -48,7 +48,7 @@ func (s *serviceImpl) UpdateStatus(
 			return err
 		}
 	}
-	if err = s.syncDiscoveredManifestsForStatus(ctx); err != nil {
+	if err = s.syncCurrentManifestForStatus(ctx, pluginID); err != nil {
 		return err
 	}
 	installed, err := s.runtimeSvc.CheckIsInstalled(ctx, pluginID)
@@ -74,10 +74,10 @@ func (s *serviceImpl) UpdateStatus(
 	return s.updateSourceStatus(ctx, manifest, pluginID, status)
 }
 
-// syncDiscoveredManifestsForStatus keeps source/dynamic registry rows current
-// before status transitions without pulling list projection assembly into lifecycle.
-func (s *serviceImpl) syncDiscoveredManifestsForStatus(ctx context.Context) error {
-	manifests, err := s.catalogSvc.ScanManifests()
+// syncCurrentManifestForStatus keeps the target plugin registry row current
+// before status transitions without rescanning every discovered manifest.
+func (s *serviceImpl) syncCurrentManifestForStatus(ctx context.Context, pluginID string) error {
+	manifest, err := s.catalogSvc.GetDesiredManifest(pluginID)
 	if err != nil {
 		return err
 	}
@@ -85,13 +85,11 @@ func (s *serviceImpl) syncDiscoveredManifestsForStatus(ctx context.Context) erro
 	if err != nil {
 		return err
 	}
-	syncCtx = management.WithManifestSnapshot(syncCtx, manifests)
-	for _, manifest := range manifests {
-		if _, err = s.storeSvc.SyncManifest(syncCtx, manifest); err != nil {
-			return err
-		}
+	syncCtx = management.WithManifestSnapshot(syncCtx, []*catalog.Manifest{manifest})
+	if _, err = s.storeSvc.SyncManifest(syncCtx, manifest); err != nil {
+		return err
 	}
-	return s.integrationSvc.RefreshEnabledSnapshot(syncCtx)
+	return nil
 }
 
 // ensureEnableDependencies blocks enable when hard plugin dependencies are not

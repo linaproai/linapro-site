@@ -24,7 +24,7 @@ function findMenuByTitle(
   title: string,
 ): AccessibleMenuNode | null {
   for (const item of list) {
-    if (item.meta?.title === title) {
+    if (item.title === title) {
       return item;
     }
     const nested = findMenuByTitle(item.children ?? [], title);
@@ -135,7 +135,7 @@ test.describe('TC-16 定时任务导航与帮助文案', () => {
 
     expect(jobCatalog).toBeTruthy();
     expect(
-      (jobCatalog?.children ?? []).map((item) => item.meta?.title),
+      (jobCatalog?.children ?? []).map((item) => item.title),
     ).toEqual(['任务管理', '分组管理', '执行日志']);
 
     await adminPage.goto('/system/scheduled-job');

@@ -49,14 +49,12 @@ type serviceImpl struct {
 	electionSvc *electionService // electionSvc participates in primary election for clustered mode.
 }
 
-// New creates and returns a new cluster Service instance.
-func New(cfg *ClusterConfig) Service {
-	return NewWithCoordination(cfg, nil)
-}
-
-// NewWithCoordination creates a cluster Service using the provided
-// coordination service for distributed leader election in cluster mode.
-func NewWithCoordination(cfg *ClusterConfig, coordinationSvc coordination.Service) Service {
+// New creates one cluster topology service bound to topology config and the
+// optional coordination backend. A nil coordination backend keeps election
+// inactive in clustered mode and is the standalone constructor path. Callers
+// must pass the startup-owned instance; this constructor does not select or
+// parse a concrete coordination implementation.
+func New(cfg *ClusterConfig, coordinationSvc coordination.Service) Service {
 	normalizedCfg := normalizeClusterConfig(cfg)
 	service := &serviceImpl{
 		cfg:    normalizedCfg,
@@ -71,28 +69,4 @@ func NewWithCoordination(cfg *ClusterConfig, coordinationSvc coordination.Servic
 	}
 	service.electionSvc = newElectionService(coordinationSvc.Lock(), &normalizedCfg.Election, service.nodeID)
 	return service
-}
-
-// normalizeClusterConfig applies default election settings while preserving the
-// caller-provided enablement flag and positive timing values.
-func normalizeClusterConfig(cfg *ClusterConfig) *ClusterConfig {
-	normalizedCfg := &ClusterConfig{
-		Enabled: false,
-		Election: ElectionConfig{
-			Lease:         defaultElectionLease,
-			RenewInterval: defaultElectionRenewInterval,
-		},
-	}
-	if cfg == nil {
-		return normalizedCfg
-	}
-
-	normalizedCfg.Enabled = cfg.Enabled
-	if cfg.Election.Lease > 0 {
-		normalizedCfg.Election.Lease = cfg.Election.Lease
-	}
-	if cfg.Election.RenewInterval > 0 {
-		normalizedCfg.Election.RenewInterval = cfg.Election.RenewInterval
-	}
-	return normalizedCfg
 }

@@ -10,7 +10,7 @@ import (
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/net/ghttp"
 
-	"lina-core/internal/model/entity"
+	menusvc "lina-core/internal/service/menu"
 	"lina-core/internal/service/plugin/internal/capabilityowner"
 	"lina-core/internal/service/plugin/internal/integration"
 	"lina-core/pkg/plugin/capability/authcap/extlogin/extidspi"
@@ -188,13 +188,13 @@ func (s *serviceImpl) DispatchHookEvent(
 }
 
 // FilterMenus filters disabled plugin menus from the given menu list.
-func (s *serviceImpl) FilterMenus(ctx context.Context, menus []*entity.SysMenu) []*entity.SysMenu {
+func (s *serviceImpl) FilterMenus(ctx context.Context, menus []menusvc.FilterItem) []menusvc.FilterItem {
 	s.ensureRuntimeCacheFreshBestEffort(ctx, "filter_menus")
 	return s.integrationSvc.FilterMenus(integration.WithAuthoritativeEnablement(ctx), menus)
 }
 
 // FilterPermissionMenus filters permission menus based on plugin enablement.
-func (s *serviceImpl) FilterPermissionMenus(ctx context.Context, menus []*entity.SysMenu) []*entity.SysMenu {
+func (s *serviceImpl) FilterPermissionMenus(ctx context.Context, menus []menusvc.FilterItem) []menusvc.FilterItem {
 	s.ensureRuntimeCacheFreshBestEffort(ctx, "filter_permission_menus")
 	return s.integrationSvc.FilterPermissionMenus(integration.WithAuthoritativeEnablement(ctx), menus)
 }

@@ -213,11 +213,11 @@ func TestHandleHostServiceInvokeHostConfigReadsAuthorizedCustomSysConfig(t *test
 	ctx := context.Background()
 	key := fmt.Sprintf("custom.dynamic.limit.%d", time.Now().UnixNano())
 	insertDynamicHostConfigSysConfig(t, ctx, key, "64")
-	if err := hostconfig.New().MarkRuntimeParamsChanged(ctx); err != nil {
+	if err := hostconfig.New(nil).MarkRuntimeParamsChanged(ctx); err != nil {
 		t.Fatalf("mark runtime params changed: %v", err)
 	}
 	bindTestHostServiceRuntime(t, withTestHostConfigService(
-		hostconfigadapter.NewStaticCapabilityAdapter(hostconfig.New()),
+		hostconfigadapter.NewStaticCapabilityAdapter(hostconfig.New(nil)),
 	))
 
 	response := invokeHostConfigService(t, hostConfigHostCallContext([]string{key}), key)
@@ -244,11 +244,11 @@ custom:
     %s: "/static-dynamic"
 `, suffix))
 	insertDynamicHostConfigSysConfig(t, ctx, key, "/runtime-dynamic")
-	if err := hostconfig.New().MarkRuntimeParamsChanged(ctx); err != nil {
+	if err := hostconfig.New(nil).MarkRuntimeParamsChanged(ctx); err != nil {
 		t.Fatalf("mark runtime params changed: %v", err)
 	}
 	bindTestHostServiceRuntime(t, withTestHostConfigService(
-		hostconfigadapter.NewStaticCapabilityAdapter(hostconfig.New()),
+		hostconfigadapter.NewStaticCapabilityAdapter(hostconfig.New(nil)),
 	))
 
 	response := invokeHostConfigService(t, hostConfigHostCallContext([]string{key}), key)
@@ -455,7 +455,7 @@ func insertDynamicHostConfigSysConfig(t *testing.T, ctx context.Context, key str
 		if _, cleanupErr := dao.SysConfig.Ctx(ctx).Unscoped().Where(do.SysConfig{Id: id}).Delete(); cleanupErr != nil {
 			t.Fatalf("cleanup dynamic hostConfig sys_config %s: %v", key, cleanupErr)
 		}
-		if markErr := hostconfig.New().MarkRuntimeParamsChanged(ctx); markErr != nil {
+		if markErr := hostconfig.New(nil).MarkRuntimeParamsChanged(ctx); markErr != nil {
 			t.Fatalf("mark runtime params changed after dynamic hostConfig cleanup: %v", markErr)
 		}
 	})

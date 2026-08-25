@@ -181,13 +181,13 @@ func TestReadOnlyListOnlyBuildsCatalogSnapshot(t *testing.T) {
 // must be explicit at construction time.
 func TestNewRequiresInjectedTenantService(t *testing.T) {
 	var (
-		configProvider = configsvc.New()
+		configProvider = configsvc.New(nil)
 		bizCtxProvider = bizctx.New()
-		cacheCoordSvc  = cachecoord.Default(cachecoord.NewStaticTopology(false))
+		cacheCoordSvc  = cachecoord.New(cachecoord.NewStaticTopology(false), nil)
 		i18nSvc        = i18nsvc.New(bizCtxProvider, configProvider, cacheCoordSvc)
 		pluginRuntime  = NewRuntimeDelegate()
 		orgSvc         = orgspi.New(nil, pluginRuntime, pluginRuntime.OrgProviderEnv)
-		roleSvc        = role.New(pluginRuntime, bizCtxProvider, configProvider, i18nSvc, orgSvc, tenantspi.New(nil, pluginRuntime, pluginRuntime.TenantProviderEnv, bizCtxProvider))
+		roleSvc        = role.New(pluginRuntime, bizCtxProvider, configProvider, i18nSvc, orgSvc, tenantspi.New(nil, pluginRuntime, pluginRuntime.TenantProviderEnv, bizCtxProvider), cacheCoordSvc)
 		capabilities   = newRootTestCapabilities(bizCtxProvider, pluginRuntime)
 	)
 	_, err := New(
@@ -198,7 +198,7 @@ func TestNewRequiresInjectedTenantService(t *testing.T) {
 		i18nSvc,
 		session.NewDBStore(),
 		roleSvc,
-		locker.New(),
+		locker.New(locker.NewSQLStore()),
 		nil,
 		capabilities,
 		orgSvc,

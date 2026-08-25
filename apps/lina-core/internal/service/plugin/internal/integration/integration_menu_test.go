@@ -882,7 +882,7 @@ func TestFilterMenusHidesRuntimeMenusWhenArtifactIsMissing(t *testing.T) {
 		t.Fatalf("failed to remove dynamic artifact: %v", err)
 	}
 
-	filtered := services.Integration.FilterMenus(ctx, []*entity.SysMenu{
+	filtered := services.Integration.FilterMenus(ctx, []menusvc.FilterItem{
 		{
 			Id:      1,
 			MenuKey: "plugin:" + pluginID + ":entry",

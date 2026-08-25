@@ -19,11 +19,9 @@ type MenuNode = {
 
 type RouteNode = {
   children?: RouteNode[];
-  meta?: {
-    icon?: string;
-    hideInMenu?: boolean;
-    title?: string;
-  };
+  icon?: string;
+  title?: string;
+  visible?: number;
 };
 
 function findMenuNodeByName(
@@ -47,7 +45,7 @@ function findRouteNodeByTitle(
   title: string,
 ): RouteNode | null {
   for (const item of list) {
-    if (item.meta?.title === title) {
+    if (item.title === title) {
       return item;
     }
     const match = findRouteNodeByTitle(item.children ?? [], title);
@@ -60,8 +58,8 @@ function findRouteNodeByTitle(
 
 function getVisibleChildTitles(node: RouteNode | null): string[] {
   return (node?.children ?? [])
-    .filter((item) => !item.meta?.hideInMenu)
-    .map((item) => item.meta?.title ?? "")
+    .filter((item) => item.visible !== 0)
+    .map((item) => item.title ?? "")
     .filter(Boolean);
 }
 
@@ -71,57 +69,9 @@ function expectStartsWith(actual: string[], expectedPrefix: string[]) {
 
 function getVisibleRootTitles(list: RouteNode[]): string[] {
   return list
-    .filter((item) => !item.meta?.hideInMenu)
-    .map((item) => item.meta?.title ?? "")
+    .filter((item) => item.visible !== 0)
+    .map((item) => item.title ?? "")
     .filter(Boolean);
-}
-
-const stableHostMenuTitles = new Set([
-  "工作台",
-  "分析页",
-  "权限管理",
-  "用户管理",
-  "角色管理",
-  "菜单管理",
-  "系统设置",
-  "字典管理",
-  "参数设置",
-  "文件管理",
-  "任务调度",
-  "任务管理",
-  "分组管理",
-  "执行日志",
-  "扩展中心",
-  "插件管理",
-  "开发中心",
-  "接口文档",
-  "版本信息",
-]);
-
-function getStableHostMenuIcons(list: RouteNode[]): string[] {
-  return list.flatMap((item) => {
-    if (item.meta?.hideInMenu) {
-      return [];
-    }
-    const currentIcon =
-      item.meta?.title &&
-      stableHostMenuTitles.has(item.meta.title) &&
-      item.meta.icon
-        ? [item.meta.icon]
-        : [];
-    return [...currentIcon, ...getStableHostMenuIcons(item.children ?? [])];
-  });
-}
-
-function findDuplicateIcons(icons: string[]): string[] {
-  const counts = new Map<string, number>();
-  for (const icon of icons) {
-    counts.set(icon, (counts.get(icon) ?? 0) + 1);
-  }
-  return [...counts.entries()]
-    .filter(([, count]) => count > 1)
-    .map(([icon]) => icon)
-    .sort();
 }
 
 async function createAdminApiContext(): Promise<APIRequestContext> {
@@ -314,13 +264,8 @@ test.describe("TC002 登录后菜单显示", () => {
 
     const monitorRoute = findRouteNodeByTitle(currentUserRoutes, "系统监控");
     if (monitorRoute) {
-      expect(monitorRoute?.meta?.icon).toBe("lucide:activity");
+      expect(monitorRoute.icon).toBe("lucide:activity");
     }
-
-    const duplicateIcons = findDuplicateIcons(
-      getStableHostMenuIcons(currentUserRoutes),
-    );
-    expect(duplicateIcons).toEqual([]);
 
     const currentMenusResponse = await adminApi!.get("menu");
     expect(currentMenusResponse.ok()).toBeTruthy();

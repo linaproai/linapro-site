@@ -1,3 +1,5 @@
+// This file implements the current-user inbox delete endpoint.
+
 package usermsg
 
 import (
@@ -8,8 +10,7 @@ import (
 
 // Delete deletes a user message
 func (c *ControllerV1) Delete(ctx context.Context, req *v1.DeleteReq) (res *v1.DeleteRes, err error) {
-	err = c.usermsgSvc.Delete(ctx, req.Id)
-	if err != nil {
+	if err = c.notifySvc.InboxDelete(ctx, c.currentUserID(ctx), req.Id); err != nil {
 		return nil, err
 	}
 	return &v1.DeleteRes{}, nil

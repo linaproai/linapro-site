@@ -7,9 +7,11 @@ import (
 
 	"lina-core/internal/model/entity"
 	"lina-core/internal/service/bizctx"
+	"lina-core/internal/service/cachecoord"
 	"lina-core/internal/service/config"
 	"lina-core/internal/service/datascope"
 	i18nsvc "lina-core/internal/service/i18n"
+	"lina-core/pkg/menuview"
 	"lina-core/pkg/plugin/capability/orgcap"
 	"lina-core/pkg/plugin/capability/tenantcap/tenantspi"
 )
@@ -42,7 +44,7 @@ const (
 type permissionMenuFilter interface {
 	// FilterPermissionMenus returns only the permission menus that should remain
 	// effective for the current host and plugin state.
-	FilterPermissionMenus(ctx context.Context, menus []*entity.SysMenu) []*entity.SysMenu
+	FilterPermissionMenus(ctx context.Context, menus []menuview.FilterItem) []menuview.FilterItem
 }
 
 // Service defines the full role service contract.
@@ -163,9 +165,14 @@ func New(
 	i18nSvc i18nsvc.Service,
 	orgCapSvc orgcap.Service,
 	tenantSvc tenantspi.Service,
+	cacheCoordSvc cachecoord.Service,
 ) Service {
 	if permissionFilter == nil {
 		permissionFilter = noopPermissionMenuFilter{}
+	}
+	clusterEnabled := false
+	if configSvc != nil {
+		clusterEnabled = configSvc.IsClusterEnabled(context.Background())
 	}
 	svc := &serviceImpl{
 		bizCtxSvc:        bizCtxSvc,
@@ -175,7 +182,8 @@ func New(
 		orgCapSvc:        orgCapSvc,
 		tenantSvc:        tenantSvc,
 		accessRevisionCtrl: newCacheCoordAccessRevisionController(
-			configSvc.IsClusterEnabled(context.Background()),
+			clusterEnabled,
+			cacheCoordSvc,
 		),
 	}
 	return svc

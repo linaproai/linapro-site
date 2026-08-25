@@ -60,7 +60,7 @@ func TestBuildRuntimeMessagesIncludesEnabledDynamicPluginAssets(t *testing.T) {
 
 	var (
 		ctx      = context.Background()
-		svc      = New(bizctx.New(), configsvc.New(), cachecoord.Default(nil))
+		svc      = New(bizctx.New(), configsvc.New(nil), cachecoord.New(nil, nil))
 		pluginID = "plugin-i18n-dynamic-runtime"
 		key      = "plugin.plugin-i18n-dynamic-runtime.name"
 		value    = "Dynamic Runtime Plugin"
@@ -135,7 +135,7 @@ func TestTranslateDynamicPluginSourceTextUsesReleaseArtifactBeforeEnable(t *test
 
 	var (
 		ctx      = context.WithValue(context.Background(), gctx.StrKey("BizCtx"), &model.Context{Locale: DefaultLocale})
-		svc      = New(bizctx.New(), configsvc.New(), cachecoord.Default(nil))
+		svc      = New(bizctx.New(), configsvc.New(nil), cachecoord.New(nil, nil))
 		pluginID = "plugin-i18n-dynamic-source-text"
 		key      = "plugin.plugin-i18n-dynamic-source-text.preview.name"
 	)
@@ -179,7 +179,7 @@ func TestTranslateDynamicPluginSourceTextReloadsLatestRelease(t *testing.T) {
 
 	var (
 		ctx      = context.WithValue(context.Background(), gctx.StrKey("BizCtx"), &model.Context{Locale: DefaultLocale})
-		svc      = New(bizctx.New(), configsvc.New(), cachecoord.Default(nil))
+		svc      = New(bizctx.New(), configsvc.New(nil), cachecoord.New(nil, nil))
 		pluginID = "plugin-i18n-dynamic-source-text-reload"
 		key      = "plugin.plugin-i18n-dynamic-source-text-reload.preview.name"
 	)
@@ -250,8 +250,8 @@ func TestTranslateDynamicPluginSourceTextFallsBackToStagingArtifact(t *testing.T
 	)
 	svc := New(
 		bizctx.New(),
-		dynamicPluginI18NConfigService{Service: configsvc.New(), dynamicStoragePath: storageDir},
-		cachecoord.Default(nil),
+		dynamicPluginI18NConfigService{Service: configsvc.New(nil), dynamicStoragePath: storageDir},
+		cachecoord.New(nil, nil),
 	)
 
 	t.Cleanup(func() {
@@ -464,8 +464,8 @@ func TestResolveDynamicPluginPackagePathAnchorsRelativeStoragePathAtRepoRoot(t *
 
 	svc := New(
 		bizctx.New(),
-		dynamicPluginI18NConfigService{Service: configsvc.New(), dynamicStoragePath: "temp/output"},
-		cachecoord.Default(nil),
+		dynamicPluginI18NConfigService{Service: configsvc.New(nil), dynamicStoragePath: "temp/output"},
+		cachecoord.New(nil, nil),
 	).(*serviceImpl)
 
 	resolvedPath, err := svc.resolveDynamicPluginPackagePath(context.Background(), filepath.ToSlash(packagePath))

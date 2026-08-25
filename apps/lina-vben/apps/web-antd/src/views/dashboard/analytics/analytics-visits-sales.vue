@@ -25,20 +25,18 @@ function renderChart() {
         data: [
           {
             name: $t('pages.dashboard.analytics.sales.outsourcing'),
-            value: 500,
+            value: 0,
           },
           {
             name: $t('pages.dashboard.analytics.sales.customDevelopment'),
-            value: 310,
+            value: 0,
           },
           {
             name: $t('pages.dashboard.analytics.sales.technicalSupport'),
-            value: 274,
+            value: 0,
           },
-          { name: $t('pages.dashboard.analytics.sales.remote'), value: 400 },
-        ].sort((left, right) => {
-          return left.value - right.value;
-        }),
+          { name: $t('pages.dashboard.analytics.sales.remote'), value: 0 },
+        ],
         name: $t('pages.dashboard.analytics.sales.title'),
         radius: '80%',
         roseType: 'radius',

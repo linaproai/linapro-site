@@ -10,10 +10,24 @@ import (
 )
 
 var (
+	// CodeNotifyNotAuthenticated reports that inbox access has no authenticated
+	// user. The public HTTP errorCode stays USERMSG_NOT_AUTHENTICATED because
+	// the user-message API still exposes that identifier.
+	CodeNotifyNotAuthenticated = bizerr.MustDefine(
+		"USERMSG_NOT_AUTHENTICATED",
+		"Not signed in",
+		gcode.CodeNotAuthorized,
+	)
 	// CodeNotifyUserNotFound reports that the target inbox user does not exist.
 	CodeNotifyUserNotFound = bizerr.MustDefine(
 		"NOTIFY_USER_NOT_FOUND",
 		"User does not exist",
+		gcode.CodeNotFound,
+	)
+	// CodeNotifyInboxNotFound reports that the requested inbox delivery does not exist.
+	CodeNotifyInboxNotFound = bizerr.MustDefine(
+		"NOTIFY_INBOX_NOT_FOUND",
+		"Message does not exist",
 		gcode.CodeNotFound,
 	)
 	// CodeNotifyChannelTypeUnsupported reports that the requested channel type is not supported.

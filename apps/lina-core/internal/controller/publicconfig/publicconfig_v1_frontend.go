@@ -29,8 +29,6 @@ func (c *ControllerV1) Frontend(ctx context.Context, _ *v1.FrontendReq) (res *v1
 			PageTitle:             c.localizePublicFrontendText(ctx, hostconfig.PublicFrontendSettingKeyAuthPageTitle, "publicFrontend.auth.pageTitle", cfg.Auth.PageTitle),
 			PageDesc:              c.localizePublicFrontendText(ctx, hostconfig.PublicFrontendSettingKeyAuthPageDesc, "publicFrontend.auth.pageDesc", cfg.Auth.PageDesc),
 			LoginSubtitle:         c.localizePublicFrontendText(ctx, hostconfig.PublicFrontendSettingKeyAuthLoginSubtitle, "publicFrontend.auth.loginSubtitle", cfg.Auth.LoginSubtitle),
-			PanelLayout:           v1.PanelLayout(cfg.Auth.PanelLayout),
-			SloganImage:           cfg.Auth.SloganImage,
 			ForgetPasswordEnabled: cfg.Auth.ForgetPasswordEnabled,
 			RegisterEnabled:       cfg.Auth.RegisterEnabled,
 			PrivacyPolicy:         c.localizePublicFrontendText(ctx, hostconfig.PublicFrontendSettingKeyAuthPrivacyPolicy, "publicFrontend.auth.privacyPolicy", cfg.Auth.PrivacyPolicy),
@@ -41,7 +39,6 @@ func (c *ControllerV1) Frontend(ctx context.Context, _ *v1.FrontendReq) (res *v1
 		},
 		UI: v1.FrontendUIRes{
 			ThemeMode:        v1.ThemeMode(cfg.UI.ThemeMode),
-			Layout:           v1.Layout(cfg.UI.Layout),
 			WatermarkEnabled: cfg.UI.WatermarkEnabled,
 			WatermarkContent: c.localizePublicFrontendText(ctx, hostconfig.PublicFrontendSettingKeyUIWatermarkContent, "publicFrontend.ui.watermarkContent", cfg.UI.WatermarkContent),
 		},

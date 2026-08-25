@@ -1,3 +1,5 @@
+// This file defines the role-assigned menu ID API DTOs.
+
 package v1
 
 import (
@@ -6,12 +8,11 @@ import (
 
 // RoleMenuTreeReq defines the request for querying a role's menu tree.
 type RoleMenuTreeReq struct {
-	g.Meta `path:"/menu/role/{roleId}" method:"get" tags:"Menu Management" summary:"Get the role menu tree" dc:"Get the role menu tree, used to display assigned menus when editing a role. Returns all menu trees and the menu IDs assigned to this role" permission:"system:menu:query"`
+	g.Meta `path:"/menu/role/{roleId}" method:"get" tags:"Menu Management" summary:"Get role menu IDs" dc:"Return the menu IDs assigned to this role. Management workbenches compile the assignable menu list from GET /menu/treeselect into a tree and apply these IDs as the checked set." permission:"system:menu:query"`
 	RoleId int `json:"roleId" v:"required|min:1" dc:"Role ID" eg:"1"`
 }
 
-// RoleMenuTreeRes defines the response for querying a role's menu tree.
+// RoleMenuTreeRes defines the response for querying a role's assigned menu IDs.
 type RoleMenuTreeRes struct {
-	Menus       []*MenuTreeNode `json:"menus" dc:"Menu tree list" eg:"[]"`
-	CheckedKeys []int           `json:"checkedKeys" dc:"Checked menu ID list" eg:"[1,2,3]"`
+	MenuIds []int `json:"menuIds" dc:"Assigned menu ID list" eg:"[1,2,3]"`
 }

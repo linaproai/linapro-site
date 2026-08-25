@@ -30,7 +30,7 @@ menus:
     parent_key: plugin:linapro-plugin-marketplace:directory
     name: plugin.linapro-plugin-marketplace.menu.mine
     path: plugin-marketplace-mine
-    component: system/plugin/dynamic-page
+    component: ""
     perms: market:plugin:publish
     icon: ant-design:appstore-outlined
     type: M
@@ -39,7 +39,7 @@ menus:
     parent_key: plugin:linapro-plugin-marketplace:directory
     name: plugin.linapro-plugin-marketplace.menu.adminList
     path: plugin-marketplace-admin-list
-    component: system/plugin/dynamic-page
+    component: ""
     perms: market:plugin:review
     icon: ant-design:unordered-list-outlined
     type: M
@@ -48,7 +48,7 @@ menus:
     parent_key: plugin:linapro-plugin-marketplace:directory
     name: plugin.linapro-plugin-marketplace.menu.review
     path: plugin-marketplace-review
-    component: system/plugin/dynamic-page
+    component: ""
     perms: market:plugin:review
     icon: ant-design:audit-outlined
     type: M
@@ -57,7 +57,7 @@ menus:
     parent_key: plugin:linapro-plugin-marketplace:directory
     name: plugin.linapro-plugin-marketplace.menu.detail
     path: plugin-marketplace-detail
-    component: system/plugin/dynamic-page
+    component: ""
     perms: market:plugin:view
     icon: ant-design:profile-outlined
     type: M

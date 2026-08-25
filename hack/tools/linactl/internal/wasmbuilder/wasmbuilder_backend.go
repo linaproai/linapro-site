@@ -1111,10 +1111,10 @@ func validateHookSpec(pluginID string, spec *hookSpec, filePath string) error {
 	if !isHookExtensionPoint(spec.Event) {
 		return fmt.Errorf("plugin hook event is not published by host: %s", filePath)
 	}
-	if spec.Action == "" {
-		spec.Action = hookActionInsert
+	if isDemoHookAction(spec.Action) {
+		return fmt.Errorf("plugin hook demo action is not supported in production: %s", filePath)
 	}
-	if !isSupportedHookAction(spec.Action) {
+	if spec.Action != "" && !isSupportedHookAction(spec.Action) {
 		return fmt.Errorf("plugin hook action is not supported: %s", filePath)
 	}
 	if spec.Mode == "" {
@@ -1369,13 +1369,20 @@ func isHookExtensionPoint(point hookExtensionPoint) bool {
 	return ok
 }
 
-func isSupportedHookAction(action hookAction) bool {
+func isDemoHookAction(action hookAction) bool {
 	switch action {
 	case hookActionInsert, hookActionSleep, hookActionError:
 		return true
 	default:
 		return false
 	}
+}
+
+func isSupportedHookAction(action hookAction) bool {
+	if action == "" {
+		return true
+	}
+	return false
 }
 
 func isExtensionPointExecutionModeSupported(point hookExtensionPoint, mode callbackExecutionMode) bool {

@@ -180,7 +180,7 @@ func (s *serviceImpl) handleLoadRegisterError(
 	if !strings.HasPrefix(strings.TrimSpace(job.HandlerRef), "plugin:") {
 		return false, nil
 	}
-	if _, ok := s.registry.Lookup(job.HandlerRef); ok {
+	if _, _, ok := s.registry.Lookup(job.HandlerRef); ok {
 		return false, nil
 	}
 

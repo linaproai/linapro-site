@@ -6,7 +6,7 @@ package pluginhost
 import "context"
 
 // NewSourcePluginLifecycleCallbackAdapter returns hook callbacks registered
-// through Declarations.Lifecycle().
+// on Declarations.
 func NewSourcePluginLifecycleCallbackAdapter(plugin SourcePluginDefinition) LifecycleCallbacks {
 	if plugin == nil {
 		return LifecycleCallbacks{}

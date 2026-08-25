@@ -130,7 +130,7 @@ Dynamic plugins access published runtime capabilities through `pluginbridge.Defa
 | Published domain capabilities | Such as AI, Auth, Cache, Storage, accessed via `host-call` bridging; `I18n()` is not published as a dynamic host service |
 | `Runtime()` | Exclusive: log writing, plugin state read/write, time retrieval, UUID generation, node identity reading |
 | `Network()` | Exclusive: governed outbound HTTP requests, requiring authorized target addresses declared in `plugin.yaml` |
-| `RecordStore()` | Exclusive: ORM-like wrapper for the `data` service, only accessing declared plugin-owned tables |
+| `RecordStore()` | Experimental, not a main path: ORM-like wrapper for the `data` service, only accessing declared plugin-owned tables |
 
 #### Capability Differences Between Source and Dynamic Plugins
 

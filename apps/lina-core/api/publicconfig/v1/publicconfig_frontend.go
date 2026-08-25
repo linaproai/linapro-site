@@ -4,18 +4,6 @@ package v1
 
 import "github.com/gogf/gf/v2/frame/g"
 
-// PanelLayout identifies the login-panel placement exposed to clients.
-type PanelLayout string
-
-const (
-	// PanelLayoutLeft aligns the login panel to the left.
-	PanelLayoutLeft PanelLayout = "panel-left"
-	// PanelLayoutCenter centers the login panel.
-	PanelLayoutCenter PanelLayout = "panel-center"
-	// PanelLayoutRight aligns the login panel to the right.
-	PanelLayoutRight PanelLayout = "panel-right"
-)
-
 // ThemeMode identifies the default frontend theme preference.
 type ThemeMode string
 
@@ -26,26 +14,6 @@ const (
 	ThemeModeDark ThemeMode = "dark"
 	// ThemeModeAuto follows the client system theme.
 	ThemeModeAuto ThemeMode = "auto"
-)
-
-// Layout identifies the default workspace navigation layout.
-type Layout string
-
-const (
-	// LayoutSidebarNav selects sidebar navigation.
-	LayoutSidebarNav Layout = "sidebar-nav"
-	// LayoutSidebarMixedNav selects mixed sidebar navigation.
-	LayoutSidebarMixedNav Layout = "sidebar-mixed-nav"
-	// LayoutHeaderNav selects header navigation.
-	LayoutHeaderNav Layout = "header-nav"
-	// LayoutHeaderSidebarNav selects header and sidebar navigation.
-	LayoutHeaderSidebarNav Layout = "header-sidebar-nav"
-	// LayoutHeaderMixedNav selects mixed header navigation.
-	LayoutHeaderMixedNav Layout = "header-mixed-nav"
-	// LayoutMixedNav selects mixed navigation.
-	LayoutMixedNav Layout = "mixed-nav"
-	// LayoutFullContent selects the full-content layout.
-	LayoutFullContent Layout = "full-content"
 )
 
 // CronLogRetentionMode identifies the system-level job-log retention policy.
@@ -62,7 +30,7 @@ const (
 
 // FrontendReq defines the request for fetching public frontend config.
 type FrontendReq struct {
-	g.Meta `path:"/config/public/frontend" method:"get" tags:"Public Configuration" summary:"Get public frontend configuration" dc:"Return to the login page and the whitelist of brand, login display and interface style configuration that can be safely and publicly read during the startup phase of the management background"`
+	g.Meta `path:"/config/public/frontend" method:"get" tags:"Public Configuration" summary:"Get public frontend configuration" dc:"Return the unauthenticated brand, login copy, feature switches, theme, and workspace path that any management workbench can read. The payload is not a Vben layout contract."`
 }
 
 // FrontendRes defines the public frontend config response.
@@ -84,15 +52,13 @@ type FrontendAppRes struct {
 
 // FrontendAuthRes stores login-page public copy and entry-switch settings.
 type FrontendAuthRes struct {
-	PageTitle             string      `json:"pageTitle" dc:"Login page main title copywriting" eg:"An AI-native full-stack framework engineered for sustainable delivery"`
-	PageDesc              string      `json:"pageDesc" dc:"Login page description copy" eg:"Facing business evolution, it provides out-of-the-box management portals and flexible pluggable expansion mechanisms."`
-	LoginSubtitle         string      `json:"loginSubtitle" dc:"Login form subtitle copywriting" eg:"Please enter your account information to enter the LinaPro hosting workspace"`
-	PanelLayout           PanelLayout `json:"panelLayout" dc:"Login box layout: panel-left=left panel-center=center panel-right=right" eg:"panel-center"`
-	SloganImage           string      `json:"sloganImage" dc:"Login-side slogan illustration image URL; default /slogan.svg is the built-in Vben graphic, empty hides the illustration" eg:"/slogan.svg"`
-	ForgetPasswordEnabled bool        `json:"forgetPasswordEnabled" dc:"Whether the login page exposes the forget-password entry: true=show false=hide" eg:"true"`
-	RegisterEnabled       bool        `json:"registerEnabled" dc:"Whether the login page exposes the create-account entry: true=show false=hide" eg:"true"`
-	PrivacyPolicy         string      `json:"privacyPolicy" dc:"Privacy policy body shown in the registration consent dialog" eg:"Privacy Policy\n\n..."`
-	TermsOfService        string      `json:"termsOfService" dc:"Terms of service body shown in the registration consent dialog" eg:"Terms of Service\n\n..."`
+	PageTitle             string `json:"pageTitle" dc:"Login page main title copywriting" eg:"An AI-native full-stack framework engineered for sustainable delivery"`
+	PageDesc              string `json:"pageDesc" dc:"Login page description copy" eg:"Facing business evolution, it provides out-of-the-box management portals and flexible pluggable expansion mechanisms."`
+	LoginSubtitle         string `json:"loginSubtitle" dc:"Login form subtitle copywriting" eg:"Please enter your account information to enter the LinaPro hosting workspace"`
+	ForgetPasswordEnabled bool   `json:"forgetPasswordEnabled" dc:"Whether the login page exposes the forget-password entry: true=show false=hide" eg:"true"`
+	RegisterEnabled       bool   `json:"registerEnabled" dc:"Whether the login page exposes the create-account entry: true=show false=hide" eg:"true"`
+	PrivacyPolicy         string `json:"privacyPolicy" dc:"Privacy policy body shown in the registration consent dialog" eg:"Privacy Policy\n\n..."`
+	TermsOfService        string `json:"termsOfService" dc:"Terms of service body shown in the registration consent dialog" eg:"Terms of Service\n\n..."`
 }
 
 // FrontendUserRes stores user-facing public fallback settings.
@@ -103,7 +69,6 @@ type FrontendUserRes struct {
 // FrontendUIRes stores public-safe theme and layout preferences.
 type FrontendUIRes struct {
 	ThemeMode        ThemeMode `json:"themeMode" dc:"Theme mode: light=light dark=dark auto=follow the system" eg:"light"`
-	Layout           Layout    `json:"layout" dc:"Backend default layout: sidebar-nav, sidebar-mixed-nav, header-nav, header-sidebar-nav, header-mixed-nav, mixed-nav, full-content" eg:"sidebar-nav"`
 	WatermarkEnabled bool      `json:"watermarkEnabled" dc:"Whether to enable watermark: true=enable false=disable" eg:"false"`
 	WatermarkContent string    `json:"watermarkContent" dc:"Watermark copy content" eg:"LinaPro"`
 }

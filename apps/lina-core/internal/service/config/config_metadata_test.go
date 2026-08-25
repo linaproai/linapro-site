@@ -94,7 +94,7 @@ func TestGetOpenApiUsesEmbeddedMetadataAsset(t *testing.T) {
 	var want OpenApiConfig
 	mustScanMetadataConfig(ctx, adapter, "openapi", &want)
 
-	got := New().GetOpenApi(ctx)
+	got := New(nil).GetOpenApi(ctx)
 
 	if got.Title != want.Title {
 		t.Fatalf("title: want %q, got %q", want.Title, got.Title)

@@ -32,7 +32,7 @@ func TestResolveRouteTextUsesApidocCatalog(t *testing.T) {
 	})
 	defer restoreCatalog()
 
-	service := New(&testConfigProvider{}, bizctx.New(), i18nsvc.New(bizctx.New(), configsvc.New(), cachecoord.Default(nil)), &testPluginRouteProvider{}).(*serviceImpl)
+	service := New(&testConfigProvider{}, bizctx.New(), i18nsvc.New(bizctx.New(), configsvc.New(nil), cachecoord.New(nil, nil)), &testPluginRouteProvider{}).(*serviceImpl)
 	ctx := context.WithValue(context.Background(), gctx.StrKey("BizCtx"), &model.Context{Locale: "zh-CN"})
 	output := service.ResolveRouteText(ctx, RouteTextInput{
 		OperationKey:    operationKey,
@@ -57,7 +57,7 @@ func TestFindRouteTitleOperationKeys(t *testing.T) {
 	defer restoreCatalog()
 
 	var (
-		service     = New(&testConfigProvider{}, bizctx.New(), i18nsvc.New(bizctx.New(), configsvc.New(), cachecoord.Default(nil)), &testPluginRouteProvider{}).(*serviceImpl)
+		service     = New(&testConfigProvider{}, bizctx.New(), i18nsvc.New(bizctx.New(), configsvc.New(nil), cachecoord.New(nil, nil)), &testPluginRouteProvider{}).(*serviceImpl)
 		ctx         = context.WithValue(context.Background(), gctx.StrKey("BizCtx"), &model.Context{Locale: "zh-CN"})
 		keys        = service.FindRouteTitleOperationKeys(ctx, "动态")
 		expectedKey = "plugins.linapro_demo_dynamic.paths.get.api.v1.backend_summary"

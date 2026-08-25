@@ -12,7 +12,7 @@ import (
 func TestGetLoginUsesRuntimeBlacklist(t *testing.T) {
 	withRuntimeParamValue(t, RuntimeParamKeyLoginBlackIPList, "127.0.0.1;10.0.0.0/8")
 
-	svc := New()
+	svc := New(nil)
 	cfg, err := svc.GetLogin(context.Background())
 	if err != nil {
 		t.Fatalf("get runtime login config: %v", err)

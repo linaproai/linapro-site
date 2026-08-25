@@ -4,18 +4,16 @@ package integration_test
 
 import (
 	"context"
-	"strings"
 	"testing"
 
 	"lina-core/internal/service/plugin/internal/catalog"
-	"lina-core/internal/service/plugin/internal/integration"
 	"lina-core/internal/service/plugin/internal/testutil"
 	"lina-core/pkg/plugin/pluginhost"
 )
 
-// TestRunPluginDeclaredHookHonorsTimeoutAndErrorActions verifies that declared
-// hooks respect timeout and explicit error behavior during execution.
-func TestRunPluginDeclaredHookHonorsTimeoutAndErrorActions(t *testing.T) {
+// TestRunPluginDeclaredHookRejectsDemoActions verifies production dispatch
+// does not interpret insert/sleep/error demo hooks.
+func TestRunPluginDeclaredHookRejectsDemoActions(t *testing.T) {
 	services := testutil.NewServices()
 
 	sleepHook := &catalog.HookSpec{
@@ -24,12 +22,9 @@ func TestRunPluginDeclaredHookHonorsTimeoutAndErrorActions(t *testing.T) {
 		TimeoutMs: 10,
 		SleepMs:   80,
 	}
-	timeoutCtx, cancel := integration.BuildPluginHookTimeoutContext(context.Background(), sleepHook)
-	defer cancel()
-
-	err := services.Integration.RunPluginDeclaredHook(timeoutCtx, "plugin-dev-dynamic-timeout", sleepHook, nil)
-	if err == nil || !strings.Contains(err.Error(), "timeout") {
-		t.Fatalf("expected timeout error for sleep hook, got: %v", err)
+	err := services.Integration.RunPluginDeclaredHook(context.Background(), "plugin-dev-dynamic-timeout", sleepHook, nil)
+	if err == nil {
+		t.Fatal("expected production dispatch to reject demo sleep hook")
 	}
 
 	errorHook := &catalog.HookSpec{
@@ -38,7 +33,7 @@ func TestRunPluginDeclaredHookHonorsTimeoutAndErrorActions(t *testing.T) {
 		ErrorMessage: "runtime hook failed on purpose",
 	}
 	err = services.Integration.RunPluginDeclaredHook(context.Background(), "plugin-dev-dynamic-error", errorHook, nil)
-	if err == nil || !strings.Contains(err.Error(), "runtime hook failed on purpose") {
-		t.Fatalf("expected declared error hook message, got: %v", err)
+	if err == nil {
+		t.Fatal("expected production dispatch to reject demo error hook")
 	}
 }

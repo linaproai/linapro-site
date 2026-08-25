@@ -18,7 +18,6 @@ gfcli:
     dao:
       - link: *localDatabaseLink
         tables: >-
-          sys_cache_revision,
           sys_config,
           sys_dict_data,
           sys_dict_type,

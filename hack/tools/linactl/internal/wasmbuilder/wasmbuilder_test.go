@@ -191,9 +191,7 @@ func TestBuildRuntimeWasmArtifactFromSourceEmbedsDeclaredAssets(t *testing.T) {
 		`wasm:
   hooks:
     - event: auth.login.succeeded
-      action: sleep
       timeout: 50ms
-      sleep: 10ms
   lifecycle:
     timeouts:
       BeforeInstall: 3s
@@ -367,9 +365,8 @@ func TestBuildRuntimeWasmArtifactFromSourceEmbedsDeclaredAssets(t *testing.T) {
 		t.Fatalf("expected hook section json to unmarshal, got error: %v", err)
 	}
 	if len(hooks) != 1 ||
-		hooks[0].Action != hookActionSleep ||
-		hooks[0].TimeoutMs != 50 ||
-		hooks[0].SleepMs != 10 {
+		hooks[0].Action != "" ||
+		hooks[0].TimeoutMs != 50 {
 		t.Fatalf("unexpected embedded hook specs: %#v", hooks)
 	}
 
@@ -492,10 +489,8 @@ func TestCollectHookSpecsReadsPluginHackConfig(t *testing.T) {
 		`wasm:
   hooks:
     - event: auth.login.succeeded
-      action: sleep
       mode: async
       timeout: 50ms
-      sleep: 10ms
 `,
 	)
 
@@ -505,10 +500,9 @@ func TestCollectHookSpecsReadsPluginHackConfig(t *testing.T) {
 	}
 	if len(items) != 1 ||
 		items[0].Event != extensionPointAuthLoginSucceeded ||
-		items[0].Action != hookActionSleep ||
+		items[0].Action != "" ||
 		items[0].Mode != callbackExecutionModeAsync ||
-		items[0].TimeoutMs != 50 ||
-		items[0].SleepMs != 10 {
+		items[0].TimeoutMs != 50 {
 		t.Fatalf("unexpected hook config result: %#v", items)
 	}
 }
@@ -521,9 +515,7 @@ func TestCollectHookSpecsRejectsConfigDurationWithoutUnit(t *testing.T) {
 		`wasm:
   hooks:
     - event: auth.login.succeeded
-      action: sleep
       timeout: "50"
-      sleep: 10ms
 `,
 	)
 
@@ -541,9 +533,7 @@ func TestCollectHookSpecsRejectsUnsupportedConfigField(t *testing.T) {
 		`wasm:
   hooks:
     - event: auth.login.succeeded
-      action: sleep
       timeoutMs: 50
-      sleep: 10ms
 `,
 	)
 

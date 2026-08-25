@@ -19,23 +19,8 @@ import (
 // codec methods. New core-owned host-service methods must use PayloadKindJSON
 // or PayloadKindNone and must not expand this set.
 var frozenDedicatedMethods = map[string]struct{}{
-	"cache.delete":                {},
-	"cache.expire":                {},
-	"cache.get":                   {},
-	"cache.incr":                  {},
-	"cache.set":                   {},
-	"data.batch_get":              {},
-	"data.create":                 {},
-	"data.delete":                 {},
-	"data.get":                    {},
-	"data.list":                   {},
-	"data.transaction":            {},
-	"data.update":                 {},
 	"hostconfig.get":              {},
 	"jobs.jobs.register":          {},
-	"lock.acquire":                {},
-	"lock.release":                {},
-	"lock.renew":                  {},
 	"manifest.get":                {},
 	"network.request":             {},
 	"notifications.messages.send": {},
@@ -47,24 +32,75 @@ var frozenDedicatedMethods = map[string]struct{}{
 	"runtime.state.delete":        {},
 	"runtime.state.get":           {},
 	"runtime.state.set":           {},
-	"storage.delete":              {},
-	"storage.get":                 {},
-	"storage.list":                {},
-	"storage.put":                 {},
-	"storage.put.abort":           {},
-	"storage.put.chunk":           {},
-	"storage.put.commit":          {},
-	"storage.put.init":            {},
-	"storage.stat":                {},
+}
+
+// jsonEnvelopeServices is the retired dedicated-codec domain set that must
+// publish PayloadKindJSON for every catalog method.
+var jsonEnvelopeServices = map[string]struct{}{
+	HostServiceCache:   {},
+	HostServiceData:    {},
+	HostServiceLock:    {},
+	HostServiceStorage: {},
+}
+
+func TestCatalogPublicationFlagsAndDynamicOnly(t *testing.T) {
+	wantDynamicOnly := map[string]struct{}{
+		HostServiceRuntime: {},
+		HostServiceNetwork: {},
+		HostServiceData:    {},
+	}
+	for _, descriptor := range Catalog() {
+		_, want := wantDynamicOnly[descriptor.Service]
+		if descriptor.DynamicOnly != want {
+			t.Fatalf("service %s DynamicOnly=%v, want %v", descriptor.Service, descriptor.DynamicOnly, want)
+		}
+		if len(descriptor.Methods) == 0 {
+			t.Fatalf("service %s has no methods", descriptor.Service)
+		}
+		for _, method := range descriptor.Methods {
+			if !method.Published || !method.GuestClient || !method.Dispatcher {
+				t.Fatalf("core catalog method %s.%s must be published for dispatcher and guest, got %#v", descriptor.Service, method.Method, method)
+			}
+		}
+	}
+	if got := len(PublishedDispatcherMethods()); got != len(Methods()) {
+		t.Fatalf("all core catalog methods are dispatcher-published, got %d of %d", got, len(Methods()))
+	}
+	if got := len(PublishedGuestMethods()); got != len(Methods()) {
+		t.Fatalf("all core catalog methods are guest-published, got %d of %d", got, len(Methods()))
+	}
+}
+
+func TestCapabilityRegistryDoesNotRedefineResourceKind(t *testing.T) {
+	content, err := os.ReadFile(filepath.Join(repoRootForCatalogTest(t), "..", "..", "..", "capability", "capregistry", "capregistry.go"))
+	if err != nil {
+		t.Fatalf("read capregistry.go: %v", err)
+	}
+	source := string(content)
+	for _, fragment := range []string{
+		`ResourceKindNone  ResourceKind = "none"`,
+		`ResourceKindPath  ResourceKind = "path"`,
+		`ResourceKindTable ResourceKind = "table"`,
+		`ResourceKindKey   ResourceKind = "key"`,
+		`ResourceKindRef   ResourceKind = "resource"`,
+	} {
+		if strings.Contains(source, fragment) {
+			t.Fatalf("capregistry must not copy hostservices ResourceKind constants: %s", fragment)
+		}
+	}
 }
 
 func TestCatalogPayloadKinds(t *testing.T) {
 	seenDedicated := map[string]struct{}{}
 	for _, descriptor := range Catalog() {
+		_, requireJSON := jsonEnvelopeServices[descriptor.Service]
 		for _, method := range descriptor.Methods {
 			key := method.Service + "." + method.Method
 			if method.PayloadKind == "" {
 				t.Fatalf("catalog method %s is missing payload kind", key)
+			}
+			if requireJSON && method.PayloadKind != PayloadKindJSON {
+				t.Fatalf("catalog method %s must use JSON envelope, got %q", key, method.PayloadKind)
 			}
 			switch method.PayloadKind {
 			case PayloadKindDedicated:
@@ -208,7 +244,7 @@ func TestCatalogWithDescriptorsProjectsOwnerMethods(t *testing.T) {
 				Method:          "text.generate",
 				Capability:      "plugin.linapro-ai-core.ai.text.v1",
 				Risk:            capregistry.RiskLevelExecute,
-				ResourceKind:    capregistry.ResourceKindKey,
+				ResourceKind:    capregistry.ResourceKind(ResourceKindKey),
 				RequestPayload:  "aitext.GenerateRequest",
 				ResponsePayload: "aitext.GenerateResponse",
 			},
@@ -286,6 +322,31 @@ func TestOrdinaryJSONServicesHaveNoDedicatedCapabilityCodecs(t *testing.T) {
 			t.Fatalf("ordinary JSON host service must not keep dedicated codec function %s", name)
 		}
 	}
+	for name := range protocolFuncs {
+		if retiredDedicatedCodecFunction(name) {
+			t.Fatalf("retired cache/lock/storage/data dedicated codec function still present: %s", name)
+		}
+	}
+}
+
+// retiredDedicatedCodecFunction reports whether a protocol helper belongs to a
+// retired cache/lock/storage/data dedicated binary codec.
+func retiredDedicatedCodecFunction(name string) bool {
+	for _, prefix := range []string{
+		"MarshalHostServiceCache",
+		"UnmarshalHostServiceCache",
+		"MarshalHostServiceLock",
+		"UnmarshalHostServiceLock",
+		"MarshalHostServiceStorage",
+		"UnmarshalHostServiceStorage",
+		"MarshalHostServiceData",
+		"UnmarshalHostServiceData",
+	} {
+		if strings.HasPrefix(name, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func repoRootForCatalogTest(t *testing.T) string {

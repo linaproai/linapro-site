@@ -47,11 +47,11 @@ func (defaultCoordinatorTestTopology) NodeID() string {
 	return "default-test-node"
 }
 
-// TestSingleNodeMarkChangedUsesProcessLocalRevision verifies local mode avoids
-// the shared revision table.
+// TestSingleNodeMarkChangedUsesProcessLocalRevision verifies local mode uses
+// the instance revision store rather than a shared SQL table.
 func TestSingleNodeMarkChangedUsesProcessLocalRevision(t *testing.T) {
 	ctx := context.Background()
-	service := New(NewStaticTopology(false))
+	service := New(NewStaticTopology(false), nil)
 
 	firstRevision, err := service.MarkChanged(
 		ctx,
@@ -76,11 +76,34 @@ func TestSingleNodeMarkChangedUsesProcessLocalRevision(t *testing.T) {
 	}
 }
 
+// TestNewInstancesDoNotShareLocalRevisions verifies two constructors do not
+// inherit each other's standalone revision counters.
+func TestNewInstancesDoNotShareLocalRevisions(t *testing.T) {
+	ctx := context.Background()
+	first := New(NewStaticTopology(false), nil)
+	second := New(NewStaticTopology(false), nil)
+
+	bumped, err := first.MarkChanged(ctx, testRuntimeConfigDomain, ScopeGlobal, ChangeReason("unit_test_isolation"))
+	if err != nil {
+		t.Fatalf("first instance mark failed: %v", err)
+	}
+	other, err := second.CurrentRevision(ctx, testRuntimeConfigDomain, ScopeGlobal)
+	if err != nil {
+		t.Fatalf("second instance current revision failed: %v", err)
+	}
+	if other >= bumped && bumped > 1 {
+		t.Fatalf("expected isolated instance revisions, first=%d second=%d", bumped, other)
+	}
+	if other != 1 {
+		t.Fatalf("expected a fresh instance to start at revision 1, got %d", other)
+	}
+}
+
 // TestTenantScopedMarkChangedIsolatesLocalRevisions verifies tenant invalidation scope uses separate revisions.
 func TestTenantScopedMarkChangedIsolatesLocalRevisions(t *testing.T) {
 	var (
 		ctx     = context.Background()
-		service = New(NewStaticTopology(false))
+		service = New(NewStaticTopology(false), nil)
 		domain  = Domain("unit-tenant-cache")
 		scope   = Scope("dict")
 	)
@@ -115,7 +138,7 @@ func TestTenantScopedMarkChangedIsolatesLocalRevisions(t *testing.T) {
 func TestTenantScopedMarkChangedCascadeUsesDistinctScope(t *testing.T) {
 	var (
 		ctx     = context.Background()
-		service = New(NewStaticTopology(false))
+		service = New(NewStaticTopology(false), nil)
 		domain  = Domain("unit-tenant-cache-cascade")
 		scope   = Scope("permission")
 	)
@@ -151,73 +174,28 @@ func TestTenantScopedMarkChangedCascadeUsesDistinctScope(t *testing.T) {
 	}
 }
 
-// TestDefaultReturnsSharedCoordinatorWithUpdatedTopology verifies production
-// constructors reuse one process coordinator while later startup wiring can
-// replace the topology view with the real cluster service.
-func TestDefaultReturnsSharedCoordinatorWithUpdatedTopology(t *testing.T) {
-	first := Default(NewStaticTopology(false))
-	impl, ok := first.(*serviceImpl)
+// TestNewInstancesDoNotShareProcessState verifies constructors bind topology
+// at creation time and later New calls cannot rewrite an earlier instance.
+func TestNewInstancesDoNotShareProcessState(t *testing.T) {
+	first := New(NewStaticTopology(false), nil)
+	second := New(defaultCoordinatorTestTopology{enabled: true}, nil)
+
+	firstImpl, ok := first.(*serviceImpl)
 	if !ok {
-		t.Fatalf("expected default coordinator implementation, got %T", first)
+		t.Fatalf("expected cachecoord implementation, got %T", first)
 	}
-	if impl.clusterEnabled() {
-		t.Fatal("expected initial default coordinator topology to be single-node")
-	}
-
-	second := Default(NewStaticTopology(true))
-	if first != second {
-		t.Fatal("expected default coordinator to reuse the same process service")
-	}
-	if !impl.clusterEnabled() {
-		t.Fatal("expected default coordinator topology to be updated to cluster mode")
-	}
-
-	third := Default(defaultCoordinatorTestTopology{enabled: true})
-	if first != third {
-		t.Fatal("expected real topology wiring to reuse the same process service")
-	}
-	if _, ok := impl.topologySnapshot().(defaultCoordinatorTestTopology); !ok {
-		t.Fatalf("expected real topology to be wired, got %T", impl.topologySnapshot())
-	}
-
-	fourth := Default(NewStaticTopology(false))
-	if first != fourth {
-		t.Fatal("expected later static topology calls to reuse the same process service")
-	}
-	if _, ok := impl.topologySnapshot().(defaultCoordinatorTestTopology); !ok {
-		t.Fatalf("expected real topology to survive later static placeholder, got %T", impl.topologySnapshot())
-	}
-
-	fifth := Default(defaultCoordinatorTestTopology{enabled: false})
-	if first != fifth {
-		t.Fatal("expected later disabled topology calls to reuse the same process service")
-	}
-	if !impl.clusterEnabled() {
-		t.Fatal("expected enabled topology to survive later disabled service wiring")
-	}
-}
-
-// TestDefaultAllowsRealSingleNodeTopologyToReplaceStaticClusterPlaceholder
-// verifies startup can downgrade an early static cluster placeholder to the
-// real single-node runtime topology.
-func TestDefaultAllowsRealSingleNodeTopologyToReplaceStaticClusterPlaceholder(t *testing.T) {
-	withResetDefaultCoordinator(t)
-
-	first := Default(NewStaticTopology(true))
-	impl, ok := first.(*serviceImpl)
+	secondImpl, ok := second.(*serviceImpl)
 	if !ok {
-		t.Fatalf("expected default coordinator implementation, got %T", first)
+		t.Fatalf("expected cachecoord implementation, got %T", second)
 	}
-	if !impl.clusterEnabled() {
-		t.Fatal("expected static cluster placeholder to enable clustered cache coordination")
+	if first == second {
+		t.Fatal("expected distinct cachecoord instances from separate New calls")
 	}
-
-	second := Default(defaultCoordinatorTestTopology{enabled: false})
-	if first != second {
-		t.Fatal("expected real single-node topology to reuse default coordinator")
+	if firstImpl.clusterEnabled() {
+		t.Fatal("expected the first instance to keep standalone topology")
 	}
-	if impl.clusterEnabled() {
-		t.Fatal("expected real single-node topology to replace static cluster placeholder")
+	if !secondImpl.clusterEnabled() {
+		t.Fatal("expected the second instance to keep clustered topology")
 	}
 }
 
@@ -225,7 +203,7 @@ func TestDefaultAllowsRealSingleNodeTopologyToReplaceStaticClusterPlaceholder(t 
 // publishers increment the same persistent row without losing revisions.
 func TestClusterMarkChangedPersistsAtomicRevision(t *testing.T) {
 	ctx := context.Background()
-	service := NewWithCoordination(NewStaticTopology(true), coordination.NewMemory(nil))
+	service := New(NewStaticTopology(true), coordination.NewMemory(nil))
 
 	const workers = 12
 	revisions := make(chan int64, workers)
@@ -280,7 +258,7 @@ func TestClusterMarkChangedPersistsAtomicRevision(t *testing.T) {
 func TestClusterMarkChangedAcceptsUnconfiguredDomain(t *testing.T) {
 	var (
 		ctx     = context.Background()
-		service = NewWithCoordination(NewStaticTopology(true), coordination.NewMemory(nil))
+		service = New(NewStaticTopology(true), coordination.NewMemory(nil))
 		domain  = Domain("plugin:unit-test:custom")
 		scope   = Scope("unit-test-free-domain")
 	)
@@ -318,7 +296,7 @@ func TestClusterMarkChangedAcceptsUnconfiguredDomain(t *testing.T) {
 func TestClusterCurrentRevisionHandlesMissingSharedRow(t *testing.T) {
 	var (
 		ctx     = context.Background()
-		service = NewWithCoordination(NewStaticTopology(true), coordination.NewMemory(nil))
+		service = New(NewStaticTopology(true), coordination.NewMemory(nil))
 		scope   = Scope("unit-test-missing-shared-row")
 	)
 
@@ -337,8 +315,8 @@ func TestEnsureFreshRefreshesOncePerRevision(t *testing.T) {
 	var (
 		ctx       = context.Background()
 		coordSvc  = coordination.NewMemory(nil)
-		publisher = NewWithCoordination(NewStaticTopology(true), coordSvc)
-		consumer  = NewWithCoordination(NewStaticTopology(true), coordSvc)
+		publisher = New(NewStaticTopology(true), coordSvc)
+		consumer  = New(NewStaticTopology(true), coordSvc)
 	)
 
 	if _, err := publisher.MarkChanged(ctx, testPluginRuntimeDomain, Scope("unit-test-refresh"), ChangeReason("first")); err != nil {
@@ -374,53 +352,47 @@ func TestEnsureFreshRefreshesOncePerRevision(t *testing.T) {
 	}
 }
 
-// TestSnapshotIncludesProcessStatusFromOtherInstances verifies diagnostics can
-// expose status recorded by cachecoord users that own separate service instances.
-func TestSnapshotIncludesProcessStatusFromOtherInstances(t *testing.T) {
+// TestSnapshotDoesNotLeakStatusAcrossInstances verifies diagnostics stay on
+// the constructing cachecoord instance.
+func TestSnapshotDoesNotLeakStatusAcrossInstances(t *testing.T) {
 	var (
 		ctx              = context.Background()
 		scope            = Scope("unit-test-process-snapshot")
 		coordSvc         = coordination.NewMemory(nil)
-		publisher        = NewWithCoordination(NewStaticTopology(true), coordSvc)
-		diagnosticReader = NewWithCoordination(NewStaticTopology(true), coordSvc)
+		publisher        = New(NewStaticTopology(true), coordSvc)
+		diagnosticReader = New(NewStaticTopology(true), coordSvc)
 	)
 
 	revision, err := publisher.MarkChanged(ctx, testRuntimeConfigDomain, scope, ChangeReason("diagnostic_snapshot"))
 	if err != nil {
 		t.Fatalf("publish revision failed: %v", err)
 	}
-
-	items, err := diagnosticReader.Snapshot(ctx)
+	items, err := publisher.Snapshot(ctx)
 	if err != nil {
-		t.Fatalf("snapshot failed: %v", err)
+		t.Fatalf("publisher snapshot failed: %v", err)
 	}
+	found := false
 	for _, item := range items {
-		if item.Domain != testRuntimeConfigDomain || item.Scope != scope {
-			continue
+		if item.Domain == testRuntimeConfigDomain && item.Scope == scope {
+			found = true
+			if item.SharedRevision != revision {
+				t.Fatalf("expected publisher snapshot revision %d, got %#v", revision, item)
+			}
 		}
-		if item.LocalRevision != revision || item.SharedRevision != revision || item.LastSyncedAt.IsZero() {
-			t.Fatalf("expected process status revision %d, got %#v", revision, item)
-		}
-		return
 	}
-	t.Fatalf("expected snapshot item for scope %q, got %#v", scope, items)
-}
+	if !found {
+		t.Fatalf("expected publisher snapshot item for scope %q, got %#v", scope, items)
+	}
 
-// withResetDefaultCoordinator clears the process-default coordinator around a
-// test that needs deterministic topology replacement behavior.
-func withResetDefaultCoordinator(t *testing.T) {
-	t.Helper()
-
-	processDefaultService.Lock()
-	previous := processDefaultService.service
-	processDefaultService.service = nil
-	processDefaultService.Unlock()
-
-	t.Cleanup(func() {
-		processDefaultService.Lock()
-		processDefaultService.service = previous
-		processDefaultService.Unlock()
-	})
+	otherItems, err := diagnosticReader.Snapshot(ctx)
+	if err != nil {
+		t.Fatalf("reader snapshot failed: %v", err)
+	}
+	for _, item := range otherItems {
+		if item.Domain == testRuntimeConfigDomain && item.Scope == scope {
+			t.Fatalf("expected isolated snapshot, reader leaked %#v", item)
+		}
+	}
 }
 
 // TestSnapshotIncludesCoordinationHealth verifies clustered cache diagnostics
@@ -430,7 +402,7 @@ func TestSnapshotIncludesCoordinationHealth(t *testing.T) {
 		ctx      = context.Background()
 		scope    = Scope("unit-test-coordination-health")
 		coordSvc = coordination.NewMemory(nil)
-		service  = NewWithCoordination(NewStaticTopology(true), coordSvc)
+		service  = New(NewStaticTopology(true), coordSvc)
 	)
 
 	subscription, err := coordSvc.Events().Subscribe(ctx, func(context.Context, coordination.Event) error {
@@ -507,8 +479,8 @@ func TestRedisCacheCoordIntegrationConcurrentRevisionAndEvent(t *testing.T) {
 		keys        = newRedisCacheCoordIntegrationKeyBuilder(t)
 		writerCoord = newRedisCacheCoordIntegrationService(t, keys)
 		readerCoord = newRedisCacheCoordIntegrationService(t, keys)
-		publisher   = NewWithCoordination(redisCacheCoordTestTopology{nodeID: "redis-cachecoord-writer"}, writerCoord)
-		consumer    = NewWithCoordination(redisCacheCoordTestTopology{nodeID: "redis-cachecoord-reader"}, readerCoord)
+		publisher   = New(redisCacheCoordTestTopology{nodeID: "redis-cachecoord-writer"}, writerCoord)
+		consumer    = New(redisCacheCoordTestTopology{nodeID: "redis-cachecoord-reader"}, readerCoord)
 		domain      = Domain("redis-cachecoord")
 		scope       = Scope("concurrent-event")
 	)

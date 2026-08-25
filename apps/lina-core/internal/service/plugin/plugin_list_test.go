@@ -17,6 +17,7 @@ import (
 	"lina-core/internal/model/do"
 	"lina-core/internal/model/entity"
 	i18nsvc "lina-core/internal/service/i18n"
+	menusvc "lina-core/internal/service/menu"
 	"lina-core/internal/service/plugin/internal/catalog"
 	"lina-core/internal/service/plugin/internal/plugintypes"
 	"lina-core/internal/service/plugin/internal/testutil"
@@ -1077,7 +1078,7 @@ func TestFilterMenusHidesPendingUpgradePluginMenus(t *testing.T) {
 		t.Fatalf("expected enabled snapshot refresh to succeed, got error: %v", err)
 	}
 
-	filtered := service.FilterMenus(ctx, []*entity.SysMenu{
+	filtered := service.FilterMenus(ctx, []menusvc.FilterItem{
 		{
 			Id:      1,
 			MenuKey: "plugin:" + pluginID + ":entry",
@@ -1129,11 +1130,20 @@ func TestFilterMenusUsesAuthoritativeRegistryState(t *testing.T) {
 			Visible: 1,
 		},
 	}
-	filtered := service.FilterMenus(ctx, menus)
+	filtered := service.FilterMenus(ctx, []menusvc.FilterItem{
+		{
+			Id:      menus[0].Id,
+			MenuKey: menus[0].MenuKey,
+			Name:    menus[0].Name,
+			Type:    menus[0].Type,
+			Status:  menus[0].Status,
+			Visible: menus[0].Visible,
+		},
+	})
 	if len(filtered) != 1 {
 		t.Fatalf("expected enabled source plugin menu to stay visible, got %d entries", len(filtered))
 	}
-	filteredPermissions := service.FilterPermissionMenus(ctx, menus)
+	filteredPermissions := service.FilterPermissionMenus(ctx, menusvc.FilterItemsFromEntities(menus))
 	if len(filteredPermissions) != 1 {
 		t.Fatalf("expected enabled source plugin permission menu to stay visible, got %d entries", len(filteredPermissions))
 	}

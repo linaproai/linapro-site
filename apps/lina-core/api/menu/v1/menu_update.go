@@ -14,14 +14,14 @@ import (
 // Name and Type are optional so list-row switches can submit only status or
 // visible without rewriting localized display titles.
 type UpdateReq struct {
-	g.Meta     `path:"/menu/{id}" method:"put" tags:"Menu Management" summary:"Update menu" dc:"Update the menu information. Omitted fields keep their current values. Writing status or visible cascades that field value to all descendant menus. The menu name cannot be repeated with other menus under the same parent; the directory and menu icons must remain globally unique in the left navigation, and duplicate icons will be rejected." permission:"system:menu:edit"`
+	g.Meta     `path:"/menu/{id}" method:"put" tags:"Menu Management" summary:"Update menu" dc:"Update the menu information. Omitted fields keep their current values. Writing status or visible cascades that field value to all descendant menus. The menu name cannot be repeated with other menus under the same parent. Icons are not required to be globally unique." permission:"system:menu:edit"`
 	Id         int                    `json:"id" v:"required|min:1" dc:"Menu ID" eg:"1"`
 	ParentId   *int                   `json:"parentId" dc:"Parent menu ID (0=root menu)" eg:"0"`
 	Name       string                 `json:"name" dc:"Menu name (supports i18n format). Optional for partial updates such as status or visibility switches." eg:"User Management"`
 	Path       string                 `json:"path" dc:"routing address" eg:"user"`
 	Component  string                 `json:"component" dc:"component path" eg:"system/user/index"`
 	Perms      string                 `json:"perms" dc:"Permission ID" eg:"system:user:list"`
-	Icon       string                 `json:"icon" dc:"Menu icon; when saving catalog and menu types, the left navigation icon will be verified to be globally unique. Button types ignore this constraint." eg:"ant-design:user-outlined"`
+	Icon       string                 `json:"icon" dc:"Menu icon identifier used by the workbench. Duplicate icons are allowed." eg:"ant-design:user-outlined"`
 	Type       menutype.Code          `json:"type" v:"in:D,M,B" dc:"Menu type: D=Directory M=Menu B=Button. Optional for partial updates." eg:"M"`
 	Sort       *int                   `json:"sort" dc:"Show sort" eg:"1"`
 	Visible    *statusflag.Visibility `json:"visible" v:"in:0,1" dc:"Whether to display: 1=show 0=hide. Writing this field cascades the value to all descendants." eg:"1"`

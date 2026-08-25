@@ -199,7 +199,7 @@ Scaling from single-node to cluster typically follows these steps:
 
 1. Prepare a shared `PostgreSQL` database.
 2. Prepare an accessible `Redis` instance.
-3. Set `cluster.enabled` to `true` and configure `cluster.coordination: redis` and `cluster.redis` endpoints.
+3. Set `cluster.enabled` to `true`, choose `cluster.coordination.backend: redis` and `cluster.coordination.group`, and put connection settings under the matching top-level `redis.<group>` entry.
 4. Start multiple `lina-core` nodes pointing to the same database.
 5. Add all core framework nodes to the load balancer.
 6. Verify `/health`, login, menus, plugin state, task scheduling, and permission change synchronization.

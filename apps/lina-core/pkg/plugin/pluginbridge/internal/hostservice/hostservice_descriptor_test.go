@@ -41,12 +41,8 @@ func TestHostServiceDescriptorsCoverProtocolGuestAndDispatcher(t *testing.T) {
 	}
 	guestSelectors := selectorNames(t, guestDirs...)
 	dispatcherSelectors := selectorNames(t, wasmDir)
-	expectedGuestSelectors := descriptorMethodConstSet(func(descriptor hostServiceMethodDescriptor) bool {
-		return descriptor.Published && descriptor.GuestClient
-	})
-	expectedDispatcherSelectors := descriptorMethodConstSet(func(descriptor hostServiceMethodDescriptor) bool {
-		return descriptor.Published && descriptor.Dispatcher
-	})
+	expectedGuestSelectors := methodConstSet(hostservices.PublishedGuestMethods())
+	expectedDispatcherSelectors := methodConstSet(hostservices.PublishedDispatcherMethods())
 
 	for _, descriptor := range hostServiceMethodDescriptors() {
 		if !descriptor.Published {
@@ -59,8 +55,8 @@ func TestHostServiceDescriptorsCoverProtocolGuestAndDispatcher(t *testing.T) {
 		if _, ok := protocolConsts[descriptor.MethodConst]; !ok {
 			t.Fatalf("published host service method %s is missing public protocol const alias %s", key, descriptor.MethodConst)
 		}
-		assertPayloadAliases(t, protocolTypes, protocolValues, key, descriptor.RequestPayload)
-		assertPayloadAliases(t, protocolTypes, protocolValues, key, descriptor.ResponsePayload)
+		assertPayloadAliases(t, protocolTypes, protocolValues, key, descriptor.RequestPayload, descriptor.PayloadKind)
+		assertPayloadAliases(t, protocolTypes, protocolValues, key, descriptor.ResponsePayload, descriptor.PayloadKind)
 		if descriptor.GuestClient {
 			if _, ok := guestSelectors[descriptor.MethodConst]; !ok {
 				t.Fatalf("published host service method %s is missing guest client usage of %s", key, descriptor.MethodConst)
@@ -367,6 +363,7 @@ func assertPayloadAliases(
 	protocolValues map[string]struct{},
 	methodKey string,
 	payload string,
+	payloadKind hostservices.PayloadKind,
 ) {
 	t.Helper()
 	if payload == "" {
@@ -375,6 +372,9 @@ func assertPayloadAliases(
 	if _, ok := protocolTypes[payload]; !ok {
 		t.Fatalf("host service method %s is missing public protocol payload type %s", methodKey, payload)
 	}
+	if payloadKind != hostservices.PayloadKindDedicated {
+		return
+	}
 	for _, fn := range []string{"Marshal" + payload, "Unmarshal" + payload} {
 		if _, ok := protocolValues[fn]; !ok {
 			t.Fatalf("host service method %s is missing public protocol codec %s", methodKey, fn)
@@ -382,10 +382,10 @@ func assertPayloadAliases(
 	}
 }
 
-func descriptorMethodConstSet(match func(hostServiceMethodDescriptor) bool) map[string]struct{} {
-	result := make(map[string]struct{})
-	for _, descriptor := range hostServiceMethodDescriptors() {
-		if descriptor.MethodConst == "" || !match(descriptor) {
+func methodConstSet(methods []hostservices.MethodDescriptor) map[string]struct{} {
+	result := make(map[string]struct{}, len(methods))
+	for _, descriptor := range methods {
+		if descriptor.MethodConst == "" {
 			continue
 		}
 		result[descriptor.MethodConst] = struct{}{}

@@ -264,7 +264,7 @@ func TestBuildOrdersTopLevelTagsFromProjectedGroups(t *testing.T) {
 		},
 	}
 
-	service := New(&testConfigProvider{}, bizctx.New(), i18nsvc.New(bizctx.New(), configsvc.New(), cachecoord.Default(nil)), pluginProvider)
+	service := New(&testConfigProvider{}, bizctx.New(), i18nsvc.New(bizctx.New(), configsvc.New(nil), cachecoord.New(nil, nil)), pluginProvider)
 	document, err := service.Build(context.Background(), server)
 	if err != nil {
 		t.Fatalf("expected hosted apidoc build to succeed, got %v", err)

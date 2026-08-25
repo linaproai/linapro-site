@@ -14,7 +14,6 @@ import (
 	"lina-core/internal/model"
 	"lina-core/internal/model/do"
 	i18nsvc "lina-core/internal/service/i18n"
-	"lina-core/internal/service/jobhandler"
 	"lina-core/internal/service/jobmeta"
 )
 
@@ -68,9 +67,9 @@ func TestListJobsKeywordMatchesLocalizedBuiltinJobName(t *testing.T) {
 		handlerRef = "plugin:linapro-demo-source/jobs:" + uniqueTestName("source-plugin-echo-inspection")
 		sourceName = uniqueTestName("Source Plugin Echo Inspection")
 		nameKey    = jobmeta.HandlerI18nKey(handlerRef, jobNameI18nField)
-		registry   = jobhandler.New()
+		registry   = NewRegistry()
 	)
-	if err := registry.Register(jobhandler.HandlerDef{
+	if err := registry.Register(HandlerDef{
 		Ref:          handlerRef,
 		DisplayName:  sourceName,
 		Description:  "Runs a lightweight source-plugin inspection task for scheduler integration validation.",

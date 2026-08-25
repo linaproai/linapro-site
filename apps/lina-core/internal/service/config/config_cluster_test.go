@@ -1,5 +1,5 @@
-// This file verifies cluster configuration loading and default election
-// fallback behavior.
+// This file verifies cluster topology configuration loading and default
+// election fallback behavior.
 
 package config
 
@@ -11,6 +11,8 @@ import (
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/os/gcfg"
 
+	"lina-core/internal/service/cachecoord"
+	"lina-core/internal/service/cluster"
 	"lina-core/pkg/dialect"
 )
 
@@ -20,15 +22,18 @@ func TestGetClusterUsesClusterElectionConfig(t *testing.T) {
 	setTestConfigContent(t, `
 cluster:
   enabled: true
-  coordination: redis
   election:
     lease: 45s
     renewInterval: 15s
-  redis:
+  coordination:
+    backend: redis
+    group: default
+redis:
+  default:
     address: "127.0.0.1:6379"
 `)
 
-	cfg := New().GetCluster(context.Background())
+	cfg := New(nil).GetCluster(context.Background())
 
 	if !cfg.Enabled {
 		t.Fatal("expected cluster mode to be enabled")
@@ -39,16 +44,11 @@ cluster:
 	if cfg.Election.RenewInterval != 15*time.Second {
 		t.Fatalf("expected cluster renew interval to be 15s, got %s", cfg.Election.RenewInterval)
 	}
-	if cfg.Coordination != ClusterCoordinationRedis {
-		t.Fatalf("expected redis coordination, got %q", cfg.Coordination)
+	if cfg.Coordination.Backend != cluster.CoordinationBackendRedis {
+		t.Fatalf("expected redis coordination backend, got %q", cfg.Coordination.Backend)
 	}
-	if cfg.Redis.Address != "127.0.0.1:6379" {
-		t.Fatalf("expected redis address to be loaded, got %q", cfg.Redis.Address)
-	}
-	if cfg.Redis.ConnectTimeout != 3*time.Second ||
-		cfg.Redis.ReadTimeout != 2*time.Second ||
-		cfg.Redis.WriteTimeout != 2*time.Second {
-		t.Fatalf("expected default redis timeouts, got connect=%s read=%s write=%s", cfg.Redis.ConnectTimeout, cfg.Redis.ReadTimeout, cfg.Redis.WriteTimeout)
+	if cfg.Coordination.Group != cluster.DefaultCoordinationGroup {
+		t.Fatalf("expected default redis group, got %q", cfg.Coordination.Group)
 	}
 }
 
@@ -60,7 +60,7 @@ cluster:
   enabled: false
 `)
 
-	cfg := New().GetCluster(context.Background())
+	cfg := New(nil).GetCluster(context.Background())
 
 	if cfg.Enabled {
 		t.Fatal("expected cluster mode to be disabled")
@@ -82,7 +82,7 @@ election:
   renewInterval: 20s
 `)
 
-	cfg := New().GetCluster(context.Background())
+	cfg := New(nil).GetCluster(context.Background())
 
 	if cfg.Enabled {
 		t.Fatal("expected cluster mode to remain disabled by default")
@@ -101,15 +101,18 @@ func TestOverrideClusterEnabledForDialect(t *testing.T) {
 	setTestConfigContent(t, `
 cluster:
   enabled: true
-  coordination: redis
-  redis:
-    address: "127.0.0.1:6379"
   election:
     lease: 45s
     renewInterval: 15s
+  coordination:
+    backend: redis
+    group: default
+redis:
+  default:
+    address: "127.0.0.1:6379"
 `)
 
-	svc := New()
+	svc := New(nil)
 	if !svc.IsClusterEnabled(context.Background()) {
 		t.Fatal("expected config to enable cluster mode before dialect override")
 	}
@@ -133,7 +136,7 @@ cluster:
 // from cluster.enabled=true back to local runtime-parameter revision handling.
 func TestOverrideClusterEnabledForDialectReselectsRuntimeParamRevisionController(t *testing.T) {
 	svc := &serviceImpl{}
-	svc.runtimeParamRevisionCtrl = newCacheCoordRuntimeParamRevisionController(true)
+	svc.runtimeParamRevisionCtrl = newCacheCoordRuntimeParamRevisionController(true, cachecoord.New(cachecoord.NewStaticTopology(true), nil))
 
 	if _, ok := svc.runtimeParamRevisionCtrl.(*clusterRuntimeParamRevisionController); !ok {
 		t.Fatal("expected test setup to start with clustered runtime-param revision controller")
@@ -152,12 +155,15 @@ func TestPostgreSQLDialectSupportsClusterKeepsConfigServiceClusterEnabled(t *tes
 	setTestConfigContent(t, `
 cluster:
   enabled: true
-  coordination: redis
-  redis:
+  coordination:
+    backend: redis
+    group: default
+redis:
+  default:
     address: "127.0.0.1:6379"
 `)
 
-	svc := New()
+	svc := New(nil)
 
 	dbDialect, err := dialect.From("pgsql:postgres:postgres@tcp(127.0.0.1:5432)/linapro?sslmode=disable")
 	if err != nil {
@@ -172,78 +178,21 @@ cluster:
 	}
 }
 
-// TestGetClusterPanicsWhenCoordinationMissing verifies clustered deployment
-// requires an explicit coordination backend.
-func TestGetClusterPanicsWhenCoordinationMissing(t *testing.T) {
-	setTestConfigContent(t, `
-cluster:
-  enabled: true
-  redis:
-    address: "127.0.0.1:6379"
-`)
-
-	defer assertConfigPanicContains(t, "field=cluster.coordination")
-	New().GetCluster(context.Background())
-}
-
-// TestGetClusterPanicsWhenCoordinationUnsupported verifies only Redis is
-// accepted as the current coordination backend.
-func TestGetClusterPanicsWhenCoordinationUnsupported(t *testing.T) {
-	setTestConfigContent(t, `
-cluster:
-  enabled: true
-  coordination: postgres
-  redis:
-    address: "127.0.0.1:6379"
-`)
-
-	defer assertConfigPanicContains(t, "fix=set cluster.coordination=redis")
-	New().GetCluster(context.Background())
-}
-
-// TestGetClusterPanicsWhenRedisAddressMissing verifies Redis address is
-// required whenever Redis coordination is enabled.
-func TestGetClusterPanicsWhenRedisAddressMissing(t *testing.T) {
-	setTestConfigContent(t, `
-cluster:
-  enabled: true
-  coordination: redis
-`)
-
-	defer assertConfigPanicContains(t, "field=cluster.redis.address")
-	New().GetCluster(context.Background())
-}
-
-// TestGetClusterPanicsWhenRedisTimeoutInvalid verifies Redis timeout fields
-// must be duration strings with units.
-func TestGetClusterPanicsWhenRedisTimeoutInvalid(t *testing.T) {
-	setTestConfigContent(t, `
-cluster:
-  enabled: true
-  coordination: redis
-  redis:
-    address: "127.0.0.1:6379"
-    connectTimeout: invalid
-`)
-
-	defer assertConfigPanicContains(t, "parse config cluster.redis.connectTimeout failed")
-	New().GetCluster(context.Background())
-}
-
-// TestSingleNodeModeDoesNotRequireRedis verifies local deployments can omit all
-// Redis coordination settings.
+// TestSingleNodeModeDoesNotRequireRedis verifies local deployments can omit
+// Redis groups.
 func TestSingleNodeModeDoesNotRequireRedis(t *testing.T) {
 	setTestConfigContent(t, `
 cluster:
   enabled: false
 `)
 
-	cfg := New().GetCluster(context.Background())
+	svc := New(nil)
+	cfg := svc.GetCluster(context.Background())
 	if cfg.Enabled {
 		t.Fatal("expected cluster mode disabled")
 	}
-	if cfg.Redis.Address != "" {
-		t.Fatalf("expected empty redis address in single-node config, got %q", cfg.Redis.Address)
+	if len(svc.GetRedis(context.Background())) != 0 {
+		t.Fatalf("expected no redis groups in single-node config, got %#v", svc.GetRedis(context.Background()))
 	}
 }
 

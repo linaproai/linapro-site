@@ -11,6 +11,7 @@ import (
 	"lina-core/internal/service/datascope"
 	"lina-core/internal/service/user/accountpolicy"
 	"lina-core/pkg/bizerr"
+	"lina-core/pkg/menuview"
 )
 
 // UserAccessContext describes the role, menu, and permission data required by the current user session.
@@ -338,7 +339,10 @@ func (s *serviceImpl) loadAllEnabledMenuAccess(ctx context.Context) ([]int, []st
 func (s *serviceImpl) collectPermissionsFromMenus(ctx context.Context, menus []*entity.SysMenu) ([]string, error) {
 	// Plugin runtime state can hide permission menus even when the backing menu
 	// rows exist, so filtering must happen before permission strings are emitted.
-	menus = s.permissionFilter.FilterPermissionMenus(ctx, menus)
+	menus = menuview.ToEntities(
+		s.permissionFilter.FilterPermissionMenus(ctx, menuview.FromEntities(menus)),
+		menus,
+	)
 
 	perms := make([]string, 0, len(menus))
 	seen := make(map[string]struct{}, len(menus))

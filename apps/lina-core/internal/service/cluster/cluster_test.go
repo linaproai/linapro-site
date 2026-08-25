@@ -22,16 +22,31 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 )
 
+// TestClusterConfigOmitsRedisConnectionFields verifies topology config can
+// select a backend and group but does not carry Redis connection settings.
+func TestClusterConfigOmitsRedisConnectionFields(t *testing.T) {
+	typ := reflect.TypeOf(ClusterConfig{})
+	for i := 0; i < typ.NumField(); i++ {
+		field := typ.Field(i)
+		name := strings.ToLower(field.Name)
+		switch name {
+		case "address", "password", "db", "connecttimeout", "readtimeout", "writetimeout", "redis":
+			t.Fatalf("cluster topology config must not include Redis connection field %s", field.Name)
+		}
+	}
+}
+
 // TestServiceDisabledTreatsCurrentNodeAsPrimary verifies single-node mode keeps
 // the local node primary without starting election infrastructure.
 func TestServiceDisabledTreatsCurrentNodeAsPrimary(t *testing.T) {
-	service := New(&ClusterConfig{Enabled: false})
+	service := New(&ClusterConfig{Enabled: false}, nil)
 	ctx := context.Background()
 
 	if service.IsEnabled() {
@@ -50,7 +65,7 @@ func TestServiceDisabledTreatsCurrentNodeAsPrimary(t *testing.T) {
 func TestServiceEnabledStartsPrimaryElection(t *testing.T) {
 	ctx := context.Background()
 
-	service := NewWithCoordination(&ClusterConfig{
+	service := New(&ClusterConfig{
 		Enabled: true,
 		Election: ElectionConfig{
 			Lease:         30 * time.Second,
@@ -256,11 +271,15 @@ func writeClusterProcessConfig(t *testing.T, link string, redisAddress string, p
 	section(config, "logger")["path"] = ""
 	clusterCfg := section(config, "cluster")
 	clusterCfg["enabled"] = true
-	clusterCfg["coordination"] = "redis"
+	delete(clusterCfg, "redis")
 	electionCfg := section(clusterCfg, "election")
 	electionCfg["lease"] = multiProcessElectionLease
 	electionCfg["renewInterval"] = multiProcessElectionRenew
-	redisCfg := section(clusterCfg, "redis")
+	coordinationCfg := section(clusterCfg, "coordination")
+	coordinationCfg["backend"] = "redis"
+	coordinationCfg["group"] = "default"
+	delete(config, "coordination")
+	redisCfg := section(section(config, "redis"), "default")
 	redisCfg["address"] = redisAddress
 	section(config, "upload")["path"] = filepath.Join(t.TempDir(), "upload-"+uploadSuffix)
 	pluginCfg := section(config, "plugin")

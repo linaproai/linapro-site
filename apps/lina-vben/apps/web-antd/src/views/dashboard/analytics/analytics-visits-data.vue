@@ -58,14 +58,14 @@ function renderChart() {
               color: '#b6a2de',
             },
             name: $t('pages.dashboard.analytics.channels.visits'),
-            value: [90, 50, 86, 40, 50, 20],
+            value: [0, 0, 0, 0, 0, 0],
           },
           {
             itemStyle: {
               color: '#5ab1ef',
             },
             name: $t('pages.dashboard.analytics.channels.trend'),
-            value: [70, 75, 70, 76, 20, 85],
+            value: [0, 0, 0, 0, 0, 0],
           },
         ],
         itemStyle: {

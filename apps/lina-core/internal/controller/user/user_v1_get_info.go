@@ -1,5 +1,5 @@
-// This file returns the authenticated user's bootstrap payload, including the
-// menu tree, permissions, and preferred landing route.
+// This file returns the authenticated user's bootstrap payload, including
+// identity, permissions, capability flags, and the preferred landing route.
 
 package user
 
@@ -12,9 +12,9 @@ import (
 	v1 "lina-core/api/user/v1"
 	"lina-core/internal/service/menu"
 	"lina-core/pkg/apitime"
+	"lina-core/pkg/menuopen"
 	"lina-core/pkg/menutype"
 	"lina-core/pkg/plugin/pluginhost"
-	"lina-core/pkg/statusflag"
 )
 
 // GetInfo returns current logged-in user information
@@ -104,16 +104,26 @@ func (c *ControllerV1) GetInfo(ctx context.Context, req *v1.GetInfoReq) (res *v1
 		}
 	}
 
+	organizationEnabled := false
+	if c.orgSvc != nil {
+		organizationEnabled = c.orgSvc.Available(ctx)
+	}
+	tenantEnabled := false
+	if c.tenantSvc != nil {
+		tenantEnabled = c.tenantSvc.Available(ctx)
+	}
+
 	return &v1.GetInfoRes{
-		UserId:      user.Id,
-		Username:    user.Username,
-		RealName:    realName,
-		Email:       user.Email,
-		Avatar:      user.Avatar,
-		Roles:       roleNames,
-		HomePath:    resolveHomePath(menuTree),
-		Menus:       convertToMenuTree(menuTree),
-		Permissions: permissions,
+		UserId:              user.Id,
+		Username:            user.Username,
+		RealName:            realName,
+		Email:               user.Email,
+		Avatar:              user.Avatar,
+		Roles:               roleNames,
+		HomePath:            resolveHomePath(menuTree),
+		Permissions:         permissions,
+		OrganizationEnabled: organizationEnabled,
+		TenantEnabled:       tenantEnabled,
 	}, nil
 }
 
@@ -196,37 +206,9 @@ func isHomePathCandidate(item *menu.MenuItem, currentPath string, preferStable b
 	if item == nil || item.Type != menutype.Menu.String() || item.IsFrame != 0 || currentPath == "" || isExternalPath(currentPath) {
 		return false
 	}
-	if preferStable && (strings.HasPrefix(currentPath, pluginhost.HostedAssetURLPrefix) || item.Component == pluginhost.DynamicPageComponentPath) {
+	openMode, _ := menuopen.Resolve(item.Path, item.IsFrame)
+	if preferStable && (strings.HasPrefix(currentPath, pluginhost.HostedAssetURLPrefix) || openMode != menuopen.Page) {
 		return false
 	}
 	return true
-}
-
-// convertToMenuTree projects internal menu items into API response DTO nodes.
-func convertToMenuTree(items []*menu.MenuItem) []*v1.MenuTree {
-	result := make([]*v1.MenuTree, 0, len(items))
-	for _, item := range items {
-		if item.Type == menutype.Button.String() {
-			continue
-		}
-
-		node := &v1.MenuTree{
-			Id:        item.Id,
-			ParentId:  item.ParentId,
-			Name:      item.Name,
-			Path:      item.Path,
-			Component: item.Component,
-			Perms:     item.Perms,
-			Icon:      item.Icon,
-			Type:      menutype.Code(item.Type),
-			Sort:      item.Sort,
-			Visible:   statusflag.Visibility(item.Visible),
-			Status:    statusflag.Enabled(item.Status),
-			IsFrame:   statusflag.YesNo(item.IsFrame),
-			IsCache:   statusflag.YesNo(item.IsCache),
-			Children:  convertToMenuTree(item.Children),
-		}
-		result = append(result, node)
-	}
-	return result
 }

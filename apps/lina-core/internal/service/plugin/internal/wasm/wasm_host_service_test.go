@@ -2355,10 +2355,9 @@ func configureOwnerCapabilityForTest(
 	}
 	for _, method := range methods {
 		descriptor.Methods = append(descriptor.Methods, capregistry.MethodDescriptor{
-			Method:       method,
-			Capability:   "plugin.linapro-ai-core.ai.v1",
-			Risk:         capregistry.RiskLevelExecute,
-			ResourceKind: capregistry.ResourceKindNone,
+			Method:     method,
+			Capability: "plugin.linapro-ai-core.ai.v1",
+			Risk:       capregistry.RiskLevelExecute,
 		})
 	}
 	if err := registry.Register(descriptor); err != nil {

@@ -17,6 +17,26 @@ import (
 	"lina-core/pkg/plugin/capability/tenantcap/tenantspi"
 )
 
+// TestDeclarationsExposesDomainGettersWithoutEmbedding verifies authors reach
+// domain registration methods through explicit domain getters, not embedding.
+func TestDeclarationsExposesDomainGettersWithoutEmbedding(t *testing.T) {
+	typ := reflect.TypeOf((*Declarations)(nil)).Elem()
+	for _, name := range []string{"Assets", "Lifecycle", "Hooks", "HTTP", "Jobs", "Providers", "Access"} {
+		if _, ok := typ.MethodByName(name); !ok {
+			t.Fatalf("Declarations must expose domain getter %s", name)
+		}
+	}
+	for _, name := range []string{"UseEmbeddedFiles", "RegisterRoutes", "RegisterJobs", "RegisterHook"} {
+		if _, ok := typ.MethodByName(name); ok {
+			t.Fatalf("Declarations must not embed domain method %s", name)
+		}
+	}
+	plugin := NewDeclarations("unit-domain-getters")
+	if plugin.Assets() == nil || plugin.HTTP() == nil || plugin.Jobs() == nil {
+		t.Fatal("expected domain getters to return facades")
+	}
+}
+
 // TestExtensionPointExecutionModes verifies hook and registrar points publish
 // the expected execution-mode support matrix.
 func TestExtensionPointExecutionModes(t *testing.T) {
@@ -123,7 +143,6 @@ func TestRegisterRoutesRejectsAsyncMode(t *testing.T) {
 // are declared through the source-plugin facade and rejected when duplicated.
 func TestProviderDeclarationsStoreFactories(t *testing.T) {
 	plugin := NewDeclarations("test-plugin-provider")
-	providers := plugin.Providers()
 	tenantFactory := func(context.Context, tenantspi.ProviderEnv) (tenantspi.Provider, error) {
 		return nil, nil
 	}
@@ -132,13 +151,13 @@ func TestProviderDeclarationsStoreFactories(t *testing.T) {
 	}
 	descriptor := testCapabilityDescriptor("test-plugin-provider", "ai", "v1", "text.generate")
 
-	if err := providers.ProvideTenant(tenantFactory); err != nil {
+	if err := plugin.Providers().ProvideTenant(tenantFactory); err != nil {
 		t.Fatalf("expected tenant provider declaration to succeed, got %v", err)
 	}
-	if err := providers.ProvideOrg(orgFactory); err != nil {
+	if err := plugin.Providers().ProvideOrg(orgFactory); err != nil {
 		t.Fatalf("expected org provider declaration to succeed, got %v", err)
 	}
-	if err := providers.ProvideCapability(descriptor); err != nil {
+	if err := plugin.Providers().ProvideCapability(descriptor); err != nil {
 		t.Fatalf("expected capability descriptor declaration to succeed, got %v", err)
 	}
 
@@ -152,13 +171,13 @@ func TestProviderDeclarationsStoreFactories(t *testing.T) {
 	if descriptors := definition.GetCapabilityDescriptors(); len(descriptors) != 1 || descriptors[0].Service != "ai" {
 		t.Fatalf("expected capability descriptor to be stored, got %#v", descriptors)
 	}
-	if err := providers.ProvideTenant(tenantFactory); err == nil {
+	if err := plugin.Providers().ProvideTenant(tenantFactory); err == nil {
 		t.Fatalf("expected duplicate tenant provider declaration to fail")
 	}
-	if err := providers.ProvideOrg(orgFactory); err == nil {
+	if err := plugin.Providers().ProvideOrg(orgFactory); err == nil {
 		t.Fatalf("expected duplicate org provider declaration to fail")
 	}
-	if err := providers.ProvideCapability(descriptor); err == nil {
+	if err := plugin.Providers().ProvideCapability(descriptor); err == nil {
 		t.Fatalf("expected duplicate capability descriptor declaration to fail")
 	}
 }
@@ -166,10 +185,10 @@ func TestProviderDeclarationsStoreFactories(t *testing.T) {
 // TestProviderDeclarationsRejectMismatchedCapabilityOwner verifies source
 // plugins cannot declare descriptors owned by a different plugin ID.
 func TestProviderDeclarationsRejectMismatchedCapabilityOwner(t *testing.T) {
-	providers := NewDeclarations("test-plugin-owner").Providers()
+	plugin := NewDeclarations("test-plugin-owner")
 	descriptor := testCapabilityDescriptor("linapro-ai-core", "ai", "v1", "text.generate")
 
-	err := providers.ProvideCapability(descriptor)
+	err := plugin.Providers().ProvideCapability(descriptor)
 	if err == nil {
 		t.Fatal("expected mismatched owner descriptor declaration to fail")
 	}
@@ -185,18 +204,17 @@ func TestProviderDeclarationsRejectMismatchedCapabilityOwner(t *testing.T) {
 // and duplicate declarations.
 func TestProvideExternalIdentityStoresOwnershipAndRejectsInvalid(t *testing.T) {
 	plugin := NewDeclarations("test-plugin-external-identity")
-	providers := plugin.Providers()
 
-	if err := providers.ProvideExternalIdentity("  "); err == nil {
+	if err := plugin.Providers().ProvideExternalIdentity("  "); err == nil {
 		t.Fatalf("expected empty external identity provider to be rejected")
 	}
-	if err := providers.ProvideExternalIdentity(" google "); err != nil {
+	if err := plugin.Providers().ProvideExternalIdentity(" google "); err != nil {
 		t.Fatalf("expected external identity provider declaration to succeed, got %v", err)
 	}
-	if err := providers.ProvideExternalIdentity("discord"); err != nil {
+	if err := plugin.Providers().ProvideExternalIdentity("discord"); err != nil {
 		t.Fatalf("expected second distinct provider declaration to succeed, got %v", err)
 	}
-	if err := providers.ProvideExternalIdentity("google"); err == nil {
+	if err := plugin.Providers().ProvideExternalIdentity("google"); err == nil {
 		t.Fatalf("expected duplicate external identity provider declaration to fail")
 	}
 
@@ -210,15 +228,15 @@ func TestProvideExternalIdentityStoresOwnershipAndRejectsInvalid(t *testing.T) {
 // TestProviderDeclarationsRejectNilFactories verifies provider facade validation
 // reports caller errors instead of storing unusable factories.
 func TestProviderDeclarationsRejectNilFactories(t *testing.T) {
-	providers := NewDeclarations("test-plugin-provider-nil").Providers()
+	plugin := NewDeclarations("test-plugin-provider-nil")
 
-	if err := providers.ProvideTenant(nil); err == nil {
+	if err := plugin.Providers().ProvideTenant(nil); err == nil {
 		t.Fatalf("expected nil tenant provider factory to fail")
 	}
-	if err := providers.ProvideOrg(nil); err == nil {
+	if err := plugin.Providers().ProvideOrg(nil); err == nil {
 		t.Fatalf("expected nil org provider factory to fail")
 	}
-	if err := providers.ProvideCapability(capregistry.Descriptor{}); err == nil {
+	if err := plugin.Providers().ProvideCapability(capregistry.Descriptor{}); err == nil {
 		t.Fatalf("expected invalid capability descriptor to fail")
 	}
 }
@@ -614,10 +632,9 @@ func testCapabilityDescriptor(owner string, service string, version string, meth
 		Version:       version,
 		Methods: []capregistry.MethodDescriptor{
 			{
-				Method:       method,
-				Capability:   "framework.test.v1",
-				Risk:         capregistry.RiskLevelExecute,
-				ResourceKind: capregistry.ResourceKindNone,
+				Method:     method,
+				Capability: "framework.test.v1",
+				Risk:       capregistry.RiskLevelExecute,
 			},
 		},
 	}

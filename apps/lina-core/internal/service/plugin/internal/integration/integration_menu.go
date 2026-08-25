@@ -17,6 +17,7 @@ import (
 	"lina-core/internal/service/plugin/internal/catalog"
 	"lina-core/internal/service/plugin/internal/plugintypes"
 	"lina-core/internal/service/startupstats"
+	"lina-core/pkg/menuopen"
 
 	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/errors/gerror"
@@ -601,7 +602,7 @@ func buildPluginMenuData(spec *catalog.MenuSpec, parentID int) (do.SysMenu, erro
 		MenuKey:    spec.Key,
 		Name:       spec.Name,
 		Path:       spec.Path,
-		Component:  spec.Component,
+		Component:  menuopen.StripWorkbenchResource(spec.Component),
 		Perms:      spec.Perms,
 		Icon:       spec.Icon,
 		Type:       catalog.NormalizeMenuType(spec.Type).String(),
@@ -796,6 +797,7 @@ func buildMenuQueryParam(spec *catalog.MenuSpec) (string, error) {
 		if err := json.Unmarshal([]byte(spec.QueryParam), &payload); err != nil {
 			return "", err
 		}
+		payload = menuopen.StripWorkbenchQuery(payload)
 		if len(payload) == 0 {
 			return "", nil
 		}
@@ -805,10 +807,11 @@ func buildMenuQueryParam(spec *catalog.MenuSpec) (string, error) {
 		}
 		return string(content), nil
 	}
-	if len(spec.Query) == 0 {
+	query := menuopen.StripWorkbenchQuery(spec.Query)
+	if len(query) == 0 {
 		return "", nil
 	}
-	content, err := json.Marshal(spec.Query)
+	content, err := json.Marshal(query)
 	if err != nil {
 		return "", err
 	}

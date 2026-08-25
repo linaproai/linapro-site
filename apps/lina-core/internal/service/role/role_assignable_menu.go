@@ -11,6 +11,7 @@ import (
 	"lina-core/internal/dao"
 	"lina-core/internal/model/entity"
 	"lina-core/pkg/bizerr"
+	"lina-core/pkg/menuview"
 )
 
 const (
@@ -128,7 +129,10 @@ func (s *serviceImpl) filterAssignableMenus(ctx context.Context, menus []*entity
 	if len(menus) == 0 {
 		return []*entity.SysMenu{}, nil
 	}
-	filteredMenus := s.permissionFilter.FilterPermissionMenus(ctx, menus)
+	filteredMenus := menuview.ToEntities(
+		s.permissionFilter.FilterPermissionMenus(ctx, menuview.FromEntities(menus)),
+		menus,
+	)
 	classifier, err := s.newRoleMenuAssignmentClassifier(ctx, filteredMenus)
 	if err != nil {
 		return nil, err

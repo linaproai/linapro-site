@@ -4,6 +4,7 @@ import { test, expect } from '../../../fixtures/auth';
 import { FilePage } from '../../../pages/FilePage';
 import {
   waitForBusyIndicatorsToClear,
+  waitForConfirmOverlay,
   waitForDropdown,
   waitForRouteReady,
   waitForUploadReady,
@@ -344,24 +345,24 @@ test.describe('TC001 文件管理', () => {
     const initialCount = await filePage.getRowCount();
 
     if (initialCount > 0) {
-      // Listen for successful delete response
-      const deleteResponsePromise = adminPage.waitForResponse(
-        (resp) => resp.url().includes('/file/') && resp.request().method() === 'DELETE' && resp.status() === 200,
-        { timeout: 10000 },
-      );
+      const deleteResponsePromise = adminPage.waitForResponse((resp) => {
+        const pathname = new URL(resp.url()).pathname.replace(/\/$/u, '');
+        return (
+          pathname.endsWith('/file') &&
+          resp.request().method() === 'DELETE'
+        );
+      });
 
-      // Click delete on first row
       const firstRow = adminPage.locator('.vxe-body--row').first();
       await firstRow.getByRole('button', { name: /删\s*除/ }).click();
+      const overlay = await waitForConfirmOverlay(adminPage);
+      await overlay.getByRole('button', { name: /确\s*定|确\s*认|OK|Yes/i }).click();
 
-      // Confirm delete (button text is "确 定")
-      await adminPage
-        .getByRole('button', { name: /确\s*定/ })
-        .click();
-
-      // Verify delete API succeeded
       const deleteResponse = await deleteResponsePromise;
-      expect(deleteResponse.status()).toBe(200);
+      expect(deleteResponse.ok()).toBeTruthy();
+      await expect
+        .poll(async () => filePage.getRowCount())
+        .toBeLessThan(initialCount);
     }
   });
 

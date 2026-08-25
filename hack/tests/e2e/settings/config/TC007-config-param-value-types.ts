@@ -32,22 +32,21 @@ test.describe('TC007 参数值类型化编辑', () => {
     });
   });
 
-  test('TC-7b: 编辑登录框位置通过下拉选择合法布局值', async ({
+  test('TC-7b: 编辑主题模式通过下拉选择合法取值', async ({
     adminPage,
   }) => {
     const configPage = new ConfigPage(adminPage);
     await configPage.goto();
-    await configPage.openEditByKey('sys.auth.loginPanelLayout');
+    await configPage.openEditByKey('sys.ui.theme.mode');
 
-    await configPage.selectDialogOption('参数键值', /左侧|Left|panel-left/i);
+    await configPage.selectDialogOption('参数键值', /深色|Dark|dark/i);
     await configPage.confirmDialog();
     await expect(adminPage.getByText(/更新成功|Updated successfully|success/i).first()).toBeVisible({
       timeout: 5000,
     });
 
-    // Restore default right layout.
-    await configPage.openEditByKey('sys.auth.loginPanelLayout');
-    await configPage.selectDialogOption('参数键值', /右侧|Right|panel-right/i);
+    await configPage.openEditByKey('sys.ui.theme.mode');
+    await configPage.selectDialogOption('参数键值', /浅色|Light|light/i);
     await configPage.confirmDialog();
     await expect(adminPage.getByText(/更新成功|Updated successfully|success/i).first()).toBeVisible({
       timeout: 5000,

@@ -1,18 +1,40 @@
-// This file defines cluster configuration value objects owned by the cluster
-// topology component. The config service aliases these types when loading
-// config.yaml so topology consumers can depend on cluster.Service without
-// introducing a package cycle.
+// This file defines cluster topology configuration value objects owned by the
+// cluster component. The config service aliases these types when loading
+// config.yaml. Redis connection settings are not part of this value object;
+// cluster.coordination only selects a backend name and a redis group.
 
 package cluster
 
-import "time"
+import (
+	"strings"
+	"time"
+)
+
+// DefaultCoordinationGroup is the redis group used when cluster.coordination.group
+// is omitted.
+const DefaultCoordinationGroup = "default"
+
+// CoordinationBackend names the coordination implementation selected by cluster
+// topology configuration.
+type CoordinationBackend string
+
+// Supported coordination backend names selected from cluster configuration.
+const (
+	// CoordinationBackendRedis selects the Redis coordination implementation.
+	CoordinationBackendRedis CoordinationBackend = "redis"
+)
 
 // ClusterConfig holds cluster topology configuration.
 type ClusterConfig struct {
-	Enabled      bool               `json:"enabled"`      // Enabled reports whether clustered deployment is enabled.
-	Coordination string             `json:"coordination"` // Coordination names the cluster coordination backend.
-	Election     ElectionConfig     `json:"election"`     // Election contains primary-election settings for clustered mode.
-	Redis        ClusterRedisConfig `json:"redis"`        // Redis stores Redis coordination connection settings.
+	Enabled      bool                      `json:"enabled"`      // Enabled reports whether clustered deployment is enabled.
+	Election     ElectionConfig            `json:"election"`     // Election contains primary-election settings for clustered mode.
+	Coordination ClusterCoordinationConfig `json:"coordination"` // Coordination selects the injected backend and redis group.
+}
+
+// ClusterCoordinationConfig selects one coordination implementation and redis group.
+type ClusterCoordinationConfig struct {
+	Backend CoordinationBackend `json:"backend"` // Backend names the coordination implementation.
+	Group   string              `json:"group"`   // Group selects a top-level redis connection group.
 }
 
 // ElectionConfig holds leader election configuration.
@@ -21,12 +43,33 @@ type ElectionConfig struct {
 	RenewInterval time.Duration `json:"renewInterval"` // RenewInterval is the lease renewal interval.
 }
 
-// ClusterRedisConfig holds Redis coordination settings for clustered mode.
-type ClusterRedisConfig struct {
-	Address        string        `json:"address"`        // Address is the host:port endpoint for Redis.
-	DB             int           `json:"db"`             // DB selects the Redis logical database.
-	Password       string        `json:"password"`       // Password authenticates to Redis when configured.
-	ConnectTimeout time.Duration `json:"connectTimeout"` // ConnectTimeout bounds Redis connection establishment.
-	ReadTimeout    time.Duration `json:"readTimeout"`    // ReadTimeout bounds Redis read operations.
-	WriteTimeout   time.Duration `json:"writeTimeout"`   // WriteTimeout bounds Redis write operations.
+// normalizeClusterConfig applies default election settings and coordination
+// group while preserving the caller-provided enablement flag.
+func normalizeClusterConfig(cfg *ClusterConfig) *ClusterConfig {
+	normalizedCfg := &ClusterConfig{
+		Enabled: false,
+		Election: ElectionConfig{
+			Lease:         defaultElectionLease,
+			RenewInterval: defaultElectionRenewInterval,
+		},
+		Coordination: ClusterCoordinationConfig{
+			Group: DefaultCoordinationGroup,
+		},
+	}
+	if cfg == nil {
+		return normalizedCfg
+	}
+
+	normalizedCfg.Enabled = cfg.Enabled
+	normalizedCfg.Coordination.Backend = CoordinationBackend(strings.TrimSpace(string(cfg.Coordination.Backend)))
+	if group := strings.TrimSpace(cfg.Coordination.Group); group != "" {
+		normalizedCfg.Coordination.Group = group
+	}
+	if cfg.Election.Lease > 0 {
+		normalizedCfg.Election.Lease = cfg.Election.Lease
+	}
+	if cfg.Election.RenewInterval > 0 {
+		normalizedCfg.Election.RenewInterval = cfg.Election.RenewInterval
+	}
+	return normalizedCfg
 }

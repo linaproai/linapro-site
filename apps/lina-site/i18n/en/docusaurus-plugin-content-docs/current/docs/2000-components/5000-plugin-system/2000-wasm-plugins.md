@@ -285,7 +285,7 @@ Dynamic plugin APIs are ultimately exposed under the unified plugin namespace. T
 |------|----------|------|
 | `Runtime()` | `pluginbridge.Services.Runtime()` | Dynamic plugins write logs, read/write state, read time, generate UUIDs, and read node identity through WASI host-service clients; source plugins use the host's native logging and runtime context directly |
 | `Network()` | `pluginbridge.Services.Network()` | Dynamic plugins access governed outbound HTTP through host-service authorization; source plugins use the host's native HTTP client or injected domain services |
-| `RecordStore()` | `pluginbridge.Services.RecordStore()` | Dynamic plugins use a guest-side facade that wraps the data host-service protocol and typed query plans; source plugins use their own DAOs or provider seams |
+| `RecordStore()` | `pluginbridge.Services.RecordStore()` | **Experimental**, not a main path. Dynamic plugins may use a guest-side facade over the `data` host-service protocol; source plugins use their own DAOs or provider seams |
 
 ## Differences from Source Plugins
 

@@ -35,11 +35,11 @@ import (
 // newTestI18nService creates a standalone i18n service for tests.
 func newTestI18nService() i18nsvc.Service {
 	var (
-		configSvc  = hostconfig.New()
+		configSvc  = hostconfig.New(nil)
 		bizCtxSvc  = bizctx.New()
-		clusterSvc = cluster.New(configSvc.GetCluster(context.Background()))
+		clusterSvc = cluster.New(configSvc.GetCluster(context.Background()), nil)
 	)
-	return i18nsvc.New(bizCtxSvc, configSvc, cachecoord.Default(clusterSvc))
+	return i18nsvc.New(bizCtxSvc, configSvc, cachecoord.New(clusterSvc, nil))
 }
 
 // TestRuntimeMessagesUsesExplicitLangOverride verifies that the runtime
@@ -480,13 +480,13 @@ func startRuntimeMessagesControllerTestServer(t *testing.T, controller any) stri
 // explicit dependencies so controller tests do not rely on disabled defaults.
 func newRuntimeMessagesTestMiddleware() middlewaresvc.Service {
 	var (
-		configSvc     = hostconfig.New()
+		configSvc     = hostconfig.New(nil)
 		bizCtxSvc     = bizctx.New()
 		i18nSvc       = newTestI18nService()
 		pluginRuntime = pluginsvc.NewRuntimeDelegate()
 		orgCapSvc     = orgspi.New(nil, pluginRuntime, pluginRuntime.OrgProviderEnv)
 		tenantSvc     = tenantspi.New(nil, pluginRuntime, pluginRuntime.TenantProviderEnv, nil)
-		roleSvc       = role.New(pluginRuntime, bizCtxSvc, configSvc, i18nSvc, orgCapSvc, tenantSvc)
+		roleSvc       = role.New(pluginRuntime, bizCtxSvc, configSvc, i18nSvc, orgCapSvc, tenantSvc, nil)
 	)
 	roleSvc.SetDataScopeService(datascope.New(bizCtxSvc, roleSvc, orgCapSvc.Scope()))
 	authSvc := auth.New(configSvc, pluginRuntime, orgCapSvc, roleSvc, tenantSvc, session.NewDBStore(), kvcache.New())

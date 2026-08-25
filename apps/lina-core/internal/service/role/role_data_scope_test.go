@@ -11,9 +11,9 @@ import (
 	"lina-core/internal/dao"
 	"lina-core/internal/model"
 	"lina-core/internal/model/do"
-	"lina-core/internal/model/entity"
 	"lina-core/internal/service/datascope"
 	"lina-core/pkg/bizerr"
+	"lina-core/pkg/menuview"
 	"lina-core/pkg/plugin/capability/bizctxcap"
 	"lina-core/pkg/plugin/capability/capmodel"
 	"lina-core/pkg/plugin/capability/orgcap"
@@ -88,7 +88,7 @@ func TestRoleAllowsDepartmentScopeWhenOrgCapabilityEnabled(t *testing.T) {
 type roleScopeEnabledOrgState struct{}
 
 // FilterPermissionMenus leaves test menus unchanged.
-func (roleScopeEnabledOrgState) FilterPermissionMenus(_ context.Context, menus []*entity.SysMenu) []*entity.SysMenu {
+func (roleScopeEnabledOrgState) FilterPermissionMenus(_ context.Context, menus []menuview.FilterItem) []menuview.FilterItem {
 	return menus
 }
 

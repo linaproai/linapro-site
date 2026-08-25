@@ -429,7 +429,10 @@ export class MenuPage {
       await confirmBtn.click();
     } else {
       const modal = this.page.locator(".ant-modal-confirm");
-      await modal.getByRole("button", { name: /确\s*定|OK/i }).click();
+      const modalConfirm = modal.getByRole("button", { name: /确\s*定|OK/i });
+      if (await modalConfirm.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await modalConfirm.click();
+      }
     }
 
     await waitForRouteReady(this.page);
@@ -470,7 +473,10 @@ export class MenuPage {
       await confirmBtn.click();
     } else {
       const modal = this.page.locator(".ant-modal-confirm");
-      await modal.getByRole("button", { name: /确\s*定|OK/i }).click();
+      const modalConfirm = modal.getByRole("button", { name: /确\s*定|OK/i });
+      if (await modalConfirm.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await modalConfirm.click();
+      }
     }
 
     await waitForRouteReady(this.page);

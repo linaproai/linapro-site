@@ -18,6 +18,7 @@ import (
 	"lina-core/internal/service/coordination"
 	i18nsvc "lina-core/internal/service/i18n"
 	"lina-core/internal/service/locker"
+	menusvc "lina-core/internal/service/menu"
 	"lina-core/internal/service/plugin/internal/catalog"
 	plugindep "lina-core/internal/service/plugin/internal/dependency"
 	"lina-core/internal/service/plugin/internal/frontend"
@@ -36,8 +37,6 @@ import (
 	"lina-core/pkg/plugin/capability/orgcap/orgspi"
 	"lina-core/pkg/plugin/capability/plugincap"
 	"lina-core/pkg/plugin/capability/tenantcap/tenantspi"
-
-	"lina-core/internal/model/entity"
 
 	"lina-core/pkg/plugin/capability"
 	"lina-core/pkg/plugin/capability/authcap/extlogin/extidspi"
@@ -343,9 +342,9 @@ type integrationService interface {
 		values map[string]interface{},
 	) error
 	// FilterMenus filters disabled plugin menus from the given menu list.
-	FilterMenus(ctx context.Context, menus []*entity.SysMenu) []*entity.SysMenu
+	FilterMenus(ctx context.Context, menus []menusvc.FilterItem) []menusvc.FilterItem
 	// FilterPermissionMenus filters permission menus based on plugin enablement.
-	FilterPermissionMenus(ctx context.Context, menus []*entity.SysMenu) []*entity.SysMenu
+	FilterPermissionMenus(ctx context.Context, menus []menusvc.FilterItem) []menusvc.FilterItem
 }
 
 // startupService defines plugin startup and startup-read-model contracts.
@@ -553,7 +552,7 @@ func New(
 
 	topologySvc := topology
 	if topologySvc == nil {
-		topologySvc = cluster.New(nil)
+		topologySvc = cluster.New(nil, nil)
 	}
 
 	var (
@@ -576,6 +575,7 @@ func New(
 		i18nSvc,
 		reconcilerLockSvc,
 		topologySvc,
+		cacheCoordSvc,
 		integrationDelegates,
 		configProvider,
 		bizCtxProvider,

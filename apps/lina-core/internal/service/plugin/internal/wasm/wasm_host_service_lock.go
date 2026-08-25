@@ -36,9 +36,9 @@ func dispatchLockHostService(
 
 	switch method {
 	case bridgehostservice.HostServiceMethodLockAcquire:
-		request, err := bridgehostservice.UnmarshalHostServiceLockAcquireRequest(payload)
-		if err != nil {
-			return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, err)
+		var request bridgehostservice.HostServiceLockAcquireRequest
+		if err := decodeCapabilityJSONRequest(payload, &request); err != nil {
+			return invalidCapabilityRequest(err)
 		}
 		output, callErr := service.Acquire(ctx, lockcap.AcquireInput{
 			Name:  resourceRef,
@@ -51,11 +51,11 @@ func dispatchLockHostService(
 		if output.ExpireAt != nil {
 			response.ExpireAt = output.ExpireAt.UTC().Format(time.RFC3339Nano)
 		}
-		return bridgehostcall.NewHostCallSuccessResponse(bridgehostservice.MarshalHostServiceLockAcquireResponse(response))
+		return capabilityJSONResponse(response)
 	case bridgehostservice.HostServiceMethodLockRenew:
-		request, err := bridgehostservice.UnmarshalHostServiceLockRenewRequest(payload)
-		if err != nil {
-			return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, err)
+		var request bridgehostservice.HostServiceLockRenewRequest
+		if err := decodeCapabilityJSONRequest(payload, &request); err != nil {
+			return invalidCapabilityRequest(err)
 		}
 		output, callErr := service.Renew(ctx, lockcap.RenewInput{Name: resourceRef, Ticket: request.Ticket})
 		if callErr != nil {
@@ -65,11 +65,11 @@ func dispatchLockHostService(
 		if output != nil && output.ExpireAt != nil {
 			response.ExpireAt = output.ExpireAt.UTC().Format(time.RFC3339Nano)
 		}
-		return bridgehostcall.NewHostCallSuccessResponse(bridgehostservice.MarshalHostServiceLockRenewResponse(response))
+		return capabilityJSONResponse(response)
 	case bridgehostservice.HostServiceMethodLockRelease:
-		request, err := bridgehostservice.UnmarshalHostServiceLockReleaseRequest(payload)
-		if err != nil {
-			return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, err)
+		var request bridgehostservice.HostServiceLockReleaseRequest
+		if err := decodeCapabilityJSONRequest(payload, &request); err != nil {
+			return invalidCapabilityRequest(err)
 		}
 		if callErr := service.Release(ctx, lockcap.ReleaseInput{Name: resourceRef, Ticket: request.Ticket}); callErr != nil {
 			return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, callErr)

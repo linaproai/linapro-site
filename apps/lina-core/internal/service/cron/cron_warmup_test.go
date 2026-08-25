@@ -24,9 +24,9 @@ func TestSingleNodeModeSkipsDistributedSyncCrons(t *testing.T) {
 	ctx := context.Background()
 
 	svc := &serviceImpl{
-		configSvc:  hostconfig.New(),
+		configSvc:  hostconfig.New(nil),
 		roleSvc:    newCronRoleTestService(),
-		clusterSvc: cluster.New(&hostconfig.ClusterConfig{Enabled: false}),
+		clusterSvc: cluster.New(&hostconfig.ClusterConfig{Enabled: false}, nil),
 	}
 
 	svc.startRuntimeParamSnapshotSync(ctx)
@@ -52,9 +52,9 @@ func TestClusterModeRegistersDistributedSyncCrons(t *testing.T) {
 	ctx := context.Background()
 
 	svc := &serviceImpl{
-		configSvc:  hostconfig.New(),
+		configSvc:  hostconfig.New(nil),
 		roleSvc:    newCronRoleTestService(),
-		clusterSvc: cluster.New(&hostconfig.ClusterConfig{Enabled: true}),
+		clusterSvc: cluster.New(&hostconfig.ClusterConfig{Enabled: true}, nil),
 	}
 
 	svc.startRuntimeParamSnapshotSync(ctx)
@@ -89,11 +89,12 @@ func TestClusterModeRegistersDistributedSyncCrons(t *testing.T) {
 func newCronRoleTestService() rolesvc.Service {
 	var (
 		bizCtxSvc = bizctx.New()
-		configSvc = hostconfig.New()
-		i18nSvc   = i18nsvc.New(bizCtxSvc, configSvc, cachecoord.Default(nil))
-		orgCapSvc = orgspi.New(nil, nil, nil)
-		tenantSvc = tenantspi.New(nil, nil, nil, bizCtxSvc)
-		roleSvc   = rolesvc.New(nil, bizCtxSvc, configSvc, i18nSvc, nil, tenantSvc)
+		configSvc = hostconfig.New(nil)
+		cacheCoordSvc = cachecoord.New(nil, nil)
+		i18nSvc       = i18nsvc.New(bizCtxSvc, configSvc, cacheCoordSvc)
+		orgCapSvc     = orgspi.New(nil, nil, nil)
+		tenantSvc     = tenantspi.New(nil, nil, nil, bizCtxSvc)
+		roleSvc       = rolesvc.New(nil, bizCtxSvc, configSvc, i18nSvc, nil, tenantSvc, cacheCoordSvc)
 	)
 	roleSvc.SetDataScopeService(datascope.New(bizCtxSvc, roleSvc, orgCapSvc.Scope()))
 	return roleSvc

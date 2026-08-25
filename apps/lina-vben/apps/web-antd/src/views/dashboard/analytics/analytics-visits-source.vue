@@ -26,10 +26,10 @@ function renderChart() {
         avoidLabelOverlap: false,
         color: ['#5ab1ef', '#b6a2de', '#67e0e3', '#2ec7c9'],
         data: [
-          { name: $t('pages.dashboard.analytics.sources.search'), value: 1048 },
-          { name: $t('pages.dashboard.analytics.sources.direct'), value: 735 },
-          { name: $t('pages.dashboard.analytics.sources.email'), value: 580 },
-          { name: $t('pages.dashboard.analytics.sources.ads'), value: 484 },
+          { name: $t('pages.dashboard.analytics.sources.search'), value: 0 },
+          { name: $t('pages.dashboard.analytics.sources.direct'), value: 0 },
+          { name: $t('pages.dashboard.analytics.sources.email'), value: 0 },
+          { name: $t('pages.dashboard.analytics.sources.ads'), value: 0 },
         ],
         emphasis: {
           label: {

@@ -43,7 +43,7 @@ func TestSetValueFirstInsertIsNotSystemManageable(t *testing.T) {
 	key := capabilityhostconfigcap.SysConfigKey(
 		fmt.Sprintf("plugin.test-sysmanage.setting.%d", time.Now().UnixNano()),
 	)
-	adapter := NewSysConfigCapabilityAdapter(nil, cachecoord.Default(nil))
+	adapter := NewSysConfigCapabilityAdapter(nil, cachecoord.New(nil, nil))
 
 	if err := adapter.SetValue(ctx, key, "first", &capabilityhostconfigcap.SetSysConfigValueOptions{
 		SystemManageable: gconv.PtrBool(false),
@@ -81,7 +81,7 @@ func TestBatchSetValueWritesAllKeysInOneRound(t *testing.T) {
 	suffix := time.Now().UnixNano()
 	keyA := capabilityhostconfigcap.SysConfigKey(fmt.Sprintf("plugin.test-batch.a.%d", suffix))
 	keyB := capabilityhostconfigcap.SysConfigKey(fmt.Sprintf("plugin.test-batch.b.%d", suffix))
-	adapter := NewSysConfigCapabilityAdapter(nil, cachecoord.Default(nil))
+	adapter := NewSysConfigCapabilityAdapter(nil, cachecoord.New(nil, nil))
 
 	if err := adapter.BatchSetValue(ctx, []capabilityhostconfigcap.SetSysConfigValueItem{
 		{Key: keyA, Value: "va"},
@@ -113,7 +113,7 @@ func TestSetValueCanMarkSystemManageable(t *testing.T) {
 	key := capabilityhostconfigcap.SysConfigKey(
 		fmt.Sprintf("plugin.test-sysmanage.public.%d", time.Now().UnixNano()),
 	)
-	adapter := NewSysConfigCapabilityAdapter(nil, cachecoord.Default(nil))
+	adapter := NewSysConfigCapabilityAdapter(nil, cachecoord.New(nil, nil))
 
 	if err := adapter.SetValue(ctx, key, "public-v1", &capabilityhostconfigcap.SetSysConfigValueOptions{
 		SystemManageable: gconv.PtrBool(true),

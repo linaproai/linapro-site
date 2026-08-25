@@ -31,9 +31,12 @@ import (
 )
 
 // Services exposes guest-side host-service clients using capability-directory
-// semantics. Methods return lightweight clients; zero-value client
-// implementations are safe to call but may return transport errors when the
-// current process is not running inside a dynamic-plugin WASI guest.
+// semantics. Core-owned entries follow protocol/hostservices catalog
+// publication; Runtime, Network, and RecordStore are catalog DynamicOnly
+// extras and are not part of capability.Services. Methods return lightweight
+// clients; zero-value client implementations are safe to call but may return
+// transport errors when the current process is not running inside a
+// dynamic-plugin WASI guest.
 type Services interface {
 	// APIDoc returns the API-documentation localization guest client.
 	APIDoc() apidoccap.Service

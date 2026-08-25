@@ -7,14 +7,15 @@ import (
 	"context"
 
 	v1 "lina-core/api/usermsg/v1"
-	usermsgsvc "lina-core/internal/service/usermsg"
+	notifysvc "lina-core/internal/service/notify"
 	"lina-core/pkg/apitime"
 	"lina-core/pkg/statusflag"
 )
 
 // List queries user message list
 func (c *ControllerV1) List(ctx context.Context, req *v1.ListReq) (res *v1.ListRes, err error) {
-	out, err := c.usermsgSvc.List(ctx, usermsgsvc.ListInput{
+	out, err := c.notifySvc.InboxList(ctx, notifysvc.InboxListInput{
+		UserID:   c.currentUserID(ctx),
 		PageNum:  req.PageNum,
 		PageSize: req.PageSize,
 	})
@@ -27,15 +28,16 @@ func (c *ControllerV1) List(ctx context.Context, req *v1.ListReq) (res *v1.ListR
 		if item == nil {
 			continue
 		}
+		categoryCode := resolveCategoryCode(item.CategoryCode)
 		items = append(items, &v1.MessageItem{
 			Id:           item.Id,
-			UserId:       item.UserId,
+			UserId:       item.UserID,
 			Title:        item.Title,
-			CategoryCode: item.CategoryCode,
-			TypeLabel:    item.TypeLabel,
-			TypeColor:    item.TypeColor,
+			CategoryCode: categoryCode,
+			TypeLabel:    c.localizeCategoryLabel(ctx, categoryCode),
+			TypeColor:    c.localizeCategoryColor(ctx, categoryCode),
 			SourceType:   v1.SourceType(item.SourceType),
-			SourceId:     item.SourceId,
+			SourceId:     item.SourceID,
 			IsRead:       statusflag.ReadState(item.IsRead),
 			ReadAt:       apitime.Milli(item.ReadAt),
 			CreatedAt:    apitime.Milli(item.CreatedAt),

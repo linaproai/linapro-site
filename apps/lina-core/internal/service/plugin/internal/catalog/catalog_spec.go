@@ -30,10 +30,10 @@ func ValidateHookSpec(pluginID string, spec *HookSpec, filePath string) error {
 	if !pluginhost.IsHookExtensionPoint(spec.Event) {
 		return gerror.Newf("plugin hook extension point is not published: %s", filePath)
 	}
-	if spec.Action == "" {
-		spec.Action = pluginhost.HookActionInsert
+	if pluginhost.IsDemoHookAction(spec.Action) {
+		return gerror.Newf("plugin hook demo action is not supported in production: %s", filePath)
 	}
-	if !pluginhost.IsSupportedHookAction(spec.Action) {
+	if spec.Action != "" && !pluginhost.IsSupportedHookAction(spec.Action) {
 		return gerror.Newf("plugin hook action is not supported by the host: %s", filePath)
 	}
 	if spec.Mode == "" {

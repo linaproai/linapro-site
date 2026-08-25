@@ -12,7 +12,7 @@ import (
 func TestGetSchedulerUsesDefaultWhenUnset(t *testing.T) {
 	setTestConfigContent(t, ``)
 
-	svc := New()
+	svc := New(nil)
 	cfg := svc.GetScheduler(context.Background())
 
 	if cfg.DefaultTimezone != "UTC" {
@@ -31,7 +31,7 @@ scheduler:
   defaultTimezone: "Europe/Berlin"
 `)
 
-	svc := New()
+	svc := New(nil)
 	cfg := svc.GetScheduler(context.Background())
 
 	if cfg.DefaultTimezone != "Europe/Berlin" {

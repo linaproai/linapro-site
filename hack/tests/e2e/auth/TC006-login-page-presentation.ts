@@ -1,26 +1,6 @@
-import type { APIRequestContext } from "@playwright/test";
-
 import { test, expect } from "../../fixtures/auth";
-import {
-  createAdminApiContext,
-  getConfigByKey,
-  updateConfigValue,
-} from "../../support/api/job";
 
 test.describe("TC-2 登录页展示收口与布局", () => {
-  let api: APIRequestContext;
-  let originalLayout: { id: number; key: string; value: string };
-
-  test.beforeAll(async () => {
-    api = await createAdminApiContext();
-    originalLayout = await getConfigByKey(api, "sys.auth.loginPanelLayout");
-  });
-
-  test.afterAll(async () => {
-    await updateConfigValue(api, originalLayout.id, originalLayout.value);
-    await api.dispose();
-  });
-
   test("TC-2a: 登录页展示已交付入口并回退未交付认证子路由", async ({
     loginPage,
     page,
@@ -35,9 +15,9 @@ test.describe("TC-2 登录页展示收口与布局", () => {
     // （平台图标行）。无插件时各自整块隐藏。布局契约见 TC-2e / TC-2f。
 
     for (const path of ["/auth/code-login", "/auth/qrcode-login"]) {
-      await page.goto(path);
-      await page.waitForURL(/\/auth\/login$/, { timeout: 10000 });
-      await expect(loginPage.usernameInput).toBeVisible();
+      await page.goto(path, { waitUntil: "domcontentloaded" });
+      await expect(loginPage.mobileLoginButton).toBeHidden();
+      await expect(loginPage.qrCodeLoginButton).toBeHidden();
     }
 
     await page.goto("/auth/forget-password");
@@ -53,9 +33,7 @@ test.describe("TC-2 登录页展示收口与布局", () => {
     await expect(page.getByText("注册", { exact: true }).first()).toBeVisible();
   });
 
-  test("TC-2b: 登录页默认使用居中登录框布局", async ({ loginPage }) => {
-    await updateConfigValue(api, originalLayout.id, "panel-center");
-
+  test("TC-2b: 登录页使用工作台本地默认居中布局", async ({ loginPage }) => {
     await loginPage.goto();
 
     await expect(loginPage.centerAuthPanel).toBeVisible();
@@ -63,15 +41,18 @@ test.describe("TC-2 登录页展示收口与布局", () => {
     await expect(loginPage.rightAuthPanel).toBeHidden();
   });
 
-  test("TC-2c: 修改系统参数后登录页按配置切换布局", async ({ loginPage }) => {
-    await updateConfigValue(api, originalLayout.id, "panel-left");
-    await loginPage.goto();
-    await expect(loginPage.leftAuthPanel).toBeVisible();
-    await expect(loginPage.centerAuthPanel).toBeHidden();
+  test("TC-2c: 宿主公开配置不再驱动登录框左右布局", async ({
+    loginPage,
+    request,
+  }) => {
+    const publicResponse = await request.get("/api/v1/config/public/frontend");
+    expect(publicResponse.ok()).toBeTruthy();
+    const publicPayload = await publicResponse.json();
+    expect(publicPayload.data.auth).not.toHaveProperty("panelLayout");
+    expect(publicPayload.data.auth).not.toHaveProperty("sloganImage");
 
-    await updateConfigValue(api, originalLayout.id, "panel-right");
     await loginPage.goto();
-    await expect(loginPage.rightAuthPanel).toBeVisible();
+    await expect(loginPage.centerAuthPanel).toBeVisible();
     await expect(loginPage.leftAuthPanel).toBeHidden();
   });
 

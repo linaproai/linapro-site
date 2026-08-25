@@ -12,8 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"lina-core/internal/model/entity"
-
 	"github.com/gogf/gf/v2/container/gvar"
 
 	"lina-core/internal/service/bizctx"
@@ -21,6 +19,7 @@ import (
 	configsvc "lina-core/internal/service/config"
 	i18nsvc "lina-core/internal/service/i18n"
 	"lina-core/internal/service/locker"
+	menusvc "lina-core/internal/service/menu"
 	"lina-core/internal/service/plugin/internal/capabilityowner"
 	"lina-core/internal/service/plugin/internal/catalog"
 	plugindep "lina-core/internal/service/plugin/internal/dependency"
@@ -102,7 +101,7 @@ type testConfigService struct {
 // newTestConfigService creates the default plugin test config provider.
 func newTestConfigService() configsvc.Service {
 	return testConfigService{
-		Service:            configsvc.New(),
+		Service:            configsvc.New(nil),
 		dynamicStoragePath: testDynamicStorageDir,
 	}
 }
@@ -174,7 +173,7 @@ func newServicesWithInjected(
 	}
 	var (
 		bizCtxProvider  = bizctx.New()
-		cacheCoordSvc   = cachecoord.Default(cachecoord.NewStaticTopology(false))
+		cacheCoordSvc   = cachecoord.New(cachecoord.NewStaticTopology(false), nil)
 		i18nService     = i18nsvc.New(bizCtxProvider, configProvider, cacheCoordSvc)
 		catalogSvc      = catalog.New(configProvider)
 		topology        = singleNodeTopology{}
@@ -182,7 +181,7 @@ func newServicesWithInjected(
 		migrationSvc    = migration.New(catalogSvc, storeSvc)
 		frontendSvc     = frontend.New(catalogSvc, storeSvc)
 		openapiSvc      = openapi.New(catalogSvc, storeSvc, nil, i18nService)
-		lockerSvc       = locker.New()
+		lockerSvc       = locker.New(locker.NewSQLStore())
 		sessionStore    = session.NewDBStore()
 		capabilitySvc   = injectedCapabilities
 		integrationHook = &testIntegrationDelegateProvider{}
@@ -191,7 +190,7 @@ func newServicesWithInjected(
 	var (
 		orgSvc    = orgspi.New(nil, nil, nil)
 		tenantSvc = tenantspi.New(nil, nil, nil, bizCtxProvider)
-		roleSvc   = role.New(integrationHook, bizCtxProvider, configProvider, i18nService, orgSvc, tenantSvc)
+		roleSvc   = role.New(integrationHook, bizCtxProvider, configProvider, i18nService, orgSvc, tenantSvc, cacheCoordSvc)
 	)
 	if capabilitySvc == nil {
 		capabilitySvc = newTestCapabilities(bizCtxProvider)
@@ -214,6 +213,7 @@ func newServicesWithInjected(
 		i18nService,
 		lockerSvc,
 		topology,
+		cacheCoordSvc,
 		integrationHook,
 		configProvider,
 		bizCtxProvider,
@@ -382,7 +382,7 @@ func (p *testIntegrationDelegateProvider) DispatchPluginHookEvent(
 }
 
 // FilterPermissionMenus delegates permission menu filtering.
-func (p *testIntegrationDelegateProvider) FilterPermissionMenus(ctx context.Context, menus []*entity.SysMenu) []*entity.SysMenu {
+func (p *testIntegrationDelegateProvider) FilterPermissionMenus(ctx context.Context, menus []menusvc.FilterItem) []menusvc.FilterItem {
 	if p == nil || p.service == nil {
 		return menus
 	}

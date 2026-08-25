@@ -83,9 +83,9 @@ func handleStoragePut(
 	targetPath string,
 	payload []byte,
 ) *bridgehostcall.HostCallResponseEnvelope {
-	request, err := bridgehostservice.UnmarshalHostServiceStoragePutRequest(payload)
-	if err != nil {
-		return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, err)
+	var request bridgehostservice.HostServiceStoragePutRequest
+	if err := decodeCapabilityJSONRequest(payload, &request); err != nil {
+		return invalidCapabilityRequest(err)
 	}
 	objectPath, err := normalizeStorageObjectPath(request.Path)
 	if err != nil {
@@ -104,11 +104,9 @@ func handleStoragePut(
 	if err != nil {
 		return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, err)
 	}
-	return bridgehostcall.NewHostCallSuccessResponse(
-		bridgehostservice.MarshalHostServiceStoragePutResponse(&bridgehostservice.HostServiceStoragePutResponse{
-			Object: storageObjectResponse(outputObject(output)),
-		}),
-	)
+	return capabilityJSONResponse(&bridgehostservice.HostServiceStoragePutResponse{
+		Object: storageObjectResponse(outputObject(output)),
+	})
 }
 
 // handleStorageGet reads one governed storage object through storagecap.
@@ -118,9 +116,9 @@ func handleStorageGet(
 	targetPath string,
 	payload []byte,
 ) *bridgehostcall.HostCallResponseEnvelope {
-	request, err := bridgehostservice.UnmarshalHostServiceStorageGetRequest(payload)
-	if err != nil {
-		return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, err)
+	var request bridgehostservice.HostServiceStorageGetRequest
+	if err := decodeCapabilityJSONRequest(payload, &request); err != nil {
+		return invalidCapabilityRequest(err)
 	}
 	objectPath, err := normalizeStorageObjectPath(request.Path)
 	if err != nil {
@@ -134,21 +132,17 @@ func handleStorageGet(
 		return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, err)
 	}
 	if output == nil || !output.Found {
-		return bridgehostcall.NewHostCallSuccessResponse(
-			bridgehostservice.MarshalHostServiceStorageGetResponse(&bridgehostservice.HostServiceStorageGetResponse{Found: false}),
-		)
+		return capabilityJSONResponse(&bridgehostservice.HostServiceStorageGetResponse{Found: false})
 	}
 	body, err := readAndCloseStorageBody(output.Body)
 	if err != nil {
 		return hostCallErrorFromError(bridgehostcall.HostCallStatusInternalError, err)
 	}
-	return bridgehostcall.NewHostCallSuccessResponse(
-		bridgehostservice.MarshalHostServiceStorageGetResponse(&bridgehostservice.HostServiceStorageGetResponse{
-			Found:  true,
-			Object: storageObjectResponse(output.Object),
-			Body:   body,
-		}),
-	)
+	return capabilityJSONResponse(&bridgehostservice.HostServiceStorageGetResponse{
+		Found:  true,
+		Object: storageObjectResponse(output.Object),
+		Body:   body,
+	})
 }
 
 // handleStorageDelete deletes one governed storage object through storagecap.
@@ -158,9 +152,9 @@ func handleStorageDelete(
 	targetPath string,
 	payload []byte,
 ) *bridgehostcall.HostCallResponseEnvelope {
-	request, err := bridgehostservice.UnmarshalHostServiceStorageDeleteRequest(payload)
-	if err != nil {
-		return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, err)
+	var request bridgehostservice.HostServiceStorageDeleteRequest
+	if err := decodeCapabilityJSONRequest(payload, &request); err != nil {
+		return invalidCapabilityRequest(err)
 	}
 	objectPath, err := normalizeStorageObjectPath(request.Path)
 	if err != nil {
@@ -208,9 +202,9 @@ func handleStorageList(
 	targetPath string,
 	payload []byte,
 ) *bridgehostcall.HostCallResponseEnvelope {
-	request, err := bridgehostservice.UnmarshalHostServiceStorageListRequest(payload)
-	if err != nil {
-		return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, err)
+	var request bridgehostservice.HostServiceStorageListRequest
+	if err := decodeCapabilityJSONRequest(payload, &request); err != nil {
+		return invalidCapabilityRequest(err)
 	}
 	prefix, err := normalizeStorageListPrefix(request.Prefix)
 	if err != nil {
@@ -230,9 +224,7 @@ func handleStorageList(
 			objects = append(objects, storageObjectResponse(object))
 		}
 	}
-	return bridgehostcall.NewHostCallSuccessResponse(
-		bridgehostservice.MarshalHostServiceStorageListResponse(&bridgehostservice.HostServiceStorageListResponse{Objects: objects}),
-	)
+	return capabilityJSONResponse(&bridgehostservice.HostServiceStorageListResponse{Objects: objects})
 }
 
 // handleStorageListCursor lists governed storage objects with cursor pagination.
@@ -289,9 +281,9 @@ func handleStorageStat(
 	targetPath string,
 	payload []byte,
 ) *bridgehostcall.HostCallResponseEnvelope {
-	request, err := bridgehostservice.UnmarshalHostServiceStorageStatRequest(payload)
-	if err != nil {
-		return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, err)
+	var request bridgehostservice.HostServiceStorageStatRequest
+	if err := decodeCapabilityJSONRequest(payload, &request); err != nil {
+		return invalidCapabilityRequest(err)
 	}
 	objectPath, err := normalizeStorageObjectPath(request.Path)
 	if err != nil {
@@ -305,16 +297,12 @@ func handleStorageStat(
 		return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, err)
 	}
 	if output == nil || !output.Found {
-		return bridgehostcall.NewHostCallSuccessResponse(
-			bridgehostservice.MarshalHostServiceStorageStatResponse(&bridgehostservice.HostServiceStorageStatResponse{Found: false}),
-		)
+		return capabilityJSONResponse(&bridgehostservice.HostServiceStorageStatResponse{Found: false})
 	}
-	return bridgehostcall.NewHostCallSuccessResponse(
-		bridgehostservice.MarshalHostServiceStorageStatResponse(&bridgehostservice.HostServiceStorageStatResponse{
-			Found:  true,
-			Object: storageObjectResponse(output.Object),
-		}),
-	)
+	return capabilityJSONResponse(&bridgehostservice.HostServiceStorageStatResponse{
+		Found:  true,
+		Object: storageObjectResponse(output.Object),
+	})
 }
 
 // handleStorageStatBatch reads governed storage metadata through storagecap.

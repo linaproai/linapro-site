@@ -199,7 +199,6 @@ func testDescriptor(owner string, service string, version string, methods ...str
 			Method:          method,
 			Capability:      "host:" + service + ":" + method,
 			Risk:            RiskLevelExecute,
-			ResourceKind:    ResourceKindNone,
 			RequestPayload:  "HostServiceJSONRequest",
 			ResponsePayload: "HostServiceJSONResponse",
 		})

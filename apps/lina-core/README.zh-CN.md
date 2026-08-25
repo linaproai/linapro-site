@@ -13,8 +13,7 @@
 
 定时任务子系统属于宿主核心治理能力，因此落在 `lina-core` 中统一实现。
 
-- `internal/service/jobhandler`：处理器注册表、宿主内置处理器装配、插件生命周期联动注册，以及参数 `Schema` 校验。
-- `internal/service/jobmgmt`：任务分组、持久化任务、执行日志、`Cron` 预览、日志保留清理，以及内置任务约束规则。
+- `internal/service/jobmgmt`：任务分组、持久化任务、执行日志、`Cron` 预览、日志保留清理、内置任务约束规则、处理器注册表、宿主内置处理器装配、插件生命周期联动注册，以及参数 `Schema` 校验。
 - `internal/service/jobmgmt/scheduler`：持久化任务装载、`gcron` 注册、并发守卫、执行分发与取消控制。
 - `internal/service/jobmgmt/shellexec`：受控 `Shell` 执行、超时处理、输出截断与手动终止支持。
 - `internal/service/cron`：宿主启动后的统一入口，负责注册宿主定时任务并装载持久化任务。
@@ -85,22 +84,36 @@ database:
 
 单机部署保持轻量本地模式：不需要`Redis`，不会连接`Redis`，并在适用场景继续使用`PostgreSQL`和进程内缓存协调。
 
-集群部署必须显式配置`Redis`协调后端：
+集群部署在拓扑里选择 Redis 分组，连接参数放在顶层具名`redis`分组中：
 
 ```yaml
 cluster:
   enabled: true
-  coordination: redis
-  redis:
+  election:
+    lease: 30s
+    renewInterval: 10s
+  coordination:
+    backend: redis
+    group: default
+
+redis:
+  default:
     address: "127.0.0.1:6379"
     db: 0
     password: ""
     connectTimeout: 3s
     readTimeout: 2s
     writeTimeout: 2s
+  cache:
+    address: "127.0.0.1:6379"
+    db: 1
+    password: ""
+    connectTimeout: 3s
+    readTimeout: 2s
+    writeTimeout: 2s
 ```
 
-当前后端仅支持`redis`。`cluster.coordination`使用稳定的标量配置，便于后续扩展其他协调后端，而不暴露按存储类型拆分的协调开关。`Redis`集成测试默认不启用；运行依赖真实`Redis`的`Go`测试前，请设置`LINA_TEST_REDIS_ADDR`，例如`LINA_TEST_REDIS_ADDR=127.0.0.1:6379`。
+`redis.<group>.address`可以是单个`host:port`，也可以是逗号分隔的 Redis Cluster 节点，写法对齐 GoFrame Redis 配置。未选中的额外分组可以并存。`Redis`集成测试默认不启用；运行依赖真实`Redis`的`Go`测试前，请设置`LINA_TEST_REDIS_ADDR`，例如`LINA_TEST_REDIS_ADDR=127.0.0.1:6379`。
 
 ## 源码插件升级
 

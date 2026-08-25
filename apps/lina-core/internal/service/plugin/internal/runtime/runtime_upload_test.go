@@ -30,7 +30,7 @@ func (p fixedUploadConfig) GetUploadMaxSize(_ context.Context) (int64, error) {
 // runtime upload ceiling is enforced before parsing the artifact payload.
 func TestUploadDynamicPackageRejectsFileExceedingRuntimeMaxSize(t *testing.T) {
 	services := testutil.NewServicesWithConfigService(fixedUploadConfig{
-		Service:   configsvc.New(),
+		Service:   configsvc.New(nil),
 		maxSizeMB: 1,
 	})
 

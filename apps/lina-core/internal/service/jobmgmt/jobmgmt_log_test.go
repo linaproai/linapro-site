@@ -205,7 +205,7 @@ func TestCleanupDueLogsAppliesGlobalRetentionBeforeJobPolicy(t *testing.T) {
 	)
 	setJobMgmtTestBizCtx(svc, jobmgmtStaticBizCtx{ctx: &model.Context{UserId: 1}})
 	svc.configSvc = jobLogCleanupConfigStub{
-		Service:          hostconfig.New(),
+		Service:          hostconfig.New(nil),
 		logRetentionDays: 7,
 		cronRetention: &hostconfig.CronLogRetentionConfig{
 			Mode:  hostconfig.CronLogRetentionModeNone,

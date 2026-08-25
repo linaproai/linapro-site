@@ -33,7 +33,7 @@ func TestListLocalizesConfigMetadata(t *testing.T) {
 		"控制登录页顶部主标题文案。",
 	)
 
-	out, err := New(nil, i18nsvc.New(bizctx.New(), hostconfig.New(), cachecoord.Default(nil))).List(ctx, ListInput{
+	out, err := New(nil, i18nsvc.New(bizctx.New(), hostconfig.New(nil), cachecoord.New(nil, nil))).List(ctx, ListInput{
 		PageNum:  1,
 		PageSize: 10,
 		Key:      hostconfig.PublicFrontendSettingKeyAuthPageTitle,
@@ -70,7 +70,7 @@ func TestListKeepsCustomConfigValueRaw(t *testing.T) {
 		"控制登录页顶部主标题文案。",
 	)
 
-	out, err := New(nil, i18nsvc.New(bizctx.New(), hostconfig.New(), cachecoord.Default(nil))).List(ctx, ListInput{
+	out, err := New(nil, i18nsvc.New(bizctx.New(), hostconfig.New(nil), cachecoord.New(nil, nil))).List(ctx, ListInput{
 		PageNum:  1,
 		PageSize: 10,
 		Key:      hostconfig.PublicFrontendSettingKeyAuthPageTitle,
@@ -99,7 +99,7 @@ func TestGetByIdLocalizesMetadataKeepsRawValue(t *testing.T) {
 		"控制登录页顶部主标题文案。",
 	)
 
-	item, err := New(nil, i18nsvc.New(bizctx.New(), hostconfig.New(), cachecoord.Default(nil))).GetById(ctx, record.Id)
+	item, err := New(nil, i18nsvc.New(bizctx.New(), hostconfig.New(nil), cachecoord.New(nil, nil))).GetById(ctx, record.Id)
 	if err != nil {
 		t.Fatalf("get localized config detail: %v", err)
 	}
@@ -127,7 +127,7 @@ func TestUpdateBuiltinIgnoresLocalizedNameRemark(t *testing.T) {
 		"控制登录页顶部主标题文案。",
 	)
 
-	svc := New(hostconfig.New(), i18nsvc.New(bizctx.New(), hostconfig.New(), cachecoord.Default(nil)))
+	svc := New(hostconfig.New(nil), i18nsvc.New(bizctx.New(), hostconfig.New(nil), cachecoord.New(nil, nil)))
 	localizedName := "Login - Page Title"
 	localizedRemark := "Controls the headline shown at the top of the login page."
 	updatedValue := "Custom Login Title For Update Guard"
@@ -164,7 +164,7 @@ func TestUpdateBuiltinIgnoresLocalizedNameRemark(t *testing.T) {
 func TestGenerateImportTemplateLocalizesHeaders(t *testing.T) {
 	ctx := newEnglishBizCtx()
 
-	data, err := New(nil, i18nsvc.New(bizctx.New(), hostconfig.New(), cachecoord.Default(nil))).GenerateImportTemplate(ctx)
+	data, err := New(nil, i18nsvc.New(bizctx.New(), hostconfig.New(nil), cachecoord.New(nil, nil))).GenerateImportTemplate(ctx)
 	if err != nil {
 		t.Fatalf("generate localized import template: %v", err)
 	}
@@ -226,7 +226,7 @@ func TestExportLocalizesHeadersButKeepsRawRows(t *testing.T) {
 		"控制登录页顶部主标题文案。",
 	)
 
-	data, err := New(nil, i18nsvc.New(bizctx.New(), hostconfig.New(), cachecoord.Default(nil))).Export(ctx, ExportInput{Ids: []int64{record.Id}})
+	data, err := New(nil, i18nsvc.New(bizctx.New(), hostconfig.New(nil), cachecoord.New(nil, nil))).Export(ctx, ExportInput{Ids: []int64{record.Id}})
 	if err != nil {
 		t.Fatalf("export localized config headers: %v", err)
 	}

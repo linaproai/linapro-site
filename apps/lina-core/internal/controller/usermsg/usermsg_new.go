@@ -6,17 +6,23 @@ package usermsg
 
 import (
 	"lina-core/api/usermsg"
-	usermsgsvc "lina-core/internal/service/usermsg"
+	"lina-core/internal/service/bizctx"
+	i18nsvc "lina-core/internal/service/i18n"
+	notifysvc "lina-core/internal/service/notify"
 )
 
 // ControllerV1 is the user message controller.
 type ControllerV1 struct {
-	usermsgSvc usermsgsvc.Service // user message service
+	bizCtxSvc bizctx.Service
+	notifySvc notifysvc.Service
+	i18nSvc   i18nsvc.Service
 }
 
 // NewV1 creates and returns a new user message controller instance.
-func NewV1(userMsgSvc usermsgsvc.Service) usermsg.IUsermsgV1 {
+func NewV1(bizCtxSvc bizctx.Service, notifySvc notifysvc.Service, i18nSvc i18nsvc.Service) usermsg.IUsermsgV1 {
 	return &ControllerV1{
-		usermsgSvc: userMsgSvc,
+		bizCtxSvc: bizCtxSvc,
+		notifySvc: notifySvc,
+		i18nSvc:   i18nSvc,
 	}
 }

@@ -5,6 +5,7 @@ package domainhostcall
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"io"
 	"testing"
@@ -34,26 +35,26 @@ func (r *storageHostCallRecorder) invoke(service string, method string, resource
 	record := storageHostCallRecord{service: service, method: method, resourceRef: resourceRef}
 	switch method {
 	case protocol.HostServiceMethodStoragePut:
-		decoded, err := protocol.UnmarshalHostServiceStoragePutRequest(request)
-		if err != nil {
+		var decoded protocol.HostServiceStoragePutRequest
+		if err := decodeHostServiceJSONRequest(request, &decoded); err != nil {
 			return nil, err
 		}
 		record.body = append([]byte(nil), decoded.Body...)
 		r.calls = append(r.calls, record)
-		return protocol.MarshalHostServiceStoragePutResponse(&protocol.HostServiceStoragePutResponse{
+		return encodeHostServiceJSONResponse(&protocol.HostServiceStoragePutResponse{
 			Object: &protocol.HostServiceStorageObject{Path: decoded.Path, Size: int64(len(decoded.Body))},
-		}), nil
+		})
 	case protocol.HostServiceMethodStoragePutInit:
-		decoded, err := protocol.UnmarshalHostServiceStoragePutInitRequest(request)
-		if err != nil {
+		var decoded protocol.HostServiceStoragePutInitRequest
+		if err := decodeHostServiceJSONRequest(request, &decoded); err != nil {
 			return nil, err
 		}
 		record.body = []byte(decoded.Path)
 		r.calls = append(r.calls, record)
-		return protocol.MarshalHostServiceStoragePutInitResponse(&protocol.HostServiceStoragePutInitResponse{UploadID: r.uploadID}), nil
+		return encodeHostServiceJSONResponse(&protocol.HostServiceStoragePutInitResponse{UploadID: r.uploadID})
 	case protocol.HostServiceMethodStoragePutChunk:
-		decoded, err := protocol.UnmarshalHostServiceStoragePutChunkRequest(request)
-		if err != nil {
+		var decoded protocol.HostServiceStoragePutChunkRequest
+		if err := decodeHostServiceJSONRequest(request, &decoded); err != nil {
 			return nil, err
 		}
 		record.offset = decoded.Offset
@@ -62,22 +63,22 @@ func (r *storageHostCallRecorder) invoke(service string, method string, resource
 		if r.nextChunkError {
 			return nil, errors.New("chunk failed")
 		}
-		return protocol.MarshalHostServiceStoragePutChunkResponse(&protocol.HostServiceStoragePutChunkResponse{
+		return encodeHostServiceJSONResponse(&protocol.HostServiceStoragePutChunkResponse{
 			NextOffset: decoded.Offset + int64(len(decoded.Body)),
-		}), nil
+		})
 	case protocol.HostServiceMethodStoragePutCommit:
-		decoded, err := protocol.UnmarshalHostServiceStoragePutCommitRequest(request)
-		if err != nil {
+		var decoded protocol.HostServiceStoragePutCommitRequest
+		if err := decodeHostServiceJSONRequest(request, &decoded); err != nil {
 			return nil, err
 		}
 		record.offset = decoded.Size
 		r.calls = append(r.calls, record)
-		return protocol.MarshalHostServiceStoragePutCommitResponse(&protocol.HostServiceStoragePutCommitResponse{
+		return encodeHostServiceJSONResponse(&protocol.HostServiceStoragePutCommitResponse{
 			Object: &protocol.HostServiceStorageObject{Path: decoded.Path, Size: decoded.Size},
-		}), nil
+		})
 	case protocol.HostServiceMethodStoragePutAbort:
-		decoded, err := protocol.UnmarshalHostServiceStoragePutAbortRequest(request)
-		if err != nil {
+		var decoded protocol.HostServiceStoragePutAbortRequest
+		if err := decodeHostServiceJSONRequest(request, &decoded); err != nil {
 			return nil, err
 		}
 		record.body = []byte(decoded.UploadID)
@@ -86,6 +87,29 @@ func (r *storageHostCallRecorder) invoke(service string, method string, resource
 	default:
 		return nil, errors.New("unexpected method: " + method)
 	}
+}
+
+// decodeHostServiceJSONRequest decodes one JSON envelope using the shipped
+// host-service JSON request codec.
+func decodeHostServiceJSONRequest(payload []byte, out any) error {
+	request, err := protocol.UnmarshalHostServiceJSONRequest(payload)
+	if err != nil {
+		return err
+	}
+	if request == nil || len(request.Value) == 0 {
+		return nil
+	}
+	return json.Unmarshal(request.Value, out)
+}
+
+// encodeHostServiceJSONResponse encodes one JSON envelope using the shipped
+// host-service JSON response codec.
+func encodeHostServiceJSONResponse(value any) ([]byte, error) {
+	content, err := json.Marshal(value)
+	if err != nil {
+		return nil, err
+	}
+	return protocol.MarshalHostServiceJSONResponse(&protocol.HostServiceJSONResponse{Value: content}), nil
 }
 
 type unknownSizeReader struct{ *bytes.Reader }

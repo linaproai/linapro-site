@@ -35,7 +35,7 @@ keywords:
 | `logger.extensions.structured` | 生产环境建议启用结构化日志 |
 | `workspace.basePath` | 保持`/admin`或使用独立后台域名的`/`，不要占用保留路径；本地默认工作台地址是`http://localhost:5666/admin` |
 | `scheduler.defaultTimezone` | 按业务所在时区设置 |
-| `cluster.redis` | 集群模式使用独立、可靠、带认证的`Redis`实例 |
+| `redis.<group>` | 集群模式使用独立、可靠、带认证的`Redis`分组 |
 | `plugin.allowForceUninstall` | 按组织治理要求决定是否允许强制卸载 |
 | `plugin.autoEnable` | 生产环境谨慎启用演示数据 |
 

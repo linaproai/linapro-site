@@ -1048,15 +1048,16 @@ func containsRoleTenantBoundaryString(values []string, target string) bool {
 func newRoleTestService(permissionFilter permissionMenuFilter, orgCapSvc orgcap.Service) *serviceImpl {
 	var (
 		bizCtxSvc        = bizctx.New()
-		configSvc        = hostconfig.New()
-		i18nSvc          = i18nsvc.New(bizCtxSvc, configSvc, cachecoord.Default(nil))
+		configSvc        = hostconfig.New(nil)
+		cacheCoordSvc    = cachecoord.New(nil, nil)
+		i18nSvc          = i18nsvc.New(bizCtxSvc, configSvc, cacheCoordSvc)
 		defaultOrgCapSvc = orgspi.New(nil, nil, nil)
 		tenantSvc        = tenantspi.New(nil, nil, nil, nil)
 	)
 	if orgCapSvc == nil {
 		orgCapSvc = defaultOrgCapSvc
 	}
-	svc := New(permissionFilter, bizCtxSvc, configSvc, i18nSvc, orgCapSvc, tenantSvc).(*serviceImpl)
+	svc := New(permissionFilter, bizCtxSvc, configSvc, i18nSvc, orgCapSvc, tenantSvc, cacheCoordSvc).(*serviceImpl)
 	refreshRoleTestScope(svc, orgCapSvc)
 	return svc
 }

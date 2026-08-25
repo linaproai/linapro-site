@@ -12,7 +12,6 @@ import (
 	"lina-core/internal/dao"
 	"lina-core/internal/model/do"
 	"lina-core/internal/model/entity"
-	"lina-core/internal/service/jobhandler"
 	"lina-core/internal/service/jobmeta"
 )
 
@@ -129,7 +128,7 @@ func TestSyncBuiltinJobsPrunesRemovedBuiltins(t *testing.T) {
 	var (
 		ctx          = context.Background()
 		scheduler    = &trackingScheduler{}
-		svc          = newTestServiceWithRegistry(t, jobhandler.New(), scheduler)
+		svc          = newTestServiceWithRegistry(t, NewRegistry(), scheduler)
 		existingDefs = snapshotExistingBuiltinDefs(t, ctx)
 	)
 

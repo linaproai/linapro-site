@@ -9,11 +9,11 @@ package scheduler
 
 import (
 	"context"
+	"encoding/json"
 	"sync"
 
 	"lina-core/internal/model/entity"
 	"lina-core/internal/service/cluster"
-	"lina-core/internal/service/jobhandler"
 	"lina-core/internal/service/jobmgmt/internal/shellexec"
 )
 
@@ -34,6 +34,17 @@ type Scheduler interface {
 	CancelLog(ctx context.Context, logID int64) error
 }
 
+// handlerRegistry resolves handler callbacks and parameter schemas during
+// persistent job execution without importing the parent jobmgmt package.
+type handlerRegistry interface {
+	// Lookup returns the invocation callback and parameter schema for one ref.
+	Lookup(ref string) (invoke func(ctx context.Context, params json.RawMessage) (any, error), paramsSchema string, ok bool)
+	// ValidateHandlerParams validates one parameter payload against a handler schema.
+	ValidateHandlerParams(schemaText string, paramsJSON json.RawMessage) error
+	// HandlerNotFoundError returns the stable missing-handler business error.
+	HandlerNotFoundError() error
+}
+
 // runningExecution stores one cancellable execution instance.
 type runningExecution struct {
 	cancel  context.CancelFunc // cancel stops the execution context.
@@ -42,9 +53,9 @@ type runningExecution struct {
 
 // serviceImpl implements Scheduler.
 type serviceImpl struct {
-	clusterSvc    cluster.Service     // clusterSvc exposes primary-node and node-ID state.
-	registry      jobhandler.Registry // registry resolves handler callbacks.
-	shellExecutor shellexec.Executor  // shellExecutor runs shell-type jobs.
+	clusterSvc    cluster.Service    // clusterSvc exposes primary-node and node-ID state.
+	registry      handlerRegistry    // registry resolves handler callbacks.
+	shellExecutor shellexec.Executor // shellExecutor runs shell-type jobs.
 
 	mu               sync.Mutex                  // mu protects running instance bookkeeping.
 	runningCounts    map[int64]int               // runningCounts tracks concurrent in-flight runs per job.
@@ -57,7 +68,7 @@ var _ Scheduler = (*serviceImpl)(nil)
 // New creates and returns one persistent scheduler.
 func New(
 	clusterSvc cluster.Service,
-	registry jobhandler.Registry,
+	registry handlerRegistry,
 	shellExecutor shellexec.Executor,
 ) Scheduler {
 	return &serviceImpl{

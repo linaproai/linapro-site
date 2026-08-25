@@ -44,9 +44,6 @@
           },
           "DataCreateReq": {
             "fields": {
-              "cssClass": {
-                "dc": "CSS类名，用于前端自定义样式"
-              },
               "dictType": {
                 "dc": "字典类型标识"
               },
@@ -61,9 +58,6 @@
               },
               "status": {
                 "dc": "状态：1=正常 0=停用"
-              },
-              "tagStyle": {
-                "dc": "标签样式，用于前端展示不同颜色标签"
               },
               "value": {
                 "dc": "字典值（存储值）"
@@ -156,9 +150,6 @@
                     "fields": {
                       "data": {
                         "fields": {
-                          "cssClass": {
-                            "dc": "CSS样式类名"
-                          },
                           "dictType": {
                             "dc": "字典类型"
                           },
@@ -176,9 +167,6 @@
                           },
                           "status": {
                             "dc": "状态（0停用 1正常）"
-                          },
-                          "tagStyle": {
-                            "dc": "标签样式（primary/success/danger/warning等）"
                           },
                           "value": {
                             "dc": "字典键值"
@@ -211,9 +199,6 @@
           },
           "DataGetRes": {
             "fields": {
-              "cssClass": {
-                "dc": "CSS样式类名"
-              },
               "dictType": {
                 "dc": "字典类型"
               },
@@ -231,9 +216,6 @@
               },
               "status": {
                 "dc": "状态（0停用 1正常）"
-              },
-              "tagStyle": {
-                "dc": "标签样式（primary/success/danger/warning等）"
               },
               "value": {
                 "dc": "字典键值"
@@ -368,9 +350,6 @@
           },
           "DataUpdateReq": {
             "fields": {
-              "cssClass": {
-                "dc": "CSS类名"
-              },
               "dictType": {
                 "dc": "字典类型标识"
               },
@@ -389,9 +368,6 @@
               "status": {
                 "dc": "状态：1=正常 0=停用"
               },
-              "tagStyle": {
-                "dc": "标签样式"
-              },
               "value": {
                 "dc": "字典值（存储值）"
               }
@@ -405,9 +381,6 @@
               "content": {
                 "application_json": {
                   "fields": {
-                    "cssClass": {
-                      "dc": "CSS类名"
-                    },
                     "dictType": {
                       "dc": "字典类型标识"
                     },
@@ -422,9 +395,6 @@
                     },
                     "status": {
                       "dc": "状态：1=正常 0=停用"
-                    },
-                    "tagStyle": {
-                      "dc": "标签样式"
                     },
                     "value": {
                       "dc": "字典值（存储值）"

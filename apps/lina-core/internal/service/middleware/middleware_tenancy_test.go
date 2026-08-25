@@ -143,8 +143,8 @@ func runTenancyMiddlewareRequest(t *testing.T, tenantSvc tenantspi.Service) (int
 
 	svc := &serviceImpl{
 		bizCtxSvc: bizctx.New(),
-		configSvc: hostconfig.New(),
-		i18nSvc:   i18nsvc.New(bizctx.New(), hostconfig.New(), cachecoord.Default(nil)),
+		configSvc: hostconfig.New(nil),
+		i18nSvc:   i18nsvc.New(bizctx.New(), hostconfig.New(nil), cachecoord.New(nil, nil)),
 		tenantSvc: tenantSvc,
 	}
 	server := g.Server("middleware-tenancy-" + guid.S())

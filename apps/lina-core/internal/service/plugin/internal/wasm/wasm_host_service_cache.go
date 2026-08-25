@@ -36,9 +36,9 @@ func dispatchCacheHostService(
 
 	switch method {
 	case bridgehostservice.HostServiceMethodCacheGet:
-		request, err := bridgehostservice.UnmarshalHostServiceCacheGetRequest(payload)
-		if err != nil {
-			return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, err)
+		var request bridgehostservice.HostServiceCacheGetRequest
+		if err := decodeCapabilityJSONRequest(payload, &request); err != nil {
+			return invalidCapabilityRequest(err)
 		}
 		item, found, callErr := service.Get(ctx, namespace, request.Key)
 		if callErr != nil {
@@ -48,7 +48,7 @@ func dispatchCacheHostService(
 		if found {
 			response.Value = buildCacheValueResponse(item)
 		}
-		return bridgehostcall.NewHostCallSuccessResponse(bridgehostservice.MarshalHostServiceCacheGetResponse(response))
+		return capabilityJSONResponse(response)
 	case bridgehostservice.HostServiceMethodCacheGetMany:
 		var request cacheGetManyRequest
 		if err := decodeCapabilityJSONRequest(payload, &request); err != nil {
@@ -63,17 +63,17 @@ func dispatchCacheHostService(
 		}
 		return capabilityJSONResponse(cacheGetManyResponseFromDomain(output))
 	case bridgehostservice.HostServiceMethodCacheSet:
-		request, err := bridgehostservice.UnmarshalHostServiceCacheSetRequest(payload)
-		if err != nil {
-			return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, err)
+		var request bridgehostservice.HostServiceCacheSetRequest
+		if err := decodeCapabilityJSONRequest(payload, &request); err != nil {
+			return invalidCapabilityRequest(err)
 		}
 		item, callErr := service.Set(ctx, namespace, request.Key, request.Value, ttlFromSeconds(request.ExpireSeconds))
 		if callErr != nil {
 			return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, callErr)
 		}
-		return bridgehostcall.NewHostCallSuccessResponse(bridgehostservice.MarshalHostServiceCacheSetResponse(&bridgehostservice.HostServiceCacheSetResponse{
+		return capabilityJSONResponse(&bridgehostservice.HostServiceCacheSetResponse{
 			Value: buildCacheValueResponse(item),
-		}))
+		})
 	case bridgehostservice.HostServiceMethodCacheSetMany:
 		var request cacheSetManyRequest
 		if err := decodeCapabilityJSONRequest(payload, &request); err != nil {
@@ -93,9 +93,9 @@ func dispatchCacheHostService(
 		}
 		return capabilityJSONResponse(cacheSetManyResponseFromDomain(output))
 	case bridgehostservice.HostServiceMethodCacheDelete:
-		request, err := bridgehostservice.UnmarshalHostServiceCacheDeleteRequest(payload)
-		if err != nil {
-			return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, err)
+		var request bridgehostservice.HostServiceCacheDeleteRequest
+		if err := decodeCapabilityJSONRequest(payload, &request); err != nil {
+			return invalidCapabilityRequest(err)
 		}
 		if callErr := service.Delete(ctx, namespace, request.Key); callErr != nil {
 			return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, callErr)
@@ -111,21 +111,21 @@ func dispatchCacheHostService(
 		}
 		return bridgehostcall.NewHostCallEmptySuccessResponse()
 	case bridgehostservice.HostServiceMethodCacheIncr:
-		request, err := bridgehostservice.UnmarshalHostServiceCacheIncrRequest(payload)
-		if err != nil {
-			return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, err)
+		var request bridgehostservice.HostServiceCacheIncrRequest
+		if err := decodeCapabilityJSONRequest(payload, &request); err != nil {
+			return invalidCapabilityRequest(err)
 		}
 		item, callErr := service.Incr(ctx, namespace, request.Key, request.Delta, ttlFromSeconds(request.ExpireSeconds))
 		if callErr != nil {
 			return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, callErr)
 		}
-		return bridgehostcall.NewHostCallSuccessResponse(bridgehostservice.MarshalHostServiceCacheIncrResponse(&bridgehostservice.HostServiceCacheIncrResponse{
+		return capabilityJSONResponse(&bridgehostservice.HostServiceCacheIncrResponse{
 			Value: buildCacheValueResponse(item),
-		}))
+		})
 	case bridgehostservice.HostServiceMethodCacheExpire:
-		request, err := bridgehostservice.UnmarshalHostServiceCacheExpireRequest(payload)
-		if err != nil {
-			return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, err)
+		var request bridgehostservice.HostServiceCacheExpireRequest
+		if err := decodeCapabilityJSONRequest(payload, &request); err != nil {
+			return invalidCapabilityRequest(err)
 		}
 		found, expireAt, callErr := service.Expire(ctx, namespace, request.Key, ttlFromSeconds(request.ExpireSeconds))
 		if callErr != nil {
@@ -135,7 +135,7 @@ func dispatchCacheHostService(
 		if expireAt != nil {
 			response.ExpireAt = expireAt.UTC().Format(time.RFC3339Nano)
 		}
-		return bridgehostcall.NewHostCallSuccessResponse(bridgehostservice.MarshalHostServiceCacheExpireResponse(response))
+		return capabilityJSONResponse(response)
 	default:
 		return bridgehostcall.NewHostCallErrorResponse(
 			bridgehostcall.HostCallStatusNotFound,
@@ -152,7 +152,7 @@ func ttlFromSeconds(seconds int64) time.Duration {
 	return time.Duration(seconds) * time.Second
 }
 
-// buildCacheValueResponse maps one cache item into the protobuf response model.
+// buildCacheValueResponse maps one cache item into the JSON payload snapshot.
 func buildCacheValueResponse(item *cachecap.CacheItem) *bridgehostservice.HostServiceCacheValue {
 	if item == nil {
 		return nil

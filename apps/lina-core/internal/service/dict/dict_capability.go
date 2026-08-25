@@ -542,8 +542,6 @@ func (a *dictValueCapabilityAdapter) Create(ctx context.Context, input capabilit
 		Value:    strings.TrimSpace(string(input.Value)),
 		Label:    input.Label,
 		Sort:     input.Sort,
-		TagStyle: input.TagStyle,
-		CssClass: input.CssClass,
 		Status:   input.Status,
 		Remark:   input.Remark,
 	}).InsertAndGetId()
@@ -567,12 +565,6 @@ func (a *dictValueCapabilityAdapter) Update(ctx context.Context, input capabilit
 	}
 	if input.Sort != nil {
 		data.Sort = *input.Sort
-	}
-	if input.TagStyle != nil {
-		data.TagStyle = *input.TagStyle
-	}
-	if input.CssClass != nil {
-		data.CssClass = *input.CssClass
 	}
 	if input.Status != nil {
 		data.Status = *input.Status

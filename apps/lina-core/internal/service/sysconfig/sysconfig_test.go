@@ -59,7 +59,7 @@ func TestGetByIdAndGetByKeyHideNonSystemManageable(t *testing.T) {
 func TestUpdateAndDeleteRejectNonSystemManageable(t *testing.T) {
 	ctx := context.Background()
 	hidden := insertConfigWithSystemManageable(t, ctx, 0)
-	svc := New(hostconfig.New(), nil)
+	svc := New(hostconfig.New(nil), nil)
 
 	updated := "should-not-apply"
 	err := svc.Update(ctx, UpdateInput{Id: hidden.Id, Value: &updated})
@@ -87,7 +87,7 @@ func TestUpdateAndDeleteRejectNonSystemManageable(t *testing.T) {
 func TestCreateDefaultsSystemManageable(t *testing.T) {
 	ctx := context.Background()
 	key := fmt.Sprintf("test.sysmanage.create.%d", time.Now().UnixNano())
-	id, err := New(hostconfig.New(), nil).Create(ctx, CreateInput{
+	id, err := New(hostconfig.New(nil), nil).Create(ctx, CreateInput{
 		Name:  "Create manageable",
 		Key:   key,
 		Value: "v1",
@@ -122,7 +122,7 @@ func TestImportUpdateRejectsNonSystemManageable(t *testing.T) {
 		"imported remark",
 	})
 
-	result, err := New(hostconfig.New(), nil).Import(ctx, bytes.NewReader(data), true)
+	result, err := New(hostconfig.New(nil), nil).Import(ctx, bytes.NewReader(data), true)
 	if err != nil {
 		t.Fatalf("import: %v", err)
 	}

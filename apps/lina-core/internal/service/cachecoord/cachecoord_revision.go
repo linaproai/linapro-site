@@ -6,7 +6,6 @@ import (
 	"context"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"lina-core/internal/service/cluster"
@@ -15,7 +14,8 @@ import (
 	"lina-core/pkg/logger"
 )
 
-// Cache revision identity and storage limits mirror sys_cache_revision columns.
+// Cache revision identity and storage limits keep domain/scope/reason lengths
+// bounded for coordination keys and diagnostic payloads.
 const (
 	maxDomainBytes = 64
 	maxScopeBytes  = 128
@@ -27,29 +27,10 @@ const (
 	cacheInvalidateEventKind = "cache.invalidate"
 )
 
-// revisionKey uniquely identifies one cache domain/scope revision row.
+// revisionKey uniquely identifies one cache domain/scope revision.
 type revisionKey struct {
 	domain Domain
 	scope  Scope
-}
-
-// processLocalRevisions shares single-node revision state across service
-// instances because several host services construct their own dependencies.
-var processLocalRevisions = struct {
-	sync.Mutex
-	values map[revisionKey]int64
-}{
-	values: make(map[revisionKey]int64),
-}
-
-// processCoordinationStatuses aggregates observable status across cachecoord
-// instances in the current process without changing per-instance freshness
-// decisions.
-var processCoordinationStatuses = struct {
-	sync.RWMutex
-	values map[revisionKey]coordinationStatus
-}{
-	values: make(map[revisionKey]coordinationStatus),
 }
 
 // ConfigureDomain configures or replaces one cache domain consistency contract.
@@ -103,7 +84,7 @@ func (s *serviceImpl) MarkTenantChanged(
 	}
 
 	if !s.clusterEnabled() {
-		revision := bumpLocalRevision(key)
+		revision := s.bumpLocalRevision(key)
 		s.storeObservedRevision(key, revision)
 		s.recordSuccess(key, revision, revision, time.Now())
 		return revision, nil
@@ -215,7 +196,7 @@ func (s *serviceImpl) CurrentRevision(ctx context.Context, domain Domain, scope 
 		return 0, err
 	}
 	if !s.clusterEnabled() {
-		revision := currentLocalRevision(key)
+		revision := s.currentLocalRevision(key)
 		s.recordSuccess(key, revision, revision, time.Now())
 		return revision, nil
 	}
@@ -251,16 +232,6 @@ func (s *serviceImpl) Snapshot(ctx context.Context) ([]SnapshotItem, error) {
 	}
 	s.mu.RUnlock()
 
-	processCoordinationStatuses.RLock()
-	for key := range processCoordinationStatuses.values {
-		if _, ok := seen[key]; ok {
-			continue
-		}
-		keys = append(keys, key)
-		seen[key] = struct{}{}
-	}
-	processCoordinationStatuses.RUnlock()
-
 	healthSnapshot := s.coordinationHealthSnapshot(ctx)
 	items := make([]SnapshotItem, 0, len(keys))
 	for _, key := range keys {
@@ -274,15 +245,14 @@ func (s *serviceImpl) Snapshot(ctx context.Context) ([]SnapshotItem, error) {
 				s.recordSharedRevision(key, revision)
 			}
 		} else {
-			sharedRevision = currentLocalRevision(key)
+			sharedRevision = s.currentLocalRevision(key)
 		}
 		items = append(items, s.snapshotItem(key, sharedRevision, healthSnapshot))
 	}
 	return items, nil
 }
 
-// bumpSharedRevision increments one persistent revision row under a transaction
-// and row lock so concurrent publishers cannot lose increments.
+// bumpSharedRevision increments the injected coordination revision store.
 func (s *serviceImpl) bumpSharedRevision(
 	ctx context.Context,
 	key revisionKey,
@@ -419,7 +389,6 @@ func (s *serviceImpl) recordSuccess(
 	status.recentError = ""
 	status.recentErrorAt = time.Time{}
 	s.mu.Unlock()
-	recordProcessSuccess(key, localRevision, sharedRevision, now)
 }
 
 // recordSharedRevision stores a shared revision read without changing observed freshness.
@@ -428,7 +397,6 @@ func (s *serviceImpl) recordSharedRevision(key revisionKey, sharedRevision int64
 	status := s.ensureStatusLocked(key)
 	status.sharedRevision = sharedRevision
 	s.mu.Unlock()
-	recordProcessSharedRevision(key, sharedRevision)
 }
 
 // recordFailure stores the latest coordination failure for diagnostics.
@@ -441,7 +409,6 @@ func (s *serviceImpl) recordFailure(key revisionKey, err error) {
 	status.recentError = err.Error()
 	status.recentErrorAt = time.Now()
 	s.mu.Unlock()
-	recordProcessFailure(key, err)
 }
 
 // ensureStatusLocked returns the mutable status object for a key. Caller must hold s.mu.
@@ -482,10 +449,7 @@ func (s *serviceImpl) storeObservedRevision(key revisionKey, revision int64) {
 	status := s.ensureStatusLocked(key)
 	status.localRevision = revision
 	status.lastSyncedAt = time.Now()
-	sharedRevision := status.sharedRevision
-	lastSyncedAt := status.lastSyncedAt
 	s.mu.Unlock()
-	recordProcessSuccess(key, revision, sharedRevision, lastSyncedAt)
 }
 
 // snapshotItem builds one detached observable snapshot row.
@@ -502,24 +466,6 @@ func (s *serviceImpl) snapshotItem(
 	}
 	s.mu.RUnlock()
 	spec := s.domainSpec(key.domain)
-	processStatus := processStatusSnapshot(key)
-	if localStatus.lastSyncedAt.IsZero() && !processStatus.lastSyncedAt.IsZero() {
-		localStatus = processStatus
-	} else {
-		if processStatus.localRevision > localStatus.localRevision {
-			localStatus.localRevision = processStatus.localRevision
-		}
-		if processStatus.sharedRevision > localStatus.sharedRevision {
-			localStatus.sharedRevision = processStatus.sharedRevision
-		}
-		if processStatus.lastSyncedAt.After(localStatus.lastSyncedAt) {
-			localStatus.lastSyncedAt = processStatus.lastSyncedAt
-		}
-		if processStatus.recentErrorAt.After(localStatus.recentErrorAt) {
-			localStatus.recentError = processStatus.recentError
-			localStatus.recentErrorAt = processStatus.recentErrorAt
-		}
-	}
 
 	staleSeconds := int64(0)
 	if !localStatus.lastSyncedAt.IsZero() {
@@ -580,81 +526,36 @@ func defaultDomainSpec(domain Domain) DomainSpec {
 		AuthoritySource:  "caller-owned cache domain",
 		ConsistencyModel: ConsistencySharedRevision,
 		MaxStale:         DefaultDomainMaxStale,
-		SyncMechanism:    "persistent sys_cache_revision plus request or watcher refresh",
+		SyncMechanism:    "coordination revision store plus request or watcher refresh",
 		FailureStrategy:  FailureStrategyReturnVisibleError,
 	}
 }
 
-// recordProcessSuccess updates process-level diagnostics after a successful
-// local freshness observation.
-func recordProcessSuccess(
-	key revisionKey,
-	localRevision int64,
-	sharedRevision int64,
-	now time.Time,
-) {
-	processCoordinationStatuses.Lock()
-	status := processCoordinationStatuses.values[key]
-	status.localRevision = maxInt64(status.localRevision, localRevision)
-	status.sharedRevision = maxInt64(status.sharedRevision, sharedRevision)
-	status.lastSyncedAt = now
-	status.recentError = ""
-	status.recentErrorAt = time.Time{}
-	processCoordinationStatuses.values[key] = status
-	processCoordinationStatuses.Unlock()
-}
-
-// recordProcessSharedRevision updates process-level diagnostics for shared
-// revision reads that do not imply local refresh completion.
-func recordProcessSharedRevision(key revisionKey, sharedRevision int64) {
-	processCoordinationStatuses.Lock()
-	status := processCoordinationStatuses.values[key]
-	status.sharedRevision = maxInt64(status.sharedRevision, sharedRevision)
-	processCoordinationStatuses.values[key] = status
-	processCoordinationStatuses.Unlock()
-}
-
-// recordProcessFailure stores the latest process-level coordination failure.
-func recordProcessFailure(key revisionKey, err error) {
-	if err == nil {
-		return
+// bumpLocalRevision increments one instance-local domain/scope revision.
+func (s *serviceImpl) bumpLocalRevision(key revisionKey) int64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.localRevisions == nil {
+		s.localRevisions = make(map[revisionKey]int64)
 	}
-	processCoordinationStatuses.Lock()
-	status := processCoordinationStatuses.values[key]
-	status.recentError = err.Error()
-	status.recentErrorAt = time.Now()
-	processCoordinationStatuses.values[key] = status
-	processCoordinationStatuses.Unlock()
-}
-
-// processStatusSnapshot returns the current process-level diagnostic row for a
-// domain/scope key.
-func processStatusSnapshot(key revisionKey) coordinationStatus {
-	processCoordinationStatuses.RLock()
-	status := processCoordinationStatuses.values[key]
-	processCoordinationStatuses.RUnlock()
-	return status
-}
-
-// bumpLocalRevision increments one process-local domain/scope revision.
-func bumpLocalRevision(key revisionKey) int64 {
-	processLocalRevisions.Lock()
-	defer processLocalRevisions.Unlock()
-	processLocalRevisions.values[key]++
-	if processLocalRevisions.values[key] <= 0 {
-		processLocalRevisions.values[key] = 1
+	s.localRevisions[key]++
+	if s.localRevisions[key] <= 0 {
+		s.localRevisions[key] = 1
 	}
-	return processLocalRevisions.values[key]
+	return s.localRevisions[key]
 }
 
-// currentLocalRevision returns one initialized process-local revision.
-func currentLocalRevision(key revisionKey) int64 {
-	processLocalRevisions.Lock()
-	defer processLocalRevisions.Unlock()
-	revision := processLocalRevisions.values[key]
+// currentLocalRevision returns one initialized instance-local revision.
+func (s *serviceImpl) currentLocalRevision(key revisionKey) int64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.localRevisions == nil {
+		s.localRevisions = make(map[revisionKey]int64)
+	}
+	revision := s.localRevisions[key]
 	if revision <= 0 {
 		revision = 1
-		processLocalRevisions.values[key] = revision
+		s.localRevisions[key] = revision
 	}
 	return revision
 }

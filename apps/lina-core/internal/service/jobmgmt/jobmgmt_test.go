@@ -17,7 +17,6 @@ import (
 	hostconfig "lina-core/internal/service/config"
 	"lina-core/internal/service/datascope"
 	i18nsvc "lina-core/internal/service/i18n"
-	"lina-core/internal/service/jobhandler"
 	"lina-core/internal/service/jobmeta"
 	"lina-core/internal/service/role"
 	"lina-core/pkg/bizerr"
@@ -174,8 +173,8 @@ func (noopCleaner) CleanupDueLogs(ctx context.Context) (int64, error) { return 0
 func newTestService(t *testing.T) *serviceImpl {
 	t.Helper()
 
-	registry := jobhandler.New()
-	if err := jobhandler.RegisterHostHandlers(registry, noopCleaner{}); err != nil {
+	registry := NewRegistry()
+	if err := RegisterHostHandlers(registry, noopCleaner{}); err != nil {
 		t.Fatalf("expected host handler registration to succeed, got error: %v", err)
 	}
 	return newTestServiceWithExplicitDependencies(t, registry, noopScheduler{})
@@ -185,13 +184,13 @@ func newTestService(t *testing.T) *serviceImpl {
 // explicit registry and scheduler dependencies for lifecycle-cascade tests.
 func newTestServiceWithRegistry(
 	t *testing.T,
-	registry jobhandler.Registry,
+	registry Registry,
 	scheduler *trackingScheduler,
 ) *serviceImpl {
 	t.Helper()
 
 	if registry == nil {
-		registry = jobhandler.New()
+		registry = NewRegistry()
 	}
 	if scheduler == nil {
 		scheduler = &trackingScheduler{}
@@ -203,18 +202,18 @@ func newTestServiceWithRegistry(
 // through the same explicit dependency path used by HTTP startup.
 func newTestServiceWithExplicitDependencies(
 	t *testing.T,
-	registry jobhandler.Registry,
+	registry Registry,
 	scheduler Scheduler,
 ) *serviceImpl {
 	t.Helper()
 
 	var (
 		bizCtxSvc = bizctx.New()
-		configSvc = hostconfig.New()
-		i18nSvc   = i18nsvc.New(bizCtxSvc, configSvc, cachecoord.Default(nil))
+		configSvc = hostconfig.New(nil)
+		i18nSvc   = i18nsvc.New(bizCtxSvc, configSvc, cachecoord.New(nil, nil))
 		orgCapSvc = orgspi.New(nil, nil, nil)
 		tenantSvc = tenantspi.New(nil, nil, nil, bizCtxSvc)
-		roleSvc   = role.New(nil, bizCtxSvc, configSvc, i18nSvc, orgCapSvc, tenantSvc)
+		roleSvc   = role.New(nil, bizCtxSvc, configSvc, i18nSvc, orgCapSvc, tenantSvc, cachecoord.New(nil, nil))
 		scopeSvc  = datascope.New(bizCtxSvc, roleSvc, orgCapSvc.Scope())
 	)
 	roleSvc.SetDataScopeService(scopeSvc)
@@ -227,13 +226,13 @@ func setJobMgmtTestBizCtx(svc *serviceImpl, bizCtxSvc bizctx.Service) {
 	svc.bizCtxSvc = bizCtxSvc
 	configSvc := svc.configSvc
 	if configSvc == nil {
-		configSvc = hostconfig.New()
+		configSvc = hostconfig.New(nil)
 	}
 	var (
-		i18nSvc   = i18nsvc.New(bizCtxSvc, configSvc, cachecoord.Default(nil))
+		i18nSvc   = i18nsvc.New(bizCtxSvc, configSvc, cachecoord.New(nil, nil))
 		orgCapSvc = orgspi.New(nil, nil, nil)
 		tenantSvc = tenantspi.New(nil, nil, nil, bizCtxSvc)
-		roleSvc   = role.New(nil, bizCtxSvc, configSvc, i18nSvc, orgCapSvc, tenantSvc)
+		roleSvc   = role.New(nil, bizCtxSvc, configSvc, i18nSvc, orgCapSvc, tenantSvc, cachecoord.New(nil, nil))
 		scopeSvc  = datascope.New(bizCtxSvc, roleSvc, orgCapSvc.Scope())
 	)
 	roleSvc.SetDataScopeService(scopeSvc)

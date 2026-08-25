@@ -12,16 +12,27 @@ import (
 // Service defines the notify service contract.
 type Service interface {
 	// InboxUnreadCount returns the unread inbox delivery count for one user.
+	// A missing or non-positive userID returns CodeNotifyNotAuthenticated.
 	InboxUnreadCount(ctx context.Context, userID int64) (int, error)
-	// InboxList returns one paged inbox list for the current user.
+	// InboxList returns one paged inbox list for the requested user.
+	// A missing or non-positive userID returns CodeNotifyNotAuthenticated.
 	InboxList(ctx context.Context, in InboxListInput) (*InboxListOutput, error)
-	// InboxMarkRead marks one inbox delivery as read for the current user.
+	// InboxGet returns one inbox delivery detail owned by the requested user.
+	// A missing or non-positive userID returns CodeNotifyNotAuthenticated.
+	// A missing delivery or a delivery owned by another user returns
+	// CodeNotifyInboxNotFound.
+	InboxGet(ctx context.Context, userID int64, deliveryID int64) (*InboxDetail, error)
+	// InboxMarkRead marks one inbox delivery as read for the requested user.
+	// A missing or non-positive userID returns CodeNotifyNotAuthenticated.
 	InboxMarkRead(ctx context.Context, userID int64, deliveryID int64) error
-	// InboxMarkAllRead marks all unread inbox deliveries as read for the current user.
+	// InboxMarkAllRead marks all unread inbox deliveries as read for the requested user.
+	// A missing or non-positive userID returns CodeNotifyNotAuthenticated.
 	InboxMarkAllRead(ctx context.Context, userID int64) error
-	// InboxDelete soft-deletes one inbox delivery for the current user.
+	// InboxDelete soft-deletes one inbox delivery for the requested user.
+	// A missing or non-positive userID returns CodeNotifyNotAuthenticated.
 	InboxDelete(ctx context.Context, userID int64, deliveryID int64) error
-	// InboxClear soft-deletes all inbox deliveries for the current user.
+	// InboxClear soft-deletes all inbox deliveries for the requested user.
+	// A missing or non-positive userID returns CodeNotifyNotAuthenticated.
 	InboxClear(ctx context.Context, userID int64) error
 	// DeleteBySource removes notify deliveries and messages for the given business source identifiers.
 	DeleteBySource(ctx context.Context, sourceType SourceType, sourceIDs []string) error
@@ -128,6 +139,26 @@ type InboxListItem struct {
 	// ReadAt is the optional read timestamp.
 	ReadAt *time.Time
 	// CreatedAt is the inbox delivery creation timestamp.
+	CreatedAt *time.Time
+}
+
+// InboxDetail is one current-user inbox message preview payload.
+type InboxDetail struct {
+	// Id is the notify delivery identifier.
+	Id int64
+	// Title is the message title.
+	Title string
+	// CategoryCode is the opaque sender-declared category code.
+	CategoryCode string
+	// SourceType is the originating business source type.
+	SourceType string
+	// SourceID is the originating business record identifier.
+	SourceID string
+	// Content is the renderable message body.
+	Content string
+	// CreatedByName is the sender display name.
+	CreatedByName string
+	// CreatedAt is the message creation timestamp.
 	CreatedAt *time.Time
 }
 

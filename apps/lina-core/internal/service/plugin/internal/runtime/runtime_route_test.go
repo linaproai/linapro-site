@@ -139,7 +139,7 @@ func TestTouchDynamicRouteSessionKeepsExistingSessionWhenTimestampDoesNotChange(
 func TestDynamicRouteIdentitySnapshotFiltersRolesByTokenTenant(t *testing.T) {
 	var (
 		ctx          = context.Background()
-		service      = &serviceImpl{configSvc: routeTestJwtConfig{Service: configsvc.New(), secret: "route-tenant-secret"}, sessionStore: session.NewDBStore()}
+		service      = &serviceImpl{configSvc: routeTestJwtConfig{Service: configsvc.New(nil), secret: "route-tenant-secret"}, sessionStore: session.NewDBStore()}
 		tenantAID    = 61001
 		actingUserID = 9001
 		tokenID      = fmt.Sprintf("plugin-dev-dynamic-route-tenant-token-%d", time.Now().UnixNano())
@@ -214,7 +214,7 @@ func TestDynamicRouteIdentitySnapshotFiltersRolesByTokenTenant(t *testing.T) {
 // only accept access JWTs and cannot be called with refresh tokens.
 func TestParseDynamicRouteTokenRejectsRefreshToken(t *testing.T) {
 	ctx := context.Background()
-	service := &serviceImpl{configSvc: routeTestJwtConfig{Service: configsvc.New(), secret: "route-token-secret"}, sessionStore: session.NewDBStore()}
+	service := &serviceImpl{configSvc: routeTestJwtConfig{Service: configsvc.New(nil), secret: "route-token-secret"}, sessionStore: session.NewDBStore()}
 
 	testCases := []struct {
 		name       string

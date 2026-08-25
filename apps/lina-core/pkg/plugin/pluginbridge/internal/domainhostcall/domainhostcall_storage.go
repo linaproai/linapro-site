@@ -1,5 +1,5 @@
 // This file implements the guest-side storage host-service client using the
-// injected raw host-service invoker and existing protocol codecs.
+// injected raw host-service invoker and JSON envelopes.
 
 package domainhostcall
 
@@ -52,52 +52,44 @@ func (s *storageService) Put(_ context.Context, in storagecap.PutInput) (*storag
 }
 
 func (s *storageService) putDirect(in storagecap.PutInput, body []byte) (*storagecap.PutOutput, error) {
-	request := &protocol.HostServiceStoragePutRequest{
-		Path:        in.Path,
-		Body:        body,
-		ContentType: in.ContentType,
-		Overwrite:   in.Overwrite,
-	}
-	payload, err := s.callHostService(
+	response := &protocol.HostServiceStoragePutResponse{}
+	err := s.callHostServiceJSONRequest(
 		protocol.HostServiceStorage,
 		protocol.HostServiceMethodStoragePut,
 		in.Path,
 		"",
-		protocol.MarshalHostServiceStoragePutRequest(request),
+		protocol.HostServiceStoragePutRequest{
+			Path:        in.Path,
+			Body:        body,
+			ContentType: in.ContentType,
+			Overwrite:   in.Overwrite,
+		},
+		response,
 	)
 	if err != nil {
 		return nil, err
-	}
-	response, err := protocol.UnmarshalHostServiceStoragePutResponse(payload)
-	if err != nil {
-		return nil, err
-	}
-	if response == nil {
-		return nil, nil
 	}
 	return &storagecap.PutOutput{Object: storageObjectFromWire(response.Object)}, nil
 }
 
 func (s *storageService) putChunked(in storagecap.PutInput, body io.Reader) (output *storagecap.PutOutput, err error) {
-	initPayload, err := s.callHostService(
+	initResponse := &protocol.HostServiceStoragePutInitResponse{}
+	err = s.callHostServiceJSONRequest(
 		protocol.HostServiceStorage,
 		protocol.HostServiceMethodStoragePutInit,
 		in.Path,
 		"",
-		protocol.MarshalHostServiceStoragePutInitRequest(&protocol.HostServiceStoragePutInitRequest{
+		protocol.HostServiceStoragePutInitRequest{
 			Path:        in.Path,
 			ContentType: in.ContentType,
 			Overwrite:   in.Overwrite,
-		}),
+		},
+		initResponse,
 	)
 	if err != nil {
 		return nil, err
 	}
-	initResponse, err := protocol.UnmarshalHostServiceStoragePutInitResponse(initPayload)
-	if err != nil {
-		return nil, err
-	}
-	if initResponse == nil || initResponse.UploadID == "" {
+	if initResponse.UploadID == "" {
 		return nil, gerror.New("storage upload init response missing upload id")
 	}
 
@@ -139,69 +131,59 @@ func (s *storageService) putChunked(in storagecap.PutInput, body io.Reader) (out
 		}
 	}
 
-	commitPayload, err := s.callHostService(
+	commitResponse := &protocol.HostServiceStoragePutCommitResponse{}
+	err = s.callHostServiceJSONRequest(
 		protocol.HostServiceStorage,
 		protocol.HostServiceMethodStoragePutCommit,
 		in.Path,
 		"",
-		protocol.MarshalHostServiceStoragePutCommitRequest(&protocol.HostServiceStoragePutCommitRequest{
+		protocol.HostServiceStoragePutCommitRequest{
 			Path:     in.Path,
 			UploadID: uploadID,
 			Size:     offset,
-		}),
+		},
+		commitResponse,
 	)
-	if err != nil {
-		return nil, err
-	}
-	commitResponse, err := protocol.UnmarshalHostServiceStoragePutCommitResponse(commitPayload)
 	if err != nil {
 		return nil, err
 	}
 	abortUpload = false
-	if commitResponse == nil {
-		return nil, nil
-	}
 	return &storagecap.PutOutput{Object: storageObjectFromWire(commitResponse.Object)}, nil
 }
 
 func (s *storageService) putChunk(path string, uploadID string, offset int64, body []byte) (int64, error) {
-	payload, err := s.callHostService(
+	response := &protocol.HostServiceStoragePutChunkResponse{}
+	err := s.callHostServiceJSONRequest(
 		protocol.HostServiceStorage,
 		protocol.HostServiceMethodStoragePutChunk,
 		path,
 		"",
-		protocol.MarshalHostServiceStoragePutChunkRequest(&protocol.HostServiceStoragePutChunkRequest{
+		protocol.HostServiceStoragePutChunkRequest{
 			Path:     path,
 			UploadID: uploadID,
 			Offset:   offset,
 			Body:     body,
-		}),
+		},
+		response,
 	)
 	if err != nil {
 		return 0, err
-	}
-	response, err := protocol.UnmarshalHostServiceStoragePutChunkResponse(payload)
-	if err != nil {
-		return 0, err
-	}
-	if response == nil {
-		return 0, gerror.New("storage upload chunk response is empty")
 	}
 	return response.NextOffset, nil
 }
 
 func (s *storageService) abortStorageUpload(path string, uploadID string) error {
-	_, err := s.callHostService(
+	return s.callHostServiceJSONRequest(
 		protocol.HostServiceStorage,
 		protocol.HostServiceMethodStoragePutAbort,
 		path,
 		"",
-		protocol.MarshalHostServiceStoragePutAbortRequest(&protocol.HostServiceStoragePutAbortRequest{
+		protocol.HostServiceStoragePutAbortRequest{
 			Path:     path,
 			UploadID: uploadID,
-		}),
+		},
+		nil,
 	)
-	return err
 }
 
 func readStorageDirectBody(body io.Reader, maxBytes int64) ([]byte, bool, error) {
@@ -218,22 +200,19 @@ func readStorageDirectBody(body io.Reader, maxBytes int64) ([]byte, bool, error)
 
 // Get reads one governed storage object under the given logical path.
 func (s *storageService) Get(_ context.Context, in storagecap.GetInput) (*storagecap.GetOutput, error) {
-	request := &protocol.HostServiceStorageGetRequest{Path: in.Path}
-	payload, err := s.callHostService(
+	response := &protocol.HostServiceStorageGetResponse{}
+	err := s.callHostServiceJSONRequest(
 		protocol.HostServiceStorage,
 		protocol.HostServiceMethodStorageGet,
 		in.Path,
 		"",
-		protocol.MarshalHostServiceStorageGetRequest(request),
+		protocol.HostServiceStorageGetRequest{Path: in.Path},
+		response,
 	)
 	if err != nil {
 		return nil, err
 	}
-	response, err := protocol.UnmarshalHostServiceStorageGetResponse(payload)
-	if err != nil {
-		return nil, err
-	}
-	if response == nil || !response.Found {
+	if !response.Found {
 		return &storagecap.GetOutput{Found: false}, nil
 	}
 	return &storagecap.GetOutput{
@@ -245,15 +224,14 @@ func (s *storageService) Get(_ context.Context, in storagecap.GetInput) (*storag
 
 // Delete removes one governed storage object under the given logical path.
 func (s *storageService) Delete(_ context.Context, in storagecap.DeleteInput) error {
-	request := &protocol.HostServiceStorageDeleteRequest{Path: in.Path}
-	_, err := s.callHostService(
+	return s.callHostServiceJSONRequest(
 		protocol.HostServiceStorage,
 		protocol.HostServiceMethodStorageDelete,
 		in.Path,
 		"",
-		protocol.MarshalHostServiceStorageDeleteRequest(request),
+		protocol.HostServiceStorageDeleteRequest{Path: in.Path},
+		nil,
 	)
-	return err
 }
 
 // DeleteMany removes governed storage objects under explicit logical paths.
@@ -270,30 +248,24 @@ func (s *storageService) DeleteMany(_ context.Context, in storagecap.DeleteManyI
 
 // List lists governed storage objects under one logical path prefix.
 func (s *storageService) List(_ context.Context, in storagecap.ListInput) (*storagecap.ListOutput, error) {
-	request := &protocol.HostServiceStorageListRequest{
-		Prefix: in.Prefix,
-		Limit:  uint32(in.Limit),
-	}
-	payload, err := s.callHostService(
+	response := &protocol.HostServiceStorageListResponse{}
+	err := s.callHostServiceJSONRequest(
 		protocol.HostServiceStorage,
 		protocol.HostServiceMethodStorageList,
 		in.Prefix,
 		"",
-		protocol.MarshalHostServiceStorageListRequest(request),
+		protocol.HostServiceStorageListRequest{
+			Prefix: in.Prefix,
+			Limit:  uint32(in.Limit),
+		},
+		response,
 	)
-	if err != nil {
-		return nil, err
-	}
-	response, err := protocol.UnmarshalHostServiceStorageListResponse(payload)
 	if err != nil {
 		return nil, err
 	}
 	output := &storagecap.ListOutput{
 		Objects: []*storagecap.Object{},
 		Limit:   storageListEffectiveLimit(in.Limit),
-	}
-	if response == nil {
-		return output, nil
 	}
 	for _, object := range response.Objects {
 		output.Objects = append(output.Objects, storageObjectFromWire(object))
@@ -335,22 +307,19 @@ func (s *storageService) ListCursor(_ context.Context, in storagecap.ListCursorI
 
 // Stat reads metadata for one governed storage object under the given logical path.
 func (s *storageService) Stat(_ context.Context, in storagecap.StatInput) (*storagecap.StatOutput, error) {
-	request := &protocol.HostServiceStorageStatRequest{Path: in.Path}
-	payload, err := s.callHostService(
+	response := &protocol.HostServiceStorageStatResponse{}
+	err := s.callHostServiceJSONRequest(
 		protocol.HostServiceStorage,
 		protocol.HostServiceMethodStorageStat,
 		in.Path,
 		"",
-		protocol.MarshalHostServiceStorageStatRequest(request),
+		protocol.HostServiceStorageStatRequest{Path: in.Path},
+		response,
 	)
 	if err != nil {
 		return nil, err
 	}
-	response, err := protocol.UnmarshalHostServiceStorageStatResponse(payload)
-	if err != nil {
-		return nil, err
-	}
-	if response == nil || !response.Found {
+	if !response.Found {
 		return &storagecap.StatOutput{Found: false}, nil
 	}
 	return &storagecap.StatOutput{Object: storageObjectFromWire(response.Object), Found: true}, nil

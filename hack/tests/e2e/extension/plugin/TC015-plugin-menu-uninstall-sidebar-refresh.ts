@@ -28,10 +28,8 @@ function publicFrontendSettings() {
     },
     auth: {
       loginSubtitle: '',
-      panelLayout: 'panel-right',
       pageDesc: '',
       pageTitle: '',
-      sloganImage: '',
     },
     cron: {
       logRetention: {
@@ -48,7 +46,6 @@ function publicFrontendSettings() {
       },
     },
     ui: {
-      layout: 'sidebar-mixed-nav',
       themeMode: 'light',
       watermarkContent: '',
       watermarkEnabled: false,
@@ -66,15 +63,16 @@ function menuRoutes(includePluginMenu: boolean) {
   const pluginMenus = includePluginMenu
     ? [
         {
-          component: 'system/plugin/dynamic-page',
-          meta: {
-            authority: [pluginID],
-            icon: 'lucide:plug',
-            order: 50,
-            title: pluginMenuName,
-          },
-          name: 'PluginMenuUninstallSidebarRefreshE2E',
+          id: 23,
+          openMode: 'page',
+          parentId: 20,
           path: 'plugin-menu-refresh-e2e',
+          perms: pluginID,
+          icon: 'lucide:plug',
+          sort: 50,
+          title: pluginMenuName,
+          type: 'M',
+          visible: 1,
         },
       ]
     : [];
@@ -83,45 +81,51 @@ function menuRoutes(includePluginMenu: boolean) {
     {
       children: [
         {
-          component: 'dashboard/analytics/index',
-          meta: {
-            icon: 'lucide:area-chart',
-            title: 'page.dashboard.analytics',
-          },
-          name: 'Analytics',
+          id: 2,
+          openMode: 'page',
+          parentId: 1,
           path: '/dashboard/analytics',
+          icon: 'lucide:area-chart',
+          resource: 'dashboard/analytics/index',
+          title: 'page.dashboard.analytics',
+          type: 'M',
+          visible: 1,
         },
       ],
-      component: 'BasicLayout',
-      meta: {
-        icon: 'lucide:layout-dashboard',
-        order: -1,
-        title: 'page.dashboard.title',
-      },
-      name: 'Dashboard',
+      id: 1,
+      openMode: 'page',
+      parentId: 0,
       path: '/dashboard',
+      icon: 'lucide:layout-dashboard',
+      sort: -1,
+      title: 'page.dashboard.title',
+      type: 'D',
+      visible: 1,
     },
     {
       children: [
         {
-          component: 'system/plugin/index',
-          meta: {
-            icon: 'lucide:plug',
-            title: 'page.routes.system.pluginManagement',
-          },
-          name: 'PluginManagement',
+          id: 21,
+          openMode: 'page',
+          parentId: 20,
           path: '/system/plugin',
+          icon: 'lucide:plug',
+          resource: 'system/plugin/index',
+          title: 'page.routes.system.pluginManagement',
+          type: 'M',
+          visible: 1,
         },
         ...pluginMenus,
       ],
-      component: 'BasicLayout',
-      meta: {
-        icon: 'lucide:puzzle',
-        order: 40,
-        title: 'page.routes.system.extensionCenter',
-      },
-      name: 'Extension',
+      id: 20,
+      openMode: 'page',
+      parentId: 0,
       path: '/extension',
+      icon: 'lucide:puzzle',
+      sort: 40,
+      title: 'page.routes.system.extensionCenter',
+      type: 'D',
+      visible: 1,
     },
   ];
 }

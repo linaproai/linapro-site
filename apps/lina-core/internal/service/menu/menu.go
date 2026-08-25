@@ -8,8 +8,26 @@ import (
 	"lina-core/internal/model/entity"
 	i18nsvc "lina-core/internal/service/i18n"
 	"lina-core/internal/service/role"
+	"lina-core/pkg/menuview"
 	"lina-core/pkg/plugin/capability/tenantcap/tenantspi"
 )
+
+// FilterItem is the stable menu projection consumed by plugin visibility
+// filters. Callers MUST NOT pass SysMenu entities across this boundary.
+// FilterItem is the stable menu projection consumed by plugin visibility
+// filters. It aliases pkg/menuview so host modules can share one type without
+// importing the menu service.
+type FilterItem = menuview.FilterItem
+
+// FilterItemsFromEntities projects SysMenu rows into the stable filter contract.
+func FilterItemsFromEntities(menus []*entity.SysMenu) []FilterItem {
+	return menuview.FromEntities(menus)
+}
+
+// EntitiesFromFilterItems restores SysMenu rows that survived a projection filter.
+func EntitiesFromFilterItems(items []FilterItem, menus []*entity.SysMenu) []*entity.SysMenu {
+	return menuview.ToEntities(items, menus)
+}
 
 // Service defines the menu service contract.
 type Service interface {
@@ -28,7 +46,7 @@ type Service interface {
 	// return the localized root label; lookup failures degrade to an empty name
 	// for display compatibility.
 	GetParentName(ctx context.Context, parentId int) string
-	// Create creates a new menu after parent/name and icon uniqueness checks.
+	// Create creates a new menu after parent/name uniqueness checks.
 	// GoFrame fills timestamps, and successful changes notify the role service
 	// so permission/access-topology caches can refresh.
 	Create(ctx context.Context, in CreateInput) (int, error)
@@ -54,7 +72,7 @@ type Service interface {
 // menus that should not be exposed for the current host state.
 type menuFilter interface {
 	// FilterMenus returns only the menus that should remain visible.
-	FilterMenus(ctx context.Context, menus []*entity.SysMenu) []*entity.SysMenu
+	FilterMenus(ctx context.Context, menus []FilterItem) []FilterItem
 }
 
 // Ensure serviceImpl implements Service.
@@ -87,7 +105,7 @@ func New(menuFilter menuFilter, i18nSvc i18nsvc.Service, roleSvc role.Service, t
 type noopMenuFilter struct{}
 
 // FilterMenus returns the original menu list unchanged.
-func (noopMenuFilter) FilterMenus(_ context.Context, menus []*entity.SysMenu) []*entity.SysMenu {
+func (noopMenuFilter) FilterMenus(_ context.Context, menus []FilterItem) []FilterItem {
 	return menus
 }
 

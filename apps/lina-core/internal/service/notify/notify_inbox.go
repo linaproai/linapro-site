@@ -29,10 +29,19 @@ type inboxListRecord struct {
 	CreatedAt    *time.Time `json:"createdAt"`
 }
 
+// requireInboxUserID rejects inbox access when the caller did not supply an
+// authenticated user identifier.
+func requireInboxUserID(userID int64) error {
+	if userID <= 0 {
+		return bizerr.NewCode(CodeNotifyNotAuthenticated)
+	}
+	return nil
+}
+
 // InboxUnreadCount returns the unread inbox delivery count for one user.
 func (s *serviceImpl) InboxUnreadCount(ctx context.Context, userID int64) (int, error) {
-	if userID <= 0 {
-		return 0, bizerr.NewCode(CodeNotifyUserNotFound)
+	if err := requireInboxUserID(userID); err != nil {
+		return 0, err
 	}
 
 	model := dao.SysNotifyDelivery.Ctx(ctx).Where(do.SysNotifyDelivery{
@@ -47,8 +56,8 @@ func (s *serviceImpl) InboxUnreadCount(ctx context.Context, userID int64) (int, 
 
 // InboxList returns one paged inbox list for the current user.
 func (s *serviceImpl) InboxList(ctx context.Context, in InboxListInput) (*InboxListOutput, error) {
-	if in.UserID <= 0 {
-		return nil, bizerr.NewCode(CodeNotifyUserNotFound)
+	if err := requireInboxUserID(in.UserID); err != nil {
+		return nil, err
 	}
 
 	var (
@@ -114,10 +123,85 @@ func (s *serviceImpl) InboxList(ctx context.Context, in InboxListInput) (*InboxL
 	}, nil
 }
 
+// inboxDetailRecord is the joined database projection used to build one inbox
+// detail payload.
+type inboxDetailRecord struct {
+	Id            int64      `json:"id"`
+	Title         string     `json:"title"`
+	CategoryCode  string     `json:"categoryCode"`
+	SourceType    string     `json:"sourceType"`
+	SourceId      string     `json:"sourceId"`
+	Content       string     `json:"content"`
+	CreatedByName string     `json:"createdByName"`
+	CreatedAt     *time.Time `json:"createdAt"`
+}
+
+// InboxGet returns one inbox delivery detail owned by the requested user.
+func (s *serviceImpl) InboxGet(ctx context.Context, userID int64, deliveryID int64) (*InboxDetail, error) {
+	if err := requireInboxUserID(userID); err != nil {
+		return nil, err
+	}
+	if deliveryID <= 0 {
+		return nil, bizerr.NewCode(CodeNotifyInboxNotFound)
+	}
+
+	var (
+		deliveryCols = dao.SysNotifyDelivery.Columns()
+		messageCols  = dao.SysNotifyMessage.Columns()
+		userCols     = dao.SysUser.Columns()
+		deliveryTbl  = dao.SysNotifyDelivery.Table()
+		messageTbl   = dao.SysNotifyMessage.Table()
+		userTbl      = dao.SysUser.Table()
+		record       *inboxDetailRecord
+	)
+
+	model := dao.SysNotifyDelivery.Ctx(ctx).
+		LeftJoin(
+			messageTbl,
+			messageTbl+"."+messageCols.Id+"="+deliveryTbl+"."+deliveryCols.MessageId,
+		).
+		LeftJoin(
+			userTbl,
+			userTbl+"."+userCols.Id+"="+messageTbl+"."+messageCols.SenderUserId,
+		).
+		Fields(
+			deliveryTbl+"."+deliveryCols.Id+" AS id",
+			messageTbl+"."+messageCols.Title+" AS title",
+			messageTbl+"."+messageCols.CategoryCode+" AS category_code",
+			messageTbl+"."+messageCols.SourceType+" AS source_type",
+			messageTbl+"."+messageCols.SourceId+" AS source_id",
+			messageTbl+"."+messageCols.Content+" AS content",
+			userTbl+"."+userCols.Username+" AS created_by_name",
+			messageTbl+"."+messageCols.CreatedAt+" AS created_at",
+		).
+		Where(deliveryTbl+"."+deliveryCols.Id, deliveryID).
+		Where(deliveryTbl+"."+deliveryCols.UserId, userID).
+		Where(deliveryTbl+"."+deliveryCols.ChannelType, ChannelTypeInbox.String()).
+		Where(deliveryTbl+"."+deliveryCols.DeliveryStatus, DeliveryStatusSucceeded)
+	model = datascope.ApplyTenantScope(ctx, model, deliveryTbl+"."+datascope.TenantColumn)
+	err := model.Scan(&record)
+	if err != nil {
+		return nil, err
+	}
+	if record == nil {
+		return nil, bizerr.NewCode(CodeNotifyInboxNotFound)
+	}
+	return &InboxDetail{
+		Id:            record.Id,
+		Title:         record.Title,
+		CategoryCode:  record.CategoryCode,
+		SourceType:    record.SourceType,
+		SourceID:      record.SourceId,
+		Content:       record.Content,
+		CreatedByName: record.CreatedByName,
+		CreatedAt:     record.CreatedAt,
+	}, nil
+}
+
 // InboxMarkRead marks one inbox delivery as read for the current user.
 func (s *serviceImpl) InboxMarkRead(ctx context.Context, userID int64, deliveryID int64) error {
-	if userID <= 0 {
-		return bizerr.NewCode(CodeNotifyUserNotFound)
+	if err := requireInboxUserID(userID); err != nil {
+		return err
 	}
 
 	model := dao.SysNotifyDelivery.Ctx(ctx).Where(do.SysNotifyDelivery{
@@ -137,8 +221,8 @@ func (s *serviceImpl) InboxMarkRead(ctx context.Context, userID int64, deliveryI
 
 // InboxMarkAllRead marks all unread inbox deliveries as read for the current user.
 func (s *serviceImpl) InboxMarkAllRead(ctx context.Context, userID int64) error {
-	if userID <= 0 {
-		return bizerr.NewCode(CodeNotifyUserNotFound)
+	if err := requireInboxUserID(userID); err != nil {
+		return err
 	}
 
 	deliveryCols := dao.SysNotifyDelivery.Columns()
@@ -159,8 +243,8 @@ func (s *serviceImpl) InboxMarkAllRead(ctx context.Context, userID int64) error 
 
 // InboxDelete soft-deletes one inbox delivery for the current user.
 func (s *serviceImpl) InboxDelete(ctx context.Context, userID int64, deliveryID int64) error {
-	if userID <= 0 {
-		return bizerr.NewCode(CodeNotifyUserNotFound)
+	if err := requireInboxUserID(userID); err != nil {
+		return err
 	}
 
 	model := dao.SysNotifyDelivery.Ctx(ctx).Where(do.SysNotifyDelivery{
@@ -175,8 +259,8 @@ func (s *serviceImpl) InboxDelete(ctx context.Context, userID int64, deliveryID 
 
 // InboxClear soft-deletes all inbox deliveries for the current user.
 func (s *serviceImpl) InboxClear(ctx context.Context, userID int64) error {
-	if userID <= 0 {
-		return bizerr.NewCode(CodeNotifyUserNotFound)
+	if err := requireInboxUserID(userID); err != nil {
+		return err
 	}
 
 	model := dao.SysNotifyDelivery.Ctx(ctx).Where(do.SysNotifyDelivery{

@@ -12,7 +12,7 @@ import (
 func TestGetLogRetentionDaysUsesRuntimeOverride(t *testing.T) {
 	withCachedRuntimeParamValue(t, RuntimeParamKeyLogRetentionDays, "120")
 
-	days, err := New().GetLogRetentionDays(context.Background())
+	days, err := New(nil).GetLogRetentionDays(context.Background())
 	if err != nil {
 		t.Fatalf("get log retention days: %v", err)
 	}
@@ -26,7 +26,7 @@ func TestGetLogRetentionDaysUsesRuntimeOverride(t *testing.T) {
 func TestGetLogRetentionDaysUsesDefaultWhenRuntimeMissing(t *testing.T) {
 	withCachedRuntimeParamSnapshot(t, &runtimeParamSnapshot{})
 
-	days, err := New().GetLogRetentionDays(context.Background())
+	days, err := New(nil).GetLogRetentionDays(context.Background())
 	if err != nil {
 		t.Fatalf("get default log retention days: %v", err)
 	}
@@ -40,7 +40,7 @@ func TestGetLogRetentionDaysUsesDefaultWhenRuntimeMissing(t *testing.T) {
 func TestGetLogRetentionDaysReturnsInvalidRuntimeValue(t *testing.T) {
 	withCachedRuntimeParamValue(t, RuntimeParamKeyLogRetentionDays, "0")
 
-	if _, err := New().GetLogRetentionDays(context.Background()); err == nil {
+	if _, err := New(nil).GetLogRetentionDays(context.Background()); err == nil {
 		t.Fatal("expected invalid log retention days override to return an error")
 	}
 }
@@ -50,7 +50,7 @@ func TestGetLogRetentionDaysReturnsInvalidRuntimeValue(t *testing.T) {
 func TestGetRawReturnsRuntimeProtectedParameter(t *testing.T) {
 	withCachedRuntimeParamValue(t, RuntimeParamKeyLogRetentionDays, "180")
 
-	value, err := New().(*serviceImpl).GetRaw(context.Background(), RuntimeParamKeyLogRetentionDays)
+	value, err := New(nil).(*serviceImpl).GetRaw(context.Background(), RuntimeParamKeyLogRetentionDays)
 	if err != nil {
 		t.Fatalf("get raw protected runtime parameter: %v", err)
 	}
@@ -67,7 +67,7 @@ func TestGetRawReturnsRuntimeProtectedParameter(t *testing.T) {
 func TestGetRawReturnsLogRetentionDefaultWhenRuntimeMissing(t *testing.T) {
 	withCachedRuntimeParamSnapshot(t, &runtimeParamSnapshot{})
 
-	value, err := New().(*serviceImpl).GetRaw(context.Background(), RuntimeParamKeyLogRetentionDays)
+	value, err := New(nil).(*serviceImpl).GetRaw(context.Background(), RuntimeParamKeyLogRetentionDays)
 	if err != nil {
 		t.Fatalf("get raw log retention default: %v", err)
 	}

@@ -13,7 +13,6 @@ type ListResult<T> = {
 };
 
 type DictDataItem = {
-  cssClass: string;
   dictType: string;
   id: number;
   isBuiltin: number;
@@ -21,7 +20,6 @@ type DictDataItem = {
   remark: string;
   sort: number;
   status: number;
-  tagStyle: string;
   value: string;
 };
 
@@ -70,13 +68,11 @@ async function createDictData(
   const result = await expectSuccess<{ id: number }>(
     await api.post('dict/data', {
       data: {
-        cssClass: '',
         dictType,
         label,
         remark: '',
         sort,
         status: 1,
-        tagStyle: 'primary',
         value,
       },
     }),
@@ -106,13 +102,11 @@ async function updateDictData(
   await expectSuccess(
     await api.put(`dict/data/${item.id}`, {
       data: {
-        cssClass: patch.cssClass ?? item.cssClass,
         dictType: patch.dictType ?? item.dictType,
         label: patch.label ?? item.label,
         remark: patch.remark ?? item.remark,
         sort: patch.sort ?? item.sort,
         status: patch.status ?? item.status,
-        tagStyle: patch.tagStyle ?? item.tagStyle,
         value: patch.value ?? item.value,
       },
     }),

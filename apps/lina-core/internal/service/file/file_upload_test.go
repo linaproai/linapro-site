@@ -84,7 +84,7 @@ func TestCreateFromReaderSurvivesBodyClosingStorage(t *testing.T) {
 	content := "cos-upload-body-close-regression"
 	storage := &closingBodyUploadStorage{}
 	svc := &serviceImpl{
-		configSvc: hostconfig.New(),
+		configSvc: hostconfig.New(nil),
 		storage:   storage,
 		bizCtxSvc: fileScopeStaticBizCtx{ctx: &model.Context{TenantId: tenantID, UserId: userID}},
 	}
@@ -163,7 +163,7 @@ func TestCreateFromReaderFailsClosedOnStorageProviderConflict(t *testing.T) {
 		&fileConflictNoopProvider{},
 	)
 	svc := &serviceImpl{
-		configSvc: hostconfig.New(),
+		configSvc: hostconfig.New(nil),
 		storage:   storage,
 		bizCtxSvc: fileScopeStaticBizCtx{ctx: &model.Context{TenantId: tenantID, UserId: userID}},
 	}
@@ -171,7 +171,7 @@ func TestCreateFromReaderFailsClosedOnStorageProviderConflict(t *testing.T) {
 
 	// Seed a hash-dedup candidate while backend is still writable (plain local).
 	seedSvc := &serviceImpl{
-		configSvc: hostconfig.New(),
+		configSvc: hostconfig.New(nil),
 		storage:   &fileTenantUploadStorage{},
 		bizCtxSvc: fileScopeStaticBizCtx{ctx: &model.Context{TenantId: tenantID, UserId: userID}},
 	}
@@ -245,7 +245,7 @@ func TestUploadRejectsFileExceedingRuntimeMaxSize(t *testing.T) {
 	var (
 		bizCtxSvc = bizctx.New()
 		orgCapSvc = orgspi.New(nil, nil, nil)
-		svc       = New(hostconfig.New(), nil, bizCtxSvc, nil, datascope.New(bizCtxSvc, nil, orgCapSvc.Scope()))
+		svc       = New(hostconfig.New(nil), nil, bizCtxSvc, nil, datascope.New(bizCtxSvc, nil, orgCapSvc.Scope()))
 	)
 	_, err := svc.Upload(context.Background(), &UploadInput{
 		File: &ghttp.UploadFile{
@@ -334,7 +334,7 @@ func withRuntimeParamValue(t *testing.T, key string, value string) {
 func markRuntimeParamChanged(t *testing.T, ctx context.Context) {
 	t.Helper()
 
-	if err := hostconfig.New().MarkRuntimeParamsChanged(ctx); err != nil {
+	if err := hostconfig.New(nil).MarkRuntimeParamsChanged(ctx); err != nil {
 		t.Fatalf("mark runtime params changed: %v", err)
 	}
 }

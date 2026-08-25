@@ -20,7 +20,7 @@ func TestGetPluginUsesDefaultStoragePathAndClonesCachedConfig(t *testing.T) {
 		setPluginDynamicStoragePathOverride("")
 	})
 
-	svc := New()
+	svc := New(nil)
 	cfg := svc.GetPlugin(context.Background())
 	if !cfg.AllowForceUninstall {
 		t.Fatal("expected force uninstall to be enabled by default")
@@ -55,7 +55,7 @@ plugin:
 		setPluginAllowForceUninstallOverride(nil)
 	})
 
-	cfg := New().GetPlugin(context.Background())
+	cfg := New(nil).GetPlugin(context.Background())
 	if cfg.AllowForceUninstall {
 		t.Fatal("expected explicit plugin.allowForceUninstall=false to be honored")
 	}
@@ -76,7 +76,7 @@ plugin:
 		setPluginDynamicStoragePathOverride("")
 	})
 
-	svc := New()
+	svc := New(nil)
 	cfg := svc.GetPlugin(context.Background())
 	if cfg.Dynamic.StoragePath != "temp/output" {
 		t.Fatalf("expected unsupported runtime storage path to be ignored, got %q", cfg.Dynamic.StoragePath)
@@ -95,7 +95,7 @@ func TestGetPluginDynamicStoragePathUsesDefaultAndOverride(t *testing.T) {
 		setPluginDynamicStoragePathOverride("")
 	})
 
-	svc := New()
+	svc := New(nil)
 	if path := svc.GetPluginDynamicStoragePath(context.Background()); path != runtimepath.Resolve("temp/output") {
 		t.Fatalf("expected default plugin storage path temp/output, got %q", path)
 	}
@@ -139,7 +139,7 @@ plugin:
 		setPluginAutoEnableOverride(nil)
 	})
 
-	svc := New()
+	svc := New(nil)
 	cfg := svc.GetPlugin(context.Background())
 	if len(cfg.AutoEnable) != 3 {
 		t.Fatalf("expected three normalized plugin IDs, got %#v", cfg.AutoEnable)
@@ -196,7 +196,7 @@ plugin:
 		setPluginAutoEnableOverride(nil)
 	})
 
-	svc := New()
+	svc := New(nil)
 	entries := svc.GetPluginAutoEnableEntries(context.Background())
 	if len(entries) != 3 {
 		t.Fatalf("expected three normalized entries, got %#v", entries)
@@ -305,7 +305,7 @@ plugin:
 					t.Fatalf("expected panic message to contain %q, got %q", tc.wantSub, msg)
 				}
 			}()
-			svc := New()
+			svc := New(nil)
 			_ = svc.GetPluginAutoEnableEntries(context.Background())
 		})
 	}
@@ -344,7 +344,7 @@ plugin:
 		}
 	}()
 
-	_ = New().GetPlugin(context.Background())
+	_ = New(nil).GetPlugin(context.Background())
 }
 
 // TestGetPluginRejectsInvalidAutoEnableType verifies plugin.autoEnable must be
@@ -362,5 +362,5 @@ plugin:
 		}
 	}()
 
-	_ = New().GetPlugin(context.Background())
+	_ = New(nil).GetPlugin(context.Background())
 }

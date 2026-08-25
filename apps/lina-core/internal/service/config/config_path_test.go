@@ -48,7 +48,7 @@ plugin:
 		setPluginDynamicStoragePathOverride("")
 	})
 
-	svc := New()
+	svc := New(nil)
 	uploadPath := svc.GetUploadPath(context.Background())
 	if !sameFilesystemPath(t, uploadPath, filepath.Join(expectedRepoRoot, "temp", "upload")) {
 		t.Fatalf("expected upload path under repo temp, got %q", uploadPath)

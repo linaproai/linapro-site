@@ -59,7 +59,7 @@ plugin-owned 非核心能力不归属`capability.Services`。owner 插件在`app
 | --- | --- | --- |
 | `Runtime` | `pluginbridge.Default().Runtime()`或`pluginbridge.New().Runtime()` | 动态插件需要通过`WASI host-service`客户端写日志、读写状态、读取时间、生成 UUID 和读取节点身份；源码插件直接使用宿主原生日志和运行期上下文。 |
 | `Network` | `pluginbridge.Default().Network()`或`pluginbridge.New().Network()` | 动态插件需要经由 host-service 授权访问受治理的出站 HTTP；源码插件使用宿主原生 HTTP client 或注入的领域 service。 |
-| `RecordStore` | `pluginbridge.Default().RecordStore()`或`pluginbridge.New().RecordStore()`，以及`pkg/plugin/pluginbridge/recordstore` | 动态插件需要 guest 侧 facade 封装 data host-service 协议和类型化查询计划；源码插件使用自有 DAO 或 provider 接缝。 |
+| `RecordStore` | `pluginbridge.Default().RecordStore()`或`pluginbridge.New().RecordStore()`，以及`pkg/plugin/pluginbridge/recordstore` | **实验能力**。动态插件可以通过该 facade 访问已授权表；当前没有第一方插件把它当作主路径。在官方动态插件真正按表访问之前，不要继续扩展查询计划器。源码插件使用自有 DAO 或 provider 接缝。 |
 
 新增能力只有在源码插件和动态插件共享同一个稳定 core-owned 领域契约时，才应进入`capability.Services`。仅服务动态插件的 host-service client 和 guest SDK 应留在`pluginbridge`下。plugin-owned 非核心能力必须从 owner 插件的`backend/cap/<domain>cap`边界发布公开契约和 guest SDK，不得在`lina-core`中新增领域包、codec 或 dispatcher 分支。
 
@@ -124,7 +124,7 @@ Core-owned provider factory 声明归属`pluginhost.Declarations.Providers()`。
 
 声明期能力是插件的静态声明和注册输出。宿主在业务执行前使用这些内容构建治理状态。
 
-源码插件通过`pluginhost.Declarations`表达声明期契约，包括`Assets()`、`Lifecycle()`、`Hooks()`、`HTTP()`、`Jobs()`和`Access()`。
+源码插件通过`pluginhost.Declarations`表达声明期契约，并在该对象上直接注册资源、生命周期回调、钩子、HTTP 路由、任务和访问过滤。
 
 ### 路由注册：`group.Bind` 绑定控制器对象
 
@@ -261,4 +261,7 @@ hostServices:
 - 新增 core-owned host service 方法必须使用统一 JSON envelope（`HostServiceJSONRequest` / `HostServiceJSONResponse` 或空载荷）。不得为新增方法引入 dedicated binary codec。
 - 存量 dedicated codec 方法集合已冻结；catalog 治理测试会拒绝名单外的 dedicated 扩张。
 - `service` / `method` 线值常量只维护在 `pluginbridge/protocol/hostservices/wire_constants.go`。catalog 必须引用这些常量（禁止重复写 wire 字符串字面量）；catalog 测试会校验。
+- WASM 分发注册由 catalog 加各 service 的 handler 图构建。catalog 已发布但缺少 handler，或 handler 对应的 service 不在 catalog 中，都会让注册表构建失败。
+- catalog 中标记为`DynamicOnly`的 service（`runtime`、`network`、`data`）不进入`capability.Services`。动态插件通过`pluginbridge.Services`的`Runtime`、`Network`、`RecordStore`使用它们。
+- Host service 的`ResourceKind`只在`pluginbridge/protocol/hostservices`定义。能力注册表只保存相同字符串值，不再维护第二套枚举。
 - WASM 分发侧新增 JSON 方法应优先复用 `decodeCapabilityJSONRequest` 与 `capabilityJSONResponse` helper。

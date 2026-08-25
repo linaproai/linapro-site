@@ -771,6 +771,9 @@
       "inbox": {
         "recipient": {
           "required": "站内信接收用户不能为空"
+        },
+        "not": {
+          "found": "消息不存在"
         }
       },
       "payload": {

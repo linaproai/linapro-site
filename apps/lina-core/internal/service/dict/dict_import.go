@@ -28,6 +28,47 @@ func isValidDictType(typeStr string) bool {
 	return dictTypeRegex.MatchString(typeStr)
 }
 
+// dictDataImportFields holds optional dictionary-data columns after type,
+// label, and value. Tag style and CSS class are storage leftovers, not core
+// import columns.
+type dictDataImportFields struct {
+	sort   int
+	status int
+	remark string
+}
+
+// parseDictDataImportFields reads sort, status, and remark from a data-sheet
+// row. The core layout is type, label, value, sort, status, remark.
+func (s *serviceImpl) parseDictDataImportFields(ctx context.Context, row []string) (dictDataImportFields, error) {
+	fields := dictDataImportFields{status: 1}
+	if len(row) > 3 && row[3] != "" {
+		sort, err := strconv.Atoi(row[3])
+		if err != nil {
+			return dictDataImportFields{}, err
+		}
+		fields.sort = sort
+	}
+	if len(row) > 4 && s.isDictDisabledStatusInput(ctx, row[4]) {
+		fields.status = 0
+	}
+	if len(row) > 5 {
+		fields.remark = row[5]
+	}
+	return fields, nil
+}
+
+// dictDataImportHeaderItems returns the core dictionary-data import columns.
+func dictDataImportHeaderItems() []runtimeTextItem {
+	return []runtimeTextItem{
+		{Key: "artifact.dict.data.header.dictType", Fallback: "Dictionary Type"},
+		{Key: "artifact.dict.data.header.label", Fallback: "Dictionary Label"},
+		{Key: "artifact.dict.data.header.value", Fallback: "Dictionary Value"},
+		{Key: "artifact.dict.data.header.sort", Fallback: "Sort"},
+		{Key: "artifact.dict.data.header.status", Fallback: "Status"},
+		{Key: "artifact.dict.data.header.remark", Fallback: "Remark"},
+	}
+}
+
 // CombinedImportResult represents the result of combined import.
 type CombinedImportResult struct {
 	TypeSuccess int
@@ -46,8 +87,6 @@ type ImportFailItem struct {
 
 // CombinedImport imports dictionary types and data from an Excel file.
 // If updateSupport is true, existing records will be updated; otherwise, they will be skipped.
-//
-//nolint:cyclop // Import validation intentionally keeps the CSV/XLSX branch outcomes explicit for operator diagnostics.
 func (s *serviceImpl) CombinedImport(ctx context.Context, fileData []byte, updateSupport bool) (result *CombinedImportResult, err error) {
 	result = &CombinedImportResult{
 		FailList: make([]ImportFailItem, 0),
@@ -265,36 +304,15 @@ func (s *serviceImpl) CombinedImport(ctx context.Context, fileData []byte, updat
 			continue
 		}
 
-		sort := 0
-		if len(row) > 3 && row[3] != "" {
-			// Parse sort using strconv for better validation
-			var parseErr error
-			sort, parseErr = strconv.Atoi(row[3])
-			if parseErr != nil {
-				result.DataFail++
-				result.FailList = append(result.FailList, ImportFailItem{
-					Sheet:  dataSheet,
-					Row:    i + 1,
-					Reason: s.runtimeText(ctx, "artifact.dict.import.failure.sortInvalid", "Sort value must be a valid integer"),
-				})
-				continue
-			}
-		}
-		tagStyle := ""
-		if len(row) > 4 {
-			tagStyle = row[4]
-		}
-		cssClass := ""
-		if len(row) > 5 {
-			cssClass = row[5]
-		}
-		status := 1
-		if len(row) > 6 && s.isDictDisabledStatusInput(ctx, row[6]) {
-			status = 0
-		}
-		remark := ""
-		if len(row) > 7 {
-			remark = row[7]
+		fields, parseErr := s.parseDictDataImportFields(ctx, row)
+		if parseErr != nil {
+			result.DataFail++
+			result.FailList = append(result.FailList, ImportFailItem{
+				Sheet:  dataSheet,
+				Row:    i + 1,
+				Reason: s.runtimeText(ctx, "artifact.dict.import.failure.sortInvalid", "Sort value must be a valid integer"),
+			})
+			continue
 		}
 		if err := assertDictTenantOverrideAllowed(ctx, dictType); err != nil {
 			result.DataFail++
@@ -338,12 +356,10 @@ func (s *serviceImpl) CombinedImport(ctx context.Context, fileData []byte, updat
 				_, err := dao.SysDictData.Ctx(ctx).
 					Where(do.SysDictData{Id: existingData.Id}).
 					Data(do.SysDictData{
-						Label:    label,
-						Sort:     sort,
-						TagStyle: tagStyle,
-						CssClass: cssClass,
-						Status:   status,
-						Remark:   remark,
+						Label:  label,
+						Sort:   fields.sort,
+						Status: fields.status,
+						Remark: fields.remark,
 					}).Update()
 				if err != nil {
 					result.DataFail++
@@ -371,11 +387,9 @@ func (s *serviceImpl) CombinedImport(ctx context.Context, fileData []byte, updat
 		data.DictType = dictType
 		data.Label = label
 		data.Value = value
-		data.Sort = sort
-		data.TagStyle = tagStyle
-		data.CssClass = cssClass
-		data.Status = status
-		data.Remark = remark
+		data.Sort = fields.sort
+		data.Status = fields.status
+		data.Remark = fields.remark
 		_, err = dao.SysDictData.Ctx(ctx).Data(data).InsertAndGetId()
 		if err != nil {
 			result.DataFail++
@@ -436,16 +450,7 @@ func (s *serviceImpl) CombinedImportTemplate(ctx context.Context) (data []byte, 
 		return nil, err
 	}
 
-	dataHeaders := s.runtimeTexts(ctx, []runtimeTextItem{
-		{Key: "artifact.dict.data.header.dictType", Fallback: "Dictionary Type"},
-		{Key: "artifact.dict.data.header.label", Fallback: "Dictionary Label"},
-		{Key: "artifact.dict.data.header.value", Fallback: "Dictionary Value"},
-		{Key: "artifact.dict.data.header.sort", Fallback: "Sort"},
-		{Key: "artifact.dict.data.header.tagStyle", Fallback: "Tag Style"},
-		{Key: "artifact.dict.data.header.cssClass", Fallback: "CSS Class"},
-		{Key: "artifact.dict.data.header.status", Fallback: "Status"},
-		{Key: "artifact.dict.data.header.remark", Fallback: "Remark"},
-	})
+	dataHeaders := s.runtimeTexts(ctx, dictDataImportHeaderItems())
 	for i, h := range dataHeaders {
 		if err = setCellValue(f, dataSheet, i+1, 1, h); err != nil {
 			return nil, err
@@ -465,16 +470,10 @@ func (s *serviceImpl) CombinedImportTemplate(ctx context.Context) (data []byte, 
 	if err = setCellValueByName(f, dataSheet, "D2", "1"); err != nil {
 		return nil, err
 	}
-	if err = setCellValueByName(f, dataSheet, "E2", "primary"); err != nil {
+	if err = setCellValueByName(f, dataSheet, "E2", s.dictStatusText(ctx, 1)); err != nil {
 		return nil, err
 	}
-	if err = setCellValueByName(f, dataSheet, "F2", ""); err != nil {
-		return nil, err
-	}
-	if err = setCellValueByName(f, dataSheet, "G2", s.dictStatusText(ctx, 1)); err != nil {
-		return nil, err
-	}
-	if err = setCellValueByName(f, dataSheet, "H2", s.runtimeText(ctx, "artifact.dict.importTemplate.example.maleRemark", "Male")); err != nil {
+	if err = setCellValueByName(f, dataSheet, "F2", s.runtimeText(ctx, "artifact.dict.importTemplate.example.maleRemark", "Male")); err != nil {
 		return nil, err
 	}
 
@@ -490,16 +489,10 @@ func (s *serviceImpl) CombinedImportTemplate(ctx context.Context) (data []byte, 
 	if err = setCellValueByName(f, dataSheet, "D3", "2"); err != nil {
 		return nil, err
 	}
-	if err = setCellValueByName(f, dataSheet, "E3", "danger"); err != nil {
+	if err = setCellValueByName(f, dataSheet, "E3", s.dictStatusText(ctx, 1)); err != nil {
 		return nil, err
 	}
-	if err = setCellValueByName(f, dataSheet, "F3", ""); err != nil {
-		return nil, err
-	}
-	if err = setCellValueByName(f, dataSheet, "G3", s.dictStatusText(ctx, 1)); err != nil {
-		return nil, err
-	}
-	if err = setCellValueByName(f, dataSheet, "H3", s.runtimeText(ctx, "artifact.dict.importTemplate.example.femaleRemark", "Female")); err != nil {
+	if err = setCellValueByName(f, dataSheet, "F3", s.runtimeText(ctx, "artifact.dict.importTemplate.example.femaleRemark", "Female")); err != nil {
 		return nil, err
 	}
 
@@ -731,34 +724,14 @@ func (s *serviceImpl) DataImport(ctx context.Context, file io.Reader, updateSupp
 			continue
 		}
 
-		sort := 0
-		if len(row) > 3 && row[3] != "" {
-			var parseErr error
-			sort, parseErr = strconv.Atoi(row[3])
-			if parseErr != nil {
-				result.Fail++
-				result.FailList = append(result.FailList, ImportFailItemRecord{
-					Row:    i + 1,
-					Reason: s.runtimeText(ctx, "artifact.dict.import.failure.sortInvalid", "Sort value must be a valid integer"),
-				})
-				continue
-			}
-		}
-		tagStyle := ""
-		if len(row) > 4 {
-			tagStyle = row[4]
-		}
-		cssClass := ""
-		if len(row) > 5 {
-			cssClass = row[5]
-		}
-		status := 1
-		if len(row) > 6 && s.isDictDisabledStatusInput(ctx, row[6]) {
-			status = 0
-		}
-		remark := ""
-		if len(row) > 7 {
-			remark = row[7]
+		fields, parseErr := s.parseDictDataImportFields(ctx, row)
+		if parseErr != nil {
+			result.Fail++
+			result.FailList = append(result.FailList, ImportFailItemRecord{
+				Row:    i + 1,
+				Reason: s.runtimeText(ctx, "artifact.dict.import.failure.sortInvalid", "Sort value must be a valid integer"),
+			})
+			continue
 		}
 		if err := assertDictTenantOverrideAllowed(ctx, dictType); err != nil {
 			result.Fail++
@@ -799,12 +772,10 @@ func (s *serviceImpl) DataImport(ctx context.Context, file io.Reader, updateSupp
 				_, err := dao.SysDictData.Ctx(ctx).
 					Where(do.SysDictData{Id: existingData.Id}).
 					Data(do.SysDictData{
-						Label:    label,
-						Sort:     sort,
-						TagStyle: tagStyle,
-						CssClass: cssClass,
-						Status:   status,
-						Remark:   remark,
+						Label:  label,
+						Sort:   fields.sort,
+						Status: fields.status,
+						Remark: fields.remark,
 					}).Update()
 				if err != nil {
 					result.Fail++
@@ -830,11 +801,9 @@ func (s *serviceImpl) DataImport(ctx context.Context, file io.Reader, updateSupp
 		data.DictType = dictType
 		data.Label = label
 		data.Value = value
-		data.Sort = sort
-		data.TagStyle = tagStyle
-		data.CssClass = cssClass
-		data.Status = status
-		data.Remark = remark
+		data.Sort = fields.sort
+		data.Status = fields.status
+		data.Remark = fields.remark
 		_, err = dao.SysDictData.Ctx(ctx).Data(data).InsertAndGetId()
 		if err != nil {
 			result.Fail++
@@ -897,16 +866,7 @@ func (s *serviceImpl) GenerateDataImportTemplate(ctx context.Context) (data []by
 	defer closeExcelFile(ctx, f, &err)
 
 	sheet := "Sheet1"
-	headers := s.runtimeTexts(ctx, []runtimeTextItem{
-		{Key: "artifact.dict.data.header.dictType", Fallback: "Dictionary Type"},
-		{Key: "artifact.dict.data.header.label", Fallback: "Dictionary Label"},
-		{Key: "artifact.dict.data.header.value", Fallback: "Dictionary Value"},
-		{Key: "artifact.dict.data.header.sort", Fallback: "Sort"},
-		{Key: "artifact.dict.data.header.tagStyle", Fallback: "Tag Style"},
-		{Key: "artifact.dict.data.header.cssClass", Fallback: "CSS Class"},
-		{Key: "artifact.dict.data.header.status", Fallback: "Status"},
-		{Key: "artifact.dict.data.header.remark", Fallback: "Remark"},
-	})
+	headers := s.runtimeTexts(ctx, dictDataImportHeaderItems())
 	for i, h := range headers {
 		if err = setCellValue(f, sheet, i+1, 1, h); err != nil {
 			return nil, err
@@ -926,16 +886,10 @@ func (s *serviceImpl) GenerateDataImportTemplate(ctx context.Context) (data []by
 	if err = setCellValueByName(f, sheet, "D2", "1"); err != nil {
 		return nil, err
 	}
-	if err = setCellValueByName(f, sheet, "E2", "primary"); err != nil {
+	if err = setCellValueByName(f, sheet, "E2", s.dictStatusText(ctx, 1)); err != nil {
 		return nil, err
 	}
-	if err = setCellValueByName(f, sheet, "F2", ""); err != nil {
-		return nil, err
-	}
-	if err = setCellValueByName(f, sheet, "G2", s.dictStatusText(ctx, 1)); err != nil {
-		return nil, err
-	}
-	if err = setCellValueByName(f, sheet, "H2", s.runtimeText(ctx, "artifact.dict.importTemplate.example.maleRemark", "Male")); err != nil {
+	if err = setCellValueByName(f, sheet, "F2", s.runtimeText(ctx, "artifact.dict.importTemplate.example.maleRemark", "Male")); err != nil {
 		return nil, err
 	}
 
@@ -951,16 +905,10 @@ func (s *serviceImpl) GenerateDataImportTemplate(ctx context.Context) (data []by
 	if err = setCellValueByName(f, sheet, "D3", "2"); err != nil {
 		return nil, err
 	}
-	if err = setCellValueByName(f, sheet, "E3", "danger"); err != nil {
+	if err = setCellValueByName(f, sheet, "E3", s.dictStatusText(ctx, 1)); err != nil {
 		return nil, err
 	}
-	if err = setCellValueByName(f, sheet, "F3", ""); err != nil {
-		return nil, err
-	}
-	if err = setCellValueByName(f, sheet, "G3", s.dictStatusText(ctx, 1)); err != nil {
-		return nil, err
-	}
-	if err = setCellValueByName(f, sheet, "H3", s.runtimeText(ctx, "artifact.dict.importTemplate.example.femaleRemark", "Female")); err != nil {
+	if err = setCellValueByName(f, sheet, "F3", s.runtimeText(ctx, "artifact.dict.importTemplate.example.femaleRemark", "Female")); err != nil {
 		return nil, err
 	}
 

@@ -19,7 +19,6 @@ import (
 	"lina-core/internal/dao"
 	"lina-core/internal/model/do"
 	"lina-core/internal/model/entity"
-	"lina-core/internal/service/jobhandler"
 	"lina-core/internal/service/jobmeta"
 	"lina-core/internal/service/jobmgmt/internal/shellexec"
 	"lina-core/pkg/logger"
@@ -276,15 +275,15 @@ func (s *serviceImpl) dispatchHandlerExecution(
 	ctx context.Context,
 	job *entity.SysJob,
 ) (jobmeta.LogStatus, string, string) {
-	def, ok := s.registry.Lookup(job.HandlerRef)
+	invoke, schema, ok := s.registry.Lookup(job.HandlerRef)
 	if !ok {
 		return joblogv1.StatusFailed, "Scheduled-job handler does not exist", ""
 	}
-	if err := jobhandler.ValidateParams(def.ParamsSchema, json.RawMessage(job.Params)); err != nil {
+	if err := s.registry.ValidateHandlerParams(schema, json.RawMessage(job.Params)); err != nil {
 		return joblogv1.StatusFailed, err.Error(), ""
 	}
 
-	result, err := def.Invoke(ctx, json.RawMessage(job.Params))
+	result, err := invoke(ctx, json.RawMessage(job.Params))
 	if err != nil {
 		return mapContextErrorToLogStatus(err, ctx), buildExecutionErrMsg(
 			err,

@@ -45,9 +45,9 @@ func (f *fakeRoleConfigService) GetCluster(_ context.Context) *hostconfig.Cluste
 	return &hostconfig.ClusterConfig{Enabled: f.clusterEnabled}
 }
 
-// GetClusterRedis returns empty Redis coordination settings for tests.
-func (f *fakeRoleConfigService) GetClusterRedis(_ context.Context) *hostconfig.ClusterRedisConfig {
-	return &hostconfig.ClusterRedisConfig{}
+// GetRedis returns empty Redis groups for tests.
+func (f *fakeRoleConfigService) GetRedis(_ context.Context) hostconfig.RedisConfig {
+	return hostconfig.RedisConfig{}
 }
 
 // IsClusterEnabled reports the configured cluster mode for the test service.
@@ -416,11 +416,11 @@ func resetRoleAccessCacheTestState(t *testing.T, svc *serviceImpl) {
 // TestNewCacheCoordAccessRevisionControllerSelectsByClusterMode verifies controller
 // selection switches between local and cluster implementations.
 func TestNewCacheCoordAccessRevisionControllerSelectsByClusterMode(t *testing.T) {
-	if _, ok := newCacheCoordAccessRevisionController(false).(*localAccessRevisionController); !ok {
+	if _, ok := newCacheCoordAccessRevisionController(false, nil).(*localAccessRevisionController); !ok {
 		t.Fatal("expected single-node mode to use local access revision controller")
 	}
 
-	controller, ok := newCacheCoordAccessRevisionController(true).(*clusterAccessRevisionController)
+	controller, ok := newCacheCoordAccessRevisionController(true, cachecoord.New(cachecoord.NewStaticTopology(true), nil)).(*clusterAccessRevisionController)
 	if !ok {
 		t.Fatal("expected cluster mode to use shared access revision controller")
 	}
@@ -738,10 +738,10 @@ func TestClusterAccessRevisionControllerConsumesCrossInstanceRevision(t *testing
 	coordSvc := coordination.NewMemory(nil)
 
 	publisher := &clusterAccessRevisionController{
-		cacheCoordSvc: cachecoord.NewWithCoordination(cachecoord.NewStaticTopology(true), coordSvc),
+		cacheCoordSvc: cachecoord.New(cachecoord.NewStaticTopology(true), coordSvc),
 	}
 	consumer := &clusterAccessRevisionController{
-		cacheCoordSvc: cachecoord.NewWithCoordination(cachecoord.NewStaticTopology(true), coordSvc),
+		cacheCoordSvc: cachecoord.New(cachecoord.NewStaticTopology(true), coordSvc),
 	}
 
 	revision, err := publisher.MarkChanged(ctx)

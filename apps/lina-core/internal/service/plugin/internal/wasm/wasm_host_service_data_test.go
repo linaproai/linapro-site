@@ -68,10 +68,8 @@ func TestHandleHostServiceInvokeDataLifecycle(t *testing.T) {
 	if createResponse.Status != protocol.HostCallStatusSuccess {
 		t.Fatalf("create expected success, got status=%d payload=%s", createResponse.Status, string(createResponse.Payload))
 	}
-	createPayload, err := protocol.UnmarshalHostServiceDataMutationResponse(createResponse.Payload)
-	if err != nil {
-		t.Fatalf("decode create payload failed: %v", err)
-	}
+	var createPayload protocol.HostServiceDataMutationResponse
+	decodeCapabilityJSONResponse(t, createResponse.Payload, &createPayload)
 	if len(createPayload.KeyJSON) == 0 {
 		t.Fatalf("expected create response key, got %#v", createPayload)
 	}
@@ -95,10 +93,8 @@ func TestHandleHostServiceInvokeDataLifecycle(t *testing.T) {
 	if listResponse.Status != protocol.HostCallStatusSuccess {
 		t.Fatalf("list expected success, got status=%d payload=%s", listResponse.Status, string(listResponse.Payload))
 	}
-	listPayload, err := protocol.UnmarshalHostServiceDataListResponse(listResponse.Payload)
-	if err != nil {
-		t.Fatalf("decode list payload failed: %v", err)
-	}
+	var listPayload protocol.HostServiceDataListResponse
+	decodeCapabilityJSONResponse(t, listResponse.Payload, &listPayload)
 	if listPayload.Total != 1 || len(listPayload.Records) != 1 {
 		t.Fatalf("unexpected list payload: %#v", listPayload)
 	}
@@ -120,10 +116,8 @@ func TestHandleHostServiceInvokeDataLifecycle(t *testing.T) {
 	if batchGetResponse.Status != protocol.HostCallStatusSuccess {
 		t.Fatalf("batch_get expected success, got status=%d payload=%s", batchGetResponse.Status, string(batchGetResponse.Payload))
 	}
-	batchGetPayload, err := protocol.UnmarshalHostServiceDataBatchGetResponse(batchGetResponse.Payload)
-	if err != nil {
-		t.Fatalf("decode batch_get payload failed: %v", err)
-	}
+	var batchGetPayload protocol.HostServiceDataBatchGetResponse
+	decodeCapabilityJSONResponse(t, batchGetResponse.Payload, &batchGetPayload)
 	if len(batchGetPayload.Records) != 1 || len(batchGetPayload.MissingKeyJSON) != 1 {
 		t.Fatalf("unexpected batch_get payload: %#v", batchGetPayload)
 	}
@@ -188,27 +182,11 @@ func invokeDataHostService(
 ) *protocol.HostCallResponseEnvelope {
 	t.Helper()
 
-	var payload []byte
-	switch typedRequest := request.(type) {
-	case *protocol.HostServiceDataListRequest:
-		payload = protocol.MarshalHostServiceDataListRequest(typedRequest)
-	case *protocol.HostServiceDataMutationRequest:
-		payload = protocol.MarshalHostServiceDataMutationRequest(typedRequest)
-	case *protocol.HostServiceDataGetRequest:
-		payload = protocol.MarshalHostServiceDataGetRequest(typedRequest)
-	case *protocol.HostServiceDataBatchGetRequest:
-		payload = protocol.MarshalHostServiceDataBatchGetRequest(typedRequest)
-	case *protocol.HostServiceDataTransactionRequest:
-		payload = protocol.MarshalHostServiceDataTransactionRequest(typedRequest)
-	default:
-		t.Fatalf("unsupported data host service request type: %T", request)
-	}
-
 	envelope := &protocol.HostServiceRequestEnvelope{
 		Service: protocol.HostServiceData,
 		Method:  method,
 		Table:   table,
-		Payload: payload,
+		Payload: marshalCapabilityJSONRequest(t, request),
 	}
 	return handleHostServiceInvoke(context.Background(), withTestHostCallRuntime(t, hcc), protocol.MarshalHostServiceRequestEnvelope(envelope))
 }

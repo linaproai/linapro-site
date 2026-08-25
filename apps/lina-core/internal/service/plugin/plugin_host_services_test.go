@@ -152,7 +152,7 @@ func TestNewWasmHostServiceRuntimeRequiresExplicitDependencies(t *testing.T) {
 func newWasmHostServiceTestDeps(t *testing.T) *wasmHostServiceTestDeps {
 	t.Helper()
 
-	configSvc := configsvc.New()
+	configSvc := configsvc.New(nil)
 	bizCtxSvc := bizctx.New()
 	return &wasmHostServiceTestDeps{
 		notifySvc:         notifysvc.New(tenantspi.New(nil, nil, nil, bizCtxSvc)),
@@ -174,10 +174,9 @@ func TestBuildSourceCapabilityRegistryIndexesDeclaredOwnerDescriptors(t *testing
 		Version:       "v1",
 		Methods: []capregistry.MethodDescriptor{
 			{
-				Method:       "run.execute",
-				Capability:   "framework.workflow.v1",
-				Risk:         capregistry.RiskLevelExecute,
-				ResourceKind: capregistry.ResourceKindNone,
+				Method:     "run.execute",
+				Capability: "framework.workflow.v1",
+				Risk:       capregistry.RiskLevelExecute,
 			},
 		},
 	}
@@ -212,10 +211,9 @@ func TestValidateSourceCapabilityDescriptorOwnerRejectsMismatch(t *testing.T) {
 		Version:       "v1",
 		Methods: []capregistry.MethodDescriptor{
 			{
-				Method:       "text.generate",
-				Capability:   "plugin.linapro-ai-core.ai.v1",
-				Risk:         capregistry.RiskLevelExecute,
-				ResourceKind: capregistry.ResourceKindNone,
+				Method:     "text.generate",
+				Capability: "plugin.linapro-ai-core.ai.v1",
+				Risk:       capregistry.RiskLevelExecute,
 			},
 		},
 	}

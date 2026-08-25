@@ -20,21 +20,19 @@ func Cache(invoker HostServiceInvoker) cachecap.Service {
 
 // Get reads one governed cache value from the authorized namespace.
 func (s *cacheService) Get(_ context.Context, namespace string, key string) (*cachecap.CacheItem, bool, error) {
-	payload, err := s.callHostService(
+	response := &protocol.HostServiceCacheGetResponse{}
+	err := s.callHostServiceJSONRequest(
 		protocol.HostServiceCache,
 		protocol.HostServiceMethodCacheGet,
 		namespace,
 		"",
-		protocol.MarshalHostServiceCacheGetRequest(&protocol.HostServiceCacheGetRequest{Key: key}),
+		protocol.HostServiceCacheGetRequest{Key: key},
+		response,
 	)
 	if err != nil {
 		return nil, false, err
 	}
-	response, err := protocol.UnmarshalHostServiceCacheGetResponse(payload)
-	if err != nil {
-		return nil, false, err
-	}
-	if response == nil || !response.Found {
+	if !response.Found {
 		return nil, false, nil
 	}
 	return cacheItemFromWire(key, response.Value), true, nil
@@ -72,26 +70,21 @@ func (s *cacheService) Set(
 	value string,
 	ttl time.Duration,
 ) (*cachecap.CacheItem, error) {
-	payload, err := s.callHostService(
+	response := &protocol.HostServiceCacheSetResponse{}
+	err := s.callHostServiceJSONRequest(
 		protocol.HostServiceCache,
 		protocol.HostServiceMethodCacheSet,
 		namespace,
 		"",
-		protocol.MarshalHostServiceCacheSetRequest(&protocol.HostServiceCacheSetRequest{
+		protocol.HostServiceCacheSetRequest{
 			Key:           key,
 			Value:         value,
 			ExpireSeconds: durationSeconds(ttl),
-		}),
+		},
+		response,
 	)
 	if err != nil {
 		return nil, err
-	}
-	response, err := protocol.UnmarshalHostServiceCacheSetResponse(payload)
-	if err != nil {
-		return nil, err
-	}
-	if response == nil {
-		return nil, nil
 	}
 	return cacheItemFromWire(key, response.Value), nil
 }
@@ -127,14 +120,14 @@ func (s *cacheService) SetMany(_ context.Context, in cachecap.SetManyInput) (*ca
 
 // Delete removes one governed cache value from the authorized namespace.
 func (s *cacheService) Delete(_ context.Context, namespace string, key string) error {
-	_, err := s.callHostService(
+	return s.callHostServiceJSONRequest(
 		protocol.HostServiceCache,
 		protocol.HostServiceMethodCacheDelete,
 		namespace,
 		"",
-		protocol.MarshalHostServiceCacheDeleteRequest(&protocol.HostServiceCacheDeleteRequest{Key: key}),
+		protocol.HostServiceCacheDeleteRequest{Key: key},
+		nil,
 	)
-	return err
 }
 
 // DeleteMany removes governed cache values from the authorized namespace.
@@ -157,51 +150,41 @@ func (s *cacheService) Incr(
 	delta int64,
 	ttl time.Duration,
 ) (*cachecap.CacheItem, error) {
-	payload, err := s.callHostService(
+	response := &protocol.HostServiceCacheIncrResponse{}
+	err := s.callHostServiceJSONRequest(
 		protocol.HostServiceCache,
 		protocol.HostServiceMethodCacheIncr,
 		namespace,
 		"",
-		protocol.MarshalHostServiceCacheIncrRequest(&protocol.HostServiceCacheIncrRequest{
+		protocol.HostServiceCacheIncrRequest{
 			Key:           key,
 			Delta:         delta,
 			ExpireSeconds: durationSeconds(ttl),
-		}),
+		},
+		response,
 	)
 	if err != nil {
 		return nil, err
-	}
-	response, err := protocol.UnmarshalHostServiceCacheIncrResponse(payload)
-	if err != nil {
-		return nil, err
-	}
-	if response == nil {
-		return nil, nil
 	}
 	return cacheItemFromWire(key, response.Value), nil
 }
 
 // Expire updates one governed cache expiration policy inside the authorized namespace.
 func (s *cacheService) Expire(_ context.Context, namespace string, key string, ttl time.Duration) (bool, *time.Time, error) {
-	payload, err := s.callHostService(
+	response := &protocol.HostServiceCacheExpireResponse{}
+	err := s.callHostServiceJSONRequest(
 		protocol.HostServiceCache,
 		protocol.HostServiceMethodCacheExpire,
 		namespace,
 		"",
-		protocol.MarshalHostServiceCacheExpireRequest(&protocol.HostServiceCacheExpireRequest{
+		protocol.HostServiceCacheExpireRequest{
 			Key:           key,
 			ExpireSeconds: durationSeconds(ttl),
-		}),
+		},
+		response,
 	)
 	if err != nil {
 		return false, nil, err
-	}
-	response, err := protocol.UnmarshalHostServiceCacheExpireResponse(payload)
-	if err != nil {
-		return false, nil, err
-	}
-	if response == nil {
-		return false, nil, nil
 	}
 	return response.Found, parseWireTime(response.ExpireAt), nil
 }

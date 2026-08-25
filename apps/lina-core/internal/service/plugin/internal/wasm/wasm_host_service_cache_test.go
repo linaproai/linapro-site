@@ -204,7 +204,7 @@ func TestHandleHostServiceInvokeCacheLifecycle(t *testing.T) {
 		hcc,
 		protocol.HostServiceMethodCacheSet,
 		namespace,
-		protocol.MarshalHostServiceCacheSetRequest(&protocol.HostServiceCacheSetRequest{
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceCacheSetRequest{
 			Key:           "profile",
 			Value:         `{"enabled":true}`,
 			ExpireSeconds: 60,
@@ -213,10 +213,8 @@ func TestHandleHostServiceInvokeCacheLifecycle(t *testing.T) {
 	if setResponse.Status != protocol.HostCallStatusSuccess {
 		t.Fatalf("set: expected success, got status=%d payload=%s", setResponse.Status, string(setResponse.Payload))
 	}
-	setPayload, err := protocol.UnmarshalHostServiceCacheSetResponse(setResponse.Payload)
-	if err != nil {
-		t.Fatalf("set payload decode failed: %v", err)
-	}
+	var setPayload protocol.HostServiceCacheSetResponse
+	decodeCapabilityJSONResponse(t, setResponse.Payload, &setPayload)
 	if setPayload.Value == nil || setPayload.Value.Value != `{"enabled":true}` {
 		t.Fatalf("set payload: got %#v", setPayload.Value)
 	}
@@ -229,15 +227,13 @@ func TestHandleHostServiceInvokeCacheLifecycle(t *testing.T) {
 		hcc,
 		protocol.HostServiceMethodCacheGet,
 		namespace,
-		protocol.MarshalHostServiceCacheGetRequest(&protocol.HostServiceCacheGetRequest{Key: "profile"}),
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceCacheGetRequest{Key: "profile"}),
 	)
 	if getResponse.Status != protocol.HostCallStatusSuccess {
 		t.Fatalf("get: expected success, got status=%d payload=%s", getResponse.Status, string(getResponse.Payload))
 	}
-	getPayload, err := protocol.UnmarshalHostServiceCacheGetResponse(getResponse.Payload)
-	if err != nil {
-		t.Fatalf("get payload decode failed: %v", err)
-	}
+	var getPayload protocol.HostServiceCacheGetResponse
+	decodeCapabilityJSONResponse(t, getResponse.Payload, &getPayload)
 	if !getPayload.Found || getPayload.Value == nil || getPayload.Value.Value != `{"enabled":true}` {
 		t.Fatalf("get payload: got %#v", getPayload)
 	}
@@ -247,7 +243,7 @@ func TestHandleHostServiceInvokeCacheLifecycle(t *testing.T) {
 		hcc,
 		protocol.HostServiceMethodCacheIncr,
 		namespace,
-		protocol.MarshalHostServiceCacheIncrRequest(&protocol.HostServiceCacheIncrRequest{
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceCacheIncrRequest{
 			Key:           "counter",
 			Delta:         2,
 			ExpireSeconds: 60,
@@ -256,10 +252,8 @@ func TestHandleHostServiceInvokeCacheLifecycle(t *testing.T) {
 	if incrResponse.Status != protocol.HostCallStatusSuccess {
 		t.Fatalf("incr: expected success, got status=%d payload=%s", incrResponse.Status, string(incrResponse.Payload))
 	}
-	incrPayload, err := protocol.UnmarshalHostServiceCacheIncrResponse(incrResponse.Payload)
-	if err != nil {
-		t.Fatalf("incr payload decode failed: %v", err)
-	}
+	var incrPayload protocol.HostServiceCacheIncrResponse
+	decodeCapabilityJSONResponse(t, incrResponse.Payload, &incrPayload)
 	if incrPayload.Value == nil || incrPayload.Value.IntValue != 2 || incrPayload.Value.ValueKind != protocol.HostServiceCacheValueKindInt {
 		t.Fatalf("incr payload: got %#v", incrPayload.Value)
 	}
@@ -272,7 +266,7 @@ func TestHandleHostServiceInvokeCacheLifecycle(t *testing.T) {
 		hcc,
 		protocol.HostServiceMethodCacheExpire,
 		namespace,
-		protocol.MarshalHostServiceCacheExpireRequest(&protocol.HostServiceCacheExpireRequest{
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceCacheExpireRequest{
 			Key:           "profile",
 			ExpireSeconds: 120,
 		}),
@@ -280,10 +274,8 @@ func TestHandleHostServiceInvokeCacheLifecycle(t *testing.T) {
 	if expireResponse.Status != protocol.HostCallStatusSuccess {
 		t.Fatalf("expire: expected success, got status=%d payload=%s", expireResponse.Status, string(expireResponse.Payload))
 	}
-	expirePayload, err := protocol.UnmarshalHostServiceCacheExpireResponse(expireResponse.Payload)
-	if err != nil {
-		t.Fatalf("expire payload decode failed: %v", err)
-	}
+	var expirePayload protocol.HostServiceCacheExpireResponse
+	decodeCapabilityJSONResponse(t, expireResponse.Payload, &expirePayload)
 	if !expirePayload.Found || strings.TrimSpace(expirePayload.ExpireAt) == "" {
 		t.Fatalf("expire payload: got %#v", expirePayload)
 	}
@@ -296,7 +288,7 @@ func TestHandleHostServiceInvokeCacheLifecycle(t *testing.T) {
 		hcc,
 		protocol.HostServiceMethodCacheDelete,
 		namespace,
-		protocol.MarshalHostServiceCacheDeleteRequest(&protocol.HostServiceCacheDeleteRequest{Key: "profile"}),
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceCacheDeleteRequest{Key: "profile"}),
 	)
 	if deleteResponse.Status != protocol.HostCallStatusSuccess {
 		t.Fatalf("delete: expected success, got status=%d payload=%s", deleteResponse.Status, string(deleteResponse.Payload))
@@ -307,15 +299,13 @@ func TestHandleHostServiceInvokeCacheLifecycle(t *testing.T) {
 		hcc,
 		protocol.HostServiceMethodCacheGet,
 		namespace,
-		protocol.MarshalHostServiceCacheGetRequest(&protocol.HostServiceCacheGetRequest{Key: "profile"}),
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceCacheGetRequest{Key: "profile"}),
 	)
 	if getDeletedResponse.Status != protocol.HostCallStatusSuccess {
 		t.Fatalf("get after delete: expected success, got status=%d payload=%s", getDeletedResponse.Status, string(getDeletedResponse.Payload))
 	}
-	getDeletedPayload, err := protocol.UnmarshalHostServiceCacheGetResponse(getDeletedResponse.Payload)
-	if err != nil {
-		t.Fatalf("get after delete payload decode failed: %v", err)
-	}
+	var getDeletedPayload protocol.HostServiceCacheGetResponse
+	decodeCapabilityJSONResponse(t, getDeletedResponse.Payload, &getDeletedPayload)
 	if getDeletedPayload.Found {
 		t.Fatalf("expected deleted cache entry to be missing, got %#v", getDeletedPayload)
 	}
@@ -331,7 +321,7 @@ func TestHandleHostServiceInvokeCacheRejectsOversizedValue(t *testing.T) {
 		hcc,
 		protocol.HostServiceMethodCacheSet,
 		"orders-cache",
-		protocol.MarshalHostServiceCacheSetRequest(&protocol.HostServiceCacheSetRequest{
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceCacheSetRequest{
 			Key:           "oversized",
 			Value:         strings.Repeat("a", 4097),
 			ExpireSeconds: 60,
@@ -353,7 +343,7 @@ func TestHandleHostServiceInvokeCacheRejectsMissingTTL(t *testing.T) {
 		hcc,
 		protocol.HostServiceMethodCacheSet,
 		"orders-cache",
-		protocol.MarshalHostServiceCacheSetRequest(&protocol.HostServiceCacheSetRequest{
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceCacheSetRequest{
 			Key:   "missing-ttl",
 			Value: "value",
 		}),
@@ -374,7 +364,7 @@ func TestHandleHostServiceInvokeCacheRejectsMissingTTL(t *testing.T) {
 		hcc,
 		protocol.HostServiceMethodCacheSet,
 		"orders-cache",
-		protocol.MarshalHostServiceCacheSetRequest(&protocol.HostServiceCacheSetRequest{
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceCacheSetRequest{
 			Key:           "negative-ttl",
 			Value:         "value",
 			ExpireSeconds: -1,
@@ -453,7 +443,7 @@ func TestHandleHostServiceInvokeCacheRejectsUnauthorizedNamespace(t *testing.T) 
 		hcc,
 		protocol.HostServiceMethodCacheGet,
 		"other-cache",
-		protocol.MarshalHostServiceCacheGetRequest(&protocol.HostServiceCacheGetRequest{Key: "profile"}),
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceCacheGetRequest{Key: "profile"}),
 	)
 	if response.Status != protocol.HostCallStatusCapabilityDenied {
 		t.Fatalf("expected capability denied for unauthorized cache namespace, got status=%d payload=%s", response.Status, string(response.Payload))
@@ -470,7 +460,7 @@ func TestHandleHostServiceInvokeCacheRequiresScopedDomainService(t *testing.T) {
 		hcc,
 		protocol.HostServiceMethodCacheGet,
 		"orders-cache",
-		protocol.MarshalHostServiceCacheGetRequest(&protocol.HostServiceCacheGetRequest{Key: "profile"}),
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceCacheGetRequest{Key: "profile"}),
 	)
 	if response.Status != protocol.HostCallStatusInternalError {
 		t.Fatalf("expected internal error for unconfigured cache service, got status=%d payload=%s", response.Status, string(response.Payload))
@@ -489,7 +479,7 @@ func TestHandleHostServiceInvokeCacheUsesConfiguredSharedService(t *testing.T) {
 		hcc,
 		protocol.HostServiceMethodCacheSet,
 		"orders-cache",
-		protocol.MarshalHostServiceCacheSetRequest(&protocol.HostServiceCacheSetRequest{
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceCacheSetRequest{
 			Key:           "profile",
 			Value:         "shared",
 			ExpireSeconds: 60,
@@ -503,7 +493,7 @@ func TestHandleHostServiceInvokeCacheUsesConfiguredSharedService(t *testing.T) {
 		hcc,
 		protocol.HostServiceMethodCacheGet,
 		"orders-cache",
-		protocol.MarshalHostServiceCacheGetRequest(&protocol.HostServiceCacheGetRequest{Key: "profile"}),
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceCacheGetRequest{Key: "profile"}),
 	)
 	if getResponse.Status != protocol.HostCallStatusSuccess {
 		t.Fatalf("get through shared cache: expected success, got status=%d payload=%s", getResponse.Status, string(getResponse.Payload))
@@ -597,7 +587,7 @@ func setTenantCacheValue(t *testing.T, hcc *hostCallContext, namespace string, k
 		hcc,
 		protocol.HostServiceMethodCacheSet,
 		namespace,
-		protocol.MarshalHostServiceCacheSetRequest(&protocol.HostServiceCacheSetRequest{
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceCacheSetRequest{
 			Key:           key,
 			Value:         value,
 			ExpireSeconds: 60,
@@ -616,15 +606,13 @@ func assertTenantCacheValue(t *testing.T, hcc *hostCallContext, namespace string
 		hcc,
 		protocol.HostServiceMethodCacheGet,
 		namespace,
-		protocol.MarshalHostServiceCacheGetRequest(&protocol.HostServiceCacheGetRequest{Key: key}),
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceCacheGetRequest{Key: key}),
 	)
 	if response.Status != protocol.HostCallStatusSuccess {
 		t.Fatalf("get cache value: expected success, got status=%d payload=%s", response.Status, string(response.Payload))
 	}
-	payload, err := protocol.UnmarshalHostServiceCacheGetResponse(response.Payload)
-	if err != nil {
-		t.Fatalf("decode cache get payload failed: %v", err)
-	}
+	var payload protocol.HostServiceCacheGetResponse
+	decodeCapabilityJSONResponse(t, response.Payload, &payload)
 	if !payload.Found || payload.Value == nil || payload.Value.Value != expected {
 		t.Fatalf("expected cache value %q, got %#v", expected, payload)
 	}

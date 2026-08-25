@@ -7,13 +7,11 @@ import (
 	"encoding/base64"
 	pluginv1 "lina-core/api/plugin/v1"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"lina-core/internal/model/entity"
 	"lina-core/internal/service/plugin/internal/catalog"
 	"lina-core/internal/service/plugin/internal/testutil"
-	"lina-core/pkg/plugin/pluginhost"
 )
 
 // TestValidateHostedMenuBindingsAcceptsHostedRuntimeModes verifies that iframe,
@@ -72,12 +70,10 @@ func TestValidateHostedMenuBindingsAcceptsHostedRuntimeModes(t *testing.T) {
 			IsFrame: 1,
 		},
 		{
-			MenuKey:    "plugin:plugin-dev-dynamic-bindings:embedded-entry",
-			Name:       "Hosted embedded entry",
-			Path:       hostedBaseURL + "mount.js",
-			Component:  pluginhost.DynamicPageComponentPath,
-			QueryParam: `{"pluginAccessMode":"embedded-mount"}`,
-			IsFrame:    0,
+			MenuKey: "plugin:plugin-dev-dynamic-bindings:embedded-entry",
+			Name:    "Hosted embedded entry",
+			Path:    hostedBaseURL + "mount.js",
+			IsFrame: 0,
 		},
 	}
 
@@ -86,9 +82,9 @@ func TestValidateHostedMenuBindingsAcceptsHostedRuntimeModes(t *testing.T) {
 	}
 }
 
-// TestValidateHostedMenuBindingsRejectsBrokenEmbeddedMountContract verifies
-// that embedded mount menus require a JS or MJS entry asset.
-func TestValidateHostedMenuBindingsRejectsBrokenEmbeddedMountContract(t *testing.T) {
+// TestValidateHostedMenuBindingsIgnoresWorkbenchEmbeddedQuery verifies leftover
+// workbench query keys do not turn a hosted HTML entry into an embedded menu.
+func TestValidateHostedMenuBindingsIgnoresWorkbenchEmbeddedQuery(t *testing.T) {
 	services := testutil.NewServices()
 	service := services.Frontend
 
@@ -128,17 +124,12 @@ func TestValidateHostedMenuBindingsRejectsBrokenEmbeddedMountContract(t *testing
 			MenuKey:    "plugin:plugin-dev-dynamic-broken-bindings:embedded-entry",
 			Name:       "Broken embedded entry",
 			Path:       hostedBaseURL + "index.html",
-			Component:  pluginhost.DynamicPageComponentPath,
 			QueryParam: `{"pluginAccessMode":"embedded-mount"}`,
 			IsFrame:    0,
 		},
 	}
 
-	err := service.ValidateHostedMenuBindings(context.Background(), manifest, menus)
-	if err == nil {
-		t.Fatalf("expected broken embedded mount contract to be rejected")
-	}
-	if expected := ".js or .mjs"; !strings.Contains(err.Error(), expected) {
-		t.Fatalf("expected error to mention %q, got: %v", expected, err)
+	if err := service.ValidateHostedMenuBindings(context.Background(), manifest, menus); err != nil {
+		t.Fatalf("expected hosted HTML menu to stay valid without workbench query, got: %v", err)
 	}
 }

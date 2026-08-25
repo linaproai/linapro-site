@@ -16,17 +16,10 @@ import (
 )
 
 // ResourceKind describes which authorization resource shape a capability
-// method uses when it is projected as a dynamic host service.
+// method uses when it is projected as a dynamic host service. Values MUST match
+// protocol/hostservices.ResourceKind; this package does not define a second
+// enum. The empty value means none.
 type ResourceKind string
-
-// Capability descriptor resource kinds.
-const (
-	ResourceKindNone  ResourceKind = "none"
-	ResourceKindPath  ResourceKind = "path"
-	ResourceKindTable ResourceKind = "table"
-	ResourceKindKey   ResourceKind = "key"
-	ResourceKindRef   ResourceKind = "resource"
-)
 
 // RiskLevel classifies one owner method for authorization and upgrade previews.
 type RiskLevel string
@@ -332,9 +325,6 @@ func normalizeDescriptor(descriptor Descriptor) (Descriptor, error) {
 		method.Capability = strings.TrimSpace(method.Capability)
 		method.RequestPayload = strings.TrimSpace(method.RequestPayload)
 		method.ResponsePayload = strings.TrimSpace(method.ResponsePayload)
-		if method.ResourceKind == "" {
-			method.ResourceKind = ResourceKindNone
-		}
 		if method.Method == "" {
 			return Descriptor{}, gerror.Newf(
 				"capability descriptor method is required: owner=%s service=%s version=%s",

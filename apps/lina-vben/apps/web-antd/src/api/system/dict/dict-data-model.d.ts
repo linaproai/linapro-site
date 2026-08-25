@@ -4,8 +4,6 @@ export interface DictData {
   label: string;
   value: string;
   sort: number;
-  tagStyle: string;
-  cssClass: string;
   status: number;
   isBuiltin: number;
   remark: string;

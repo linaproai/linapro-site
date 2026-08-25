@@ -29,10 +29,7 @@ function renderChart() {
     series: [
       {
         barMaxWidth: 80,
-        data: [
-          3000, 2000, 3333, 5000, 3200, 4200, 3200, 2100, 3000, 5100, 6000,
-          3200, 4800,
-        ],
+        data: Array.from({ length: 12 }, () => 0),
         type: 'bar',
       },
     ],
@@ -49,8 +46,6 @@ function renderChart() {
       type: 'category',
     },
     yAxis: {
-      max: 8000,
-      splitNumber: 4,
       type: 'value',
     },
   });

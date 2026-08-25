@@ -47,16 +47,12 @@ func dispatchDataHostService(
 		return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, err)
 	}
 
-	var (
-		responsePayload []byte
-		execErr         error
-		orgSvc          = orgServiceForHostCall(hcc)
-	)
+	orgSvc := orgServiceForHostCall(hcc)
 	switch method {
 	case bridgehostservice.HostServiceMethodDataList:
-		request, decodeErr := bridgehostservice.UnmarshalHostServiceDataListRequest(payload)
-		if decodeErr != nil {
-			return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, decodeErr)
+		var request bridgehostservice.HostServiceDataListRequest
+		if err := decodeCapabilityJSONRequest(payload, &request); err != nil {
+			return invalidCapabilityRequest(err)
 		}
 		response, callErr := datahost.ExecuteList(
 			ctx,
@@ -66,17 +62,16 @@ func dispatchDataHostService(
 			hcc.identity,
 			orgSvc,
 			resource,
-			request,
+			&request,
 		)
 		if callErr != nil {
-			execErr = callErr
-			break
+			return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, callErr)
 		}
-		responsePayload = bridgehostservice.MarshalHostServiceDataListResponse(response)
+		return capabilityJSONResponse(response)
 	case bridgehostservice.HostServiceMethodDataGet:
-		request, decodeErr := bridgehostservice.UnmarshalHostServiceDataGetRequest(payload)
-		if decodeErr != nil {
-			return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, decodeErr)
+		var request bridgehostservice.HostServiceDataGetRequest
+		if err := decodeCapabilityJSONRequest(payload, &request); err != nil {
+			return invalidCapabilityRequest(err)
 		}
 		response, callErr := datahost.ExecuteGet(
 			ctx,
@@ -86,17 +81,16 @@ func dispatchDataHostService(
 			hcc.identity,
 			orgSvc,
 			resource,
-			request,
+			&request,
 		)
 		if callErr != nil {
-			execErr = callErr
-			break
+			return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, callErr)
 		}
-		responsePayload = bridgehostservice.MarshalHostServiceDataGetResponse(response)
+		return capabilityJSONResponse(response)
 	case bridgehostservice.HostServiceMethodDataBatchGet:
-		request, decodeErr := bridgehostservice.UnmarshalHostServiceDataBatchGetRequest(payload)
-		if decodeErr != nil {
-			return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, decodeErr)
+		var request bridgehostservice.HostServiceDataBatchGetRequest
+		if err := decodeCapabilityJSONRequest(payload, &request); err != nil {
+			return invalidCapabilityRequest(err)
 		}
 		response, callErr := datahost.ExecuteBatchGet(
 			ctx,
@@ -106,17 +100,16 @@ func dispatchDataHostService(
 			hcc.identity,
 			orgSvc,
 			resource,
-			request,
+			&request,
 		)
 		if callErr != nil {
-			execErr = callErr
-			break
+			return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, callErr)
 		}
-		responsePayload = bridgehostservice.MarshalHostServiceDataBatchGetResponse(response)
+		return capabilityJSONResponse(response)
 	case bridgehostservice.HostServiceMethodDataCreate:
-		request, decodeErr := bridgehostservice.UnmarshalHostServiceDataMutationRequest(payload)
-		if decodeErr != nil {
-			return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, decodeErr)
+		var request bridgehostservice.HostServiceDataMutationRequest
+		if err := decodeCapabilityJSONRequest(payload, &request); err != nil {
+			return invalidCapabilityRequest(err)
 		}
 		response, callErr := datahost.ExecuteCreate(
 			ctx,
@@ -126,17 +119,16 @@ func dispatchDataHostService(
 			hcc.identity,
 			orgSvc,
 			resource,
-			request,
+			&request,
 		)
 		if callErr != nil {
-			execErr = callErr
-			break
+			return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, callErr)
 		}
-		responsePayload = bridgehostservice.MarshalHostServiceDataMutationResponse(response)
+		return capabilityJSONResponse(response)
 	case bridgehostservice.HostServiceMethodDataUpdate:
-		request, decodeErr := bridgehostservice.UnmarshalHostServiceDataMutationRequest(payload)
-		if decodeErr != nil {
-			return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, decodeErr)
+		var request bridgehostservice.HostServiceDataMutationRequest
+		if err := decodeCapabilityJSONRequest(payload, &request); err != nil {
+			return invalidCapabilityRequest(err)
 		}
 		response, callErr := datahost.ExecuteUpdate(
 			ctx,
@@ -146,17 +138,16 @@ func dispatchDataHostService(
 			hcc.identity,
 			orgSvc,
 			resource,
-			request,
+			&request,
 		)
 		if callErr != nil {
-			execErr = callErr
-			break
+			return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, callErr)
 		}
-		responsePayload = bridgehostservice.MarshalHostServiceDataMutationResponse(response)
+		return capabilityJSONResponse(response)
 	case bridgehostservice.HostServiceMethodDataDelete:
-		request, decodeErr := bridgehostservice.UnmarshalHostServiceDataMutationRequest(payload)
-		if decodeErr != nil {
-			return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, decodeErr)
+		var request bridgehostservice.HostServiceDataMutationRequest
+		if err := decodeCapabilityJSONRequest(payload, &request); err != nil {
+			return invalidCapabilityRequest(err)
 		}
 		response, callErr := datahost.ExecuteDelete(
 			ctx,
@@ -166,17 +157,16 @@ func dispatchDataHostService(
 			hcc.identity,
 			orgSvc,
 			resource,
-			request,
+			&request,
 		)
 		if callErr != nil {
-			execErr = callErr
-			break
+			return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, callErr)
 		}
-		responsePayload = bridgehostservice.MarshalHostServiceDataMutationResponse(response)
+		return capabilityJSONResponse(response)
 	case bridgehostservice.HostServiceMethodDataTransaction:
-		request, decodeErr := bridgehostservice.UnmarshalHostServiceDataTransactionRequest(payload)
-		if decodeErr != nil {
-			return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, decodeErr)
+		var request bridgehostservice.HostServiceDataTransactionRequest
+		if err := decodeCapabilityJSONRequest(payload, &request); err != nil {
+			return invalidCapabilityRequest(err)
 		}
 		response, callErr := datahost.ExecuteTransaction(
 			ctx,
@@ -186,23 +176,18 @@ func dispatchDataHostService(
 			hcc.identity,
 			orgSvc,
 			resource,
-			request,
+			&request,
 		)
 		if callErr != nil {
-			execErr = callErr
-			break
+			return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, callErr)
 		}
-		responsePayload = bridgehostservice.MarshalHostServiceDataTransactionResponse(response)
+		return capabilityJSONResponse(response)
 	default:
 		return bridgehostcall.NewHostCallErrorResponse(
 			bridgehostcall.HostCallStatusNotFound,
 			"unsupported data host service method: "+method,
 		)
 	}
-	if execErr != nil {
-		return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, execErr)
-	}
-	return bridgehostcall.NewHostCallSuccessResponse(responsePayload)
 }
 
 func dataHostServiceTableOwnedByPlugin(pluginID string, table string) bool {

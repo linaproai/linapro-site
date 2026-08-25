@@ -771,6 +771,9 @@
       "inbox": {
         "recipient": {
           "required": "Inbox notification recipient users cannot be empty"
+        },
+        "not": {
+          "found": "Message does not exist"
         }
       },
       "payload": {

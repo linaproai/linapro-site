@@ -290,7 +290,7 @@ func TestHandleHostServiceInvokeStorageLifecycle(t *testing.T) {
 		hcc,
 		protocol.HostServiceMethodStoragePut,
 		"reports/demo.json",
-		protocol.MarshalHostServiceStoragePutRequest(&protocol.HostServiceStoragePutRequest{
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceStoragePutRequest{
 			Path:        "reports/demo.json",
 			Body:        []byte(`{"ok":true}`),
 			ContentType: "application/json",
@@ -300,10 +300,8 @@ func TestHandleHostServiceInvokeStorageLifecycle(t *testing.T) {
 	if putResponse.Status != protocol.HostCallStatusSuccess {
 		t.Fatalf("put: expected success, got status=%d payload=%s", putResponse.Status, string(putResponse.Payload))
 	}
-	putPayload, err := protocol.UnmarshalHostServiceStoragePutResponse(putResponse.Payload)
-	if err != nil {
-		t.Fatalf("put payload decode failed: %v", err)
-	}
+	var putPayload protocol.HostServiceStoragePutResponse
+	decodeCapabilityJSONResponse(t, putResponse.Payload, &putPayload)
 	if putPayload.Object == nil || putPayload.Object.Path != "reports/demo.json" {
 		t.Fatalf("put object: got %#v", putPayload.Object)
 	}
@@ -316,15 +314,13 @@ func TestHandleHostServiceInvokeStorageLifecycle(t *testing.T) {
 		hcc,
 		protocol.HostServiceMethodStorageGet,
 		"reports/demo.json",
-		protocol.MarshalHostServiceStorageGetRequest(&protocol.HostServiceStorageGetRequest{Path: "reports/demo.json"}),
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceStorageGetRequest{Path: "reports/demo.json"}),
 	)
 	if getResponse.Status != protocol.HostCallStatusSuccess {
 		t.Fatalf("get: expected success, got status=%d payload=%s", getResponse.Status, string(getResponse.Payload))
 	}
-	getPayload, err := protocol.UnmarshalHostServiceStorageGetResponse(getResponse.Payload)
-	if err != nil {
-		t.Fatalf("get payload decode failed: %v", err)
-	}
+	var getPayload protocol.HostServiceStorageGetResponse
+	decodeCapabilityJSONResponse(t, getResponse.Payload, &getPayload)
 	if !getPayload.Found || string(getPayload.Body) != `{"ok":true}` {
 		t.Fatalf("get payload: got %#v", getPayload)
 	}
@@ -334,7 +330,7 @@ func TestHandleHostServiceInvokeStorageLifecycle(t *testing.T) {
 		hcc,
 		protocol.HostServiceMethodStorageList,
 		"reports",
-		protocol.MarshalHostServiceStorageListRequest(&protocol.HostServiceStorageListRequest{
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceStorageListRequest{
 			Prefix: "reports",
 			Limit:  10,
 		}),
@@ -342,10 +338,8 @@ func TestHandleHostServiceInvokeStorageLifecycle(t *testing.T) {
 	if listResponse.Status != protocol.HostCallStatusSuccess {
 		t.Fatalf("list: expected success, got status=%d payload=%s", listResponse.Status, string(listResponse.Payload))
 	}
-	listPayload, err := protocol.UnmarshalHostServiceStorageListResponse(listResponse.Payload)
-	if err != nil {
-		t.Fatalf("list payload decode failed: %v", err)
-	}
+	var listPayload protocol.HostServiceStorageListResponse
+	decodeCapabilityJSONResponse(t, listResponse.Payload, &listPayload)
 	if len(listPayload.Objects) != 1 || listPayload.Objects[0].Path != "reports/demo.json" {
 		t.Fatalf("list payload: got %#v", listPayload.Objects)
 	}
@@ -358,7 +352,7 @@ func TestHandleHostServiceInvokeStorageLifecycle(t *testing.T) {
 		hcc,
 		protocol.HostServiceMethodStorageDelete,
 		"reports/demo.json",
-		protocol.MarshalHostServiceStorageDeleteRequest(&protocol.HostServiceStorageDeleteRequest{Path: "reports/demo.json"}),
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceStorageDeleteRequest{Path: "reports/demo.json"}),
 	)
 	if deleteResponse.Status != protocol.HostCallStatusSuccess {
 		t.Fatalf("delete: expected success, got status=%d payload=%s", deleteResponse.Status, string(deleteResponse.Payload))
@@ -369,15 +363,13 @@ func TestHandleHostServiceInvokeStorageLifecycle(t *testing.T) {
 		hcc,
 		protocol.HostServiceMethodStorageStat,
 		"reports/demo.json",
-		protocol.MarshalHostServiceStorageStatRequest(&protocol.HostServiceStorageStatRequest{Path: "reports/demo.json"}),
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceStorageStatRequest{Path: "reports/demo.json"}),
 	)
 	if statResponse.Status != protocol.HostCallStatusSuccess {
 		t.Fatalf("stat: expected success, got status=%d payload=%s", statResponse.Status, string(statResponse.Payload))
 	}
-	statPayload, err := protocol.UnmarshalHostServiceStorageStatResponse(statResponse.Payload)
-	if err != nil {
-		t.Fatalf("stat payload decode failed: %v", err)
-	}
+	var statPayload protocol.HostServiceStorageStatResponse
+	decodeCapabilityJSONResponse(t, statResponse.Payload, &statPayload)
 	if statPayload.Found {
 		t.Fatalf("stat: expected object to be deleted, got %#v", statPayload.Object)
 	}
@@ -445,7 +437,7 @@ func TestHandleHostServiceInvokeStorageRejectsUnauthorizedPath(t *testing.T) {
 		hcc,
 		protocol.HostServiceMethodStoragePut,
 		"private/escape.txt",
-		protocol.MarshalHostServiceStoragePutRequest(&protocol.HostServiceStoragePutRequest{
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceStoragePutRequest{
 			Path: "private/escape.txt",
 			Body: []byte("blocked"),
 		}),
@@ -466,7 +458,7 @@ func TestHandleHostServiceInvokeStorageRejectsTargetMismatch(t *testing.T) {
 		hcc,
 		protocol.HostServiceMethodStoragePut,
 		"reports/demo.json",
-		protocol.MarshalHostServiceStoragePutRequest(&protocol.HostServiceStoragePutRequest{
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceStoragePutRequest{
 			Path: "reports/other.json",
 			Body: []byte("blocked"),
 		}),
@@ -487,7 +479,7 @@ func TestHandleHostServiceInvokeStorageRequiresConfiguredService(t *testing.T) {
 		hcc,
 		protocol.HostServiceMethodStoragePut,
 		"reports/demo.json",
-		protocol.MarshalHostServiceStoragePutRequest(&protocol.HostServiceStoragePutRequest{
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceStoragePutRequest{
 			Path: "reports/demo.json",
 			Body: []byte("blocked"),
 		}),
@@ -509,7 +501,7 @@ func TestHandleHostServiceInvokeStorageUsesConfiguredSharedService(t *testing.T)
 		hcc,
 		protocol.HostServiceMethodStoragePut,
 		"reports/demo.json",
-		protocol.MarshalHostServiceStoragePutRequest(&protocol.HostServiceStoragePutRequest{
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceStoragePutRequest{
 			Path: "reports/demo.json",
 			Body: []byte("shared"),
 		}),
@@ -535,7 +527,7 @@ func TestHandleHostServiceInvokeStorageChunkedPutCommitsThroughStoragecap(t *tes
 		hcc,
 		protocol.HostServiceMethodStoragePutInit,
 		objectPath,
-		protocol.MarshalHostServiceStoragePutInitRequest(&protocol.HostServiceStoragePutInitRequest{
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceStoragePutInitRequest{
 			Path:        objectPath,
 			ContentType: "application/octet-stream",
 			Overwrite:   true,
@@ -544,10 +536,8 @@ func TestHandleHostServiceInvokeStorageChunkedPutCommitsThroughStoragecap(t *tes
 	if initResponse.Status != protocol.HostCallStatusSuccess {
 		t.Fatalf("init: expected success, got status=%d payload=%s", initResponse.Status, string(initResponse.Payload))
 	}
-	initPayload, err := protocol.UnmarshalHostServiceStoragePutInitResponse(initResponse.Payload)
-	if err != nil {
-		t.Fatalf("init payload decode failed: %v", err)
-	}
+	var initPayload protocol.HostServiceStoragePutInitResponse
+	decodeCapabilityJSONResponse(t, initResponse.Payload, &initPayload)
 	if initPayload.UploadID == "" {
 		t.Fatal("expected upload id")
 	}
@@ -557,7 +547,7 @@ func TestHandleHostServiceInvokeStorageChunkedPutCommitsThroughStoragecap(t *tes
 		hcc,
 		protocol.HostServiceMethodStoragePutChunk,
 		objectPath,
-		protocol.MarshalHostServiceStoragePutChunkRequest(&protocol.HostServiceStoragePutChunkRequest{
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceStoragePutChunkRequest{
 			Path:     objectPath,
 			UploadID: initPayload.UploadID,
 			Offset:   0,
@@ -567,10 +557,8 @@ func TestHandleHostServiceInvokeStorageChunkedPutCommitsThroughStoragecap(t *tes
 	if firstChunk.Status != protocol.HostCallStatusSuccess {
 		t.Fatalf("first chunk: expected success, got status=%d payload=%s", firstChunk.Status, string(firstChunk.Payload))
 	}
-	firstPayload, err := protocol.UnmarshalHostServiceStoragePutChunkResponse(firstChunk.Payload)
-	if err != nil {
-		t.Fatalf("first chunk payload decode failed: %v", err)
-	}
+	var firstPayload protocol.HostServiceStoragePutChunkResponse
+	decodeCapabilityJSONResponse(t, firstChunk.Payload, &firstPayload)
 	if firstPayload.NextOffset != 6 {
 		t.Fatalf("first chunk next offset: got %d want 6", firstPayload.NextOffset)
 	}
@@ -580,7 +568,7 @@ func TestHandleHostServiceInvokeStorageChunkedPutCommitsThroughStoragecap(t *tes
 		hcc,
 		protocol.HostServiceMethodStoragePutChunk,
 		objectPath,
-		protocol.MarshalHostServiceStoragePutChunkRequest(&protocol.HostServiceStoragePutChunkRequest{
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceStoragePutChunkRequest{
 			Path:     objectPath,
 			UploadID: initPayload.UploadID,
 			Offset:   firstPayload.NextOffset,
@@ -596,7 +584,7 @@ func TestHandleHostServiceInvokeStorageChunkedPutCommitsThroughStoragecap(t *tes
 		hcc,
 		protocol.HostServiceMethodStoragePutCommit,
 		objectPath,
-		protocol.MarshalHostServiceStoragePutCommitRequest(&protocol.HostServiceStoragePutCommitRequest{
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceStoragePutCommitRequest{
 			Path:     objectPath,
 			UploadID: initPayload.UploadID,
 			Size:     11,
@@ -605,10 +593,8 @@ func TestHandleHostServiceInvokeStorageChunkedPutCommitsThroughStoragecap(t *tes
 	if commitResponse.Status != protocol.HostCallStatusSuccess {
 		t.Fatalf("commit: expected success, got status=%d payload=%s", commitResponse.Status, string(commitResponse.Payload))
 	}
-	commitPayload, err := protocol.UnmarshalHostServiceStoragePutCommitResponse(commitResponse.Payload)
-	if err != nil {
-		t.Fatalf("commit payload decode failed: %v", err)
-	}
+	var commitPayload protocol.HostServiceStoragePutCommitResponse
+	decodeCapabilityJSONResponse(t, commitResponse.Payload, &commitPayload)
 	if commitPayload.Object == nil || commitPayload.Object.Path != objectPath || commitPayload.Object.Size != 11 {
 		t.Fatalf("commit object: got %#v", commitPayload.Object)
 	}
@@ -632,19 +618,17 @@ func TestHandleHostServiceInvokeStorageChunkedPutRejectsOffsetMismatch(t *testin
 		hcc,
 		protocol.HostServiceMethodStoragePutInit,
 		objectPath,
-		protocol.MarshalHostServiceStoragePutInitRequest(&protocol.HostServiceStoragePutInitRequest{Path: objectPath}),
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceStoragePutInitRequest{Path: objectPath}),
 	)
-	initPayload, err := protocol.UnmarshalHostServiceStoragePutInitResponse(initResponse.Payload)
-	if err != nil {
-		t.Fatalf("init payload decode failed: %v", err)
-	}
+	var initPayload protocol.HostServiceStoragePutInitResponse
+	decodeCapabilityJSONResponse(t, initResponse.Payload, &initPayload)
 
 	response := invokeStorageHostService(
 		t,
 		hcc,
 		protocol.HostServiceMethodStoragePutChunk,
 		objectPath,
-		protocol.MarshalHostServiceStoragePutChunkRequest(&protocol.HostServiceStoragePutChunkRequest{
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceStoragePutChunkRequest{
 			Path:     objectPath,
 			UploadID: initPayload.UploadID,
 			Offset:   3,
@@ -669,19 +653,17 @@ func TestHandleHostServiceInvokeStorageChunkedPutAbortRemovesSession(t *testing.
 		hcc,
 		protocol.HostServiceMethodStoragePutInit,
 		objectPath,
-		protocol.MarshalHostServiceStoragePutInitRequest(&protocol.HostServiceStoragePutInitRequest{Path: objectPath}),
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceStoragePutInitRequest{Path: objectPath}),
 	)
-	initPayload, err := protocol.UnmarshalHostServiceStoragePutInitResponse(initResponse.Payload)
-	if err != nil {
-		t.Fatalf("init payload decode failed: %v", err)
-	}
+	var initPayload protocol.HostServiceStoragePutInitResponse
+	decodeCapabilityJSONResponse(t, initResponse.Payload, &initPayload)
 
 	chunkResponse := invokeStorageHostService(
 		t,
 		hcc,
 		protocol.HostServiceMethodStoragePutChunk,
 		objectPath,
-		protocol.MarshalHostServiceStoragePutChunkRequest(&protocol.HostServiceStoragePutChunkRequest{
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceStoragePutChunkRequest{
 			Path:     objectPath,
 			UploadID: initPayload.UploadID,
 			Offset:   0,
@@ -697,7 +679,7 @@ func TestHandleHostServiceInvokeStorageChunkedPutAbortRemovesSession(t *testing.
 		hcc,
 		protocol.HostServiceMethodStoragePutAbort,
 		objectPath,
-		protocol.MarshalHostServiceStoragePutAbortRequest(&protocol.HostServiceStoragePutAbortRequest{
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceStoragePutAbortRequest{
 			Path:     objectPath,
 			UploadID: initPayload.UploadID,
 		}),
@@ -711,7 +693,7 @@ func TestHandleHostServiceInvokeStorageChunkedPutAbortRemovesSession(t *testing.
 		hcc,
 		protocol.HostServiceMethodStoragePutCommit,
 		objectPath,
-		protocol.MarshalHostServiceStoragePutCommitRequest(&protocol.HostServiceStoragePutCommitRequest{
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceStoragePutCommitRequest{
 			Path:     objectPath,
 			UploadID: initPayload.UploadID,
 			Size:     7,
@@ -755,7 +737,7 @@ func TestHandleHostServiceInvokeStorageConcurrentDispatchIsRaceSafe(t *testing.T
 					hcc,
 					protocol.HostServiceMethodStorageGet,
 					"reports/demo.json",
-					protocol.MarshalHostServiceStorageGetRequest(&protocol.HostServiceStorageGetRequest{Path: "reports/demo.json"}),
+					marshalCapabilityJSONRequest(t, &protocol.HostServiceStorageGetRequest{Path: "reports/demo.json"}),
 				)
 				if response.Status != protocol.HostCallStatusSuccess {
 					errCh <- string(response.Payload)

@@ -15,7 +15,6 @@ import (
 	"lina-core/internal/model/do"
 	"lina-core/internal/model/entity"
 	"lina-core/internal/service/datascope"
-	"lina-core/internal/service/jobhandler"
 	"lina-core/internal/service/jobmeta"
 	"lina-core/pkg/bizerr"
 	"lina-core/pkg/gdbutil"
@@ -361,13 +360,13 @@ func (s *serviceImpl) normalizeJobRecord(
 	case jobv1.TaskTypeHandler:
 		def, ok := s.registry.Lookup(handlerRef)
 		if !ok {
-			return do.SysJob{}, bizerr.NewCode(jobhandler.CodeJobHandlerNotFound)
+			return do.SysJob{}, bizerr.NewCode(CodeJobHandlerNotFound)
 		}
 		paramsData, marshalErr := json.Marshal(in.Params)
 		if marshalErr != nil {
 			return do.SysJob{}, bizerr.WrapCode(marshalErr, CodeJobParamsMarshalFailed)
 		}
-		if err = jobhandler.ValidateParams(def.ParamsSchema, paramsData); err != nil {
+		if err = ValidateParams(def.ParamsSchema, paramsData); err != nil {
 			return do.SysJob{}, err
 		}
 		paramsJSON = string(paramsData)

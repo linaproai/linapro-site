@@ -20,7 +20,7 @@ logger:
     traceIDEnabled: true
 `)
 
-	cfg := New().GetLogger(context.Background())
+	cfg := New(nil).GetLogger(context.Background())
 
 	if cfg.Path != "/tmp/lina" {
 		t.Fatalf("expected log path to be loaded, got %q", cfg.Path)
@@ -47,7 +47,7 @@ logger:
   level: "all"
 `)
 
-	cfg := New().GetLogger(context.Background())
+	cfg := New(nil).GetLogger(context.Background())
 
 	if cfg.Path != "" {
 		t.Fatalf("expected default log path to be empty, got %q", cfg.Path)

@@ -20,22 +20,17 @@ func Lock(invoker HostServiceInvoker) lockcap.Service {
 
 // Acquire attempts to acquire one governed distributed lock.
 func (s *lockService) Acquire(_ context.Context, in lockcap.AcquireInput) (*lockcap.AcquireOutput, error) {
-	payload, err := s.callHostService(
+	response := &protocol.HostServiceLockAcquireResponse{}
+	err := s.callHostServiceJSONRequest(
 		protocol.HostServiceLock,
 		protocol.HostServiceMethodLockAcquire,
 		in.Name,
 		"",
-		protocol.MarshalHostServiceLockAcquireRequest(&protocol.HostServiceLockAcquireRequest{LeaseMillis: leaseMillis(in.Lease)}),
+		protocol.HostServiceLockAcquireRequest{LeaseMillis: leaseMillis(in.Lease)},
+		response,
 	)
 	if err != nil {
 		return nil, err
-	}
-	response, err := protocol.UnmarshalHostServiceLockAcquireResponse(payload)
-	if err != nil {
-		return nil, err
-	}
-	if response == nil {
-		return nil, nil
 	}
 	return &lockcap.AcquireOutput{
 		Acquired: response.Acquired,
@@ -46,36 +41,31 @@ func (s *lockService) Acquire(_ context.Context, in lockcap.AcquireInput) (*lock
 
 // Renew extends one governed distributed lock using the issued ticket.
 func (s *lockService) Renew(_ context.Context, in lockcap.RenewInput) (*lockcap.RenewOutput, error) {
-	payload, err := s.callHostService(
+	response := &protocol.HostServiceLockRenewResponse{}
+	err := s.callHostServiceJSONRequest(
 		protocol.HostServiceLock,
 		protocol.HostServiceMethodLockRenew,
 		in.Name,
 		"",
-		protocol.MarshalHostServiceLockRenewRequest(&protocol.HostServiceLockRenewRequest{Ticket: in.Ticket}),
+		protocol.HostServiceLockRenewRequest{Ticket: in.Ticket},
+		response,
 	)
 	if err != nil {
 		return nil, err
-	}
-	response, err := protocol.UnmarshalHostServiceLockRenewResponse(payload)
-	if err != nil {
-		return nil, err
-	}
-	if response == nil {
-		return nil, nil
 	}
 	return &lockcap.RenewOutput{ExpireAt: parseWireTime(response.ExpireAt)}, nil
 }
 
 // Release releases one governed distributed lock using the issued ticket.
 func (s *lockService) Release(_ context.Context, in lockcap.ReleaseInput) error {
-	_, err := s.callHostService(
+	return s.callHostServiceJSONRequest(
 		protocol.HostServiceLock,
 		protocol.HostServiceMethodLockRelease,
 		in.Name,
 		"",
-		protocol.MarshalHostServiceLockReleaseRequest(&protocol.HostServiceLockReleaseRequest{Ticket: in.Ticket}),
+		protocol.HostServiceLockReleaseRequest{Ticket: in.Ticket},
+		nil,
 	)
-	return err
 }
 
 func leaseMillis(lease time.Duration) int64 {

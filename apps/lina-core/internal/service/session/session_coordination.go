@@ -19,7 +19,10 @@ import (
 	"lina-core/pkg/plugin/capability/tenantcap/tenantspi"
 )
 
-var _ sessionConfigurableStore = (*CoordinationStore)(nil)
+var (
+	_ sessionConfigurableStore = (*CoordinationStore)(nil)
+	_ Directory                = (*CoordinationStore)(nil)
+)
 
 // CoordinationStore stores request-path session state in coordination KV and
 // delegates management-list projections to PostgreSQL.
@@ -27,7 +30,7 @@ type CoordinationStore struct {
 	coordinationSvc coordination.Service
 	kvStore         coordination.KVStore
 	keyBuilder      *coordination.KeyBuilder
-	projection      Store
+	projection      Directory
 	defaultTTL      time.Duration
 }
 
@@ -59,7 +62,7 @@ type sessionUserIndex struct {
 
 // NewCoordinationStore creates a session store backed by coordination KV for
 // hot state and PostgreSQL for management projections.
-func NewCoordinationStore(coordinationSvc coordination.Service, projection Store) Store {
+func NewCoordinationStore(coordinationSvc coordination.Service, projection Directory) Directory {
 	if projection == nil {
 		projection = &DBStore{}
 	}
@@ -82,9 +85,9 @@ func NewCoordinationStore(coordinationSvc coordination.Service, projection Store
 // applies the runtime-effective session timeout before callers write sessions.
 func NewCoordinationStoreWithDefaultTTL(
 	coordinationSvc coordination.Service,
-	projection Store,
+	projection Directory,
 	ttl time.Duration,
-) Store {
+) Directory {
 	store := NewCoordinationStore(coordinationSvc, projection)
 	if configurable, ok := store.(sessionConfigurableStore); ok {
 		configurable.SetDefaultTTL(ttl)

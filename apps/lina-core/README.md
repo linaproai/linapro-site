@@ -13,8 +13,7 @@
 
 The scheduled-job subsystem is part of the host service because it is a core governance capability.
 
-- `internal/service/jobhandler`: handler registry, host handler bootstrap, plugin-linked handler registration, and schema validation.
-- `internal/service/jobmgmt`: job groups, persisted jobs, execution logs, cron preview, retention cleanup, and lifecycle rules for built-in jobs.
+- `internal/service/jobmgmt`: job groups, persisted jobs, execution logs, cron preview, retention cleanup, lifecycle rules for built-in jobs, handler registry, host handler bootstrap, plugin-linked handler registration, and schema validation.
 - `internal/service/jobmgmt/scheduler`: persisted job loading, `gcron` registration, concurrency guards, execution dispatch, and cancellation.
 - `internal/service/jobmgmt/shellexec`: guarded `Shell` execution, timeout handling, output truncation, and manual cancellation support.
 - `internal/service/cron`: startup entrypoint that registers host cron jobs and loads persisted scheduled jobs after the host boots.
@@ -84,22 +83,36 @@ For external hosted `PostgreSQL`, such as `RDS` or `Aliyun PolarDB`, point `data
 
 Single-node deployments keep the lightweight local mode: they do not require `Redis`, do not connect to `Redis`, and continue to use PostgreSQL plus process-local cache coordination where appropriate.
 
-Clustered deployments must configure the Redis coordination backend explicitly:
+Clustered deployments select a Redis group from cluster topology and keep connection settings in top-level named Redis groups:
 
 ```yaml
 cluster:
   enabled: true
-  coordination: redis
-  redis:
+  election:
+    lease: 30s
+    renewInterval: 10s
+  coordination:
+    backend: redis
+    group: default
+
+redis:
+  default:
     address: "127.0.0.1:6379"
     db: 0
     password: ""
     connectTimeout: 3s
     readTimeout: 2s
     writeTimeout: 2s
+  cache:
+    address: "127.0.0.1:6379"
+    db: 1
+    password: ""
+    connectTimeout: 3s
+    readTimeout: 2s
+    writeTimeout: 2s
 ```
 
-The current backend only supports `redis`. The scalar `cluster.coordination` setting is intentionally stable so future backends can be added without exposing per-store coordination switches. Redis integration tests are opt-in; set `LINA_TEST_REDIS_ADDR`, for example `LINA_TEST_REDIS_ADDR=127.0.0.1:6379`, before running the Redis-specific Go test cases.
+`redis.<group>.address` may be a single `host:port` or comma-separated Redis Cluster nodes, matching GoFrame Redis configuration. Extra groups can exist without being selected. Redis integration tests are opt-in; set `LINA_TEST_REDIS_ADDR`, for example `LINA_TEST_REDIS_ADDR=127.0.0.1:6379`, before running the Redis-specific Go test cases.
 
 ## Source Plugin Upgrade
 

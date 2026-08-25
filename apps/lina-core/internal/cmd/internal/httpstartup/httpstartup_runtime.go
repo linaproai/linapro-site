@@ -29,7 +29,6 @@ import (
 	"lina-core/internal/service/file"
 	"lina-core/internal/service/hostlock"
 	i18nsvc "lina-core/internal/service/i18n"
-	jobhandlersvc "lina-core/internal/service/jobhandler"
 	jobmgmtsvc "lina-core/internal/service/jobmgmt"
 	"lina-core/internal/service/kvcache"
 	"lina-core/internal/service/locker"
@@ -44,7 +43,6 @@ import (
 	"lina-core/internal/service/sysconfig"
 	sysinfosvc "lina-core/internal/service/sysinfo"
 	"lina-core/internal/service/user"
-	"lina-core/internal/service/usermsg"
 	"lina-core/pkg/dialect"
 	"lina-core/pkg/logger"
 	"lina-core/pkg/plugin/capability/authcap/extlogin/extidspi"
@@ -63,6 +61,7 @@ type httpRuntime struct {
 	bizCtxSvc       bizctx.Service       // bizCtxSvc owns request-scoped business context mutation.
 	i18nSvc         i18nsvc.Service      // i18nSvc owns runtime language bundles and localization.
 	orgSvc          orgspi.Service       // orgSvc owns organization capability and workspace projections.
+	tenantSvc       tenantspi.Service    // tenantSvc owns tenant capability availability for identity flags.
 	roleSvc         role.Service         // roleSvc owns permission and access snapshot state.
 	dictSvc         dict.Service         // dictSvc owns dictionary lookup and maintenance.
 	fileSvc         file.Service         // fileSvc owns file metadata and storage operations.
@@ -70,9 +69,9 @@ type httpRuntime struct {
 	sysConfigSvc    sysconfig.Service    // sysConfigSvc owns mutable runtime configuration records.
 	sysInfoSvc      sysinfosvc.Service   // sysInfoSvc owns runtime diagnostics projection.
 	userSvc         user.Service         // userSvc owns host user management operations.
-	userMsgSvc      usermsg.Service      // userMsgSvc owns current-user inbox operations.
+	notifySvc       notify.Service       // notifySvc owns notification send and inbox reads.
 	apiDocSvc       apidoc.Service       // apiDocSvc builds the host-managed OpenAPI document.
-	jobRegistry     jobhandlersvc.Registry
+	jobRegistry     jobmgmtsvc.Registry
 	jobMgmtSvc      jobmgmtsvc.Service
 	middlewareSvc   middleware.Service
 	cronSvc         cron.Service
@@ -235,14 +234,11 @@ func newHTTPRuntime(ctx context.Context, configSvc config.Service) (*httpRuntime
 	if err != nil {
 		return nil, err
 	}
-	clusterSvc := cluster.NewWithCoordination(clusterCfg, coordinationSvc)
-	if clusterCfg != nil && clusterCfg.Enabled {
-		cachecoord.DefaultWithCoordination(clusterSvc, coordinationSvc)
-		locker.ConfigureCoordination(coordinationSvc)
-		session.ConfigureCoordination(coordinationSvc)
-	} else {
-		locker.ConfigureCoordination(nil)
-		session.ConfigureCoordination(nil)
+	clusterSvc := cluster.New(clusterCfg, coordinationSvc)
+	cacheCoordSvc := cachecoord.New(clusterSvc, coordinationSvc)
+	configSvc = config.New(cacheCoordSvc)
+	if !dbDialect.SupportsCluster() {
+		configSvc.OverrideClusterEnabledForDialect(false)
 	}
 	kvCacheProvider, err := newHTTPKVCacheProvider(clusterCfg, coordinationSvc)
 	if err != nil {
@@ -256,18 +252,17 @@ func newHTTPRuntime(ctx context.Context, configSvc config.Service) (*httpRuntime
 
 	var (
 		bizCtxSvc     = bizctx.New()
-		sessionStore  = session.NewDBStore()
-		cacheCoordSvc = cachecoord.Default(clusterSvc)
+		sessionStore  = session.NewCoordinationStore(coordinationSvc, session.NewDBStore())
 		i18nSvc       = i18nsvc.New(bizCtxSvc, configSvc, cacheCoordSvc)
-		lockerSvc     = locker.New()
 		lockStore     = runtimeUpgradeLockStore(coordinationSvc)
+		lockerSvc     = locker.New(lockStore)
 		pluginRuntime = pluginsvc.NewRuntimeDelegate()
 		kvCacheSvc    = kvcache.New(kvcache.WithProvider(kvCacheProvider))
 		objectStorage = storagesvc.New(storagesvc.Config{NamespaceRoots: map[string]string{
 			storagesvc.NamespaceFiles:   configSvc.GetUploadPath(ctx),
 			storagesvc.NamespacePlugins: configSvc.GetPluginDynamicStoragePath(ctx),
 		}})
-		jobRegistry = jobhandlersvc.New()
+		jobRegistry = jobmgmtsvc.NewRegistry()
 	)
 	var (
 		tenantProviderManager           = tenantspi.NewManager()
@@ -277,7 +272,7 @@ func newHTTPRuntime(ctx context.Context, configSvc config.Service) (*httpRuntime
 	var (
 		orgCapSvc            = orgspi.New(orgProviderManager, pluginRuntime, pluginRuntime.OrgProviderEnv)
 		tenantSvc            = tenantspi.New(tenantProviderManager, pluginRuntime, pluginRuntime.TenantProviderEnv, bizCtxSvc)
-		roleSvc              = role.New(pluginRuntime, bizCtxSvc, configSvc, i18nSvc, orgCapSvc, tenantSvc)
+		roleSvc              = role.New(pluginRuntime, bizCtxSvc, configSvc, i18nSvc, orgCapSvc, tenantSvc, cacheCoordSvc)
 		scopeSvc             = datascope.New(bizCtxSvc, roleSvc, orgCapSvc.Scope())
 		dictSvc              = dict.New(i18nSvc)
 		menuSvc              = menu.New(pluginRuntime, i18nSvc, roleSvc, tenantSvc)
@@ -289,7 +284,6 @@ func newHTTPRuntime(ctx context.Context, configSvc config.Service) (*httpRuntime
 		fileSvc              = file.New(configSvc, fileStorage, bizCtxSvc, dictSvc, scopeSvc)
 		sysConfigSvc         = sysconfig.New(configSvc, i18nSvc)
 		userSvc              = user.New(authSvc, bizCtxSvc, i18nSvc, orgCapSvc, roleSvc, scopeSvc, tenantSvc)
-		userMsgSvc           = usermsg.New(bizCtxSvc, notifySvc, i18nSvc)
 		apiDocSvc            = apidoc.New(configSvc, bizCtxSvc, i18nSvc, pluginRuntime)
 	)
 	// Bind the manager-backed external-identity provider seam. The bound value
@@ -387,7 +381,7 @@ func newHTTPRuntime(ctx context.Context, configSvc config.Service) (*httpRuntime
 
 	// Host-owned handler definitions are registered before cron startup so the
 	// persistent scheduler can project and validate code-owned jobs immediately.
-	if err = jobhandlersvc.RegisterHostHandlers(jobRegistry, jobMgmtSvc); err != nil {
+	if err = jobmgmtsvc.RegisterHostHandlers(jobRegistry, jobMgmtSvc); err != nil {
 		closeHTTPCoordinationAfterInitError(ctx, coordinationSvc)
 		return nil, err
 	}
@@ -406,6 +400,7 @@ func newHTTPRuntime(ctx context.Context, configSvc config.Service) (*httpRuntime
 		bizCtxSvc:       bizCtxSvc,
 		i18nSvc:         i18nSvc,
 		orgSvc:          orgCapSvc,
+		tenantSvc:       tenantSvc,
 		roleSvc:         roleSvc,
 		dictSvc:         dictSvc,
 		fileSvc:         fileSvc,
@@ -413,7 +408,7 @@ func newHTTPRuntime(ctx context.Context, configSvc config.Service) (*httpRuntime
 		sysConfigSvc:    sysConfigSvc,
 		sysInfoSvc:      sysInfoSvc,
 		userSvc:         userSvc,
-		userMsgSvc:      userMsgSvc,
+		notifySvc:       notifySvc,
 		apiDocSvc:       apiDocSvc,
 		jobRegistry:     jobRegistry,
 		jobMgmtSvc:      jobMgmtSvc,
@@ -447,31 +442,36 @@ func newHTTPCoordinationService(
 	if clusterCfg == nil || !clusterCfg.Enabled {
 		return nil, nil
 	}
-	if clusterCfg.Coordination != config.ClusterCoordinationRedis {
-		return nil, gerror.Newf("cluster.coordination=%s is unsupported; only redis is supported", clusterCfg.Coordination)
+	if clusterCfg.Coordination.Backend != cluster.CoordinationBackendRedis {
+		return nil, gerror.Newf(
+			"cluster.coordination.backend=%s is unsupported; only redis is supported",
+			clusterCfg.Coordination.Backend,
+		)
 	}
-	redisCfg := configSvc.GetClusterRedis(ctx)
-	if redisCfg == nil {
-		return nil, gerror.New("cluster.redis is required when cluster.coordination=redis")
+	groupName := strings.TrimSpace(clusterCfg.Coordination.Group)
+	if groupName == "" {
+		groupName = cluster.DefaultCoordinationGroup
 	}
-	return coordination.NewRedis(ctx, coordination.RedisOptions{
-		Address:        redisCfg.Address,
-		DB:             redisCfg.DB,
-		Password:       redisCfg.Password,
-		ConnectTimeout: redisCfg.ConnectTimeout,
-		ReadTimeout:    redisCfg.ReadTimeout,
-		WriteTimeout:   redisCfg.WriteTimeout,
-		KeyBuilder:     coordination.DefaultKeyBuilder(),
-	})
+	redisGroup, ok := configSvc.GetRedis(ctx)[groupName]
+	if !ok {
+		return nil, gerror.Newf("redis.%s is required when cluster.coordination.group=%s", groupName, groupName)
+	}
+	if strings.TrimSpace(redisGroup.Address) == "" {
+		return nil, gerror.Newf("redis.%s.address is required when cluster.coordination.backend=redis", groupName)
+	}
+	return coordination.NewRedis(ctx, redisGroup.Options(coordination.DefaultKeyBuilder()))
 }
 
 // runtimeUpgradeLockStore extracts the cluster coordination lock store used by
-// plugin runtime upgrades. Single-node deployments pass nil explicitly.
+// plugin runtime upgrades. Single-node deployments bind the SQL table store.
 func runtimeUpgradeLockStore(coordinationSvc coordination.Service) coordination.LockStore {
 	if coordinationSvc == nil {
-		return nil
+		return locker.NewSQLStore()
 	}
-	return coordinationSvc.Lock()
+	if store := coordinationSvc.Lock(); store != nil {
+		return store
+	}
+	return locker.NewSQLStore()
 }
 
 // closeHTTPCoordinationAfterInitError best-effort closes Redis coordination
@@ -521,7 +521,7 @@ func finishHTTPRuntimeAfterSourceRoutes(ctx context.Context, runtime *httpRuntim
 		return err
 	}
 	if err := startupstats.Observe(ctx, startupstats.PhasePluginLifecycleAttach, func() error {
-		_, attachErr := jobhandlersvc.AttachPluginLifecycle(
+		_, attachErr := jobmgmtsvc.AttachPluginLifecycle(
 			ctx,
 			runtime.jobRegistry,
 			runtime.pluginSvc,

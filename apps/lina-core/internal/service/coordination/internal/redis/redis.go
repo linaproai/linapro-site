@@ -1,5 +1,5 @@
 // Package redis implements the Redis-backed coordination provider used when
-// cluster.enabled=true and cluster.coordination=redis.
+// cluster.enabled=true and cluster.coordination.backend=redis.
 package redis
 
 import (
@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/redis/go-redis/v9"
 
 	"lina-core/internal/service/coordination/internal/core"
@@ -15,8 +16,8 @@ import (
 
 // Options contains normalized Redis connection settings for coordination.
 type Options struct {
-	Address        string           // Address is the host:port endpoint for Redis.
-	DB             int              // DB selects the Redis logical database.
+	Address        string           // Address is host:port or comma-separated Redis Cluster nodes.
+	DB             int              // DB selects the Redis logical database for standalone instances.
 	Password       string           // Password authenticates to Redis when configured.
 	ConnectTimeout time.Duration    // ConnectTimeout bounds Redis connection establishment.
 	ReadTimeout    time.Duration    // ReadTimeout bounds Redis read operations.
@@ -26,7 +27,7 @@ type Options struct {
 
 // redisBackend implements all coordination stores through one Redis client.
 type redisBackend struct {
-	client  *redis.Client
+	client  redis.UniversalClient
 	keys    *core.KeyBuilder
 	health  *redisHealth
 	closeMu sync.Mutex
@@ -75,8 +76,12 @@ func New(ctx context.Context, options Options) (core.Service, error) {
 	if options.WriteTimeout <= 0 {
 		options.WriteTimeout = 2 * time.Second
 	}
-	client := redis.NewClient(&redis.Options{
-		Addr:         options.Address,
+	addrs := splitRedisAddrs(options.Address)
+	if len(addrs) == 0 {
+		return nil, gerror.New("redis address is required")
+	}
+	client := redis.NewUniversalClient(&redis.UniversalOptions{
+		Addrs:        addrs,
 		DB:           options.DB,
 		Password:     options.Password,
 		DialTimeout:  options.ConnectTimeout,

@@ -8,7 +8,6 @@ import (
 
 	"lina-core/internal/service/cluster"
 	"lina-core/internal/service/config"
-	jobhandlersvc "lina-core/internal/service/jobhandler"
 	jobmgmtsvc "lina-core/internal/service/jobmgmt"
 	pluginsvc "lina-core/internal/service/plugin"
 	rolesvc "lina-core/internal/service/role"
@@ -35,15 +34,15 @@ var _ Service = (*serviceImpl)(nil)
 
 // serviceImpl implements Service.
 type serviceImpl struct {
-	configSvc           config.Service         // Config service
-	roleSvc             rolesvc.Service        // Role service
-	sessionStore        session.Store          // Session store
-	clusterSvc          cluster.Service        // Cluster topology service
-	registry            jobhandlersvc.Registry // registry stores managed host and plugin handlers.
-	pluginSvc           pluginsvc.Service      // pluginSvc exposes plugin lifecycle and job declarations.
-	builtinSyncer       jobmgmtsvc.Service     // builtinSyncer persists code-owned job definitions.
-	persistentScheduler jobmgmtsvc.Scheduler   // persistentScheduler loads and registers persisted jobs.
-	pluginObserverOnce  sync.Once              // pluginObserverOnce avoids duplicate lifecycle subscriptions.
+	configSvc           config.Service       // Config service
+	roleSvc             rolesvc.Service      // Role service
+	sessionStore        session.Directory    // Session management projection used by cleanup jobs
+	clusterSvc          cluster.Service      // Cluster topology service
+	registry            jobmgmtsvc.Registry  // registry stores managed host and plugin handlers.
+	pluginSvc           pluginsvc.Service    // pluginSvc exposes plugin lifecycle and job declarations.
+	builtinSyncer       jobmgmtsvc.Service   // builtinSyncer persists code-owned job definitions.
+	persistentScheduler jobmgmtsvc.Scheduler // persistentScheduler loads and registers persisted jobs.
+	pluginObserverOnce  sync.Once            // pluginObserverOnce avoids duplicate lifecycle subscriptions.
 }
 
 // New creates and returns a new Service instance.
@@ -51,9 +50,9 @@ func New(
 	configSvc config.Service,
 	roleSvc rolesvc.Service,
 	pluginSvc pluginsvc.Service,
-	sessionStore session.Store,
+	sessionStore session.Directory,
 	clusterSvc cluster.Service,
-	registry jobhandlersvc.Registry,
+	registry jobmgmtsvc.Registry,
 	builtinSyncer jobmgmtsvc.Service,
 	persistentScheduler jobmgmtsvc.Scheduler,
 ) Service {

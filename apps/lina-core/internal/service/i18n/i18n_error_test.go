@@ -35,7 +35,7 @@ func TestLocalizeErrorSupportsStructuredRuntimeMessages(t *testing.T) {
 		EnglishLocale: `{"error":{"test":{"structured":{"error":"User {username} does not exist"}}}}`,
 	})
 
-	svc := New(bizctx.New(), config.New(), cachecoord.Default(nil))
+	svc := New(bizctx.New(), config.New(nil), cachecoord.New(nil, nil))
 	testCases := []struct {
 		locale   string
 		expected string
@@ -61,7 +61,7 @@ func TestLocalizeErrorSupportsStructuredRuntimeMessages(t *testing.T) {
 func TestLocalizeErrorUsesStructuredFallback(t *testing.T) {
 	resetRuntimeBundleCache()
 
-	svc := New(bizctx.New(), config.New(), cachecoord.Default(nil))
+	svc := New(bizctx.New(), config.New(nil), cachecoord.New(nil, nil))
 	ctx := context.WithValue(context.Background(), gctx.StrKey("BizCtx"), &model.Context{Locale: EnglishLocale})
 	code := bizerr.MustDefine(
 		"TEST_STRUCTURED_MISSING_KEY",
@@ -80,7 +80,7 @@ func TestLocalizeErrorUsesHostAuthErrorResources(t *testing.T) {
 	resetRuntimeBundleCache()
 	t.Cleanup(resetRuntimeBundleCache)
 
-	svc := New(bizctx.New(), config.New(), cachecoord.Default(nil))
+	svc := New(bizctx.New(), config.New(nil), cachecoord.New(nil, nil))
 	code := bizerr.MustDefine(
 		"AUTH_TENANT_UNAVAILABLE",
 		"Tenant is not available",
@@ -129,7 +129,7 @@ func TestLocalizeErrorUsesRuntimeBundleCache(t *testing.T) {
 	resetRuntimeBundleCache()
 
 	var (
-		svc = New(bizctx.New(), config.New(), cachecoord.Default(nil))
+		svc = New(bizctx.New(), config.New(nil), cachecoord.New(nil, nil))
 		ctx = context.WithValue(context.Background(), gctx.StrKey("BizCtx"), &model.Context{Locale: EnglishLocale})
 		err = bizerr.NewCode(code, bizerr.P("value", "message"))
 	)
@@ -145,7 +145,7 @@ func TestLocalizeErrorUsesHostDataScopeErrorResources(t *testing.T) {
 	resetRuntimeBundleCache()
 	t.Cleanup(resetRuntimeBundleCache)
 
-	svc := New(bizctx.New(), config.New(), cachecoord.Default(nil))
+	svc := New(bizctx.New(), config.New(nil), cachecoord.New(nil, nil))
 	testCases := []struct {
 		name     string
 		key      string
@@ -263,7 +263,7 @@ func TestLocalizeErrorUsesHostUserTenantMembershipErrorResources(t *testing.T) {
 	resetRuntimeBundleCache()
 	t.Cleanup(resetRuntimeBundleCache)
 
-	svc := New(bizctx.New(), config.New(), cachecoord.Default(nil))
+	svc := New(bizctx.New(), config.New(nil), cachecoord.New(nil, nil))
 	testCases := []struct {
 		name     string
 		key      string
@@ -384,7 +384,7 @@ func TestLocalizeErrorUsesSourcePluginErrorResources(t *testing.T) {
 }`,
 	})
 
-	svc := New(bizctx.New(), config.New(), cachecoord.Default(nil))
+	svc := New(bizctx.New(), config.New(nil), cachecoord.New(nil, nil))
 	testCases := []struct {
 		name     string
 		key      string

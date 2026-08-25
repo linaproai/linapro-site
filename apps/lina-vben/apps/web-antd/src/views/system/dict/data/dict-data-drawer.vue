@@ -12,10 +12,8 @@ import {
   dictDataInfo,
   dictDataUpdate,
 } from '#/api/system/dict/dict-data';
-import { tagTypes } from '#/components/dict';
 
 import { drawerSchema } from './data';
-import TagStylePicker from './tag-style-picker.vue';
 
 const emit = defineEmits<{ reload: [dictType: string] }>();
 
@@ -31,21 +29,6 @@ const title = computed(() =>
     ? $t('pages.system.dict.data.drawer.editTitle')
     : $t('pages.system.dict.data.drawer.createTitle'),
 );
-
-/**
- * 标签样式选择器
- * default: 预设标签样式
- * custom: 自定义标签样式
- */
-const selectType = ref<'custom' | 'default'>('default');
-
-/**
- * 根据标签样式判断是自定义还是默认
- */
-function setupSelectType(tagStyle: string) {
-  const isDefault = Reflect.has(tagTypes, tagStyle);
-  selectType.value = isDefault ? 'default' : 'custom';
-}
 
 const [Form, formApi] = useVbenForm({
   commonConfig: {
@@ -74,7 +57,6 @@ const [Drawer, drawerApi] = useVbenDrawer({
 
     if (id && isEdit.value) {
       const record = await dictDataInfo(id);
-      setupSelectType(record.tagStyle ?? '');
       await formApi.setValues(record);
     }
 
@@ -88,10 +70,6 @@ const [Drawer, drawerApi] = useVbenDrawer({
         return;
       }
       const data = await formApi.getValues();
-      // 确保 tagStyle 为空字符串而非 undefined
-      if (!data.tagStyle) {
-        data.tagStyle = '';
-      }
 
       if (isEdit.value) {
         await dictDataUpdate(editId.value, data);
@@ -111,28 +89,12 @@ const [Drawer, drawerApi] = useVbenDrawer({
   },
   onClosed() {
     formApi.resetForm();
-    selectType.value = 'default';
   },
 });
-
-/**
- * 取消标签选中 必须设置为undefined才行
- */
-async function handleDeSelect() {
-  await formApi.setFieldValue('tagStyle', undefined);
-}
 </script>
 
 <template>
   <Drawer :title="title" class="w-[700px] max-w-[calc(100vw-32px)]">
-    <Form>
-      <template #tagStyle="slotProps">
-        <TagStylePicker
-          v-bind="slotProps"
-          v-model:select-type="selectType"
-          @deselect="handleDeSelect"
-        />
-      </template>
-    </Form>
+    <Form />
   </Drawer>
 </template>

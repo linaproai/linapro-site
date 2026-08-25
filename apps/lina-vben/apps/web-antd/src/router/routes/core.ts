@@ -57,22 +57,6 @@ const coreRoutes: RouteRecordRaw[] = [
         },
       },
       {
-        name: 'CodeLogin',
-        path: 'code-login',
-        redirect: LOGIN_PATH,
-        meta: {
-          title: $t('page.auth.codeLogin'),
-        },
-      },
-      {
-        name: 'QrCodeLogin',
-        path: 'qrcode-login',
-        redirect: LOGIN_PATH,
-        meta: {
-          title: $t('page.auth.qrcodeLogin'),
-        },
-      },
-      {
         name: 'ForgetPassword',
         path: 'forget-password',
         component: () =>

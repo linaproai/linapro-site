@@ -12,8 +12,6 @@ type DataUpdateReq struct {
 	Label    *string `json:"label" dc:"dictionary tag (display name)" eg:"male"`
 	Value    *string `json:"value" dc:"Dictionary value (stored value)" eg:"1"`
 	Sort     *int    `json:"sort" dc:"sequence number" eg:"1"`
-	TagStyle *string `json:"tagStyle" dc:"label style" eg:"success"`
-	CssClass *string `json:"cssClass" dc:"CSS class name" eg:"text-green"`
 	Status   *int    `json:"status" dc:"Status: 1=normal 0=disabled" eg:"1"`
 	Remark   *string `json:"remark" dc:"Remarks" eg:"Gender male"`
 }

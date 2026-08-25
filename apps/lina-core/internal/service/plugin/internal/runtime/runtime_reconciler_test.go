@@ -36,13 +36,10 @@ import (
 func TestRuntimeReconcilerLockSerializesSamePlugin(t *testing.T) {
 	ctx := context.Background()
 	coordSvc := coordination.NewMemory(nil)
-	locker.ConfigureCoordination(coordSvc)
-	t.Cleanup(func() {
-		locker.ConfigureCoordination(nil)
-	})
+	lockSvc := locker.New(coordSvc.Lock())
 
 	pluginID := "plugin-dev-reconciler-lock-same"
-	held, ok, err := locker.New().Lock(ctx, runtimeReconcilerLockName(pluginID), "node-a", "test", time.Minute)
+	held, ok, err := lockSvc.Lock(ctx, runtimeReconcilerLockName(pluginID), "node-a", "test", time.Minute)
 	if err != nil || !ok || held == nil {
 		t.Fatalf("expected initial per-plugin lock, ok=%v err=%v", ok, err)
 	}
@@ -54,7 +51,7 @@ func TestRuntimeReconcilerLockSerializesSamePlugin(t *testing.T) {
 
 	service := &serviceImpl{
 		topology:          reconcilerRevisionTestTopology{cluster: true, primary: true, nodeID: "node-b"},
-		reconcilerLockSvc: locker.New(),
+		reconcilerLockSvc: lockSvc,
 	}
 	locked, unlock, err := service.lockRuntimeReconcilePlugin(ctx, pluginID)
 	if err != nil {
@@ -71,12 +68,9 @@ func TestRuntimeReconcilerLockSerializesSamePlugin(t *testing.T) {
 func TestRuntimeReconcilerLockNamesArePerPlugin(t *testing.T) {
 	ctx := context.Background()
 	coordSvc := coordination.NewMemory(nil)
-	locker.ConfigureCoordination(coordSvc)
-	t.Cleanup(func() {
-		locker.ConfigureCoordination(nil)
-	})
+	lockSvc := locker.New(coordSvc.Lock())
 
-	held, ok, err := locker.New().Lock(ctx, runtimeReconcilerLockName("plugin-dev-reconciler-lock-a"), "node-a", "test", time.Minute)
+	held, ok, err := lockSvc.Lock(ctx, runtimeReconcilerLockName("plugin-dev-reconciler-lock-a"), "node-a", "test", time.Minute)
 	if err != nil || !ok || held == nil {
 		t.Fatalf("expected initial plugin A lock, ok=%v err=%v", ok, err)
 	}
@@ -88,7 +82,7 @@ func TestRuntimeReconcilerLockNamesArePerPlugin(t *testing.T) {
 
 	service := &serviceImpl{
 		topology:          reconcilerRevisionTestTopology{cluster: true, primary: true, nodeID: "node-b"},
-		reconcilerLockSvc: locker.New(),
+		reconcilerLockSvc: lockSvc,
 	}
 	locked, unlock, err := service.lockRuntimeReconcilePlugin(ctx, "plugin-dev-reconciler-lock-b")
 	if err != nil {
@@ -105,13 +99,10 @@ func TestRuntimeReconcilerLockNamesArePerPlugin(t *testing.T) {
 func TestRequiredRuntimeReconcilerLockReturnsConflict(t *testing.T) {
 	ctx := context.Background()
 	coordSvc := coordination.NewMemory(nil)
-	locker.ConfigureCoordination(coordSvc)
-	t.Cleanup(func() {
-		locker.ConfigureCoordination(nil)
-	})
+	lockSvc := locker.New(coordSvc.Lock())
 
 	const pluginID = "plugin-dev-reconciler-lock-required"
-	held, ok, err := locker.New().Lock(ctx, runtimeReconcilerLockName(pluginID), "node-a", "test", time.Minute)
+	held, ok, err := lockSvc.Lock(ctx, runtimeReconcilerLockName(pluginID), "node-a", "test", time.Minute)
 	if err != nil || !ok || held == nil {
 		t.Fatalf("expected initial per-plugin lock, ok=%v err=%v", ok, err)
 	}
@@ -123,7 +114,7 @@ func TestRequiredRuntimeReconcilerLockReturnsConflict(t *testing.T) {
 
 	service := &serviceImpl{
 		topology:          reconcilerRevisionTestTopology{cluster: true, primary: true, nodeID: "node-b"},
-		reconcilerLockSvc: locker.New(),
+		reconcilerLockSvc: lockSvc,
 	}
 	called := false
 	err = service.reconcilePrimaryPluginWithRequiredLock(
@@ -390,7 +381,7 @@ func (p *runtimeSafetyLifecycleReconciler) EnsureRuntimeArtifactAvailable(manife
 // only the dependencies exercised by reconciler safety tests.
 func newRuntimeSafetyServices() *runtimeSafetyServices {
 	var (
-		configProvider = configsvc.New()
+		configProvider = configsvc.New(nil)
 		catalogSvc     = catalog.New(configProvider)
 		topology       = reconcilerRevisionTestTopology{cluster: false, primary: true, nodeID: "test-node"}
 		storeSvc       = store.New(catalogSvc, topology)
@@ -403,8 +394,9 @@ func newRuntimeSafetyServices() *runtimeSafetyServices {
 		migrationSvc,
 		nil,
 		nil,
-		locker.New(),
+		locker.New(locker.NewSQLStore()),
 		topology,
+		nil,
 		nil,
 		configProvider,
 		nil,

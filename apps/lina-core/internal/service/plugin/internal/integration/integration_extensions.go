@@ -13,6 +13,7 @@ import (
 	"github.com/gogf/gf/v2/os/gtime"
 
 	"lina-core/internal/model/entity"
+	menusvc "lina-core/internal/service/menu"
 	"lina-core/internal/service/plugin/internal/catalog"
 	"lina-core/internal/service/plugin/internal/plugintypes"
 	"lina-core/pkg/logger"
@@ -141,7 +142,7 @@ func (s *serviceImpl) DispatchPluginHookEvent(
 }
 
 // FilterMenus filters disabled plugin menus by menu_key prefix "plugin:<plugin-id>".
-func (s *serviceImpl) FilterMenus(ctx context.Context, menus []*entity.SysMenu) []*entity.SysMenu {
+func (s *serviceImpl) FilterMenus(ctx context.Context, menus []menusvc.FilterItem) []menusvc.FilterItem {
 	if len(menus) == 0 {
 		return menus
 	}
@@ -155,7 +156,7 @@ func (s *serviceImpl) FilterMenus(ctx context.Context, menus []*entity.SysMenu) 
 
 // FilterPermissionMenus filters permission menus based on plugin enablement and plugin-defined permission visibility.
 // It implements runtime.IntegrationService.
-func (s *serviceImpl) FilterPermissionMenus(ctx context.Context, menus []*entity.SysMenu) []*entity.SysMenu {
+func (s *serviceImpl) FilterPermissionMenus(ctx context.Context, menus []menusvc.FilterItem) []menusvc.FilterItem {
 	if len(menus) == 0 {
 		return menus
 	}
@@ -165,21 +166,18 @@ func (s *serviceImpl) FilterPermissionMenus(ctx context.Context, menus []*entity
 		return s.filterPermissionMenusSlow(ctx, menus)
 	}
 
-	filteredMenus := s.filterMenusWithRuntime(ctx, menus, runtime)
-	filtered := make([]*entity.SysMenu, 0, len(filteredMenus))
-	for _, menu := range filteredMenus {
-		if menu == nil {
-			continue
-		}
-		if s.shouldKeepPermissionWithRuntime(ctx, menu, runtime) {
-			filtered = append(filtered, menu)
+	filteredItems := s.filterMenusWithRuntime(ctx, menus, runtime)
+	kept := make([]menusvc.FilterItem, 0, len(filteredItems))
+	for _, item := range filteredItems {
+		if s.shouldKeepPermissionWithRuntime(ctx, item, runtime) {
+			kept = append(kept, item)
 		}
 	}
-	return filtered
+	return kept
 }
 
 // ShouldKeepPermission reports whether a permission should stay effective after plugin filtering.
-func (s *serviceImpl) ShouldKeepPermission(ctx context.Context, menu *entity.SysMenu) bool {
+func (s *serviceImpl) ShouldKeepPermission(ctx context.Context, menu menusvc.FilterItem) bool {
 	runtime, err := s.buildFilterRuntime(ctx)
 	if err != nil {
 		return s.shouldKeepPermissionSlow(ctx, menu)
@@ -191,19 +189,16 @@ func (s *serviceImpl) ShouldKeepPermission(ctx context.Context, menu *entity.Sys
 // enablement/runtime snapshot to avoid repeated registry lookups.
 func (s *serviceImpl) filterMenusWithRuntime(
 	ctx context.Context,
-	menus []*entity.SysMenu,
+	menus []menusvc.FilterItem,
 	runtime *filterRuntime,
-) []*entity.SysMenu {
-	filtered := make([]*entity.SysMenu, 0, len(menus))
+) []menusvc.FilterItem {
+	filtered := make([]menusvc.FilterItem, 0, len(menus))
 	for _, menu := range menus {
-		if menu == nil {
-			continue
-		}
 		pluginID := plugintypes.ParsePluginIDFromMenuKey(menu.MenuKey)
 		if pluginID != "" && !runtime.isEnabled(pluginID) {
 			continue
 		}
-		if s.shouldKeepMenuWithRuntime(ctx, menu, runtime) {
+		if s.shouldKeepMenuWithRuntime(ctx, filterItemAsMenu(menu), runtime) {
 			filtered = append(filtered, menu)
 		}
 	}
@@ -212,17 +207,14 @@ func (s *serviceImpl) filterMenusWithRuntime(
 
 // filterMenusSlow filters menus by querying plugin state on demand when the
 // cached runtime snapshot cannot be built.
-func (s *serviceImpl) filterMenusSlow(ctx context.Context, menus []*entity.SysMenu) []*entity.SysMenu {
-	filtered := make([]*entity.SysMenu, 0, len(menus))
+func (s *serviceImpl) filterMenusSlow(ctx context.Context, menus []menusvc.FilterItem) []menusvc.FilterItem {
+	filtered := make([]menusvc.FilterItem, 0, len(menus))
 	for _, menu := range menus {
-		if menu == nil {
-			continue
-		}
 		pluginID := plugintypes.ParsePluginIDFromMenuKey(menu.MenuKey)
 		if pluginID != "" && !s.CanExposeBusinessEntries(ctx, pluginID) {
 			continue
 		}
-		if s.shouldKeepMenuSlow(ctx, menu) {
+		if s.shouldKeepMenuSlow(ctx, filterItemAsMenu(menu)) {
 			filtered = append(filtered, menu)
 		}
 	}
@@ -231,18 +223,15 @@ func (s *serviceImpl) filterMenusSlow(ctx context.Context, menus []*entity.SysMe
 
 // filterPermissionMenusSlow filters permission menus using the slow-path menu
 // and permission checks without a reusable runtime snapshot.
-func (s *serviceImpl) filterPermissionMenusSlow(ctx context.Context, menus []*entity.SysMenu) []*entity.SysMenu {
+func (s *serviceImpl) filterPermissionMenusSlow(ctx context.Context, menus []menusvc.FilterItem) []menusvc.FilterItem {
 	filteredMenus := s.filterMenusSlow(ctx, menus)
-	filtered := make([]*entity.SysMenu, 0, len(filteredMenus))
-	for _, menu := range filteredMenus {
-		if menu == nil {
-			continue
-		}
-		if s.shouldKeepPermissionSlow(ctx, menu) {
-			filtered = append(filtered, menu)
+	kept := make([]menusvc.FilterItem, 0, len(filteredMenus))
+	for _, item := range filteredMenus {
+		if s.shouldKeepPermissionSlow(ctx, item) {
+			kept = append(kept, item)
 		}
 	}
-	return filtered
+	return kept
 }
 
 // shouldKeepMenuWithRuntime evaluates one menu against all enabled plugin menu
@@ -356,13 +345,9 @@ func (s *serviceImpl) shouldKeepMenuSlow(ctx context.Context, menu *entity.SysMe
 // plugin permission filters using the supplied runtime snapshot.
 func (s *serviceImpl) shouldKeepPermissionWithRuntime(
 	ctx context.Context,
-	menu *entity.SysMenu,
+	menu menusvc.FilterItem,
 	runtime *filterRuntime,
 ) bool {
-	if menu == nil {
-		return false
-	}
-
 	descriptor := pluginhost.NewPermissionDescriptor(
 		menu.MenuKey,
 		menu.Name,
@@ -396,7 +381,7 @@ func (s *serviceImpl) shouldKeepPermissionWithRuntime(
 
 // shouldKeepPermissionSlow evaluates one permission menu when the reusable
 // runtime snapshot is unavailable.
-func (s *serviceImpl) shouldKeepPermissionSlow(ctx context.Context, menu *entity.SysMenu) bool {
+func (s *serviceImpl) shouldKeepPermissionSlow(ctx context.Context, menu menusvc.FilterItem) bool {
 	manifests, err := s.catalogSvc.ScanManifests()
 	if err != nil {
 		logger.Warningf(ctx, "scan plugin manifests for permission filter failed: %v", err)
@@ -409,10 +394,6 @@ func (s *serviceImpl) shouldKeepPermissionSlow(ctx context.Context, menu *entity
 	}
 	if runtime != nil {
 		return s.shouldKeepPermissionWithRuntime(ctx, menu, runtime)
-	}
-
-	if menu == nil {
-		return false
 	}
 
 	descriptor := pluginhost.NewPermissionDescriptor(
@@ -443,6 +424,21 @@ func (s *serviceImpl) shouldKeepPermissionSlow(ctx context.Context, menu *entity
 		}
 	}
 	return true
+}
+
+func filterItemAsMenu(item menusvc.FilterItem) *entity.SysMenu {
+	return &entity.SysMenu{
+		Id:        item.Id,
+		ParentId:  item.ParentId,
+		Name:      item.Name,
+		Path:      item.Path,
+		Component: item.Component,
+		Perms:     item.Perms,
+		MenuKey:   item.MenuKey,
+		Type:      item.Type,
+		Visible:   item.Visible,
+		Status:    item.Status,
+	}
 }
 
 // shouldDispatchHookToPlugin determines whether the hook event should be delivered to a plugin.
@@ -569,13 +565,12 @@ func (s *serviceImpl) runPluginDeclaredHook(
 		return nil
 	}
 
+	if pluginhost.IsDemoHookAction(hook.Action) {
+		return gerror.Newf("plugin hook action is not supported: %s", hook.Action)
+	}
 	switch hook.Action {
-	case pluginhost.HookActionInsert:
-		err = s.executePluginInsertHook(ctx, pluginID, hook, payload)
-	case pluginhost.HookActionSleep:
-		err = executePluginSleepHook(ctx, hook)
-	case pluginhost.HookActionError:
-		err = executePluginErrorHook(hook)
+	case "":
+		return nil
 	default:
 		err = gerror.Newf("plugin hook action is not supported: %s", hook.Action)
 	}

@@ -21,7 +21,7 @@ database:
 `)
 	withRuntimeParamAbsent(t, RuntimeParamKeyUploadMaxSize)
 
-	svc := New()
+	svc := New(nil)
 	cfg, err := svc.GetUpload(context.Background())
 	if err != nil {
 		t.Fatalf("get upload config: %v", err)
@@ -48,7 +48,7 @@ upload:
 `)
 	withRuntimeParamAbsent(t, RuntimeParamKeyUploadMaxSize)
 
-	svc := New()
+	svc := New(nil)
 	if path := svc.GetUploadPath(context.Background()); path != runtimepath.Resolve("runtime/uploads") {
 		t.Fatalf("expected upload path to be runtime/uploads, got %s", path)
 	}
@@ -77,7 +77,7 @@ upload:
 func TestGetUploadPrefersRuntimeParamMaxSize(t *testing.T) {
 	withRuntimeParamValue(t, RuntimeParamKeyUploadMaxSize, "8")
 
-	svc := New()
+	svc := New(nil)
 	cfg, err := svc.GetUpload(context.Background())
 	if err != nil {
 		t.Fatalf("get upload config: %v", err)
@@ -103,7 +103,7 @@ func TestGetUploadMultipartDefaults(t *testing.T) {
 	withRuntimeParamAbsent(t, RuntimeParamKeyUploadMultipartPartSizeMB)
 	withRuntimeParamAbsent(t, RuntimeParamKeyUploadMultipartMaxConcurrency)
 
-	svc := New()
+	svc := New(nil)
 	enabled, err := svc.GetUploadMultipartEnabled(context.Background())
 	if err != nil {
 		t.Fatalf("GetUploadMultipartEnabled: %v", err)
@@ -150,7 +150,7 @@ func TestValidateUploadMultipartPartSizeConfigValue(t *testing.T) {
 func TestGetUploadDirectUrlTTLDefaultsToOneHour(t *testing.T) {
 	withRuntimeParamAbsent(t, RuntimeParamKeyUploadDirectUrlTTL)
 
-	svc := New()
+	svc := New(nil)
 	ttl, err := svc.GetUploadDirectUrlTTL(context.Background())
 	if err != nil {
 		t.Fatalf("get direct url ttl: %v", err)
@@ -172,7 +172,7 @@ func TestGetUploadDirectUrlTTLDefaultsToOneHour(t *testing.T) {
 func TestGetUploadDirectUrlTTLPrefersRuntimeParam(t *testing.T) {
 	withRuntimeParamValue(t, RuntimeParamKeyUploadDirectUrlTTL, "30m")
 
-	svc := New()
+	svc := New(nil)
 	ttl, err := svc.GetUploadDirectUrlTTL(context.Background())
 	if err != nil {
 		t.Fatalf("get direct url ttl: %v", err)

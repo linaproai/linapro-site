@@ -19,7 +19,7 @@ database:
 `)
 	withRuntimeParamAbsent(t, RuntimeParamKeySessionTimeout)
 
-	cfg, err := New().GetSession(context.Background())
+	cfg, err := New(nil).GetSession(context.Background())
 	if err != nil {
 		t.Fatalf("get session config: %v", err)
 	}
@@ -45,7 +45,7 @@ session:
 `)
 	withRuntimeParamAbsent(t, RuntimeParamKeySessionTimeout)
 
-	svc := New()
+	svc := New(nil)
 	cfg, err := svc.GetSession(context.Background())
 	if err != nil {
 		t.Fatalf("get session config: %v", err)
@@ -71,7 +71,7 @@ session:
 func TestGetSessionPrefersRuntimeParamTimeout(t *testing.T) {
 	withRuntimeParamValue(t, RuntimeParamKeySessionTimeout, "2h")
 
-	svc := New()
+	svc := New(nil)
 	cfg, err := svc.GetSession(context.Background())
 	if err != nil {
 		t.Fatalf("get session config: %v", err)
@@ -102,7 +102,7 @@ session:
 
 	defer assertConfigPanicContains(t, "whole seconds")
 
-	cfg, err := New().GetSession(context.Background())
+	cfg, err := New(nil).GetSession(context.Background())
 	if err != nil {
 		t.Fatalf("get session config after invalid static config: %v", err)
 	}

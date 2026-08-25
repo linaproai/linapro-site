@@ -43,8 +43,6 @@ func dictDataItem(row *dictsvc.DictDataProjection) v1.DictDataItem {
 		Label:          row.Label,
 		Value:          row.Value,
 		Sort:           row.Sort,
-		TagStyle:       row.TagStyle,
-		CssClass:       row.CssClass,
 		Status:         statusflag.Enabled(row.Status),
 		IsBuiltin:      statusflag.YesNo(row.IsBuiltin),
 		Remark:         row.Remark,

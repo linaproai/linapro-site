@@ -357,7 +357,7 @@ func TestControllerConsumesCrossInstancePluginRuntimeRevision(t *testing.T) {
 		scope,
 		RuntimeCacheChangeReason,
 		true,
-		cachecoord.NewWithCoordination(cachecoord.NewStaticTopology(true), coordSvc),
+		cachecoord.New(cachecoord.NewStaticTopology(true), coordSvc),
 		NewObservedRevision(),
 		nil,
 	)
@@ -366,7 +366,7 @@ func TestControllerConsumesCrossInstancePluginRuntimeRevision(t *testing.T) {
 		scope,
 		RuntimeCacheChangeReason,
 		true,
-		cachecoord.NewWithCoordination(cachecoord.NewStaticTopology(true), coordSvc),
+		cachecoord.New(cachecoord.NewStaticTopology(true), coordSvc),
 		NewObservedRevision(),
 		func(_ context.Context, _ int64) error {
 			atomic.AddInt32(&refreshCalls, 1)

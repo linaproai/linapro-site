@@ -51,7 +51,7 @@ func TestInvalidateRuntimeBundleCacheHostSectorIsLocaleScoped(t *testing.T) {
 	enVersionBefore := enCache.version
 	zhVersionBefore := zhCache.version
 
-	svc := New(bizctx.New(), config.New(), cachecoord.Default(nil)).(*serviceImpl)
+	svc := New(bizctx.New(), config.New(nil), cachecoord.New(nil, nil)).(*serviceImpl)
 	svc.InvalidateRuntimeBundleCache(InvalidateScope{
 		Locales: []string{enLocale},
 		Sectors: []Sector{SectorHost},
@@ -101,7 +101,7 @@ func TestInvalidateRuntimeBundleCacheDynamicPluginIsPluginScoped(t *testing.T) {
 
 	versionBefore := enCache.version
 
-	svc := New(bizctx.New(), config.New(), cachecoord.Default(nil)).(*serviceImpl)
+	svc := New(bizctx.New(), config.New(nil), cachecoord.New(nil, nil)).(*serviceImpl)
 	svc.InvalidateRuntimeBundleCache(InvalidateScope{
 		Sectors:         []Sector{SectorDynamicPlugin},
 		DynamicPluginID: targetPluginID,
@@ -149,7 +149,7 @@ func TestInvalidateRuntimeBundleCacheSourcePluginIsPluginScoped(t *testing.T) {
 
 	versionBefore := enCache.version
 
-	svc := New(bizctx.New(), config.New(), cachecoord.Default(nil)).(*serviceImpl)
+	svc := New(bizctx.New(), config.New(nil), cachecoord.New(nil, nil)).(*serviceImpl)
 	svc.InvalidateRuntimeBundleCache(InvalidateScope{
 		Sectors:        []Sector{SectorSourcePlugin},
 		SourcePluginID: targetPluginID,
@@ -191,7 +191,7 @@ func TestBundleRevisionReportsCachedFingerprint(t *testing.T) {
 		}
 	})
 
-	svc := New(bizctx.New(), config.New(), cachecoord.Default(nil)).(*serviceImpl)
+	svc := New(bizctx.New(), config.New(nil), cachecoord.New(nil, nil)).(*serviceImpl)
 	revision, err := svc.BundleRevision(context.Background(), EnglishLocale)
 	if err != nil {
 		t.Fatalf("expected bundle revision without error, got %v", err)
@@ -244,7 +244,7 @@ func TestBundleRevisionIncrementsOnInvalidate(t *testing.T) {
 		lc.host = map[string]string{"menu.dashboard.title": "Dashboard"}
 	})
 
-	svc := New(bizctx.New(), config.New(), cachecoord.Default(nil)).(*serviceImpl)
+	svc := New(bizctx.New(), config.New(nil), cachecoord.New(nil, nil)).(*serviceImpl)
 	revisionBefore, err := svc.BundleRevision(context.Background(), EnglishLocale)
 	if err != nil {
 		t.Fatalf("expected bundle revision before invalidation without error, got %v", err)
@@ -285,7 +285,7 @@ func TestBundleRevisionIncrementsOnLocaleWideInvalidate(t *testing.T) {
 		}
 	})
 
-	svc := New(bizctx.New(), config.New(), cachecoord.Default(nil)).(*serviceImpl)
+	svc := New(bizctx.New(), config.New(nil), cachecoord.New(nil, nil)).(*serviceImpl)
 	revisionBefore, err := svc.BundleRevision(context.Background(), EnglishLocale)
 	if err != nil {
 		t.Fatalf("expected bundle revision before locale-wide invalidation without error, got %v", err)
@@ -326,7 +326,7 @@ func TestBundleRevisionIncrementsOnFullInvalidate(t *testing.T) {
 		lc.host = map[string]string{"menu.dashboard.title": "工作台"}
 	})
 
-	svc := New(bizctx.New(), config.New(), cachecoord.Default(nil)).(*serviceImpl)
+	svc := New(bizctx.New(), config.New(nil), cachecoord.New(nil, nil)).(*serviceImpl)
 	enRevisionBefore, err := svc.BundleRevision(context.Background(), EnglishLocale)
 	if err != nil {
 		t.Fatalf("expected en-US bundle revision before full invalidation without error, got %v", err)

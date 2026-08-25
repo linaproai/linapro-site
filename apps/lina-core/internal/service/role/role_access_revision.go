@@ -44,9 +44,11 @@ type clusterAccessRevisionController struct {
 
 // newCacheCoordAccessRevisionController selects the deployment-specific
 // revision strategy backed by cachecoord in cluster mode.
-func newCacheCoordAccessRevisionController(clusterEnabled bool) accessRevisionController {
-	if clusterEnabled {
-		cacheCoordSvc := cachecoord.Default(cachecoord.NewStaticTopology(true))
+func newCacheCoordAccessRevisionController(
+	clusterEnabled bool,
+	cacheCoordSvc cachecoord.Service,
+) accessRevisionController {
+	if clusterEnabled && cacheCoordSvc != nil {
 		configureAccessTopologyCacheDomain(cacheCoordSvc)
 		return &clusterAccessRevisionController{
 			cacheCoordSvc: cacheCoordSvc,
@@ -66,7 +68,7 @@ func configureAccessTopologyCacheDomain(cacheCoordSvc cachecoord.Service) {
 		AuthoritySource:  "sys_role, sys_role_menu, sys_user_role, sys_menu, plugin permissions",
 		ConsistencyModel: cachecoord.ConsistencySharedRevision,
 		MaxStale:         accessTopologyCacheMaxStale,
-		SyncMechanism:    "persistent sys_cache_revision plus request or watcher refresh",
+		SyncMechanism:    "coordination revision store plus request or watcher refresh",
 		FailureStrategy:  cachecoord.FailureStrategyFailClosed,
 	}); err != nil {
 		panic(err)

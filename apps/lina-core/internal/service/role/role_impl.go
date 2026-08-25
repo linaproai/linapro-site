@@ -14,6 +14,7 @@ import (
 	"lina-core/internal/service/datascope"
 	"lina-core/pkg/apitime"
 	"lina-core/pkg/bizerr"
+	"lina-core/pkg/menuview"
 	"lina-core/pkg/plugin/capability/tenantcap"
 
 	"github.com/gogf/gf/v2/database/gdb"
@@ -28,7 +29,7 @@ func (s *serviceImpl) SetDataScopeService(scopeSvc datascope.Service) {
 }
 
 // FilterPermissionMenus returns the original menu slice unchanged.
-func (noopPermissionMenuFilter) FilterPermissionMenus(_ context.Context, menus []*entity.SysMenu) []*entity.SysMenu {
+func (noopPermissionMenuFilter) FilterPermissionMenus(_ context.Context, menus []menuview.FilterItem) []menuview.FilterItem {
 	return menus
 }
 

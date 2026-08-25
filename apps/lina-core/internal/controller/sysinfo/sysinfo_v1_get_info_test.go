@@ -92,7 +92,7 @@ func (f *fakeSysInfoService) GetInfo(_ context.Context) (*sysinfosvc.SystemInfo,
 func TestFormatRunDurationUsesRuntimeLocale(t *testing.T) {
 	t.Parallel()
 
-	controller := &ControllerV1{i18nSvc: i18nsvc.New(bizctx.New(), hostconfig.New(), cachecoord.Default(nil))}
+	controller := &ControllerV1{i18nSvc: i18nsvc.New(bizctx.New(), hostconfig.New(nil), cachecoord.New(nil, nil))}
 
 	testCases := []struct {
 		name     string
@@ -129,7 +129,7 @@ func TestGetInfoMapsCacheCoordinationDiagnostics(t *testing.T) {
 	ctx := context.Background()
 	syncedAt := time.Date(2025, 1, 1, 8, 0, 0, 0, time.UTC)
 	controller := &ControllerV1{
-		i18nSvc: i18nsvc.New(bizctx.New(), hostconfig.New(), cachecoord.Default(nil)),
+		i18nSvc: i18nsvc.New(bizctx.New(), hostconfig.New(nil), cachecoord.New(nil, nil)),
 		sysInfoSvc: &fakeSysInfoService{
 			info: &sysinfosvc.SystemInfo{
 				Framework: sysinfosvc.FrameworkInfo{Name: "LinaPro"},

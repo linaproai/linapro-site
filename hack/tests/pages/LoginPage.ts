@@ -173,7 +173,7 @@ export class LoginPage {
 
   /**
    * Slogan illustration image on the left/right login layout side panel.
-   * Absent when `sys.auth.sloganImage` is empty.
+   * Absent when the workbench local slogan image is empty.
    */
   get sloganImage() {
     return this.page.getByTestId("login-slogan-image");

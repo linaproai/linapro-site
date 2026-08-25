@@ -13,6 +13,20 @@ import (
 	"lina-core/pkg/bizerr"
 )
 
+// TestNewDBStoreDoesNotWrapCoordination verifies the DB constructor stays a
+// PostgreSQL projection even when a coordination service exists in the process.
+func TestNewDBStoreDoesNotWrapCoordination(t *testing.T) {
+	_ = coordination.NewMemory(nil)
+	store := NewDBStore()
+	if _, ok := store.(*DBStore); !ok {
+		t.Fatalf("expected NewDBStore to return *DBStore, got %T", store)
+	}
+	wrapped := NewCoordinationStore(coordination.NewMemory(nil), store)
+	if _, ok := wrapped.(*CoordinationStore); !ok {
+		t.Fatalf("expected explicit coordination wrapping, got %T", wrapped)
+	}
+}
+
 // TestCoordinationStoreWritesHotStateAndProjection verifies login-time session
 // writes are dual-written to coordination KV and the PostgreSQL projection.
 func TestCoordinationStoreWritesHotStateAndProjection(t *testing.T) {

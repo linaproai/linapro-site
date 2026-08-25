@@ -154,7 +154,7 @@ func TestNewRejectsNilConfigService(t *testing.T) {
 // TestNewRejectsNilCacheCoordinationService verifies sysinfo construction
 // returns an error when cache coordination diagnostics would use an isolated fallback.
 func TestNewRejectsNilCacheCoordinationService(t *testing.T) {
-	if _, err := New(config.New(), nil, nil, nil); err == nil {
+	if _, err := New(config.New(nil), nil, nil, nil); err == nil {
 		t.Fatal("expected nil cache coordination service to return an error")
 	}
 }
@@ -216,8 +216,8 @@ func TestLoadCacheCoordinationMapsSnapshot(t *testing.T) {
 func TestLoadCoordinationUsesRuntimeServices(t *testing.T) {
 	coordSvc := coordination.NewMemory(nil)
 	service := &serviceImpl{
-		configSvc:       config.New(),
-		clusterSvc:      cluster.NewWithCoordination(&config.ClusterConfig{Enabled: true}, coordSvc),
+		configSvc:       config.New(nil),
+		clusterSvc:      cluster.New(&config.ClusterConfig{Enabled: true}, coordSvc),
 		coordinationSvc: coordSvc,
 	}
 
@@ -257,8 +257,8 @@ func TestLoadCoordinationReportsRedisHealth(t *testing.T) {
 		testCase := testCase
 		t.Run(testCase.name, func(t *testing.T) {
 			service := &serviceImpl{
-				configSvc:  config.New(),
-				clusterSvc: cluster.NewWithCoordination(&config.ClusterConfig{Enabled: true}, nil),
+				configSvc:  config.New(nil),
+				clusterSvc: cluster.New(&config.ClusterConfig{Enabled: true}, nil),
 				coordinationSvc: &fakeCoordinationService{
 					snapshot: coordination.HealthSnapshot{
 						Backend:       coordination.BackendRedis,

@@ -76,7 +76,7 @@ var rootTestConfigOverrides = struct {
 
 // newRootTestConfigService creates the config provider used by root plugin tests.
 func newRootTestConfigService() configsvc.Service {
-	return rootTestConfigService{Service: configsvc.New()}
+	return rootTestConfigService{Service: configsvc.New(nil)}
 }
 
 // GetPlugin returns plugin config with package-local test overrides applied.
@@ -233,7 +233,7 @@ func newTestServiceWithTopologyAndTenantDeps(
 	var (
 		configProvider = newRootTestConfigService()
 		bizCtxProvider = bizctx.New()
-		cacheCoordSvc  = cachecoord.Default(cachecoord.NewStaticTopology(false))
+		cacheCoordSvc  = cachecoord.New(cachecoord.NewStaticTopology(false), nil)
 		pluginRuntime  = NewRuntimeDelegate()
 	)
 	orgSvc := orgspi.New(nil, pluginRuntime, pluginRuntime.OrgProviderEnv)
@@ -255,11 +255,10 @@ func newTestServiceWithTopologyAndTenantDeps(
 	capabilities := newRootTestCapabilities(bizCtxProvider, pluginRuntime)
 	if topology != nil && topology.IsEnabled() {
 		coordSvc := coordination.NewMemory(nil)
-		lockerSvc := locker.New()
-		cachecoord.DefaultWithCoordination(topology, coordSvc)
-		cacheCoordSvc = cachecoord.Default(topology)
+		lockerSvc := locker.New(coordSvc.Lock())
+		cacheCoordSvc = cachecoord.New(topology, coordSvc)
 		i18nSvc := i18nsvc.New(bizCtxProvider, configProvider, cacheCoordSvc)
-		roleSvc := role.New(pluginRuntime, bizCtxProvider, configProvider, i18nSvc, orgSvc, tenantSvc)
+		roleSvc := role.New(pluginRuntime, bizCtxProvider, configProvider, i18nSvc, orgSvc, tenantSvc, cacheCoordSvc)
 		service, err := New(
 			topology,
 			configProvider,
@@ -286,9 +285,9 @@ func newTestServiceWithTopologyAndTenantDeps(
 		return serviceImpl, nil
 	}
 	var (
-		lockerSvc = locker.New()
+		lockerSvc = locker.New(locker.NewSQLStore())
 		i18nSvc   = i18nsvc.New(bizCtxProvider, configProvider, cacheCoordSvc)
-		roleSvc   = role.New(pluginRuntime, bizCtxProvider, configProvider, i18nSvc, orgSvc, tenantSvc)
+		roleSvc   = role.New(pluginRuntime, bizCtxProvider, configProvider, i18nSvc, orgSvc, tenantSvc, cacheCoordSvc)
 	)
 	service, err := New(
 		topology,

@@ -2,7 +2,7 @@
 slug: '/docs/domain-capability-recordstore'
 title: 'RecordStore（数据操作）'
 hide_title: true
-description: '数据记录能力是动态插件通过`hostServices.data`和`pluginbridge.Default().RecordStore()`访问插件自有表的受管控入口，覆盖单表查询、按键读取、创建、更新、删除和结构化事务。源码插件没有普通`Services.Data()`入口，通常通过宿主`dao`包访问插件自有表，并在需要租户隔离时使用`TenantFilter()`。'
+description: 'RecordStore是动态插件访问插件自有表的实验能力，通过`hostServices.data`和`pluginbridge.Default().RecordStore()`提供受治理的查询、读取、创建、更新、删除和事务入口。它不是动态插件主路径，也没有第一方插件必须使用。源码插件没有普通`Services.Data()`入口，通常通过宿主`dao`包访问插件自有表，并在需要租户隔离时使用`TenantFilter()`。'
 keywords:
   - RecordStore
   - data服务
@@ -23,7 +23,9 @@ keywords:
 
 ## 基本介绍
 
-动态插件通过`plugin.yaml`声明`service: data`，再使用`pluginbridge.Default().RecordStore()`访问授权表。该能力面向插件自有表，不面向宿主核心表。
+`RecordStore`是实验能力，不是动态插件主路径。当前没有第一方插件必须通过它访问表；在官方动态插件真正按表使用之前，不应继续扩展查询计划器。
+
+动态插件可以通过`plugin.yaml`声明`service: data`，再使用`pluginbridge.Default().RecordStore()`访问授权表。该能力面向插件自有表，不面向宿主核心表。
 
 源码插件没有普通`Services.Data()`入口。源码插件与宿主同进程运行，通常在插件自己的领域服务中通过宿主`dao`包访问插件自有表；当插件自有表带有`tenant_id`时，应配合租户能力中的`TenantFilter()`。
 

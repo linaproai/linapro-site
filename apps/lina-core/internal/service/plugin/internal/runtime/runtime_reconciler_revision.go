@@ -79,7 +79,7 @@ func (s *serviceImpl) configureReconcilerRevisionController() {
 		cachecoord.ScopeReconciler,
 		revisionctrl.ReconcilerCacheChangeReason,
 		s.isClusterModeEnabled(),
-		cachecoord.Default(s.topology),
+		s.cacheCoordSvc,
 		s.reconcilerRevisionObserved,
 		nil,
 	)

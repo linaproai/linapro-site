@@ -157,12 +157,9 @@ var publishedCallbackExecutionModes = map[CallbackExecutionMode]struct{}{
 	CallbackExecutionModeAsync:    {},
 }
 
-// publishedHookActions enumerates the demo hook actions understood by the host.
-var publishedHookActions = map[HookAction]struct{}{
-	HookActionInsert: {},
-	HookActionSleep:  {},
-	HookActionError:  {},
-}
+// publishedHookActions enumerates production hook actions. Demo insert/sleep/error
+// actions are not published and fail production validation.
+var publishedHookActions = map[HookAction]struct{}{}
 
 // String returns the canonical backend extension point key.
 func (point ExtensionPoint) String() string {
@@ -230,8 +227,21 @@ func (action HookAction) String() string {
 	return string(action)
 }
 
-// IsSupportedHookAction reports whether the hook action is supported by current host runtime.
+// IsSupportedHookAction reports whether the hook action is parsed by current host runtime.
 func IsSupportedHookAction(action HookAction) bool {
+	if action == "" {
+		return true
+	}
 	_, ok := publishedHookActions[action]
 	return ok
+}
+
+// IsDemoHookAction reports whether the action is a test-only insert/sleep/error hook.
+func IsDemoHookAction(action HookAction) bool {
+	switch action {
+	case HookActionInsert, HookActionSleep, HookActionError:
+		return true
+	default:
+		return false
+	}
 }

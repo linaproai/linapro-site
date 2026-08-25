@@ -8,7 +8,11 @@ import { cloneDeep } from '@vben/utils';
 import { message } from 'ant-design-vue';
 
 import { useVbenForm } from '#/adapter/form';
-import { menuTreeSelect, roleMenuTreeSelect } from '#/api/system/menu';
+import {
+  compileMenuTree,
+  menuTreeSelect,
+  roleMenuTreeSelect,
+} from '#/api/system/menu';
 import { roleAdd, roleInfo, roleUpdate } from '#/api/system/role';
 import {
   MenuSelectTable,
@@ -68,22 +72,22 @@ async function syncRoleCapabilities() {
 }
 
 async function setupMenuTree(id?: number) {
+  const tree = compileMenuTree(await menuTreeSelect());
+  menuTree.value = tree;
   if (id) {
     const resp = await roleMenuTreeSelect(id);
-    menuTree.value = resp.menus;
+    const menuIds = resp.menuIds ?? [];
     await nextTick();
     await formApi.setFieldValue(
       'menuCheckStrictly',
-      shouldUseAssociatedMenuSelection(resp.menus, resp.checkedKeys),
+      shouldUseAssociatedMenuSelection(tree, menuIds),
     );
-    await formApi.setFieldValue('menuIds', resp.checkedKeys);
-  } else {
-    const resp = await menuTreeSelect();
-    menuTree.value = resp;
-    await nextTick();
-    await formApi.setFieldValue('menuCheckStrictly', true);
-    await formApi.setFieldValue('menuIds', []);
+    await formApi.setFieldValue('menuIds', menuIds);
+    return;
   }
+  await nextTick();
+  await formApi.setFieldValue('menuCheckStrictly', true);
+  await formApi.setFieldValue('menuIds', []);
 }
 
 async function customFormValueGetter() {

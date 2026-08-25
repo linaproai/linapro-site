@@ -55,9 +55,9 @@ func handleStoragePutInit(
 	targetPath string,
 	payload []byte,
 ) *bridgehostcall.HostCallResponseEnvelope {
-	request, err := bridgehostservice.UnmarshalHostServiceStoragePutInitRequest(payload)
-	if err != nil {
-		return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, err)
+	var request bridgehostservice.HostServiceStoragePutInitRequest
+	if err := decodeCapabilityJSONRequest(payload, &request); err != nil {
+		return invalidCapabilityRequest(err)
 	}
 	objectPath, err := normalizeStorageObjectPath(request.Path)
 	if err != nil {
@@ -74,11 +74,7 @@ func handleStoragePutInit(
 	if err != nil {
 		return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, err)
 	}
-	return bridgehostcall.NewHostCallSuccessResponse(
-		bridgehostservice.MarshalHostServiceStoragePutInitResponse(&bridgehostservice.HostServiceStoragePutInitResponse{
-			UploadID: uploadID,
-		}),
-	)
+	return capabilityJSONResponse(&bridgehostservice.HostServiceStoragePutInitResponse{UploadID: uploadID})
 }
 
 // handleStoragePutChunk appends one ordered storage upload chunk.
@@ -87,9 +83,9 @@ func handleStoragePutChunk(
 	targetPath string,
 	payload []byte,
 ) *bridgehostcall.HostCallResponseEnvelope {
-	request, err := bridgehostservice.UnmarshalHostServiceStoragePutChunkRequest(payload)
-	if err != nil {
-		return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, err)
+	var request bridgehostservice.HostServiceStoragePutChunkRequest
+	if err := decodeCapabilityJSONRequest(payload, &request); err != nil {
+		return invalidCapabilityRequest(err)
 	}
 	objectPath, err := normalizeStorageObjectPath(request.Path)
 	if err != nil {
@@ -106,11 +102,7 @@ func handleStoragePutChunk(
 	if err != nil {
 		return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, err)
 	}
-	return bridgehostcall.NewHostCallSuccessResponse(
-		bridgehostservice.MarshalHostServiceStoragePutChunkResponse(&bridgehostservice.HostServiceStoragePutChunkResponse{
-			NextOffset: nextOffset,
-		}),
-	)
+	return capabilityJSONResponse(&bridgehostservice.HostServiceStoragePutChunkResponse{NextOffset: nextOffset})
 }
 
 // handleStoragePutCommit commits one chunked storage upload session through storagecap.
@@ -121,9 +113,9 @@ func handleStoragePutCommit(
 	targetPath string,
 	payload []byte,
 ) *bridgehostcall.HostCallResponseEnvelope {
-	request, err := bridgehostservice.UnmarshalHostServiceStoragePutCommitRequest(payload)
-	if err != nil {
-		return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, err)
+	var request bridgehostservice.HostServiceStoragePutCommitRequest
+	if err := decodeCapabilityJSONRequest(payload, &request); err != nil {
+		return invalidCapabilityRequest(err)
 	}
 	objectPath, err := normalizeStorageObjectPath(request.Path)
 	if err != nil {
@@ -140,11 +132,9 @@ func handleStoragePutCommit(
 	if err != nil {
 		return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, err)
 	}
-	return bridgehostcall.NewHostCallSuccessResponse(
-		bridgehostservice.MarshalHostServiceStoragePutCommitResponse(&bridgehostservice.HostServiceStoragePutCommitResponse{
-			Object: storageObjectResponse(outputObject(output)),
-		}),
-	)
+	return capabilityJSONResponse(&bridgehostservice.HostServiceStoragePutCommitResponse{
+		Object: storageObjectResponse(outputObject(output)),
+	})
 }
 
 // handleStoragePutAbort aborts one chunked storage upload session.
@@ -153,9 +143,9 @@ func handleStoragePutAbort(
 	targetPath string,
 	payload []byte,
 ) *bridgehostcall.HostCallResponseEnvelope {
-	request, err := bridgehostservice.UnmarshalHostServiceStoragePutAbortRequest(payload)
-	if err != nil {
-		return hostCallErrorFromError(bridgehostcall.HostCallStatusInvalidRequest, err)
+	var request bridgehostservice.HostServiceStoragePutAbortRequest
+	if err := decodeCapabilityJSONRequest(payload, &request); err != nil {
+		return invalidCapabilityRequest(err)
 	}
 	objectPath, err := normalizeStorageObjectPath(request.Path)
 	if err != nil {

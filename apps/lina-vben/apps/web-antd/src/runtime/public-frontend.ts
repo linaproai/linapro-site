@@ -140,18 +140,6 @@ function normalizeNumber(value: unknown, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function normalizeAuthPanelLayout(value: unknown): AuthPageLayoutType {
-  const normalized = normalizeString(value);
-  switch (normalized) {
-    case 'panel-left':
-    case 'panel-center':
-    case 'panel-right':
-      return normalized;
-    default:
-      return 'panel-center';
-  }
-}
-
 function normalizeWorkspaceBasePath(value: unknown): string {
   const cleaned = normalizeString(value)
     .replaceAll('\\', '/')
@@ -305,7 +293,7 @@ function normalizePublicFrontendSettings(payload: any): PublicFrontendSettings {
           ? true
           : normalizeBoolean(auth.forgetPasswordEnabled),
       loginSubtitle: normalizeString(auth.loginSubtitle),
-      panelLayout: normalizeAuthPanelLayout(auth.panelLayout),
+      panelLayout: publicFrontendState.auth.panelLayout,
       pageDesc: normalizeString(auth.pageDesc),
       pageTitle: normalizeString(auth.pageTitle),
       privacyPolicy: normalizeString(auth.privacyPolicy),
@@ -313,7 +301,7 @@ function normalizePublicFrontendSettings(payload: any): PublicFrontendSettings {
         auth?.registerEnabled === undefined
           ? true
           : normalizeBoolean(auth.registerEnabled),
-      sloganImage: normalizeString(auth.sloganImage),
+      sloganImage: publicFrontendState.auth.sloganImage,
       termsOfService: normalizeString(auth.termsOfService),
     },
     cron: {
@@ -332,7 +320,7 @@ function normalizePublicFrontendSettings(payload: any): PublicFrontendSettings {
       defaultAvatar: normalizeString(user.defaultAvatar),
     },
     ui: {
-      layout: normalizeString(ui.layout),
+      layout: publicFrontendState.ui.layout,
       themeMode: normalizeString(ui.themeMode),
       watermarkContent: normalizeString(ui.watermarkContent),
       watermarkEnabled: normalizeBoolean(ui.watermarkEnabled),
@@ -362,11 +350,11 @@ function applyPublicFrontendPreferences(settings: PublicFrontendSettings) {
   updatePreferences(
     {
       app: {
-        authPageLayout: settings.auth.panelLayout,
+        authPageLayout: initial.app.authPageLayout,
         defaultAvatar: resolveWorkspaceAssetURL(
           settings.user.defaultAvatar || initial.app.defaultAvatar,
         ),
-        layout: (settings.ui.layout || initial.app.layout) as any,
+        layout: initial.app.layout,
         name: settings.app.name || initial.app.name,
         watermark: settings.ui.watermarkEnabled,
         watermarkContent:

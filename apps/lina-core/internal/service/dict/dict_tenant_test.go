@@ -167,7 +167,7 @@ func TestTenantDictDataImportCreatesOverrideInsteadOfUpdatingPlatformFallback(t 
 	)
 	insertTenantFallbackDictType(t, ctx, datascope.PlatformTenantID, dictType, "Platform Type", true)
 	insertTenantFallbackDictData(t, ctx, datascope.PlatformTenantID, dictType, "shared", "Platform Label")
-	importData := buildDictDataImportFile(t, []string{dictType, "Tenant Label", "shared", "1", "primary", "", "1", "tenant import override"})
+	importData := buildDictDataImportFile(t, []string{dictType, "Tenant Label", "shared", "1", "1", "tenant import override"})
 
 	result, err := New(nil).DataImport(tenantCtx, bytes.NewReader(importData), true)
 	if err != nil {
@@ -297,7 +297,7 @@ func buildDictDataImportFile(t *testing.T, row []string) []byte {
 	return buildDictImportWorkbook(
 		t,
 		"Sheet1",
-		[]string{"Dictionary Type", "Dictionary Label", "Dictionary Value", "Sort", "Tag Style", "CSS Class", "Status", "Remark"},
+		[]string{"Dictionary Type", "Dictionary Label", "Dictionary Value", "Sort", "Status", "Remark"},
 		row,
 	)
 }

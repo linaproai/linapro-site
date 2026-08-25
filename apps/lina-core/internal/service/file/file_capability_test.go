@@ -46,7 +46,7 @@ func TestCreateFromReaderCreatesFileRecord(t *testing.T) {
 	content := uniqueFileScopeName("reader-content")
 	storage := &fileCapabilityTestStorage{}
 	svc := &serviceImpl{
-		configSvc: hostconfig.New(),
+		configSvc: hostconfig.New(nil),
 		storage:   storage,
 		bizCtxSvc: fileScopeStaticBizCtx{ctx: &model.Context{TenantId: tenantID, UserId: userID}},
 	}
@@ -93,7 +93,7 @@ func TestCreateFromReaderUsesCapabilityBizContext(t *testing.T) {
 		storage = &fileCapabilityTestStorage{}
 	)
 	svc := &serviceImpl{
-		configSvc: hostconfig.New(),
+		configSvc: hostconfig.New(nil),
 		storage:   storage,
 		bizCtxSvc: internalbizctx.New(),
 	}
@@ -128,7 +128,7 @@ func TestCapabilityUploadCreatesFileRecord(t *testing.T) {
 	content := uniqueFileScopeName("cap-upload-content")
 	storage := &fileCapabilityTestStorage{}
 	svc := &serviceImpl{
-		configSvc: hostconfig.New(),
+		configSvc: hostconfig.New(nil),
 		storage:   storage,
 		bizCtxSvc: fileScopeStaticBizCtx{ctx: &model.Context{TenantId: tenantID, UserId: userID}},
 	}
@@ -172,7 +172,7 @@ func TestCapabilityCreateFromStorageCopiesPluginObject(t *testing.T) {
 		pluginStorage = &fileCapabilityPluginStorage{content: content}
 	)
 	svc := &serviceImpl{
-		configSvc: hostconfig.New(),
+		configSvc: hostconfig.New(nil),
 		storage:   fileStorage,
 		bizCtxSvc: fileScopeStaticBizCtx{ctx: &model.Context{TenantId: tenantID, UserId: userID}},
 	}

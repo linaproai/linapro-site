@@ -53,8 +53,6 @@ INSERT INTO sys_config ("tenant_id", "name", "key", "value", "value_type", "opti
 (0, '登录展示-页面标题', 'sys.auth.pageTitle', '面向可持续交付的 AI 原生全栈框架', 'text', '', 1, '控制登录页顶部主标题文案。', NOW(), NOW()),
 (0, '登录展示-页面说明', 'sys.auth.pageDesc', '帮助团队快速交付生产级应用，同时保持架构、测试与治理的可持续演进', 'text', '', 1, '控制登录页顶部说明文案。', NOW(), NOW()),
 (0, '登录展示-登录副标题', 'sys.auth.loginSubtitle', '请输入您的帐户信息以开始管理您的项目', 'text', '', 1, '控制登录表单上方的提示说明文案。', NOW(), NOW()),
-(0, '登录展示-登录框位置', 'sys.auth.loginPanelLayout', 'panel-center', 'select', '[{"label":"左侧","value":"panel-left"},{"label":"居中","value":"panel-center"},{"label":"右侧","value":"panel-right"}]', 1, '控制登录框默认布局，可选值：panel-left、panel-center、panel-right。', NOW(), NOW()),
-(0, '登录展示-Slogan 插画', 'sys.auth.sloganImage', '/slogan.svg', 'text', '', 1, '控制登录页侧栏 slogan 插画图片地址，支持 http(s) 或站内绝对路径；默认 /slogan.svg 为 Vben 内置插画，留空表示不使用插画。', NOW(), NOW()),
 (0, '登录展示-忘记密码入口', 'sys.auth.forgetPasswordEnabled', 'true', 'boolean', '', 1, '控制登录页是否显示忘记密码入口，可选值：true、false。关闭后访问忘记密码路由会回退到登录页。', NOW(), NOW()),
 (0, '登录展示-创建账号入口', 'sys.auth.registerEnabled', 'true', 'boolean', '', 1, '控制登录页是否显示创建账号入口，可选值：true、false。关闭后访问注册路由会回退到登录页。', NOW(), NOW()),
 (0, '登录展示-隐私政策正文', 'sys.auth.privacyPolicy', E'隐私政策\n\n本服务仅为账号认证与工作区访问收集必要信息，包括用户名与邮箱。数据仅用于提供宿主工作台及相关安全能力。如需了解数据保留或导出，请联系系统管理员。', 'textarea', '', 1, '控制注册页“隐私政策”弹窗正文，支持多行文本。', NOW(), NOW()),
@@ -70,7 +68,6 @@ INSERT INTO sys_config ("tenant_id", "name", "key", "value", "value_type", "opti
 (0, '用户登录-IP 黑名单列表', 'sys.login.blackIPList', '', 'textarea', '', 1, '禁止登录的 IP 或 CIDR 网段，多个值以英文分号分隔，例如 127.0.0.1;10.0.0.0/8。', NOW(), NOW()),
 (0, '系统日志-最长存储时间', 'sys.log.retentionDays', '90', 'number', '', 1, '控制系统日志最长存储时间，单位为天，必须为正整数；默认 90 天。', NOW(), NOW()),
 (0, '界面风格-主题模式', 'sys.ui.theme.mode', 'light', 'select', '[{"label":"浅色","value":"light"},{"label":"深色","value":"dark"},{"label":"跟随系统","value":"auto"}]', 1, '控制默认主题模式，可选值：light、dark、auto。', NOW(), NOW()),
-(0, '界面风格-工作台布局', 'sys.ui.layout', 'sidebar-nav', 'select', '[{"label":"侧边导航","value":"sidebar-nav"},{"label":"侧边混合导航","value":"sidebar-mixed-nav"},{"label":"顶部导航","value":"header-nav"},{"label":"顶部侧边导航","value":"header-sidebar-nav"},{"label":"顶部混合导航","value":"header-mixed-nav"},{"label":"混合导航","value":"mixed-nav"},{"label":"全内容","value":"full-content"}]', 1, '控制后台默认布局，可选值：sidebar-nav、sidebar-mixed-nav、header-nav、header-sidebar-nav、header-mixed-nav、mixed-nav、full-content。', NOW(), NOW()),
 (0, '界面风格-是否启用水印', 'sys.ui.watermark.enabled', 'false', 'boolean', '', 1, '控制工作台是否启用水印，可选值：true、false。', NOW(), NOW()),
 (0, '界面风格-水印文案', 'sys.ui.watermark.content', 'LinaPro', 'text', '', 1, '控制工作台水印文案内容。', NOW(), NOW())
 ON CONFLICT DO NOTHING;

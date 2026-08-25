@@ -21,37 +21,7 @@ const (
 	HostedAssetPathSegment = "x-assets"
 	// HostedAssetURLPrefix is the public URL prefix for host-served plugin public assets.
 	HostedAssetURLPrefix = "/" + HostedAssetPathSegment + "/"
-	// DynamicPageComponentPath is the workbench component used by dynamic plugin pages.
-	DynamicPageComponentPath = "system/plugin/dynamic-page"
-	// DynamicEmbeddedSourceQueryKey is the menu query key carrying an embedded asset URL.
-	DynamicEmbeddedSourceQueryKey = "embeddedSrc"
-	// DynamicAccessModeQueryKey is the menu query key controlling dynamic plugin page access mode.
-	DynamicAccessModeQueryKey = "pluginAccessMode"
 )
-
-// DynamicAccessMode identifies how a dynamic plugin page is mounted in the workbench.
-type DynamicAccessMode string
-
-// Supported dynamic plugin page access modes.
-const (
-	// DynamicAccessModeEmbeddedMount mounts a runtime ESM asset inside the host shell.
-	DynamicAccessModeEmbeddedMount DynamicAccessMode = "embedded-mount"
-)
-
-// String returns the canonical dynamic access mode value.
-func (m DynamicAccessMode) String() string {
-	return string(m)
-}
-
-// IsValid reports whether the access mode is a known non-empty value.
-func (m DynamicAccessMode) IsValid() bool {
-	switch m {
-	case DynamicAccessModeEmbeddedMount:
-		return true
-	default:
-		return false
-	}
-}
 
 // PluginInstallMode identifies how a tenant-aware plugin is enabled across tenants.
 // Values match api/plugin/v1.InstallMode and plugin.yaml default_install_mode.
@@ -81,7 +51,8 @@ func (m PluginInstallMode) IsValid() bool {
 }
 
 // Declarations defines the grouped declaration-time contract published to
-// source plugins during compile-time registration.
+// source plugins during compile-time registration. Domain methods return the
+// corresponding domain interfaces; this surface must not embed those interfaces.
 type Declarations interface {
 	// ID returns the stable plugin identifier that must match `plugin.yaml`.
 	ID() string

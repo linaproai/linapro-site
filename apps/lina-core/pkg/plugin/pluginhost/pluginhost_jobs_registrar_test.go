@@ -24,17 +24,6 @@ func TestAuthHookReasonIsValid(t *testing.T) {
 	}
 }
 
-func TestDynamicAccessModeIsValid(t *testing.T) {
-	t.Parallel()
-
-	if !DynamicAccessModeEmbeddedMount.IsValid() {
-		t.Fatal("embedded-mount should be valid")
-	}
-	if DynamicAccessMode("").IsValid() || DynamicAccessMode("iframe").IsValid() {
-		t.Fatal("empty or unknown access mode should be invalid")
-	}
-}
-
 func TestPluginInstallModeIsValid(t *testing.T) {
 	t.Parallel()
 

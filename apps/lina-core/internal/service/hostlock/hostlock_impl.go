@@ -11,6 +11,7 @@ import (
 
 	"github.com/gogf/gf/v2/util/guid"
 
+	"lina-core/internal/service/coordination"
 	"lina-core/pkg/bizerr"
 )
 
@@ -67,11 +68,13 @@ func (s *serviceImpl) Renew(ctx context.Context, pluginID string, tenantID int64
 	if err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(claims.LockName) != "" {
-		err = s.lockerSvc.RenewByName(ctx, claims.LockName, claims.Holder, lease)
-	} else {
-		err = s.lockerSvc.Renew(ctx, claims.LockID, claims.Holder, lease)
-	}
+	err = s.lockerSvc.Renew(ctx, &coordination.LockHandle{
+		Name:         claims.LockName,
+		Owner:        claims.Holder,
+		Token:        claims.Holder,
+		FencingToken: claims.LockID,
+		Lease:        lease,
+	}, lease)
 	if err != nil {
 		return nil, err
 	}
@@ -85,10 +88,12 @@ func (s *serviceImpl) Release(ctx context.Context, pluginID string, tenantID int
 	if err != nil {
 		return err
 	}
-	if strings.TrimSpace(claims.LockName) != "" {
-		return s.lockerSvc.UnlockByName(ctx, claims.LockName, claims.Holder)
-	}
-	return s.lockerSvc.Unlock(ctx, claims.LockID, claims.Holder)
+	return s.lockerSvc.Release(ctx, &coordination.LockHandle{
+		Name:         claims.LockName,
+		Owner:        claims.Holder,
+		Token:        claims.Holder,
+		FencingToken: claims.LockID,
+	})
 }
 
 // buildActualLockName combines the plugin, tenant, and logical resource name

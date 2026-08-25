@@ -26,6 +26,7 @@ func (box *staticConfigBox[T]) load(loader func() *T) *T {
 // configuration loading and test resets can be managed in one place.
 type staticConfigCaches struct {
 	cluster          staticConfigBox[ClusterConfig]
+	redis            staticConfigBox[RedisConfig]
 	i18n             staticConfigBox[I18nConfig]
 	jwt              staticConfigBox[JwtConfig]
 	logger           staticConfigBox[LoggerConfig]
@@ -58,13 +59,16 @@ func cloneClusterConfig(cfg *ClusterConfig) *ClusterConfig {
 	return &cloned
 }
 
-// cloneClusterRedisConfig returns a detached copy of Redis coordination config.
-func cloneClusterRedisConfig(cfg *ClusterRedisConfig) *ClusterRedisConfig {
+// cloneRedisConfig returns a detached copy of named Redis groups.
+func cloneRedisConfig(cfg RedisConfig) RedisConfig {
 	if cfg == nil {
-		return nil
+		return RedisConfig{}
 	}
-	cloned := *cfg
-	return &cloned
+	cloned := make(RedisConfig, len(cfg))
+	for name, group := range cfg {
+		cloned[name] = group
+	}
+	return cloned
 }
 
 // cloneI18nConfig returns a detached copy so callers cannot mutate the shared

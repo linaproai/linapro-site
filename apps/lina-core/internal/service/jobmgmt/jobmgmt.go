@@ -1,21 +1,25 @@
 // Package jobmgmt implements persistent scheduled-job CRUD, group management,
-// log management, and cron-preview services.
+// log management, cron-preview services, and the in-memory handler registry
+// shared by job management, the scheduler, and plugin lifecycle hooks.
+//
+// Handlers run under at-least-once delivery. Prefer jobmeta.ExecutionLogID(ctx)
+// as an idempotency key when side effects are not naturally safe to repeat.
 package jobmgmt
 
 import (
 	"context"
-	jobv1 "lina-core/api/job/v1"
+	"encoding/json"
 	"time"
 
 	"github.com/gogf/gf/v2/errors/gerror"
 
+	jobv1 "lina-core/api/job/v1"
 	"lina-core/internal/model/entity"
 	"lina-core/internal/service/bizctx"
 	"lina-core/internal/service/cluster"
 	configsvc "lina-core/internal/service/config"
 	"lina-core/internal/service/datascope"
 	i18nsvc "lina-core/internal/service/i18n"
-	"lina-core/internal/service/jobhandler"
 	"lina-core/internal/service/jobmeta"
 	internalscheduler "lina-core/internal/service/jobmgmt/internal/scheduler"
 	internalshellexec "lina-core/internal/service/jobmgmt/internal/shellexec"
@@ -103,8 +107,64 @@ type Scheduler interface {
 	CancelLog(ctx context.Context, logID int64) error
 }
 
+// InvokeFunc defines one registered scheduled-job callback.
+type InvokeFunc func(ctx context.Context, params json.RawMessage) (result any, err error)
+
+// HandlerDef defines one registry entry with execution callback and metadata.
+type HandlerDef struct {
+	Ref          string                // Ref is the stable handler reference.
+	DisplayName  string                // DisplayName is shown in the UI.
+	Description  string                // Description explains the handler purpose.
+	ParamsSchema string                // ParamsSchema stores the accepted JSON Schema subset.
+	Source       jobmeta.HandlerSource // Source identifies whether the handler comes from host or plugin code.
+	PluginID     string                // PluginID stores the owning plugin when Source=plugin.
+	Invoke       InvokeFunc            // Invoke executes the handler.
+}
+
+// HandlerInfo defines one display-safe handler snapshot exposed to callers.
+type HandlerInfo struct {
+	Ref          string                // Ref is the stable handler reference.
+	DisplayName  string                // DisplayName is shown in the UI.
+	Description  string                // Description explains the handler purpose.
+	ParamsSchema string                // ParamsSchema stores the accepted JSON Schema subset.
+	Source       jobmeta.HandlerSource // Source identifies whether the handler comes from host or plugin code.
+	PluginID     string                // PluginID stores the owning plugin when Source=plugin.
+}
+
+// ChangeCallback receives registry change notifications after a handler is
+// registered or unregistered.
+type ChangeCallback func(ref string, exists bool)
+
+// Registry defines the scheduled-job handler registry contract.
+type Registry interface {
+	// Register stores one handler definition and rejects duplicate refs.
+	// The definition is normalized before storage; missing refs, names,
+	// callbacks, unsupported sources, invalid plugin ownership, duplicate refs,
+	// or invalid parameter schemas return business errors. Successful calls
+	// notify subscribers outside the registry lock.
+	Register(def HandlerDef) error
+	// Unregister removes one handler definition and notifies change observers.
+	// Blank or unknown refs are ignored, making plugin lifecycle cleanup
+	// idempotent.
+	Unregister(ref string)
+	// Lookup returns one registered handler definition by ref. The returned
+	// definition includes the invocation callback and must only be used inside
+	// trusted scheduler execution paths.
+	Lookup(ref string) (HandlerDef, bool)
+	// List returns all registered handlers sorted by ref. The result excludes
+	// callback functions and is safe to expose to management views.
+	List() []HandlerInfo
+	// SubscribeChanges registers one change callback and returns its unsubscribe
+	// function. Nil callbacks receive a no-op unsubscribe function; callbacks are
+	// invoked after lock release and should avoid blocking scheduler refresh.
+	SubscribeChanges(callback ChangeCallback) func()
+}
+
 // Ensure serviceImpl implements Service.
 var _ Service = (*serviceImpl)(nil)
+
+// Ensure handlerRegistry implements Registry.
+var _ Registry = (*handlerRegistry)(nil)
 
 // orderField identifies one public list sorting field accepted by jobmgmt APIs.
 type orderField string
@@ -139,19 +199,19 @@ const (
 
 // serviceImpl implements Service.
 type serviceImpl struct {
-	bizCtxSvc bizctx.Service      // bizCtxSvc resolves the current operator identity.
-	configSvc configsvc.Service   // configSvc exposes runtime cron-management parameters.
-	i18nSvc   i18nsvc.Service     // i18nSvc localizes backend-owned display metadata.
-	registry  jobhandler.Registry // registry resolves handler definitions and validation schemas.
-	scheduler Scheduler           // scheduler keeps persistent jobs registered with gcron.
-	scopeSvc  datascope.Service   // scopeSvc enforces user-owned scheduled-job boundaries.
+	bizCtxSvc bizctx.Service    // bizCtxSvc resolves the current operator identity.
+	configSvc configsvc.Service // configSvc exposes runtime cron-management parameters.
+	i18nSvc   i18nsvc.Service   // i18nSvc localizes backend-owned display metadata.
+	registry  Registry          // registry resolves handler definitions and validation schemas.
+	scheduler Scheduler         // scheduler keeps persistent jobs registered with gcron.
+	scopeSvc  datascope.Service // scopeSvc enforces user-owned scheduled-job boundaries.
 }
 
 // NewScheduler creates the persistent scheduler plus its internal shell
 // executor so callers only depend on the jobmgmt component boundary.
 func NewScheduler(
 	clusterSvc cluster.Service,
-	registry jobhandler.Registry,
+	registry Registry,
 	configSvc configsvc.Service,
 ) (Scheduler, error) {
 	executor, err := internalshellexec.New(configSvc)
@@ -160,9 +220,17 @@ func NewScheduler(
 	}
 	return internalscheduler.New(
 		clusterSvc,
-		registry,
+		schedulerHandlerRuntime{registry: registry},
 		executor,
 	), nil
+}
+
+// NewRegistry creates and returns one empty handler registry.
+func NewRegistry() Registry {
+	return &handlerRegistry{
+		handlers:  make(map[string]HandlerDef),
+		callbacks: make(map[int]ChangeCallback),
+	}
 }
 
 // New creates and returns one scheduled-job management service.
@@ -170,7 +238,7 @@ func New(
 	bizCtxSvc bizctx.Service,
 	configSvc configsvc.Service,
 	i18nSvc i18nsvc.Service,
-	registry jobhandler.Registry,
+	registry Registry,
 	scheduler Scheduler,
 	scopeSvc datascope.Service,
 ) Service {

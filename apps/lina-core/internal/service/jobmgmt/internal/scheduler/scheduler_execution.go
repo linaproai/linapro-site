@@ -17,7 +17,6 @@ import (
 	"lina-core/internal/dao"
 	"lina-core/internal/model/do"
 	"lina-core/internal/model/entity"
-	"lina-core/internal/service/jobhandler"
 	"lina-core/internal/service/jobmeta"
 	"lina-core/pkg/bizerr"
 )
@@ -87,11 +86,11 @@ func (s *serviceImpl) validateExecutableJob(ctx context.Context, job *entity.Sys
 	}
 	switch jobmeta.NormalizeTaskType(job.TaskType) {
 	case jobv1.TaskTypeHandler:
-		def, ok := s.registry.Lookup(job.HandlerRef)
+		_, schema, ok := s.registry.Lookup(job.HandlerRef)
 		if !ok {
-			return bizerr.NewCode(jobhandler.CodeJobHandlerNotFound)
+			return s.registry.HandlerNotFoundError()
 		}
-		return jobhandler.ValidateParams(def.ParamsSchema, json.RawMessage(job.Params))
+		return s.registry.ValidateHandlerParams(schema, json.RawMessage(job.Params))
 
 	case jobv1.TaskTypeShell:
 		if s.shellExecutor == nil {

@@ -48,6 +48,23 @@ function assertOk(response: APIResponse, message: string) {
   expect(response.ok(), `${message}, status=${response.status()}`).toBeTruthy();
 }
 
+async function expectApiSuccess<T = any>(
+  response: APIResponse,
+  message: string,
+): Promise<T> {
+  assertOk(response, message);
+  const payload = (await response.json()) as {
+    code?: number;
+    data?: T;
+    message?: string;
+  };
+  expect(
+    payload?.code,
+    `${message}, business code=${payload?.code}, business message=${payload?.message ?? ""}`,
+  ).toBe(0);
+  return (payload?.data ?? null) as T;
+}
+
 function safeParseJSON(value: string) {
   try {
     return JSON.parse(value);
@@ -305,12 +322,12 @@ async function uploadDynamicPlugin(
       },
     },
   });
-  assertOk(response, `上传动态插件失败: ${artifactPath}`);
+  await expectApiSuccess(response, `上传动态插件失败: ${artifactPath}`);
 }
 
 async function installPlugin(adminApi: APIRequestContext) {
   const response = await adminApi.post(`plugins/${pluginID}/install`);
-  assertOk(response, "安装动态插件失败");
+  await expectApiSuccess(response, "安装动态插件失败");
 }
 
 async function upgradePlugin(adminApi: APIRequestContext) {
@@ -337,7 +354,14 @@ async function setPluginEnabled(
   const response = await adminApi.put(
     enabled ? `plugins/${pluginID}/enable` : `plugins/${pluginID}/disable`,
   );
-  assertOk(response, `切换动态插件状态失败: enabled=${enabled}`);
+  await expectApiSuccess(response, `切换动态插件状态失败: enabled=${enabled}`);
+}
+
+async function resetPlugin(adminApi: APIRequestContext) {
+  await adminApi.put(`plugins/${pluginID}/disable`);
+  await adminApi.delete(`plugins/${pluginID}`);
+  cleanupRuntimeWorkspace();
+  cleanupRuntimeRows();
 }
 
 function getPluginRegistryRow() {
@@ -441,6 +465,7 @@ async function bootstrapEnabledRuntimePlugin(
   });
 
   await setPluginEnabled(adminApi, true);
+  await expectApiSuccess(await adminApi.post("plugins/sync"), "同步插件治理资源失败");
   await waitForPluginRegistryState({
     installed: 1,
     enabled: 1,
@@ -487,19 +512,26 @@ test.describe("TC-3 动态插件热升级与回滚", () => {
   });
 
   test.afterAll(async () => {
-    cleanupRuntimeWorkspace();
-    cleanupRuntimeRows();
     if (adminApi) {
+      await resetPlugin(adminApi);
       await adminApi.dispose();
     }
+    cleanupRuntimeWorkspace();
+    cleanupRuntimeRows();
   });
 
   test.beforeEach(async () => {
+    if (adminApi) {
+      await resetPlugin(adminApi);
+    }
     cleanupRuntimeWorkspace();
     cleanupRuntimeRows();
   });
 
   test.afterEach(async () => {
+    if (adminApi) {
+      await resetPlugin(adminApi);
+    }
     cleanupRuntimeWorkspace();
     cleanupRuntimeRows();
   });

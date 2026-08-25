@@ -1,3 +1,5 @@
+// This file defines assignable menu resource DTOs used by role authorization.
+
 package v1
 
 import (
@@ -8,20 +10,19 @@ import (
 
 // TreeSelectReq defines the request for querying the menu tree select data.
 type TreeSelectReq struct {
-	g.Meta `path:"/menu/treeselect" method:"get" tags:"Menu Management" summary:"Get menu dropdown tree" dc:"Get the menu dropdown tree, used for selection when assigning the role to the menu. Filter out button type menus" permission:"system:menu:query"`
+	g.Meta `path:"/menu/treeselect" method:"get" tags:"Menu Management" summary:"Get assignable menu resources" dc:"Return the flat assignable menu resource list used when authorizing a role. Management workbenches compile parent/child relationships into a tree. Button-type menus remain included." permission:"system:menu:query"`
 }
 
-// MenuTreeNode represents a node in the tree select
+// MenuTreeNode represents one assignable menu resource.
 type MenuTreeNode struct {
-	Id       int             `json:"id" dc:"Menu ID" eg:"1"`
-	ParentId int             `json:"parentId" dc:"Parent menu ID" eg:"0"`
-	Label    string          `json:"label" dc:"Menu name" eg:"System management"`
-	Type     menutype.Code   `json:"type" dc:"Menu type: D=Directory M=Menu B=Button" eg:"D"`
-	Icon     string          `json:"icon" dc:"menu icon" eg:"ant-design:dashboard-outlined"`
-	Children []*MenuTreeNode `json:"children" dc:"submenu" eg:"[]"`
+	Id       int           `json:"id" dc:"Menu ID" eg:"1"`
+	ParentId int           `json:"parentId" dc:"Parent menu ID" eg:"0"`
+	Label    string        `json:"label" dc:"Menu name" eg:"System management"`
+	Type     menutype.Code `json:"type" dc:"Menu type: D=Directory M=Menu B=Button" eg:"D"`
+	Icon     string        `json:"icon" dc:"menu icon" eg:"ant-design:dashboard-outlined"`
 }
 
-// TreeSelectRes defines the response for querying the menu tree select data.
+// TreeSelectRes defines the response for querying assignable menu resources.
 type TreeSelectRes struct {
-	List []*MenuTreeNode `json:"list" dc:"Menu tree list" eg:"[]"`
+	List []*MenuTreeNode `json:"list" dc:"Flat assignable menu resource list" eg:"[]"`
 }

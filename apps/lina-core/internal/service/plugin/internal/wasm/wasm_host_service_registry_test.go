@@ -20,10 +20,7 @@ func TestHostServiceDispatchRegistryCoversCatalog(t *testing.T) {
 		t.Fatalf("build host service dispatch registry failed: %v", err)
 	}
 	expected := make(map[string]struct{})
-	for _, descriptor := range hostservices.Methods() {
-		if !descriptor.Published || !descriptor.Dispatcher {
-			continue
-		}
+	for _, descriptor := range hostservices.PublishedDispatcherMethods() {
 		expected[descriptor.Service+"\x00"+descriptor.Method] = struct{}{}
 		if _, ok := registry.lookup(descriptor.Service, descriptor.Method); !ok {
 			t.Fatalf("host service dispatch registry is missing %s.%s", descriptor.Service, descriptor.Method)
@@ -38,6 +35,55 @@ func TestHostServiceDispatchRegistryCoversCatalog(t *testing.T) {
 	}
 	for key := range expected {
 		t.Fatalf("host service dispatch registry is missing catalog method key %q", key)
+	}
+}
+
+func TestBuildHostServiceDispatchRegistryMissingHandlerFails(t *testing.T) {
+	_, err := buildHostServiceDispatchRegistry([]hostservices.MethodDescriptor{{
+		Service:    hostservices.HostServiceUsers,
+		Method:     hostservices.HostServiceMethodUsersBatchGet,
+		Published:  true,
+		Dispatcher: true,
+	}}, map[string]hostServiceDispatchAdapter{})
+	if err == nil || !strings.Contains(err.Error(), hostservices.HostServiceUsers+"."+hostservices.HostServiceMethodUsersBatchGet) {
+		t.Fatalf("missing handler must fail with service.method, got %v", err)
+	}
+}
+
+func TestBuildHostServiceDispatchRegistryOrphanHandlerFails(t *testing.T) {
+	adapter := func(context.Context, *hostCallContext, hostServiceDispatchContext) *bridgehostcall.HostCallResponseEnvelope {
+		return bridgehostcall.NewHostCallEmptySuccessResponse()
+	}
+	_, err := buildHostServiceDispatchRegistry(nil, map[string]hostServiceDispatchAdapter{
+		"ghost": adapter,
+	})
+	if err == nil || !strings.Contains(err.Error(), "ghost") {
+		t.Fatalf("orphan handler must fail, got %v", err)
+	}
+}
+
+func TestBuildHostServiceDispatchRegistryBindsJSONAndDedicatedMethods(t *testing.T) {
+	registry, err := newHostServiceDispatchRegistry()
+	if err != nil {
+		t.Fatalf("build host service dispatch registry failed: %v", err)
+	}
+	var (
+		sawJSON      bool
+		sawDedicated bool
+	)
+	for _, descriptor := range hostservices.PublishedDispatcherMethods() {
+		if _, ok := registry.lookup(descriptor.Service, descriptor.Method); !ok {
+			t.Fatalf("registry missing catalog method %s.%s", descriptor.Service, descriptor.Method)
+		}
+		switch descriptor.PayloadKind {
+		case hostservices.PayloadKindJSON, hostservices.PayloadKindNone:
+			sawJSON = true
+		case hostservices.PayloadKindDedicated:
+			sawDedicated = true
+		}
+	}
+	if !sawJSON || !sawDedicated {
+		t.Fatalf("registry must bind both JSON and dedicated catalog methods, json=%v dedicated=%v", sawJSON, sawDedicated)
 	}
 }
 

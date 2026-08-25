@@ -22,7 +22,7 @@ const testHolder = "test-node"
 
 // newTestService creates a new locker service for testing.
 func newTestService() *serviceImpl {
-	return New().(*serviceImpl)
+	return New(NewSQLStore()).(*serviceImpl)
 }
 
 // cleanupLock removes the lock by name after test.
@@ -392,12 +392,7 @@ func TestService_LockFunc_AlreadyLocked(t *testing.T) {
 // tokens for acquire, renew, held-state checks, and release.
 func TestCoordinationLockerLifecycle(t *testing.T) {
 	ctx := context.Background()
-	ConfigureCoordination(coordination.NewMemory(nil))
-	t.Cleanup(func() {
-		ConfigureCoordination(nil)
-	})
-
-	svc := New()
+	svc := New(coordination.NewMemory(nil).Lock())
 	instance, ok, err := svc.Lock(ctx, "unit-coord-lock", "node-a", "unit", time.Second)
 	if err != nil {
 		t.Fatalf("acquire coordination lock: %v", err)
@@ -414,14 +409,27 @@ func TestCoordinationLockerLifecycle(t *testing.T) {
 	if err = instance.Renew(ctx); err != nil {
 		t.Fatalf("renew coordination lock through instance: %v", err)
 	}
-	if err = svc.RenewByName(ctx, instance.Name(), instance.Holder(), time.Second); err != nil {
-		t.Fatalf("renew coordination lock by name: %v", err)
+	if err = svc.Renew(ctx, &coordination.LockHandle{
+		Name:  instance.Name(),
+		Owner: instance.Holder(),
+		Token: instance.Holder(),
+		Lease: time.Second,
+	}, time.Second); err != nil {
+		t.Fatalf("renew coordination lock by handle: %v", err)
 	}
-	if err = svc.UnlockByName(ctx, instance.Name(), "wrong-token"); err != ErrLockNotHeld {
+	if err = svc.Release(ctx, &coordination.LockHandle{
+		Name:  instance.Name(),
+		Owner: "wrong-token",
+		Token: "wrong-token",
+	}); err != ErrLockNotHeld {
 		t.Fatalf("expected wrong-token release to fail, got %v", err)
 	}
-	if err = svc.UnlockByName(ctx, instance.Name(), instance.Holder()); err != nil {
-		t.Fatalf("release coordination lock by name: %v", err)
+	if err = svc.Release(ctx, &coordination.LockHandle{
+		Name:  instance.Name(),
+		Owner: instance.Holder(),
+		Token: instance.Holder(),
+	}); err != nil {
+		t.Fatalf("release coordination lock by handle: %v", err)
 	}
 	if held, err := instance.IsHeld(ctx); err != nil || held {
 		t.Fatalf("expected coordination lock released, held=%t err=%v", held, err)
@@ -432,12 +440,7 @@ func TestCoordinationLockerLifecycle(t *testing.T) {
 // independent even when held by the same owner.
 func TestCoordinationLockerIsolatesNames(t *testing.T) {
 	ctx := context.Background()
-	ConfigureCoordination(coordination.NewMemory(nil))
-	t.Cleanup(func() {
-		ConfigureCoordination(nil)
-	})
-
-	svc := New()
+	svc := New(coordination.NewMemory(nil).Lock())
 	first, ok, err := svc.Lock(ctx, "plugin:a:sync", "node-a", "first", time.Second)
 	if err != nil || !ok || first == nil {
 		t.Fatalf("acquire first coordination lock, ok=%t err=%v", ok, err)
@@ -462,16 +465,38 @@ func TestCoordinationLockerIsolatesNames(t *testing.T) {
 func TestCoordinationLockerFailureReturnsError(t *testing.T) {
 	ctx := context.Background()
 	coordSvc := coordination.NewMemory(nil)
-	ConfigureCoordination(coordSvc)
-	t.Cleanup(func() {
-		ConfigureCoordination(nil)
-	})
 	if err := coordSvc.Close(ctx); err != nil {
 		t.Fatalf("close coordination backend: %v", err)
 	}
 
-	if instance, ok, err := New().Lock(ctx, "unit-closed-lock", "node-a", "unit", time.Second); err == nil || ok || instance != nil {
+	if instance, ok, err := New(coordSvc.Lock()).Lock(ctx, "unit-closed-lock", "node-a", "unit", time.Second); err == nil || ok || instance != nil {
 		t.Fatalf("expected coordination lock failure, instance=%#v ok=%t err=%v", instance, ok, err)
+	}
+}
+
+// TestConstructedLockerKeepsInjectedStore verifies two locker services bound
+// to different stores do not share ownership or process-global backend state.
+func TestConstructedLockerKeepsInjectedStore(t *testing.T) {
+	ctx := context.Background()
+	first := New(coordination.NewMemory(nil).Lock())
+	second := New(coordination.NewMemory(nil).Lock())
+
+	held, ok, err := first.Lock(ctx, "startup-di-lock", "node-a", "unit", time.Second)
+	if err != nil || !ok || held == nil {
+		t.Fatalf("acquire first store lock, ok=%t err=%v", ok, err)
+	}
+	t.Cleanup(func() {
+		if unlockErr := held.Unlock(ctx); unlockErr != nil {
+			t.Fatalf("unlock first store lock: %v", unlockErr)
+		}
+	})
+
+	other, ok, err := second.Lock(ctx, "startup-di-lock", "node-b", "unit", time.Second)
+	if err != nil || !ok || other == nil {
+		t.Fatalf("expected second locker to use an independent store, ok=%t err=%v", ok, err)
+	}
+	if unlockErr := other.Unlock(ctx); unlockErr != nil {
+		t.Fatalf("unlock second store lock: %v", unlockErr)
 	}
 }
 

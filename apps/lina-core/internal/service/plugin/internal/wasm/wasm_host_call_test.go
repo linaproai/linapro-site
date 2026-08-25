@@ -403,7 +403,7 @@ func TestHandleHostServiceInvokeRejectsUnauthorizedResourceRef(t *testing.T) {
 		Service:     protocol.HostServiceStorage,
 		Method:      protocol.HostServiceMethodStorageGet,
 		ResourceRef: "denied-files/demo.txt",
-		Payload: protocol.MarshalHostServiceStorageGetRequest(&protocol.HostServiceStorageGetRequest{
+		Payload: marshalCapabilityJSONRequest(t, &protocol.HostServiceStorageGetRequest{
 			Path: "denied-files/demo.txt",
 		}),
 	}

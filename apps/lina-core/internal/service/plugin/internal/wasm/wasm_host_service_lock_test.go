@@ -146,15 +146,13 @@ func TestHandleHostServiceInvokeLockLifecycle(t *testing.T) {
 		hcc,
 		protocol.HostServiceMethodLockAcquire,
 		lockName,
-		protocol.MarshalHostServiceLockAcquireRequest(&protocol.HostServiceLockAcquireRequest{LeaseMillis: 5000}),
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceLockAcquireRequest{LeaseMillis: 5000}),
 	)
 	if acquireResponse.Status != protocol.HostCallStatusSuccess {
 		t.Fatalf("acquire: expected success, got status=%d payload=%s", acquireResponse.Status, string(acquireResponse.Payload))
 	}
-	acquirePayload, err := protocol.UnmarshalHostServiceLockAcquireResponse(acquireResponse.Payload)
-	if err != nil {
-		t.Fatalf("acquire payload decode failed: %v", err)
-	}
+	var acquirePayload protocol.HostServiceLockAcquireResponse
+	decodeCapabilityJSONResponse(t, acquireResponse.Payload, &acquirePayload)
 	if !acquirePayload.Acquired || strings.TrimSpace(acquirePayload.Ticket) == "" {
 		t.Fatalf("acquire payload: got %#v", acquirePayload)
 	}
@@ -167,15 +165,13 @@ func TestHandleHostServiceInvokeLockLifecycle(t *testing.T) {
 		hcc,
 		protocol.HostServiceMethodLockAcquire,
 		lockName,
-		protocol.MarshalHostServiceLockAcquireRequest(&protocol.HostServiceLockAcquireRequest{LeaseMillis: 5000}),
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceLockAcquireRequest{LeaseMillis: 5000}),
 	)
 	if duplicateAcquireResponse.Status != protocol.HostCallStatusSuccess {
 		t.Fatalf("duplicate acquire: expected success envelope, got status=%d payload=%s", duplicateAcquireResponse.Status, string(duplicateAcquireResponse.Payload))
 	}
-	duplicateAcquirePayload, err := protocol.UnmarshalHostServiceLockAcquireResponse(duplicateAcquireResponse.Payload)
-	if err != nil {
-		t.Fatalf("duplicate acquire payload decode failed: %v", err)
-	}
+	var duplicateAcquirePayload protocol.HostServiceLockAcquireResponse
+	decodeCapabilityJSONResponse(t, duplicateAcquireResponse.Payload, &duplicateAcquirePayload)
 	if duplicateAcquirePayload.Acquired {
 		t.Fatalf("expected duplicate acquire to be rejected by lock holder, got %#v", duplicateAcquirePayload)
 	}
@@ -185,15 +181,13 @@ func TestHandleHostServiceInvokeLockLifecycle(t *testing.T) {
 		hcc,
 		protocol.HostServiceMethodLockRenew,
 		lockName,
-		protocol.MarshalHostServiceLockRenewRequest(&protocol.HostServiceLockRenewRequest{Ticket: acquirePayload.Ticket}),
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceLockRenewRequest{Ticket: acquirePayload.Ticket}),
 	)
 	if renewResponse.Status != protocol.HostCallStatusSuccess {
 		t.Fatalf("renew: expected success, got status=%d payload=%s", renewResponse.Status, string(renewResponse.Payload))
 	}
-	renewPayload, err := protocol.UnmarshalHostServiceLockRenewResponse(renewResponse.Payload)
-	if err != nil {
-		t.Fatalf("renew payload decode failed: %v", err)
-	}
+	var renewPayload protocol.HostServiceLockRenewResponse
+	decodeCapabilityJSONResponse(t, renewResponse.Payload, &renewPayload)
 	if strings.TrimSpace(renewPayload.ExpireAt) == "" {
 		t.Fatalf("renew payload: got %#v", renewPayload)
 	}
@@ -206,7 +200,7 @@ func TestHandleHostServiceInvokeLockLifecycle(t *testing.T) {
 		hcc,
 		protocol.HostServiceMethodLockRelease,
 		lockName,
-		protocol.MarshalHostServiceLockReleaseRequest(&protocol.HostServiceLockReleaseRequest{Ticket: acquirePayload.Ticket}),
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceLockReleaseRequest{Ticket: acquirePayload.Ticket}),
 	)
 	if releaseResponse.Status != protocol.HostCallStatusSuccess {
 		t.Fatalf("release: expected success, got status=%d payload=%s", releaseResponse.Status, string(releaseResponse.Payload))
@@ -217,15 +211,13 @@ func TestHandleHostServiceInvokeLockLifecycle(t *testing.T) {
 		hcc,
 		protocol.HostServiceMethodLockAcquire,
 		lockName,
-		protocol.MarshalHostServiceLockAcquireRequest(&protocol.HostServiceLockAcquireRequest{LeaseMillis: 5000}),
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceLockAcquireRequest{LeaseMillis: 5000}),
 	)
 	if reacquireResponse.Status != protocol.HostCallStatusSuccess {
 		t.Fatalf("reacquire: expected success, got status=%d payload=%s", reacquireResponse.Status, string(reacquireResponse.Payload))
 	}
-	reacquirePayload, err := protocol.UnmarshalHostServiceLockAcquireResponse(reacquireResponse.Payload)
-	if err != nil {
-		t.Fatalf("reacquire payload decode failed: %v", err)
-	}
+	var reacquirePayload protocol.HostServiceLockAcquireResponse
+	decodeCapabilityJSONResponse(t, reacquireResponse.Payload, &reacquirePayload)
 	if !reacquirePayload.Acquired {
 		t.Fatalf("expected released lock to be acquirable again, got %#v", reacquirePayload)
 	}
@@ -255,22 +247,20 @@ func TestHandleHostServiceInvokeLockRejectsTicketMismatch(t *testing.T) {
 		hcc,
 		protocol.HostServiceMethodLockAcquire,
 		lockName,
-		protocol.MarshalHostServiceLockAcquireRequest(&protocol.HostServiceLockAcquireRequest{LeaseMillis: 5000}),
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceLockAcquireRequest{LeaseMillis: 5000}),
 	)
 	if acquireResponse.Status != protocol.HostCallStatusSuccess {
 		t.Fatalf("acquire: expected success, got status=%d payload=%s", acquireResponse.Status, string(acquireResponse.Payload))
 	}
-	acquirePayload, err := protocol.UnmarshalHostServiceLockAcquireResponse(acquireResponse.Payload)
-	if err != nil {
-		t.Fatalf("acquire payload decode failed: %v", err)
-	}
+	var acquirePayload protocol.HostServiceLockAcquireResponse
+	decodeCapabilityJSONResponse(t, acquireResponse.Payload, &acquirePayload)
 
 	mismatchResponse := invokeLockHostService(
 		t,
 		hcc,
 		protocol.HostServiceMethodLockRenew,
 		otherLockName,
-		protocol.MarshalHostServiceLockRenewRequest(&protocol.HostServiceLockRenewRequest{Ticket: acquirePayload.Ticket}),
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceLockRenewRequest{Ticket: acquirePayload.Ticket}),
 	)
 	if mismatchResponse.Status != protocol.HostCallStatusInvalidRequest {
 		t.Fatalf("expected invalid request for mismatched ticket, got status=%d payload=%s", mismatchResponse.Status, string(mismatchResponse.Payload))
@@ -285,7 +275,7 @@ func TestHandleHostServiceInvokeLockRejectsUnauthorizedResource(t *testing.T) {
 		hcc,
 		protocol.HostServiceMethodLockAcquire,
 		"inventory-sync",
-		protocol.MarshalHostServiceLockAcquireRequest(&protocol.HostServiceLockAcquireRequest{LeaseMillis: 5000}),
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceLockAcquireRequest{LeaseMillis: 5000}),
 	)
 	if response.Status != protocol.HostCallStatusCapabilityDenied {
 		t.Fatalf("expected capability denied for unauthorized lock name, got status=%d payload=%s", response.Status, string(response.Payload))
@@ -303,7 +293,7 @@ func TestHandleHostServiceInvokeLockRequiresConfiguredService(t *testing.T) {
 		hcc,
 		protocol.HostServiceMethodLockAcquire,
 		"orders-sync",
-		protocol.MarshalHostServiceLockAcquireRequest(&protocol.HostServiceLockAcquireRequest{LeaseMillis: 5000}),
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceLockAcquireRequest{LeaseMillis: 5000}),
 	)
 	if response.Status != protocol.HostCallStatusInternalError {
 		t.Fatalf("expected internal error for unconfigured lock service, got status=%d payload=%s", response.Status, string(response.Payload))
@@ -322,15 +312,13 @@ func TestHandleHostServiceInvokeLockUsesConfiguredSharedService(t *testing.T) {
 		hcc,
 		protocol.HostServiceMethodLockAcquire,
 		"orders-sync",
-		protocol.MarshalHostServiceLockAcquireRequest(&protocol.HostServiceLockAcquireRequest{LeaseMillis: 5000}),
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceLockAcquireRequest{LeaseMillis: 5000}),
 	)
 	if response.Status != protocol.HostCallStatusSuccess {
 		t.Fatalf("acquire through shared lock: expected success, got status=%d payload=%s", response.Status, string(response.Payload))
 	}
-	payload, err := protocol.UnmarshalHostServiceLockAcquireResponse(response.Payload)
-	if err != nil {
-		t.Fatalf("decode shared lock acquire: %v", err)
-	}
+	var payload protocol.HostServiceLockAcquireResponse
+	decodeCapabilityJSONResponse(t, response.Payload, &payload)
 	if payload.Ticket != "shared-lock-ticket" {
 		t.Fatalf("expected shared lock ticket, got %#v", payload)
 	}
@@ -346,15 +334,11 @@ func TestHandleHostServiceInvokeLockUsesConfiguredSharedService(t *testing.T) {
 // Wasm plugin locks use coordination locking and tenant-scoped lock names.
 func TestHandleHostServiceInvokeLockUsesCoordinationAndTenantIsolation(t *testing.T) {
 	coordSvc := coordination.NewMemory(nil)
-	locker.ConfigureCoordination(coordSvc)
-	lockSvc, err := hostlock.New(locker.New())
+	lockSvc, err := hostlock.New(locker.New(coordSvc.Lock()))
 	if err != nil {
 		t.Fatalf("create host lock service failed: %v", err)
 	}
 	configureLockDomainServiceForTest(t, &lockDomainTestService{service: lockSvc})
-	t.Cleanup(func() {
-		locker.ConfigureCoordination(nil)
-	})
 
 	var (
 		lockName    = "orders-sync"
@@ -377,15 +361,13 @@ func TestHandleHostServiceInvokeLockUsesCoordinationAndTenantIsolation(t *testin
 		tenantOne,
 		protocol.HostServiceMethodLockAcquire,
 		lockName,
-		protocol.MarshalHostServiceLockAcquireRequest(&protocol.HostServiceLockAcquireRequest{LeaseMillis: 5000}),
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceLockAcquireRequest{LeaseMillis: 5000}),
 	)
 	if duplicateResponse.Status != protocol.HostCallStatusSuccess {
 		t.Fatalf("duplicate acquire expected success envelope, got status=%d payload=%s", duplicateResponse.Status, string(duplicateResponse.Payload))
 	}
-	duplicatePayload, err := protocol.UnmarshalHostServiceLockAcquireResponse(duplicateResponse.Payload)
-	if err != nil {
-		t.Fatalf("decode duplicate acquire payload: %v", err)
-	}
+	var duplicatePayload protocol.HostServiceLockAcquireResponse
+	decodeCapabilityJSONResponse(t, duplicateResponse.Payload, &duplicatePayload)
 	if duplicatePayload.Acquired {
 		t.Fatalf("expected duplicate same plugin/tenant lock acquire to miss, got %#v", duplicatePayload)
 	}
@@ -395,7 +377,7 @@ func TestHandleHostServiceInvokeLockUsesCoordinationAndTenantIsolation(t *testin
 		tenantOne,
 		protocol.HostServiceMethodLockRelease,
 		lockName,
-		protocol.MarshalHostServiceLockReleaseRequest(&protocol.HostServiceLockReleaseRequest{Ticket: tenantTwoTicket}),
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceLockReleaseRequest{Ticket: tenantTwoTicket}),
 	)
 	if wrongRelease.Status != protocol.HostCallStatusInvalidRequest {
 		t.Fatalf("expected cross-tenant release to fail, got status=%d payload=%s", wrongRelease.Status, string(wrongRelease.Payload))
@@ -412,7 +394,7 @@ func TestHandleHostServiceInvokeLockUsesCoordinationAndTenantIsolation(t *testin
 // lock service shape used by startup.
 func configureDefaultLockDomainService(t *testing.T) {
 	t.Helper()
-	lockSvc, err := hostlock.New(locker.New())
+	lockSvc, err := hostlock.New(locker.New(locker.NewSQLStore()))
 	if err != nil {
 		t.Fatalf("create host lock service failed: %v", err)
 	}
@@ -486,15 +468,13 @@ func acquireLockTicket(t *testing.T, hcc *hostCallContext, lockName string) stri
 		hcc,
 		protocol.HostServiceMethodLockAcquire,
 		lockName,
-		protocol.MarshalHostServiceLockAcquireRequest(&protocol.HostServiceLockAcquireRequest{LeaseMillis: 5000}),
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceLockAcquireRequest{LeaseMillis: 5000}),
 	)
 	if response.Status != protocol.HostCallStatusSuccess {
 		t.Fatalf("acquire coordination lock expected success, got status=%d payload=%s", response.Status, string(response.Payload))
 	}
-	payload, err := protocol.UnmarshalHostServiceLockAcquireResponse(response.Payload)
-	if err != nil {
-		t.Fatalf("decode acquire payload: %v", err)
-	}
+	var payload protocol.HostServiceLockAcquireResponse
+	decodeCapabilityJSONResponse(t, response.Payload, &payload)
 	if !payload.Acquired || strings.TrimSpace(payload.Ticket) == "" {
 		t.Fatalf("expected acquired lock ticket, got %#v", payload)
 	}
@@ -509,7 +489,7 @@ func releaseLockTicket(t *testing.T, hcc *hostCallContext, lockName string, tick
 		hcc,
 		protocol.HostServiceMethodLockRelease,
 		lockName,
-		protocol.MarshalHostServiceLockReleaseRequest(&protocol.HostServiceLockReleaseRequest{Ticket: ticket}),
+		marshalCapabilityJSONRequest(t, &protocol.HostServiceLockReleaseRequest{Ticket: ticket}),
 	)
 	if response.Status != protocol.HostCallStatusSuccess {
 		t.Fatalf("release coordination lock expected success, got status=%d payload=%s", response.Status, string(response.Payload))

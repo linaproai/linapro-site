@@ -21,18 +21,11 @@ export interface Menu {
   children?: Menu[];
 }
 
-export interface MenuTreeNode {
-  id: number;
-  parentId: number;
-  label: string;
-  type: string; // D=Directory M=Menu B=Button
-  icon?: string;
-  children?: MenuTreeNode[];
-}
+export type { MenuTreeNode } from './compile-menu-tree';
+export { compileMenuTree } from './compile-menu-tree';
 
 export interface RoleMenuTreeResp {
-  menus: MenuTreeNode[];
-  checkedKeys: number[];
+  menuIds: number[];
 }
 
 export interface MenuListParams {

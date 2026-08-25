@@ -4,6 +4,8 @@ package publicconfig
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 	"testing"
 
 	_ "lina-core/pkg/dbdriver"
@@ -52,8 +54,8 @@ func TestFrontendProjectsLocalizedSeedCopy(t *testing.T) {
 	)
 
 	controller := &ControllerV1{
-		configSvc: hostconfig.New(),
-		i18nSvc:   i18nsvc.New(bizctx.New(), hostconfig.New(), cachecoord.Default(nil)),
+		configSvc: hostconfig.New(nil),
+		i18nSvc:   i18nsvc.New(bizctx.New(), hostconfig.New(nil), cachecoord.New(nil, nil)),
 	}
 
 	res, err := controller.Frontend(ctx, &v1.FrontendReq{})
@@ -86,8 +88,8 @@ func TestFrontendKeepsCustomizedCopy(t *testing.T) {
 	)
 
 	controller := &ControllerV1{
-		configSvc: hostconfig.New(),
-		i18nSvc:   i18nsvc.New(bizctx.New(), hostconfig.New(), cachecoord.Default(nil)),
+		configSvc: hostconfig.New(nil),
+		i18nSvc:   i18nsvc.New(bizctx.New(), hostconfig.New(nil), cachecoord.New(nil, nil)),
 	}
 
 	res, err := controller.Frontend(ctx, &v1.FrontendReq{})
@@ -96,6 +98,32 @@ func TestFrontendKeepsCustomizedCopy(t *testing.T) {
 	}
 	if res.Auth.PageTitle != "自定义中文标题" {
 		t.Fatalf("expected customized page title to remain raw, got %q", res.Auth.PageTitle)
+	}
+}
+
+// TestFrontendOmitsWorkbenchLayoutVocabulary drives the shipped public
+// frontend controller and asserts the JSON contract has no Vben layout words.
+func TestFrontendOmitsWorkbenchLayoutVocabulary(t *testing.T) {
+	controller := &ControllerV1{
+		configSvc: hostconfig.New(nil),
+		i18nSvc:   i18nsvc.New(bizctx.New(), hostconfig.New(nil), cachecoord.New(nil, nil)),
+	}
+	res, err := controller.Frontend(newEnglishPublicConfigCtx(), &v1.FrontendReq{})
+	if err != nil {
+		t.Fatalf("load public frontend config: %v", err)
+	}
+	encoded, err := json.Marshal(res)
+	if err != nil {
+		t.Fatalf("marshal public frontend response: %v", err)
+	}
+	body := string(encoded)
+	for _, token := range []string{"panelLayout", "sloganImage", `"layout"`, "panel-left", "sidebar-mixed-nav"} {
+		if strings.Contains(body, token) {
+			t.Fatalf("public frontend JSON must not include %s, got %s", token, body)
+		}
+	}
+	if res.App.Name == "" {
+		t.Fatal("expected brand name on the public frontend contract")
 	}
 }
 
@@ -134,7 +162,7 @@ func ensureConfigRecordState(
 		if err != nil {
 			t.Fatalf("insert config record %s: %v", key, err)
 		}
-		if err = hostconfig.New().MarkRuntimeParamsChanged(ctx); err != nil {
+		if err = hostconfig.New(nil).MarkRuntimeParamsChanged(ctx); err != nil {
 			t.Fatalf("mark runtime params changed: %v", err)
 		}
 		t.Cleanup(func() {
@@ -142,7 +170,7 @@ func ensureConfigRecordState(
 			if cleanupErr != nil {
 				t.Fatalf("delete config record %s: %v", key, cleanupErr)
 			}
-			if cleanupErr = hostconfig.New().MarkRuntimeParamsChanged(ctx); cleanupErr != nil {
+			if cleanupErr = hostconfig.New(nil).MarkRuntimeParamsChanged(ctx); cleanupErr != nil {
 				t.Fatalf("mark runtime params changed after delete: %v", cleanupErr)
 			}
 		})
@@ -162,7 +190,7 @@ func ensureConfigRecordState(
 	if err != nil {
 		t.Fatalf("update config record %s: %v", key, err)
 	}
-	if err = hostconfig.New().MarkRuntimeParamsChanged(ctx); err != nil {
+	if err = hostconfig.New(nil).MarkRuntimeParamsChanged(ctx); err != nil {
 		t.Fatalf("mark runtime params changed: %v", err)
 	}
 	t.Cleanup(func() {
@@ -179,7 +207,7 @@ func ensureConfigRecordState(
 		if cleanupErr != nil {
 			t.Fatalf("restore config record %s: %v", key, cleanupErr)
 		}
-		if cleanupErr = hostconfig.New().MarkRuntimeParamsChanged(ctx); cleanupErr != nil {
+		if cleanupErr = hostconfig.New(nil).MarkRuntimeParamsChanged(ctx); cleanupErr != nil {
 			t.Fatalf("mark runtime params changed after restore: %v", cleanupErr)
 		}
 	})

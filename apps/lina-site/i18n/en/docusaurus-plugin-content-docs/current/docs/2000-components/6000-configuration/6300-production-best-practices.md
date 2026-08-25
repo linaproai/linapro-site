@@ -35,7 +35,7 @@ Before going live, at least check these configurations to ensure system stabilit
 | `logger.extensions.structured` | Enable structured logging in production |
 | `workspace.basePath` | Keep `/admin` or use `/` for independent admin domain; do not occupy reserved paths; default workspace address locally is `http://localhost:5666/admin` |
 | `scheduler.defaultTimezone` | Set according to business timezone |
-| `cluster.redis` | Use independent, reliable, authenticated `Redis` instance in cluster mode |
+| `redis.<group>` | Use an independent, reliable, authenticated Redis group in cluster mode |
 | `plugin.allowForceUninstall` | Decide based on organizational governance requirements |
 | `plugin.autoEnable` | Carefully enable demo data in production |
 

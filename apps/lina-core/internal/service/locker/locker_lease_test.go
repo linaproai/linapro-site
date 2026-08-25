@@ -17,7 +17,7 @@ import (
 // stops cleanly.
 func TestLeaseManager_StartAndStop(t *testing.T) {
 	var (
-		svc    = New()
+		svc    = New(NewSQLStore())
 		name   = "test-lease-start-stop-" + gtime.TimestampMilliStr()
 		reason = "test reason"
 		ctx    = context.Background()
@@ -64,7 +64,7 @@ func TestLeaseManager_StartAndStop(t *testing.T) {
 // closed after stop.
 func TestLeaseManager_StopChan(t *testing.T) {
 	var (
-		svc    = New()
+		svc    = New(NewSQLStore())
 		name   = "test-lease-chan-" + gtime.TimestampMilliStr()
 		reason = "test reason"
 		ctx    = context.Background()
@@ -113,7 +113,7 @@ func TestLeaseManager_StopChan(t *testing.T) {
 // manager loop.
 func TestLeaseManager_RenewalFailure(t *testing.T) {
 	var (
-		svc    = New()
+		svc    = New(NewSQLStore())
 		name   = "test-lease-fail-" + gtime.TimestampMilliStr()
 		reason = "test reason"
 		ctx    = context.Background()

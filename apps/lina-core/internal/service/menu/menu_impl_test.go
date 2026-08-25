@@ -261,6 +261,86 @@ func TestUpdateDisableWithoutDescendants(t *testing.T) {
 	assertMenuFlags(t, ctx, leafID, 1, 0)
 }
 
+// TestCreateAllowsDuplicateIcons verifies sidebar icon uniqueness is not a
+// host integrity rule.
+func TestCreateAllowsDuplicateIcons(t *testing.T) {
+	var (
+		ctx    = context.Background()
+		prefix = fmt.Sprintf("menu-dup-icon-%d", time.Now().UnixNano())
+		svc    = &serviceImpl{roleSvc: &menuNotifyRoleService{}}
+		icon   = "ant-design:user-outlined"
+	)
+
+	firstID, err := svc.Create(ctx, CreateInput{
+		Name:    prefix + "-a",
+		Path:    prefix + "-a",
+		Icon:    icon,
+		Type:    menutype.Menu.String(),
+		Visible: 1,
+		Status:  1,
+	})
+	if err != nil {
+		t.Fatalf("create first menu: %v", err)
+	}
+	secondID, err := svc.Create(ctx, CreateInput{
+		Name:    prefix + "-b",
+		Path:    prefix + "-b",
+		Icon:    icon,
+		Type:    menutype.Menu.String(),
+		Visible: 1,
+		Status:  1,
+	})
+	if err != nil {
+		t.Fatalf("create second menu with the same icon: %v", err)
+	}
+	t.Cleanup(func() {
+		cleanupTestMenus(t, ctx, firstID, secondID)
+	})
+	if firstID == 0 || secondID == 0 || firstID == secondID {
+		t.Fatalf("expected two distinct menu IDs, got %d and %d", firstID, secondID)
+	}
+}
+
+// TestUpdateAllowsDuplicateIcons verifies PUT-path menu updates may reuse an
+// icon already assigned to another menu.
+func TestUpdateAllowsDuplicateIcons(t *testing.T) {
+	var (
+		ctx    = context.Background()
+		prefix = fmt.Sprintf("menu-upd-icon-%d", time.Now().UnixNano())
+		svc    = &serviceImpl{roleSvc: &menuNotifyRoleService{}}
+		icon   = "ant-design:user-outlined"
+	)
+
+	firstID, err := svc.Create(ctx, CreateInput{
+		Name:    prefix + "-a",
+		Path:    prefix + "-a",
+		Icon:    icon,
+		Type:    menutype.Menu.String(),
+		Visible: 1,
+		Status:  1,
+	})
+	if err != nil {
+		t.Fatalf("create first menu: %v", err)
+	}
+	secondID, err := svc.Create(ctx, CreateInput{
+		Name:    prefix + "-b",
+		Path:    prefix + "-b",
+		Icon:    "ant-design:setting-outlined",
+		Type:    menutype.Menu.String(),
+		Visible: 1,
+		Status:  1,
+	})
+	if err != nil {
+		t.Fatalf("create second menu: %v", err)
+	}
+	t.Cleanup(func() {
+		cleanupTestMenus(t, ctx, firstID, secondID)
+	})
+	if err := svc.Update(ctx, UpdateInput{Id: secondID, Icon: &icon}); err != nil {
+		t.Fatalf("update menu to a duplicate icon: %v", err)
+	}
+}
+
 // menuNotifyRoleService records topology notifications for cascade update tests.
 type menuNotifyRoleService struct {
 	rolesvc.Service

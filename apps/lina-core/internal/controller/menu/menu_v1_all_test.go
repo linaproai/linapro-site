@@ -5,14 +5,14 @@ import (
 
 	"lina-core/internal/model/entity"
 	menusvc "lina-core/internal/service/menu"
+	"lina-core/pkg/menuopen"
 	"lina-core/pkg/menutype"
 )
 
-// TestConvertToRouteItemsBuildsIframeRouteForHostedXAssets verifies hosted
-// asset menus default to iframe routes when they are not marked as new-window
-// or embedded-mount entries.
-func TestConvertToRouteItemsBuildsIframeRouteForHostedXAssets(t *testing.T) {
-	routes := convertToRouteItems([]*menusvc.MenuItem{
+// TestConvertToNavResourcesUsesIframeModeForHostedHTML verifies hosted HTML
+// assets become iframe resources without compiling Vben components.
+func TestConvertToNavResourcesUsesIframeModeForHostedHTML(t *testing.T) {
+	resources := convertToNavResources([]*menusvc.MenuItem{
 		{
 			Id:      101,
 			Name:    "Runtime Iframe Entry",
@@ -24,26 +24,25 @@ func TestConvertToRouteItemsBuildsIframeRouteForHostedXAssets(t *testing.T) {
 		},
 	})
 
-	if len(routes) != 1 {
-		t.Fatalf("expected 1 route, got %d", len(routes))
+	if len(resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
-
-	route := routes[0]
-	if route.Component != "IFrameView" {
-		t.Fatalf("expected iframe route component, got %s", route.Component)
+	item := resources[0]
+	if item.OpenMode != menuopen.IFrame {
+		t.Fatalf("expected iframe open mode, got %s", item.OpenMode)
 	}
-	if route.Meta == nil || route.Meta.IframeSrc != "/x-assets/plugin-runtime-demo/v0.1.0/index.html" {
-		t.Fatalf("expected iframe src to be preserved, got %#v", route.Meta)
+	if item.Target != "/x-assets/plugin-runtime-demo/v0.1.0/index.html" {
+		t.Fatalf("expected hosted target, got %s", item.Target)
 	}
-	if route.Path == "/x-assets/plugin-runtime-demo/v0.1.0/index.html" {
-		t.Fatalf("expected virtual router path instead of raw asset path, got %s", route.Path)
+	if item.Resource != "" {
+		t.Fatalf("expected empty resource for iframe, got %s", item.Resource)
 	}
 }
 
-// TestConvertToRouteItemsBuildsNewWindowRouteForHostedXAssets verifies
-// hosted asset menus marked as frames become new-window link routes.
-func TestConvertToRouteItemsBuildsNewWindowRouteForHostedXAssets(t *testing.T) {
-	routes := convertToRouteItems([]*menusvc.MenuItem{
+// TestConvertToNavResourcesUsesExternalModeForFrameFlag verifies is_frame
+// stored rows become external open mode.
+func TestConvertToNavResourcesUsesExternalModeForFrameFlag(t *testing.T) {
+	resources := convertToNavResources([]*menusvc.MenuItem{
 		{
 			Id:      102,
 			Name:    "Runtime New Window Entry",
@@ -54,28 +53,15 @@ func TestConvertToRouteItemsBuildsNewWindowRouteForHostedXAssets(t *testing.T) {
 			Status:  1,
 		},
 	})
-
-	if len(routes) != 1 {
-		t.Fatalf("expected 1 route, got %d", len(routes))
-	}
-
-	route := routes[0]
-	if route.Component != "BasicLayout" {
-		t.Fatalf("expected new-window route to keep basic layout component, got %s", route.Component)
-	}
-	if route.Meta == nil || route.Meta.Link != "/x-assets/plugin-runtime-demo/v0.1.0/index.html" {
-		t.Fatalf("expected link target to be preserved, got %#v", route.Meta)
-	}
-	if !route.Meta.OpenInNewWindow {
-		t.Fatalf("expected route to open in new window")
+	if len(resources) != 1 || resources[0].OpenMode != menuopen.External {
+		t.Fatalf("expected external mode, got %#v", resources)
 	}
 }
 
-// TestConvertToRouteItemsBuildsEmbeddedMountRouteForHostedXAssets verifies
-// embedded-mount runtime menus keep the hosted shell component and forward the
-// target URL through query parameters.
-func TestConvertToRouteItemsBuildsEmbeddedMountRouteForHostedXAssets(t *testing.T) {
-	routes := convertToRouteItems([]*menusvc.MenuItem{
+// TestConvertToNavResourcesUsesEmbeddedModeForHostedJS verifies hosted ESM
+// entries become embedded resources and drop workbench query keys.
+func TestConvertToNavResourcesUsesEmbeddedModeForHostedJS(t *testing.T) {
+	resources := convertToNavResources([]*menusvc.MenuItem{
 		{
 			Id:         103,
 			Name:       "Runtime Embedded Entry",
@@ -85,40 +71,35 @@ func TestConvertToRouteItemsBuildsEmbeddedMountRouteForHostedXAssets(t *testing.
 			IsFrame:    0,
 			Visible:    1,
 			Status:     1,
-			QueryParam: `{"pluginAccessMode":"embedded-mount"}`,
+			QueryParam: `{"pluginAccessMode":"embedded-mount","tab":"overview"}`,
 		},
 	})
-
-	if len(routes) != 1 {
-		t.Fatalf("expected 1 route, got %d", len(routes))
+	if len(resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
-
-	route := routes[0]
-	if route.Component != "#/views/system/plugin/dynamic-page" {
-		t.Fatalf("expected embedded route to keep runtime host component, got %s", route.Component)
+	item := resources[0]
+	if item.OpenMode != menuopen.Embedded {
+		t.Fatalf("expected embedded open mode, got %s", item.OpenMode)
 	}
-	if route.Meta == nil || route.Meta.Query == nil {
-		t.Fatalf("expected embedded route query to be present, got %#v", route.Meta)
+	if item.Target != "/x-assets/plugin-runtime-demo/v0.1.0/mount.js" {
+		t.Fatalf("expected hosted target, got %s", item.Target)
 	}
-	if route.Meta.Query["pluginAccessMode"] != "embedded-mount" {
-		t.Fatalf("expected embedded access mode query, got %#v", route.Meta.Query)
+	if item.Resource != "" {
+		t.Fatalf("expected empty resource for embedded, got %s", item.Resource)
 	}
-	if route.Meta.Query["embeddedSrc"] != "/x-assets/plugin-runtime-demo/v0.1.0/mount.js" {
-		t.Fatalf("expected embedded asset url to be preserved, got %#v", route.Meta.Query)
-	}
-	if route.Path == "/x-assets/plugin-runtime-demo/v0.1.0/mount.js" {
-		t.Fatalf("expected virtual host route instead of raw asset path, got %s", route.Path)
+	if item.Query["pluginAccessMode"] != "" || item.Query["tab"] != "overview" {
+		t.Fatalf("expected workbench query keys stripped, got %#v", item.Query)
 	}
 }
 
-// TestConvertToRouteItemsKeepsRegularViewRouteUnchanged verifies normal
-// workspace views are not rewritten by hosted-link conversion logic.
-func TestConvertToRouteItemsKeepsRegularViewRouteUnchanged(t *testing.T) {
-	routes := convertToRouteItems([]*menusvc.MenuItem{
+// TestConvertToNavResourcesStripsWorkbenchPageResource verifies leftover
+// workbench shell paths are not emitted as host page resources.
+func TestConvertToNavResourcesStripsWorkbenchPageResource(t *testing.T) {
+	resources := convertToNavResources([]*menusvc.MenuItem{
 		{
-			Id:        104,
-			Name:      "Plugin Demo Source",
-			Path:      "linapro-demo-source-sidebar-entry",
+			Id:        105,
+			Name:      "My Plugins",
+			Path:      "plugin-marketplace-mine",
 			Component: "system/plugin/dynamic-page",
 			Type:      menutype.Menu.String(),
 			IsFrame:   0,
@@ -126,27 +107,49 @@ func TestConvertToRouteItemsKeepsRegularViewRouteUnchanged(t *testing.T) {
 			Status:    1,
 		},
 	})
-
-	if len(routes) != 1 {
-		t.Fatalf("expected 1 route, got %d", len(routes))
+	if len(resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(resources))
 	}
-
-	route := routes[0]
-	if route.Component != "#/views/system/plugin/dynamic-page" {
-		t.Fatalf("expected host view component, got %s", route.Component)
+	item := resources[0]
+	if item.OpenMode != menuopen.Page {
+		t.Fatalf("expected page open mode, got %s", item.OpenMode)
 	}
-	if route.Meta == nil || route.Meta.IframeSrc != "" || route.Meta.Link != "" {
-		t.Fatalf("expected regular route meta to stay without link semantics, got %#v", route.Meta)
-	}
-	if route.Path != "/linapro-demo-source-sidebar-entry" {
-		t.Fatalf("expected normal menu path, got %s", route.Path)
+	if item.Resource != "" {
+		t.Fatalf("expected empty resource for workbench shell path, got %s", item.Resource)
 	}
 }
 
-// TestConvertToRouteItemsKeepsAbsoluteChildPath verifies grouped directory
-// menus can keep child routes on their original absolute URLs.
-func TestConvertToRouteItemsKeepsAbsoluteChildPath(t *testing.T) {
-	routes := convertToRouteItems([]*menusvc.MenuItem{
+// TestConvertToNavResourcesKeepsOpaquePageResource verifies in-app pages keep
+// stored resource addresses without #/views prefixes.
+func TestConvertToNavResourcesKeepsOpaquePageResource(t *testing.T) {
+	resources := convertToNavResources([]*menusvc.MenuItem{
+		{
+			Id:        104,
+			Name:      "User",
+			Path:      "/system/user",
+			Component: "system/user/index",
+			Type:      menutype.Menu.String(),
+			IsFrame:   0,
+			Visible:   1,
+			Status:    1,
+		},
+	})
+	if len(resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(resources))
+	}
+	item := resources[0]
+	if item.OpenMode != menuopen.Page || item.Resource != "system/user/index" {
+		t.Fatalf("expected page resource, got %#v", item)
+	}
+	if item.Path != "/system/user" {
+		t.Fatalf("expected stored path, got %s", item.Path)
+	}
+}
+
+// TestConvertToNavResourcesKeepsAbsoluteChildPath verifies grouped directory
+// menus keep child stored paths.
+func TestConvertToNavResourcesKeepsAbsoluteChildPath(t *testing.T) {
+	resources := convertToNavResources([]*menusvc.MenuItem{
 		{
 			Id:      201,
 			Name:    "定时任务",
@@ -168,22 +171,18 @@ func TestConvertToRouteItemsKeepsAbsoluteChildPath(t *testing.T) {
 			},
 		},
 	})
-
-	if len(routes) != 1 {
-		t.Fatalf("expected 1 directory route, got %d", len(routes))
+	if len(resources) != 1 || len(resources[0].Children) != 1 {
+		t.Fatalf("expected directory with child, got %#v", resources)
 	}
-	if len(routes[0].Children) != 1 {
-		t.Fatalf("expected 1 child route, got %#v", routes[0].Children)
-	}
-	if routes[0].Children[0].Path != "/system/job" {
-		t.Fatalf("expected absolute child path to be preserved, got %q", routes[0].Children[0].Path)
+	if resources[0].Children[0].Path != "/system/job" {
+		t.Fatalf("expected absolute child path, got %q", resources[0].Children[0].Path)
 	}
 }
 
-// TestConvertToRouteItemsSkipsDirectoryWithoutVisibleChildren verifies host
-// directory menus disappear once all child nodes are filtered out.
-func TestConvertToRouteItemsSkipsDirectoryWithoutVisibleChildren(t *testing.T) {
-	routes := convertToRouteItems([]*menusvc.MenuItem{
+// TestConvertToNavResourcesDropsButtonsButKeepsEmptyDirectory verifies buttons
+// are omitted while empty directories stay for the workbench compiler.
+func TestConvertToNavResourcesDropsButtonsButKeepsEmptyDirectory(t *testing.T) {
+	resources := convertToNavResources([]*menusvc.MenuItem{
 		{
 			Id:      301,
 			Name:    "系统监控",
@@ -204,9 +203,11 @@ func TestConvertToRouteItemsSkipsDirectoryWithoutVisibleChildren(t *testing.T) {
 			},
 		},
 	})
-
-	if len(routes) != 0 {
-		t.Fatalf("expected empty directory route to be hidden, got %#v", routes)
+	if len(resources) != 1 {
+		t.Fatalf("expected directory resource, got %#v", resources)
+	}
+	if len(resources[0].Children) != 0 {
+		t.Fatalf("expected buttons omitted, got %#v", resources[0].Children)
 	}
 }
 

@@ -13,6 +13,7 @@ import (
 	"lina-core/internal/service/bizctx"
 	"lina-core/internal/service/cluster"
 	"lina-core/internal/service/jobmeta"
+	menusvc "lina-core/internal/service/menu"
 	"lina-core/internal/service/plugin/internal/capabilityowner"
 	"lina-core/internal/service/plugin/internal/catalog"
 	"lina-core/internal/service/plugin/internal/plugintypes"
@@ -155,12 +156,12 @@ type Service interface {
 	) error
 
 	// FilterMenus filters disabled plugin menus by menu_key prefix "plugin:<plugin-id>".
-	FilterMenus(ctx context.Context, menus []*entity.SysMenu) []*entity.SysMenu
+	FilterMenus(ctx context.Context, menus []menusvc.FilterItem) []menusvc.FilterItem
 	// FilterPermissionMenus filters permission menus based on plugin enablement and plugin-defined permission visibility.
 	// It implements runtime.IntegrationService.
-	FilterPermissionMenus(ctx context.Context, menus []*entity.SysMenu) []*entity.SysMenu
+	FilterPermissionMenus(ctx context.Context, menus []menusvc.FilterItem) []menusvc.FilterItem
 	// ShouldKeepPermission reports whether a permission should stay effective after plugin filtering.
-	ShouldKeepPermission(ctx context.Context, menu *entity.SysMenu) bool
+	ShouldKeepPermission(ctx context.Context, menu menusvc.FilterItem) bool
 	// RunPluginDeclaredHook is the exported form of runPluginDeclaredHook for cross-package access.
 	RunPluginDeclaredHook(
 		ctx context.Context,

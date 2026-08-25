@@ -8,7 +8,6 @@ import (
 
 	"lina-core/internal/service/menu"
 	"lina-core/pkg/menutype"
-	"lina-core/pkg/plugin/pluginhost"
 )
 
 // TestResolveHomePathPrefersStableHostRoutes verifies stable workspace routes
@@ -16,10 +15,9 @@ import (
 func TestResolveHomePathPrefersStableHostRoutes(t *testing.T) {
 	items := []*menu.MenuItem{
 		{
-			Name:      "源码插件示例",
-			Path:      "linapro-demo-source-sidebar-entry",
-			Component: pluginhost.DynamicPageComponentPath,
-			Type:      menutype.Menu.String(),
+			Name: "源码插件示例",
+			Path: "/x-assets/plugin-runtime-demo/v0.1.0/mount.js",
+			Type: menutype.Menu.String(),
 		},
 		{
 			Name: "工作台",

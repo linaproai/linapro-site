@@ -5,10 +5,6 @@ import type { DictData } from '#/api/system/dict/dict-data-model';
 import { h } from 'vue';
 import { $t } from '#/locales';
 
-import { Tag } from 'ant-design-vue';
-
-import { tagTypes } from '#/components/dict';
-
 /** 查询表单schema */
 export const querySchema: VbenFormSchema[] = [
   {
@@ -27,13 +23,8 @@ export const columns: VxeGridProps['columns'] = [
     minWidth: 180,
     slots: {
       default: ({ row }) => {
-        const { label, tagStyle, cssClass } = row as DictData;
-        if (!tagStyle) {
-          return h('span', { class: cssClass }, label);
-        }
-        const isDefault = Reflect.has(tagTypes, tagStyle);
-        const color = isDefault ? tagTypes[tagStyle]!.color : tagStyle;
-        return h(Tag, { color, class: cssClass }, () => label);
+        const { label } = row as DictData;
+        return h('span', label);
       },
     },
   },
@@ -72,11 +63,6 @@ export const drawerSchema: VbenFormSchema[] = [
   },
   {
     component: 'Input',
-    fieldName: 'tagStyle',
-    label: $t('pages.system.dict.data.fields.tagStyle'),
-  },
-  {
-    component: 'Input',
     fieldName: 'label',
     label: $t('pages.system.dict.data.fields.dataLabel'),
     rules: 'required',
@@ -92,12 +78,6 @@ export const drawerSchema: VbenFormSchema[] = [
     fieldName: 'sort',
     label: $t('pages.system.dict.data.fields.sortOrder'),
     defaultValue: 0,
-  },
-  {
-    component: 'Input',
-    fieldName: 'cssClass',
-    label: $t('pages.system.dict.data.fields.cssClass'),
-    help: $t('pages.system.dict.data.help.cssClass'),
   },
   {
     component: 'RadioGroup',

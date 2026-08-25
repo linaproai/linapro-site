@@ -18,6 +18,7 @@ import (
 	"lina-core/internal/model/entity"
 	"lina-core/internal/service/plugin/internal/catalog"
 	"lina-core/internal/service/plugin/internal/plugintypes"
+	"lina-core/pkg/menuopen"
 	"lina-core/pkg/plugin/pluginhost"
 )
 
@@ -96,11 +97,10 @@ func (s *serviceImpl) validateHostedMenuBindings(ctx context.Context, manifest *
 			)
 		}
 
-		queryParams, err := parseMenuQueryParams(menu.QueryParam)
-		if err != nil {
+		if _, err := parseMenuQueryParams(menu.QueryParam); err != nil {
 			return wrapMenuValidationError(menu, err)
 		}
-		if err = validateHostedMenuMode(menu, queryParams, relativeAssetPath); err != nil {
+		if err = validateHostedMenuMode(menu, relativeAssetPath); err != nil {
 			return wrapMenuValidationError(menu, err)
 		}
 	}
@@ -182,36 +182,18 @@ func parseMenuQueryParams(rawQuery string) (map[string]string, error) {
 // mount menus that load runtime ESM entry assets inside the host shell.
 func validateHostedMenuMode(
 	menu *entity.SysMenu,
-	queryParams map[string]string,
 	relativeAssetPath string,
 ) error {
-	var (
-		componentPath       = strings.TrimSpace(menu.Component)
-		accessMode          = pluginhost.DynamicAccessMode(strings.TrimSpace(queryParams[pluginhost.DynamicAccessModeQueryKey]))
-		isEmbeddedComponent = componentPath == pluginhost.DynamicPageComponentPath
-	)
-
-	if accessMode == pluginhost.DynamicAccessModeEmbeddedMount {
-		if !isEmbeddedComponent {
-			return gerror.Newf("host embedded mount menus must use component %s", pluginhost.DynamicPageComponentPath)
-		}
-		if menu.IsFrame != 0 {
-			return gerror.New("host embedded mount menus cannot be declared as external links")
-		}
-		extension := strings.ToLower(filepath.Ext(relativeAssetPath))
-		if extension != embeddedJSExtension && extension != embeddedMJSExtension {
-			return gerror.New("host embedded mount entry must point to a .js or .mjs ESM asset")
-		}
+	openMode, _ := menuopen.Resolve(menu.Path, menu.IsFrame)
+	if openMode != menuopen.Embedded {
 		return nil
 	}
-
-	if isEmbeddedComponent {
-		return gerror.Newf(
-			"hosted asset menus using component %s must declare query_param.%s=%s",
-			pluginhost.DynamicPageComponentPath,
-			pluginhost.DynamicAccessModeQueryKey,
-			pluginhost.DynamicAccessModeEmbeddedMount.String(),
-		)
+	if menu.IsFrame != 0 {
+		return gerror.New("embedded hosted menus cannot be declared as external links")
+	}
+	extension := strings.ToLower(filepath.Ext(relativeAssetPath))
+	if extension != embeddedJSExtension && extension != embeddedMJSExtension {
+		return gerror.New("embedded hosted entry must point to a .js or .mjs ESM asset")
 	}
 	return nil
 }

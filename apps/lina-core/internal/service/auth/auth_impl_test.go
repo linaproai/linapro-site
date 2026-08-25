@@ -1183,14 +1183,13 @@ func (configTestService) IsLoginIPBlacklisted(context.Context, string) (bool, er
 // GetPublicFrontend returns public frontend settings for unit tests. It prefers
 // the real config service so withRuntimeParamValue overrides are visible.
 func (configTestService) GetPublicFrontend(ctx context.Context) (*configsvc.PublicFrontendConfig, error) {
-	if cfg, err := configsvc.New().GetPublicFrontend(ctx); err == nil && cfg != nil {
+	if cfg, err := configsvc.New(nil).GetPublicFrontend(ctx); err == nil && cfg != nil {
 		return cfg, nil
 	}
 	return &configsvc.PublicFrontendConfig{
 		Auth: configsvc.PublicFrontendAuthConfig{
 			RegisterEnabled:       true,
 			ForgetPasswordEnabled: true,
-			PanelLayout:           configsvc.PublicFrontendAuthPanelLayoutRight,
 		},
 	}, nil
 }
@@ -1693,7 +1692,7 @@ func TestLoginRejectsBlacklistedIP(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected blacklisted login attempt to fail")
 	}
-	if localized := i18nsvc.New(bizctx.New(), configsvc.New(), cachecoord.Default(nil)).LocalizeError(context.Background(), err); localized != "登录IP已被禁止" {
+	if localized := i18nsvc.New(bizctx.New(), configsvc.New(nil), cachecoord.New(nil, nil)).LocalizeError(context.Background(), err); localized != "登录IP已被禁止" {
 		t.Fatalf("expected blacklisted login error %q, got %q", "登录IP已被禁止", localized)
 	}
 }
@@ -1702,7 +1701,7 @@ func TestLoginRejectsBlacklistedIP(t *testing.T) {
 // dependencies while still reading runtime params from the real config service.
 func newRuntimeParamAuthTestService() Service {
 	var (
-		configSvc    = configsvc.New()
+		configSvc    = configsvc.New(nil)
 		sessionStore = session.NewDBStore()
 		cacheSvc     = kvcache.New()
 	)
@@ -1797,7 +1796,7 @@ func withRuntimeParamValue(t *testing.T, key string, value string) {
 func markRuntimeParamChanged(t *testing.T, ctx context.Context) {
 	t.Helper()
 
-	if err := configsvc.New().MarkRuntimeParamsChanged(ctx); err != nil {
+	if err := configsvc.New(nil).MarkRuntimeParamsChanged(ctx); err != nil {
 		t.Fatalf("mark runtime params changed: %v", err)
 	}
 }

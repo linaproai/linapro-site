@@ -18,15 +18,16 @@ const apiBaseURL = config.apiBaseURL;
 
 const pluginID = "plugin-dev-dynamic-governance";
 const pluginName = "Runtime Governance Plugin";
-const pluginVersion = "v0.2.0";
+const pluginVersion = `v0.2.${Date.now()}`;
 const pluginMenuKey = "plugin:plugin-dev-dynamic-governance:main-entry";
 const pluginButtonMenuKey = "plugin:plugin-dev-dynamic-governance:records:list";
 const pluginMenuName = "运行时治理示例";
 const pluginPermission = "plugin-dev-dynamic-governance:records:list";
 const pluginRecordTable = "plugin_runtime_governance_record";
-const testRoleName = "运行时治理角色";
-const testRoleKey = "runtime_governance_role";
-const testUsername = "runtime_governance_user";
+const uniqueSuffix = `${Date.now()}`.slice(-8);
+const testRoleName = `运行时治理角色 ${uniqueSuffix}`;
+const testRoleKey = `rgr_${uniqueSuffix}`;
+const testUsername = `rgr_user_${uniqueSuffix}`;
 const testPassword = "runtime123";
 const testNickname = "运行时治理用户";
 
@@ -80,6 +81,7 @@ type UserInfoPayload = {
 
 type MenuTreeNode = {
   name?: string;
+  title?: string;
   children?: MenuTreeNode[];
 };
 
@@ -107,6 +109,23 @@ function assertOk(response: APIResponse, message: string) {
   expect(response.ok(), `${message}, status=${response.status()}`).toBeTruthy();
 }
 
+async function expectApiSuccess<T = any>(
+  response: APIResponse,
+  message: string,
+): Promise<T> {
+  assertOk(response, message);
+  const payload = (await response.json()) as {
+    code?: number;
+    data?: T;
+    message?: string;
+  };
+  expect(
+    payload?.code,
+    `${message}, business code=${payload?.code}, business message=${payload?.message ?? ""}`,
+  ).toBe(0);
+  return (payload?.data ?? null) as T;
+}
+
 function repoRoot() {
   return path.resolve(process.cwd(), "../..");
 }
@@ -125,6 +144,10 @@ function tempArtifactPath() {
 
 function runtimeStorageArtifactPath() {
   return path.join(runtimeStorageDir(), `${pluginID}.wasm`);
+}
+
+function runtimeReleaseArchiveDir() {
+  return path.join(runtimeStorageDir(), "releases", pluginID);
 }
 
 function runtimePluginDir() {
@@ -253,6 +276,7 @@ function cleanupRuntimeWorkspace() {
   rmSync(runtimePluginDir(), { force: true, recursive: true });
   rmSync(tempArtifactPath(), { force: true });
   rmSync(runtimeStorageArtifactPath(), { force: true });
+  rmSync(runtimeReleaseArchiveDir(), { force: true, recursive: true });
 }
 
 function cleanupGovernanceRows() {
@@ -317,19 +341,29 @@ async function uploadDynamicPlugin(adminApi: APIRequestContext, artifactPath: st
       },
     },
   });
-  assertOk(response, "上传动态插件失败");
+  await expectApiSuccess(response, "上传动态插件失败");
 }
 
 async function installPlugin(adminApi: APIRequestContext) {
   const response = await adminApi.post(`plugins/${pluginID}/install`);
-  assertOk(response, "安装动态插件失败");
+  await expectApiSuccess(response, "安装动态插件失败");
 }
 
 async function setPluginEnabled(adminApi: APIRequestContext, enabled: boolean) {
   const response = await adminApi.put(
     enabled ? `plugins/${pluginID}/enable` : `plugins/${pluginID}/disable`,
   );
-  assertOk(response, `切换插件状态失败: ${enabled}`);
+  await expectApiSuccess(response, `切换插件状态失败: ${enabled}`);
+}
+
+async function resetPlugin(adminApi: APIRequestContext) {
+  const response = await adminApi.delete(`plugins/${pluginID}`);
+  const payload = (await response.json()) as { code?: number };
+  if (payload?.code === 0) {
+    return;
+  }
+  cleanupGovernanceRows();
+  cleanupRuntimeWorkspace();
 }
 
 async function createRole(adminApi: APIRequestContext, menuIDs: number[]) {
@@ -368,8 +402,19 @@ async function createUser(adminApi: APIRequestContext, roleID: number) {
 
 async function fetchUserInfo(apiContext: APIRequestContext) {
   const response = await apiContext.get("user/info");
-  assertOk(response, "查询用户信息失败");
-  return (unwrapApiData(await response.json()) ?? {}) as UserInfoPayload;
+  return (await expectApiSuccess<UserInfoPayload>(
+    response,
+    "查询用户信息失败",
+  )) as UserInfoPayload;
+}
+
+async function fetchCurrentUserMenus(apiContext: APIRequestContext) {
+  const response = await apiContext.get("menus/all");
+  const payload = await expectApiSuccess<{ list?: MenuTreeNode[] }>(
+    response,
+    "查询当前用户导航资源失败",
+  );
+  return payload?.list ?? [];
 }
 
 async function queryPluginResource(apiContext: APIRequestContext) {
@@ -382,7 +427,7 @@ async function queryPluginResource(apiContext: APIRequestContext) {
 
 function hasMenuName(list: MenuTreeNode[], name: string): boolean {
   return list.some((item) => {
-    if (item.name === name) {
+    if (item.name === name || item.title === name) {
       return true;
     }
     return hasMenuName(item.children ?? [], name);
@@ -417,6 +462,7 @@ function buildRuntimeGovernanceArtifact() {
     menus: [
       {
         key: pluginMenuKey,
+        parent_key: "extension",
         name: pluginMenuName,
         path: frontendAssetPath,
         perms: "",
@@ -493,19 +539,26 @@ test.describe("TC-2 动态插件权限治理", () => {
   });
 
   test.afterAll(async () => {
-    cleanupRuntimeWorkspace();
-    cleanupGovernanceRows();
     if (adminApi) {
+      await resetPlugin(adminApi);
       await adminApi.dispose();
     }
+    cleanupRuntimeWorkspace();
+    cleanupGovernanceRows();
   });
 
   test.beforeEach(async () => {
+    if (adminApi) {
+      await resetPlugin(adminApi);
+    }
     cleanupRuntimeWorkspace();
     cleanupGovernanceRows();
   });
 
   test.afterEach(async () => {
+    if (adminApi) {
+      await resetPlugin(adminApi);
+    }
     cleanupRuntimeWorkspace();
     cleanupGovernanceRows();
   });
@@ -516,8 +569,12 @@ test.describe("TC-2 动态插件权限治理", () => {
     await installPlugin(adminApi!);
     await setPluginEnabled(adminApi!, true);
 
+    await expect
+      .poll(() => getPluginMenuIDs().length, {
+        message: "动态插件菜单和按钮权限都应写入 sys_menu",
+      })
+      .toBe(2);
     const menuIDs = getPluginMenuIDs();
-    expect(menuIDs.length, "动态插件菜单和按钮权限都应写入 sys_menu").toBe(2);
 
     const roleID = await createRole(adminApi!, menuIDs);
     const userID = await createUser(adminApi!, roleID);
@@ -525,8 +582,9 @@ test.describe("TC-2 动态插件权限治理", () => {
 
     const userApi = await createApiContext(await loginByPassword(testUsername, testPassword));
     const userInfo = await fetchUserInfo(userApi);
+    const userMenus = await fetchCurrentUserMenus(userApi);
     expect(
-      hasMenuName(userInfo.menus ?? [], pluginMenuName),
+      hasMenuName(userMenus, pluginMenuName),
       "角色授权后，用户应看到动态插件菜单",
     ).toBeTruthy();
     expect(
@@ -540,16 +598,18 @@ test.describe("TC-2 动态插件权限治理", () => {
 
     await setPluginEnabled(adminApi!, false);
     const disabledInfo = await fetchUserInfo(userApi);
+    const disabledMenus = await fetchCurrentUserMenus(userApi);
     expect(
-      hasMenuName(disabledInfo.menus ?? [], pluginMenuName),
+      hasMenuName(disabledMenus, pluginMenuName),
       "禁用动态插件后，菜单应从用户视图中隐藏",
     ).toBeFalsy();
     expect(disabledInfo.permissions ?? []).not.toContain(pluginPermission);
 
     await setPluginEnabled(adminApi!, true);
     const restoredInfo = await fetchUserInfo(userApi);
+    const restoredMenus = await fetchCurrentUserMenus(userApi);
     expect(
-      hasMenuName(restoredInfo.menus ?? [], pluginMenuName),
+      hasMenuName(restoredMenus, pluginMenuName),
       "重新启用后，既有角色授权关系应自动恢复",
     ).toBeTruthy();
     expect(restoredInfo.permissions ?? []).toContain(pluginPermission);

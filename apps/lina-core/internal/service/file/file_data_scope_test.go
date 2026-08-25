@@ -111,7 +111,7 @@ func TestTenantUploadPersistsCurrentTenantAndListsInTenantScope(t *testing.T) {
 		scopeSvc  = datascope.New(bizCtxSvc, fileTenantUploadAccessProvider{userID: currentUserID}, nil)
 	)
 	svc := &serviceImpl{
-		configSvc: hostconfig.New(),
+		configSvc: hostconfig.New(nil),
 		storage:   storage,
 		bizCtxSvc: bizCtxSvc,
 		scopeSvc:  scopeSvc,
@@ -148,10 +148,11 @@ func TestTenantUploadPersistsCurrentTenantAndListsInTenantScope(t *testing.T) {
 // file data-scope tests.
 func newFileDataScopeRoleService(bizCtxSvc bizctx.Service, orgCapSvc orgcap.Service) rolesvc.Service {
 	var (
-		configSvc = hostconfig.New()
-		i18nSvc   = i18nsvc.New(bizCtxSvc, configSvc, cachecoord.Default(nil))
-		tenantSvc = tenantspi.New(nil, nil, nil, bizCtxSvc)
-		roleSvc   = rolesvc.New(nil, bizCtxSvc, configSvc, i18nSvc, nil, tenantSvc)
+		configSvc = hostconfig.New(nil)
+		cacheCoordSvc = cachecoord.New(nil, nil)
+		i18nSvc       = i18nsvc.New(bizCtxSvc, configSvc, cacheCoordSvc)
+		tenantSvc     = tenantspi.New(nil, nil, nil, bizCtxSvc)
+		roleSvc       = rolesvc.New(nil, bizCtxSvc, configSvc, i18nSvc, nil, tenantSvc, cacheCoordSvc)
 	)
 	var orgScope orgspi.ScopeService
 	if scope, ok := orgCapSvc.(orgspi.ScopeService); ok {

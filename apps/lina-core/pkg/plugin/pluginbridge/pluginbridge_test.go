@@ -17,7 +17,52 @@ import (
 	"testing"
 
 	"lina-core/pkg/plugin/pluginbridge/protocol"
+	"lina-core/pkg/plugin/pluginbridge/protocol/hostservices"
 )
+
+// TestGuestServicesFollowHostServiceCatalog verifies the guest facade exposes
+// every catalog service and keeps dynamic-only extras off capability.Services.
+func TestGuestServicesFollowHostServiceCatalog(t *testing.T) {
+	guestType := reflect.TypeOf((*Services)(nil)).Elem()
+	if _, ok := guestType.MethodByName("I18n"); ok {
+		t.Fatal("pluginbridge.Services must not expose source-plugin I18n")
+	}
+	expected := make(map[string]string)
+	for _, descriptor := range hostservices.Catalog() {
+		methodName := guestDirectoryMethodForCatalogService(descriptor.Service)
+		if methodName == "" {
+			t.Fatalf("catalog service %s has no guest directory method mapping", descriptor.Service)
+		}
+		if _, ok := guestType.MethodByName(methodName); !ok {
+			t.Fatalf("pluginbridge.Services is missing catalog service %s as %s", descriptor.Service, methodName)
+		}
+		expected[methodName] = descriptor.Service
+	}
+	for i := 0; i < guestType.NumMethod(); i++ {
+		name := guestType.Method(i).Name
+		if _, ok := expected[name]; !ok {
+			t.Fatalf("pluginbridge.Services method %s is not derived from the host-service catalog", name)
+		}
+	}
+}
+
+func guestDirectoryMethodForCatalogService(service string) string {
+	switch service {
+	case hostservices.HostServiceAPIDoc:
+		return "APIDoc"
+	case hostservices.HostServiceHostConfig:
+		return "HostConfig"
+	case hostservices.HostServiceBizCtx:
+		return "BizCtx"
+	case hostservices.HostServiceData:
+		return "RecordStore"
+	default:
+		if service == "" {
+			return ""
+		}
+		return strings.ToUpper(service[:1]) + service[1:]
+	}
+}
 
 // TestDefaultDirectoryReturnsCapabilityClients verifies the guest directory
 // owns host-service client semantics instead of exposing pluginbridge guest

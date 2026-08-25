@@ -46,9 +46,7 @@ func TestBuildRuntimeWasmArtifactEmbedsBackendContracts(t *testing.T) {
 		`wasm:
   hooks:
     - event: auth.login.succeeded
-      action: sleep
       timeout: 50ms
-      sleep: 10ms
   resources:
     - key: records
       type: table-list
@@ -87,8 +85,8 @@ func TestBuildRuntimeWasmArtifactEmbedsBackendContracts(t *testing.T) {
 	if len(artifact.HookSpecs) != 1 {
 		t.Fatalf("expected 1 embedded hook spec, got %d", len(artifact.HookSpecs))
 	}
-	if artifact.HookSpecs[0].Action != pluginhost.HookActionSleep {
-		t.Fatalf("expected embedded hook action sleep, got %s", artifact.HookSpecs[0].Action)
+	if artifact.HookSpecs[0].Action != "" {
+		t.Fatalf("expected embedded hook without demo action, got %s", artifact.HookSpecs[0].Action)
 	}
 	if len(artifact.ResourceSpecs) != 1 {
 		t.Fatalf("expected 1 embedded resource spec, got %d", len(artifact.ResourceSpecs))
@@ -154,9 +152,7 @@ func TestLoadRuntimePluginManifestFromArtifactHydratesBackendContracts(t *testin
 		`wasm:
   hooks:
     - event: auth.login.succeeded
-      action: sleep
       timeout: 50ms
-      sleep: 10ms
   resources:
     - key: records
       type: table-list

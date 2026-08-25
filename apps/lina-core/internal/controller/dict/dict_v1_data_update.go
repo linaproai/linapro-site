@@ -15,8 +15,6 @@ func (c *ControllerV1) DataUpdate(ctx context.Context, req *v1.DataUpdateReq) (r
 		Label:    req.Label,
 		Value:    req.Value,
 		Sort:     req.Sort,
-		TagStyle: req.TagStyle,
-		CssClass: req.CssClass,
 		Status:   req.Status,
 		Remark:   req.Remark,
 	})

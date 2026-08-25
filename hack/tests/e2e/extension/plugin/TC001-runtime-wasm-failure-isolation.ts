@@ -11,7 +11,6 @@ import {
   execPgSQLStatements,
   pgEscapeLiteral,
   pgIdentifier,
-  queryPgScalar,
 } from "../../../support/postgres";
 
 const apiBaseURL = config.apiBaseURL;
@@ -25,11 +24,6 @@ type PluginListItem = {
   id: string;
   enabled?: number;
   installed?: number;
-};
-
-type PluginResourceResponse = {
-  list?: Array<Record<string, unknown>>;
-  total?: number;
 };
 
 type RuntimeFrontendAsset = {
@@ -261,7 +255,7 @@ function writeRuntimeArtifact(pluginID: string, content: Buffer) {
 }
 
 function cleanupRuntimeWorkspace() {
-  for (const pluginID of [goodPluginID, badPluginID]) {
+  for (const pluginID of [goodPluginID, badPluginID, `${badPluginID}-demo`]) {
     rmSync(runtimePluginDir(pluginID), { force: true, recursive: true });
     rmSync(tempArtifactPath(pluginID), { force: true });
     // Dynamic uploads persist to plugin.dynamic.storagePath instead of the
@@ -275,21 +269,15 @@ function cleanupRuntimeWorkspace() {
 function cleanupRuntimeRows() {
   const goodID = pgEscapeLiteral(goodPluginID);
   const badID = pgEscapeLiteral(badPluginID);
+  const demoID = pgEscapeLiteral(`${badPluginID}-demo`);
   execPgSQLStatements([
     `DROP TABLE IF EXISTS ${pgIdentifier(goodPluginLogTable)};`,
-    `DELETE FROM sys_plugin_node_state WHERE plugin_id IN ('${goodID}', '${badID}');`,
-    `DELETE FROM sys_plugin_resource_ref WHERE plugin_id IN ('${goodID}', '${badID}');`,
-    `DELETE FROM sys_plugin_migration WHERE plugin_id IN ('${goodID}', '${badID}');`,
-    `DELETE FROM sys_plugin_release WHERE plugin_id IN ('${goodID}', '${badID}');`,
-    `DELETE FROM sys_plugin WHERE plugin_id IN ('${goodID}', '${badID}');`,
+    `DELETE FROM sys_plugin_node_state WHERE plugin_id IN ('${goodID}', '${badID}', '${demoID}');`,
+    `DELETE FROM sys_plugin_resource_ref WHERE plugin_id IN ('${goodID}', '${badID}', '${demoID}');`,
+    `DELETE FROM sys_plugin_migration WHERE plugin_id IN ('${goodID}', '${badID}', '${demoID}');`,
+    `DELETE FROM sys_plugin_release WHERE plugin_id IN ('${goodID}', '${badID}', '${demoID}');`,
+    `DELETE FROM sys_plugin WHERE plugin_id IN ('${goodID}', '${badID}', '${demoID}');`,
   ]);
-}
-
-function queryGoodHookRowCount() {
-  const output = queryPgScalar(
-    `SELECT COUNT(1) FROM ${pgIdentifier(goodPluginLogTable)};`,
-  );
-  return Number.parseInt(output || "0", 10);
 }
 
 async function loginByPassword(
@@ -365,6 +353,29 @@ async function uploadDynamicPlugin(
   );
 }
 
+async function uploadDynamicPluginExpectingFailure(
+  adminApi: APIRequestContext,
+  artifactPath: string,
+  message: string,
+) {
+  const response = await adminApi.post("plugins/dynamic/package", {
+    multipart: {
+      overwriteSupport: "0",
+      file: {
+        name: path.basename(artifactPath),
+        mimeType: "application/wasm",
+        buffer: readFileSync(artifactPath),
+      },
+    },
+  });
+  const payload = (await response.json()) as {
+    code?: number;
+    message?: string;
+  };
+  expect(payload?.code, message).not.toBe(0);
+  expect(payload?.message ?? "", message).toMatch(/demo action/i);
+}
+
 async function installPlugin(adminApi: APIRequestContext, pluginID: string) {
   const response = await adminApi.post(`plugins/${pluginID}/install`);
   await expectApiSuccess(response, `安装动态插件失败: ${pluginID}`);
@@ -379,22 +390,6 @@ async function setPluginEnabled(
     enabled ? `plugins/${pluginID}/enable` : `plugins/${pluginID}/disable`,
   );
   await expectApiSuccess(response, `切换插件启停失败: ${pluginID}`);
-}
-
-async function queryPluginResource(
-  adminApi: APIRequestContext,
-  pluginID: string,
-  resourceID: string,
-): Promise<PluginResourceResponse> {
-  const response = await adminApi.get(
-    `plugins/${pluginID}/resources/${resourceID}?pageNum=1&pageSize=20`,
-  );
-  return (
-    (await expectApiSuccess<PluginResourceResponse>(
-      response,
-      `查询插件资源失败: ${pluginID}/${resourceID}`,
-    )) ?? {}
-  );
 }
 
 function buildGoodRuntimeArtifact() {
@@ -425,15 +420,9 @@ function buildGoodRuntimeArtifact() {
     hookSpecs: [
       {
         event: "auth.login.succeeded",
-        action: "insert",
+        action: "",
         mode: "blocking",
         timeoutMs: 1000,
-        table: goodPluginLogTable,
-        fields: {
-          user_name: "event.userName",
-          event_name: "event.message",
-          created_at: "now",
-        },
       },
     ],
     resourceSpecs: [
@@ -451,6 +440,24 @@ function buildGoodRuntimeArtifact() {
   });
 }
 
+function buildDemoActionRuntimeArtifact() {
+  return buildRuntimeWasmArtifact({
+    id: `${badPluginID}-demo`,
+    name: "Runtime Hook Demo Action",
+    version: badPluginVersion,
+    description: "Runtime plugin that still declares a retired demo hook action.",
+    hookSpecs: [
+      {
+        event: "auth.login.succeeded",
+        action: "sleep",
+        mode: "blocking",
+        timeoutMs: 50,
+        sleepMs: 800,
+      },
+    ],
+  });
+}
+
 function buildBadRuntimeArtifact() {
   return buildRuntimeWasmArtifact({
     id: badPluginID,
@@ -461,17 +468,9 @@ function buildBadRuntimeArtifact() {
     hookSpecs: [
       {
         event: "auth.login.succeeded",
-        action: "sleep",
+        action: "",
         mode: "blocking",
         timeoutMs: 50,
-        sleepMs: 800,
-      },
-      {
-        event: "auth.login.succeeded",
-        action: "error",
-        mode: "blocking",
-        timeoutMs: 300,
-        errorMessage: "runtime hook failed on purpose",
       },
     ],
   });
@@ -517,19 +516,20 @@ test.describe("TC-1 运行时 wasm 失败隔离与回收", () => {
   });
 
   test("TC-1a: runtime hook 超时和报错不会阻断宿主登录，也不会影响其他 runtime hook 执行", async () => {
+    const demoArtifactPath = writeRuntimeArtifact(
+      `${badPluginID}-demo`,
+      buildDemoActionRuntimeArtifact(),
+    );
+    await uploadDynamicPluginExpectingFailure(
+      adminApi!,
+      demoArtifactPath,
+      "生产上传必须拒绝 insert/sleep/error 演示钩子",
+    );
+
     await prepareEnabledRuntimePlugins(adminApi!);
 
     const accessToken = await loginByPassword(config.adminUser, config.adminPass);
-    expect(accessToken, "即使存在失败的 runtime hook，宿主登录仍应成功").toBeTruthy();
-
-    const resourceData = await queryPluginResource(
-      adminApi!,
-      goodPluginID,
-      "login-audit",
-    );
-    expect(resourceData.total, "成功的 runtime hook 应写入登录审计记录").toBe(1);
-    expect(resourceData.list?.[0]?.userName).toBe(config.adminUser);
-    expect(resourceData.list?.[0]?.eventName).toBe("Login successful");
+    expect(accessToken, "声明了登录钩子的动态插件不得阻断宿主登录").toBeTruthy();
 
     const goodPlugin = await findPlugin(adminApi!, goodPluginID);
     const badPlugin = await findPlugin(adminApi!, badPluginID);
@@ -541,14 +541,23 @@ test.describe("TC-1 运行时 wasm 失败隔离与回收", () => {
     await prepareEnabledRuntimePlugins(adminApi!);
 
     await loginByPassword(config.adminUser, config.adminPass);
-    expect(queryGoodHookRowCount()).toBe(1);
 
     await setPluginEnabled(adminApi!, goodPluginID, false);
-    await loginByPassword(config.adminUser, config.adminPass);
-    expect(queryGoodHookRowCount(), "禁用后 runtime hook 不应继续参与宿主登录链路").toBe(1);
+    const disabledPlugin = await findPlugin(adminApi!, goodPluginID);
+    expect(disabledPlugin?.enabled).toBe(0);
+    const afterDisableToken = await loginByPassword(
+      config.adminUser,
+      config.adminPass,
+    );
+    expect(afterDisableToken, "禁用动态插件后宿主登录仍应成功").toBeTruthy();
 
     await setPluginEnabled(adminApi!, goodPluginID, true);
-    await loginByPassword(config.adminUser, config.adminPass);
-    expect(queryGoodHookRowCount(), "重新启用后 runtime hook 应恢复执行").toBe(2);
+    const restoredPlugin = await findPlugin(adminApi!, goodPluginID);
+    expect(restoredPlugin?.enabled).toBe(1);
+    const afterEnableToken = await loginByPassword(
+      config.adminUser,
+      config.adminPass,
+    );
+    expect(afterEnableToken, "重新启用动态插件后宿主登录仍应成功").toBeTruthy();
   });
 });

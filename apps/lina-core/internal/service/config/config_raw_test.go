@@ -34,7 +34,7 @@ func TestGetRawReadsCustomSysConfigKey(t *testing.T) {
 	insertRawSysConfig(t, ctx, datascope.PlatformTenantID, key, "100")
 	markRuntimeParamChanged(t, ctx)
 
-	value, err := New().(*serviceImpl).GetRaw(ctx, key)
+	value, err := New(nil).(*serviceImpl).GetRaw(ctx, key)
 	if err != nil {
 		t.Fatalf("get custom sys_config raw value: %v", err)
 	}
@@ -52,7 +52,7 @@ func TestGetRawPrefersTenantSysConfigOverride(t *testing.T) {
 	insertRawSysConfig(t, ctx, 87, key, "tenant")
 	markRuntimeParamChanged(t, ctx)
 
-	value, err := New().(*serviceImpl).GetRaw(datascope.WithTenantScope(ctx, 87), key)
+	value, err := New(nil).(*serviceImpl).GetRaw(datascope.WithTenantScope(ctx, 87), key)
 	if err != nil {
 		t.Fatalf("get tenant custom sys_config raw value: %v", err)
 	}
@@ -71,7 +71,7 @@ func TestGetRawReloadsCustomSysConfigAfterRevisionChange(t *testing.T) {
 	)
 	markRuntimeParamChanged(t, ctx)
 
-	svc := New().(*serviceImpl)
+	svc := New(nil).(*serviceImpl)
 	value, err := svc.GetRaw(ctx, key)
 	if err != nil {
 		t.Fatalf("get initial custom sys_config raw value: %v", err)
@@ -117,7 +117,7 @@ workspace:
   basePath: "/ops"
 `)
 
-	value, err := New().(*serviceImpl).GetRaw(context.Background(), "workspace.basePath")
+	value, err := New(nil).(*serviceImpl).GetRaw(context.Background(), "workspace.basePath")
 	if err != nil {
 		t.Fatalf("get static config fallback: %v", err)
 	}
@@ -137,7 +137,7 @@ workspace:
   basePath: "/ops"
 `)
 
-	value, err := New().(*serviceImpl).GetRaw(context.Background(), "workspace.basePath")
+	value, err := New(nil).(*serviceImpl).GetRaw(context.Background(), "workspace.basePath")
 	if err != nil {
 		t.Fatalf("get raw host config value: %v", err)
 	}
@@ -152,7 +152,7 @@ func TestGetRawFallsBackToHostDefaultWhenDynamicAndStaticMissing(t *testing.T) {
 	withCachedRuntimeParamSnapshot(t, &runtimeParamSnapshot{})
 	setTestServerConfigAdapter(t, ``)
 
-	value, err := New().(*serviceImpl).GetRaw(context.Background(), "workspace.basePath")
+	value, err := New(nil).(*serviceImpl).GetRaw(context.Background(), "workspace.basePath")
 	if err != nil {
 		t.Fatalf("get default host config value: %v", err)
 	}
@@ -167,7 +167,7 @@ func TestGetRawReturnsNilWhenEverySourceMisses(t *testing.T) {
 	withCachedRuntimeParamSnapshot(t, &runtimeParamSnapshot{})
 	setTestServerConfigAdapter(t, ``)
 
-	value, err := New().(*serviceImpl).GetRaw(context.Background(), "custom.missing.key")
+	value, err := New(nil).(*serviceImpl).GetRaw(context.Background(), "custom.missing.key")
 	if err != nil {
 		t.Fatalf("get missing host config value: %v", err)
 	}
@@ -185,7 +185,7 @@ custom:
   empty: ""
 `)
 
-	value, err := New().(*serviceImpl).GetRaw(context.Background(), "custom.empty")
+	value, err := New(nil).(*serviceImpl).GetRaw(context.Background(), "custom.empty")
 	if err != nil {
 		t.Fatalf("get explicit empty static value: %v", err)
 	}
@@ -205,7 +205,7 @@ workspace:
   basePath: "/ops"
 `)
 	expectedErr := errors.New("runtime snapshot freshness failed")
-	svc := New().(*serviceImpl)
+	svc := New(nil).(*serviceImpl)
 	svc.runtimeParamRevisionCtrl = &fakeRuntimeParamRevisionController{currentErr: expectedErr}
 
 	value, err := svc.GetRaw(context.Background(), "workspace.basePath")
@@ -368,11 +368,11 @@ func insertRawSysConfig(t *testing.T, ctx context.Context, tenantID int, key str
 // TestNewCacheCoordRuntimeParamRevisionControllerSelectsByClusterMode verifies the
 // constructor selects the local or clustered revision strategy correctly.
 func TestNewCacheCoordRuntimeParamRevisionControllerSelectsByClusterMode(t *testing.T) {
-	if _, ok := newCacheCoordRuntimeParamRevisionController(false).(*localRuntimeParamRevisionController); !ok {
+	if _, ok := newCacheCoordRuntimeParamRevisionController(false, nil).(*localRuntimeParamRevisionController); !ok {
 		t.Fatal("expected single-node mode to use local runtime-param revision controller")
 	}
 
-	controller, ok := newCacheCoordRuntimeParamRevisionController(true).(*clusterRuntimeParamRevisionController)
+	controller, ok := newCacheCoordRuntimeParamRevisionController(true, cachecoord.New(cachecoord.NewStaticTopology(true), nil)).(*clusterRuntimeParamRevisionController)
 	if !ok {
 		t.Fatal("expected cluster mode to use shared runtime-param revision controller")
 	}
@@ -472,7 +472,7 @@ func TestRuntimeParamSnapshotReloadsAfterRevisionChange(t *testing.T) {
 	withRuntimeParamValue(t, RuntimeParamKeyJWTExpire, "12h")
 	clearRuntimeParamSnapshotCache(t, ctx)
 
-	svc := New()
+	svc := New(nil)
 	cfg, err := svc.GetJwt(ctx)
 	if err != nil {
 		t.Fatalf("get initial jwt config: %v", err)
@@ -535,7 +535,7 @@ func TestSyncRuntimeParamSnapshotKeepsCachedValueWhenRevisionUnchanged(t *testin
 	withRuntimeParamValue(t, RuntimeParamKeyJWTExpire, "12h")
 	clearRuntimeParamSnapshotCache(t, ctx)
 
-	svc := New()
+	svc := New(nil)
 	if err := svc.SyncRuntimeParamSnapshot(ctx); err != nil {
 		t.Fatalf("initial runtime param sync failed: %v", err)
 	}
@@ -594,7 +594,7 @@ func TestSyncRuntimeParamSnapshotReloadsAfterRevisionChange(t *testing.T) {
 	withRuntimeParamValue(t, RuntimeParamKeyJWTExpire, "12h")
 	clearRuntimeParamSnapshotCache(t, ctx)
 
-	svc := New()
+	svc := New(nil)
 	if err := svc.SyncRuntimeParamSnapshot(ctx); err != nil {
 		t.Fatalf("initial runtime param sync failed: %v", err)
 	}
@@ -647,7 +647,7 @@ func TestSingleNodeRuntimeParamSnapshotStaysLocal(t *testing.T) {
 	ctx := context.Background()
 	withRuntimeParamValue(t, RuntimeParamKeyJWTExpire, "12h")
 
-	svc := New().(*serviceImpl)
+	svc := New(nil).(*serviceImpl)
 	resetRuntimeParamCacheTestState(t)
 	svc.runtimeParamRevisionCtrl = &localRuntimeParamRevisionController{}
 
@@ -869,7 +869,7 @@ func withCachedRuntimeParamSnapshot(t *testing.T, snapshot *runtimeParamSnapshot
 func markRuntimeParamChanged(t *testing.T, ctx context.Context) {
 	t.Helper()
 
-	if err := New().MarkRuntimeParamsChanged(ctx); err != nil {
+	if err := New(nil).MarkRuntimeParamsChanged(ctx); err != nil {
 		t.Fatalf("mark runtime params changed: %v", err)
 	}
 }
@@ -1144,10 +1144,10 @@ func TestClusterRuntimeParamRevisionControllerConsumesCrossInstanceRevision(t *t
 	coordSvc := coordination.NewMemory(nil)
 
 	publisher := &clusterRuntimeParamRevisionController{
-		cacheCoordSvc: cachecoord.NewWithCoordination(cachecoord.NewStaticTopology(true), coordSvc),
+		cacheCoordSvc: cachecoord.New(cachecoord.NewStaticTopology(true), coordSvc),
 	}
 	consumer := &clusterRuntimeParamRevisionController{
-		cacheCoordSvc: cachecoord.NewWithCoordination(cachecoord.NewStaticTopology(true), coordSvc),
+		cacheCoordSvc: cachecoord.New(cachecoord.NewStaticTopology(true), coordSvc),
 	}
 
 	revision, err := publisher.MarkChanged(ctx)
@@ -1248,7 +1248,7 @@ func TestGetCachedRuntimeParamSnapshotRemovesInvalidEntries(t *testing.T) {
 	ctx := context.Background()
 	resetRuntimeParamCacheTestState(t)
 
-	svc := New().(*serviceImpl)
+	svc := New(nil).(*serviceImpl)
 	if err := runtimeParamSnapshotCache.Set(ctx, scopedRuntimeParamSnapshotCacheKey(ctx), "invalid", runtimeParamSnapshotCacheTTL); err != nil {
 		t.Fatalf("seed invalid runtime snapshot cache entry: %v", err)
 	}

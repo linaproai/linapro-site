@@ -83,7 +83,7 @@ func (p *testConfigProvider) GetOpenApi(ctx context.Context) *configsvc.OpenApiC
 
 // GetPluginDynamicStoragePath returns the default dynamic-plugin storage root.
 func (p *testConfigProvider) GetPluginDynamicStoragePath(ctx context.Context) string {
-	return configsvc.New().GetPluginDynamicStoragePath(ctx)
+	return configsvc.New(nil).GetPluginDynamicStoragePath(ctx)
 }
 
 // ListSourceRouteBindings returns the test-controlled source route snapshot.
@@ -170,7 +170,7 @@ func TestBuildProjectsHostAndEnabledPluginRoutes(t *testing.T) {
 		},
 	}
 
-	service := New(&testConfigProvider{}, bizctx.New(), i18nsvc.New(bizctx.New(), configsvc.New(), cachecoord.Default(nil)), pluginProvider)
+	service := New(&testConfigProvider{}, bizctx.New(), i18nsvc.New(bizctx.New(), configsvc.New(nil), cachecoord.New(nil, nil)), pluginProvider)
 	document, err := service.Build(context.Background(), server)
 	if err != nil {
 		t.Fatalf("expected hosted apidoc build to succeed, got %v", err)
@@ -237,7 +237,7 @@ func TestBuildLocalizesOpenAPIForRequestLocale(t *testing.T) {
 		gctx.StrKey("BizCtx"),
 		&model.Context{Locale: i18nsvc.EnglishLocale},
 	)
-	service := New(&testConfigProvider{}, bizctx.New(), i18nsvc.New(bizctx.New(), configsvc.New(), cachecoord.Default(nil)), pluginProvider)
+	service := New(&testConfigProvider{}, bizctx.New(), i18nsvc.New(bizctx.New(), configsvc.New(nil), cachecoord.New(nil, nil)), pluginProvider)
 	document, err := service.Build(ctx, server)
 	if err != nil {
 		t.Fatalf("expected hosted apidoc build to succeed, got %v", err)
@@ -349,7 +349,7 @@ func registerOpenAPITestCatalog(locale string, entries map[string]string) func()
 // TestLocalizeSchemaTranslatesAlreadySeenDirectMetadata verifies recursive
 // cycle guards do not skip direct schema display text for shared schema nodes.
 func TestLocalizeSchemaTranslatesAlreadySeenDirectMetadata(t *testing.T) {
-	service := New(&testConfigProvider{}, bizctx.New(), i18nsvc.New(bizctx.New(), configsvc.New(), cachecoord.Default(nil)), &testPluginRouteProvider{}).(*serviceImpl)
+	service := New(&testConfigProvider{}, bizctx.New(), i18nsvc.New(bizctx.New(), configsvc.New(nil), cachecoord.New(nil, nil)), &testPluginRouteProvider{}).(*serviceImpl)
 	localizer := &openAPILocalizer{
 		catalog: map[string]string{
 			"test.schema.title":   "Parameter ID",
@@ -387,7 +387,7 @@ func TestLocalizeSchemaTranslatesAlreadySeenDirectMetadata(t *testing.T) {
 // keeps generated entity and framework metadata exactly as its source provides
 // it when the empty en-US apidoc bundle has no translation entry.
 func TestEnglishLocalizerPreservesGeneratedSchemaMetadata(t *testing.T) {
-	service := New(&testConfigProvider{}, bizctx.New(), i18nsvc.New(bizctx.New(), configsvc.New(), cachecoord.Default(nil)), &testPluginRouteProvider{}).(*serviceImpl)
+	service := New(&testConfigProvider{}, bizctx.New(), i18nsvc.New(bizctx.New(), configsvc.New(nil), cachecoord.New(nil, nil)), &testPluginRouteProvider{}).(*serviceImpl)
 	localizer := &openAPILocalizer{
 		catalog: map[string]string{},
 	}

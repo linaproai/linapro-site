@@ -19,7 +19,7 @@ i18n:
       nativeName: English
 `)
 
-	cfg := New().GetI18n(context.Background())
+	cfg := New(nil).GetI18n(context.Background())
 
 	if cfg.Default != "en-US" {
 		t.Fatalf("expected default locale %q, got %q", "en-US", cfg.Default)
@@ -42,7 +42,7 @@ func TestGetI18nRejectsMissingConfig(t *testing.T) {
 			t.Fatal("expected missing i18n.default to panic")
 		}
 	}()
-	_ = New().GetI18n(context.Background())
+	_ = New(nil).GetI18n(context.Background())
 }
 
 // TestGetI18nRejectsMissingDefault verifies the runtime default language is a
@@ -61,7 +61,7 @@ i18n:
 			t.Fatal("expected missing i18n.default to panic")
 		}
 	}()
-	_ = New().GetI18n(context.Background())
+	_ = New(nil).GetI18n(context.Background())
 }
 
 // TestGetI18nAllowsDefaultOutsideSelectableLocales verifies the default locale
@@ -76,7 +76,7 @@ i18n:
       nativeName: English
 `)
 
-	cfg := New().GetI18n(context.Background())
+	cfg := New(nil).GetI18n(context.Background())
 
 	if cfg.Default != "zh-CN" {
 		t.Fatalf("expected configured default locale %q, got %q", "zh-CN", cfg.Default)

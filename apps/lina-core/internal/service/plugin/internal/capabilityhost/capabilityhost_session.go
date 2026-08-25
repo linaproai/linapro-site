@@ -27,7 +27,7 @@ type sessionCapabilityAdapter struct {
 	bizCtx       bizctxcap.Service
 	users        capabilityusercap.Service
 	scopeSvc     datascope.Service
-	sessionStore session.Store
+	sessionStore session.Directory
 	tenantSvc    tenantspi.Service
 }
 
@@ -41,9 +41,11 @@ func newSessionCapabilityAdapter(
 	scopeSvc datascope.Service,
 	tenantSvc tenantspi.Service,
 ) capabilitysessioncap.Service {
-	var sessionStore session.Store
+	var sessionStore session.Directory
 	if authSvc != nil {
-		sessionStore = authSvc.SessionStore()
+		if directory, ok := authSvc.SessionStore().(session.Directory); ok {
+			sessionStore = directory
+		}
 	}
 	return &sessionCapabilityAdapter{
 		authSvc:      authSvc,

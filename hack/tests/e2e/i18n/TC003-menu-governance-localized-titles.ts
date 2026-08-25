@@ -15,6 +15,7 @@ type MenuListItem = {
 
 type MenuTreeSelectItem = {
   id: number;
+  parentId?: number;
   label: string;
   children?: MenuTreeSelectItem[];
 };
@@ -181,9 +182,11 @@ test.describe('TC003 菜单治理标题国际化专项回归', () => {
     expect(localizedTreeNode?.label).toBe('Menus');
 
     const pluginTreeNode = flatTreeSelect.find((item) => item.label === 'Plugins');
-    expect(pluginTreeNode?.children?.map((item) => item.label)).toEqual(
-      pluginButtonEnglishNames,
-    );
+    expect(
+      flatTreeSelect
+        .filter((item) => item.parentId === pluginTreeNode?.id)
+        .map((item) => item.label),
+    ).toEqual(pluginButtonEnglishNames);
 
     const roles = await expectSuccess<{ list: RoleListItem[]; total: number }>(
       await adminApi.get('role', {
@@ -198,8 +201,7 @@ test.describe('TC003 菜单治理标题国际化专项回归', () => {
     expect(adminRole, 'missing admin role').toBeTruthy();
 
     const roleMenuTree = await expectSuccess<{
-      menus: MenuTreeSelectItem[];
-      checkedKeys: number[];
+      menuIds: number[];
     }>(
       await adminApi.get(`menu/role/${adminRole!.id}`, {
         headers: {
@@ -207,14 +209,16 @@ test.describe('TC003 菜单治理标题国际化专项回归', () => {
         },
       }),
     );
-    const flatRoleMenus = flattenMenuTreeSelect(roleMenuTree.menus);
-    const localizedRoleNode = flatRoleMenus.find((item) => item.id === menuManagement?.id);
+    expect(roleMenuTree.menuIds).toContain(menuManagement?.id);
+    expect(roleMenuTree).not.toHaveProperty('checkedKeys');
+    expect(roleMenuTree).not.toHaveProperty('menus');
+    const localizedRoleNode = flatTreeSelect.find((item) => item.id === menuManagement?.id);
     expect(localizedRoleNode?.label).toBe('Menus');
-
-    const pluginRoleNode = flatRoleMenus.find((item) => item.label === 'Plugins');
-    expect(pluginRoleNode?.children?.map((item) => item.label)).toEqual(
-      pluginButtonEnglishNames,
-    );
+    expect(
+      flatTreeSelect
+        .filter((item) => item.parentId === pluginTreeNode?.id)
+        .map((item) => item.label),
+    ).toEqual(pluginButtonEnglishNames);
   });
 
   test('TC-3c: 英文环境下菜单详情保留可编辑原值并本地化父级名称', async () => {

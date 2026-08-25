@@ -215,16 +215,16 @@ test.describe("TC001 角色管理 CRUD", () => {
         adminPage.locator(".vxe-body--row", { hasText: role.name }).first(),
       ).toBeVisible();
 
-      // 获取当前状态
-      const switchEl = adminPage.locator(".vxe-body--row .ant-switch").first();
+      const switchEl = adminPage
+        .locator(".vxe-body--row", { hasText: role.name })
+        .locator(".ant-switch")
+        .first();
       const initialState = await switchEl.getAttribute("aria-checked");
 
-      // 切换状态
       await rolePage.toggleStatus(role.name);
-
-      // 验证状态已改变
-      const newState = await switchEl.getAttribute("aria-checked");
-      expect(newState).not.toBe(initialState);
+      await expect
+        .poll(async () => switchEl.getAttribute("aria-checked"))
+        .not.toBe(initialState);
 
       // 恢复原状态
       await rolePage.toggleStatus(role.name);

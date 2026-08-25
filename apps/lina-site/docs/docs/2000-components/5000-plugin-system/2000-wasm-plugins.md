@@ -289,7 +289,7 @@ menus:
 |------|----------|------|
 | `Runtime()` | `pluginbridge.Services.Runtime()` | 动态插件通过`WASI host-service`客户端写日志、读写状态、读取时间、生成`UUID`和读取节点身份；源码插件直接使用宿主原生日志和运行期上下文 |
 | `Network()` | `pluginbridge.Services.Network()` | 动态插件通过`host-service`授权访问受治理的出站`HTTP`；源码插件使用宿主原生`HTTP client`或注入的领域服务 |
-| `RecordStore()` | `pluginbridge.Services.RecordStore()` | 动态插件使用`guest`侧`facade`封装`data host-service`协议和类型化查询计划；源码插件使用自有`DAO`或提供方接缝 |
+| `RecordStore()` | `pluginbridge.Services.RecordStore()` | **实验能力**，不是主路径。动态插件可用`guest`侧`facade`封装`data host-service`协议；源码插件使用自有`DAO`或提供方接缝 |
 
 ## 与源码插件的差异
 

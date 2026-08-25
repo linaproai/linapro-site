@@ -79,10 +79,8 @@ func TestLoadPluginBackendConfigReadsPluginHackConfig(t *testing.T) {
 		`wasm:
   hooks:
     - event: auth.login.succeeded
-      action: sleep
       mode: async
       timeout: 50ms
-      sleep: 10ms
   resources:
     - key: records
       type: table-list
@@ -111,10 +109,9 @@ func TestLoadPluginBackendConfigReadsPluginHackConfig(t *testing.T) {
 		t.Fatalf("expected backend config load to succeed, got error: %v", err)
 	}
 	if len(manifest.Hooks) != 1 ||
-		manifest.Hooks[0].Action != pluginhost.HookActionSleep ||
+		manifest.Hooks[0].Action != "" ||
 		manifest.Hooks[0].Mode != pluginhost.CallbackExecutionModeAsync ||
-		manifest.Hooks[0].TimeoutMs != 50 ||
-		manifest.Hooks[0].SleepMs != 10 {
+		manifest.Hooks[0].TimeoutMs != 50 {
 		t.Fatalf("unexpected hydrated hooks: %#v", manifest.Hooks)
 	}
 	resource, ok := manifest.BackendResources["records"]

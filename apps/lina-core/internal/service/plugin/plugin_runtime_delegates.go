@@ -11,7 +11,7 @@ import (
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/net/goai"
 
-	"lina-core/internal/model/entity"
+	menusvc "lina-core/internal/service/menu"
 	"lina-core/internal/service/plugin/internal/catalog"
 	"lina-core/internal/service/plugin/internal/runtime"
 	"lina-core/internal/service/plugin/internal/wasm"
@@ -71,7 +71,7 @@ func (d *RuntimeDelegate) DispatchHookEvent(
 }
 
 // FilterPermissionMenus filters role permission menus after binding.
-func (d *RuntimeDelegate) FilterPermissionMenus(ctx context.Context, menus []*entity.SysMenu) []*entity.SysMenu {
+func (d *RuntimeDelegate) FilterPermissionMenus(ctx context.Context, menus []menusvc.FilterItem) []menusvc.FilterItem {
 	service := d.serviceSnapshot()
 	if service == nil {
 		return menus
@@ -80,7 +80,7 @@ func (d *RuntimeDelegate) FilterPermissionMenus(ctx context.Context, menus []*en
 }
 
 // FilterMenus filters navigation menus after binding.
-func (d *RuntimeDelegate) FilterMenus(ctx context.Context, menus []*entity.SysMenu) []*entity.SysMenu {
+func (d *RuntimeDelegate) FilterMenus(ctx context.Context, menus []menusvc.FilterItem) []menusvc.FilterItem {
 	service := d.serviceSnapshot()
 	if service == nil {
 		return menus
@@ -275,7 +275,7 @@ func pluginIntegrationDelegateUnboundError() error {
 }
 
 // FilterPermissionMenus filters permission menus through plugin enablement.
-func (p *integrationDelegateProvider) FilterPermissionMenus(ctx context.Context, menus []*entity.SysMenu) []*entity.SysMenu {
+func (p *integrationDelegateProvider) FilterPermissionMenus(ctx context.Context, menus []menusvc.FilterItem) []menusvc.FilterItem {
 	service := p.serviceSnapshot()
 	if service == nil {
 		return menus

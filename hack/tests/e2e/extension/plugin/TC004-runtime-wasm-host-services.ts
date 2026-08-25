@@ -453,7 +453,7 @@ menus:
     parent_key: extension
     name: Host Services E2E
     path: host-services-e2e
-    component: system/plugin/dynamic-page
+    component: ""
     perms: ${successPluginID}:host-services:view
     icon: lucide:plug
     type: M
@@ -773,6 +773,24 @@ func (c *Controller) HostServices(request *protocol.BridgeRequestEnvelopeV1) (*p
     path.join(pluginDir, "manifest", "README.md"),
     "runtime host services e2e fixture\n",
   );
+  writeTestFile(
+    path.join(pluginDir, "manifest", "sql", "001-host-services-e2e-record.sql"),
+    [
+      `CREATE TABLE IF NOT EXISTS ${successDataTable} (`,
+      "  id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,",
+      "  plugin_id VARCHAR(64) NOT NULL DEFAULT '',",
+      "  release_id INTEGER NOT NULL DEFAULT 0,",
+      "  node_key VARCHAR(255) NOT NULL DEFAULT '',",
+      "  desired_state VARCHAR(64) NOT NULL DEFAULT '',",
+      "  current_state VARCHAR(64) NOT NULL DEFAULT '',",
+      "  generation INTEGER NOT NULL DEFAULT 0,",
+      "  error_message TEXT NOT NULL DEFAULT '',",
+      "  created_at TIMESTAMP,",
+      "  updated_at TIMESTAMP,",
+      "  deleted_at TIMESTAMP",
+      ");",
+    ].join("\n"),
+  );
   return pluginDir;
 }
 
@@ -806,7 +824,7 @@ menus:
     parent_key: extension
     name: Host Services Denied E2E
     path: host-services-denied-e2e
-    component: system/plugin/dynamic-page
+    component: ""
     perms: ${deniedPluginID}:denied-method:view
     icon: lucide:shield-alert
     type: M
@@ -1130,7 +1148,7 @@ test.describe("TC-4 Runtime Wasm Host Services", () => {
     await resetPlugin(adminApi!, successPluginID);
     await resetPlugin(adminApi!, deniedPluginID);
     cleanupPluginRows([successPluginID, deniedPluginID, rawSQLPluginID]);
-    cleanupSuccessDataTable();
+    ensureSuccessDataTable();
     cleanupArtifacts([successPluginID, deniedPluginID, rawSQLPluginID]);
   });
 
@@ -1146,6 +1164,7 @@ test.describe("TC-4 Runtime Wasm Host Services", () => {
     await uploadDynamicPlugin(adminApi!, successArtifact);
     await installPlugin(adminApi!, successPluginID);
     await setPluginEnabled(adminApi!, successPluginID, true);
+    ensureSuccessDataTable();
 
     const response = await adminApi!.get(pluginApiPath(successPluginID, "/host-services"));
     const responseText = await response.text();

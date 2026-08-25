@@ -199,7 +199,7 @@ sequenceDiagram
 
 1. 准备共享`PostgreSQL`数据库。
 2. 准备可访问的`Redis`实例。
-3. 将`cluster.enabled`设为`true`，配置`cluster.coordination: redis`和`cluster.redis`端点。
+3. 将`cluster.enabled`设为`true`，配置`cluster.coordination.backend: redis`和`cluster.coordination.group`，并在顶层`redis.<group>`中填写连接参数。
 4. 启动多个`lina-core`节点，指向同一套数据库。
 5. 在负载均衡器中加入所有主框架节点。
 6. 验证`/health`、登录、菜单、插件状态、任务调度和权限变更同步。

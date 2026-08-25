@@ -12,11 +12,13 @@ import (
 
 	"lina-core/internal/model/entity"
 	"lina-core/internal/service/bizctx"
+	"lina-core/internal/service/cachecoord"
 	"lina-core/internal/service/cachecoord/revisionctrl"
 	"lina-core/internal/service/cluster"
 	configsvc "lina-core/internal/service/config"
 	i18nsvc "lina-core/internal/service/i18n"
 	"lina-core/internal/service/locker"
+	menusvc "lina-core/internal/service/menu"
 	"lina-core/internal/service/plugin/internal/catalog"
 	"lina-core/internal/service/plugin/internal/frontend"
 	"lina-core/internal/service/plugin/internal/migration"
@@ -50,7 +52,7 @@ type IntegrationService interface {
 		values map[string]interface{},
 	) error
 	// FilterPermissionMenus returns only the menus that pass plugin-level enablement checks.
-	FilterPermissionMenus(ctx context.Context, menus []*entity.SysMenu) []*entity.SysMenu
+	FilterPermissionMenus(ctx context.Context, menus []menusvc.FilterItem) []menusvc.FilterItem
 	// CanExposeBusinessEntries reports whether a plugin can expose business entries in the current tenant context.
 	CanExposeBusinessEntries(ctx context.Context, pluginID string) bool
 }
@@ -252,6 +254,8 @@ type serviceImpl struct {
 	frontendSvc frontend.Service
 	// topology provides cluster topology information.
 	topology cluster.Service
+	// cacheCoordSvc is the startup-owned cache coordinator used for reconciler revisions.
+	cacheCoordSvc cachecoord.Service
 	// integrationSvc handles runtime integration side effects.
 	integrationSvc IntegrationService
 	// configSvc provides runtime configuration for dynamic routes and package uploads.
@@ -298,6 +302,7 @@ func New(
 	i18nSvc i18nsvc.Service,
 	reconcilerLockSvc locker.Service,
 	topology cluster.Service,
+	cacheCoordSvc cachecoord.Service,
 	integrationSvc IntegrationService,
 	configSvc configsvc.Service,
 	userCtx bizctx.Service,
@@ -314,6 +319,7 @@ func New(
 		migrationSvc:               migrationSvc,
 		frontendSvc:                frontendSvc,
 		topology:                   topology,
+		cacheCoordSvc:              cacheCoordSvc,
 		integrationSvc:             integrationSvc,
 		configSvc:                  configSvc,
 		userCtx:                    userCtx,

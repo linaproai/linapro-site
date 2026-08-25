@@ -5,17 +5,17 @@ package jobhandler
 import (
 	"lina-core/api/jobhandler"
 	i18nsvc "lina-core/internal/service/i18n"
-	jobhandlersvc "lina-core/internal/service/jobhandler"
+	jobmgmtsvc "lina-core/internal/service/jobmgmt"
 )
 
 // ControllerV1 defines the v1 scheduled job handler controller.
 type ControllerV1 struct {
-	registry jobhandlersvc.Registry // registry exposes registered handler metadata.
-	i18nSvc  i18nsvc.Service        // i18nSvc localizes handler display metadata.
+	registry jobmgmtsvc.Registry // registry exposes registered handler metadata.
+	i18nSvc  i18nsvc.Service     // i18nSvc localizes handler display metadata.
 }
 
 // NewV1 creates and returns the v1 scheduled job handler controller.
-func NewV1(registry jobhandlersvc.Registry, i18nSvc i18nsvc.Service) jobhandler.IJobhandlerV1 {
+func NewV1(registry jobmgmtsvc.Registry, i18nSvc i18nsvc.Service) jobhandler.IJobhandlerV1 {
 	return &ControllerV1{
 		registry: registry,
 		i18nSvc:  i18nSvc,

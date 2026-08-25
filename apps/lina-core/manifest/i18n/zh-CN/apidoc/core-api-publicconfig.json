@@ -30,12 +30,6 @@
               "pageTitle": {
                 "dc": "登录页主标题文案"
               },
-              "panelLayout": {
-                "dc": "登录框布局：panel-left=居左 panel-center=居中 panel-right=居右"
-              },
-              "sloganImage": {
-                "dc": "登录侧栏 slogan 插画图片地址；默认 /slogan.svg 为 Vben 内置插画，为空表示不展示插画"
-              },
               "privacyPolicy": {
                 "dc": "注册页隐私政策弹窗正文"
               },
@@ -102,7 +96,7 @@
           },
           "FrontendReq": {
             "meta": {
-              "dc": "返回登录页与管理后台启动阶段可安全公开读取的品牌、登录展示和界面风格配置白名单",
+              "dc": "返回任意管理工作台均可读取的未登录品牌、登录文案、功能开关、主题和工作台入口路径。载荷不是 Vben 布局契约。",
               "summary": "获取公共前端配置",
               "tags": "公共配置"
             },
@@ -139,7 +133,7 @@
               }
             },
             "schema": {
-              "dc": "返回登录页与管理后台启动阶段可安全公开读取的品牌、登录展示和界面风格配置白名单"
+              "dc": "返回任意管理工作台均可读取的未登录品牌、登录文案、功能开关、主题和工作台入口路径。载荷不是 Vben 布局契约。"
             }
           },
           "FrontendRes": {
@@ -166,9 +160,6 @@
           },
           "FrontendUIRes": {
             "fields": {
-              "layout": {
-                "dc": "后台默认布局：sidebar-nav、sidebar-mixed-nav、header-nav、header-sidebar-nav、header-mixed-nav、mixed-nav、full-content"
-              },
               "themeMode": {
                 "dc": "主题模式：light=浅色 dark=深色 auto=跟随系统"
               },

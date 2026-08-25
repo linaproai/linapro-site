@@ -12,13 +12,13 @@ import (
 
 // CreateReq defines the request for creating a menu.
 type CreateReq struct {
-	g.Meta     `path:"/menu" method:"post" tags:"Menu Management" summary:"Create menu" dc:"Create a new menu, supporting three types: directory, menu, and button. Menu names cannot be repeated under the same parent; the directory/menu icons in the left navigation must be globally unique. Duplicate icons will be refused to save." permission:"system:menu:add"`
+	g.Meta     `path:"/menu" method:"post" tags:"Menu Management" summary:"Create menu" dc:"Create a new menu, supporting three types: directory, menu, and button. Menu names cannot be repeated under the same parent. Icons are not required to be globally unique." permission:"system:menu:add"`
 	ParentId   int                   `json:"parentId" d:"0" dc:"Parent menu ID (0=root menu)" eg:"0"`
 	Name       string                `json:"name" v:"required" dc:"Menu name (supports i18n format such as menu.system.user)" eg:"User Management"`
 	Path       string                `json:"path" dc:"Routing address (required for directory and menu types)" eg:"user"`
 	Component  string                `json:"component" dc:"Component path (required for menu type)" eg:"system/user/index"`
 	Perms      string                `json:"perms" dc:"Permission ID (required for menu and button types)" eg:"system:user:list"`
-	Icon       string                `json:"icon" dc:"Menu icon; when saving catalog and menu types, the left navigation icon will be verified to be globally unique. Button types ignore this constraint." eg:"ant-design:user-outlined"`
+	Icon       string                `json:"icon" dc:"Menu icon identifier used by the workbench. Duplicate icons are allowed." eg:"ant-design:user-outlined"`
 	Type       menutype.Code         `json:"type" v:"required|in:D,M,B" dc:"Menu type: D=Directory M=Menu B=Button" eg:"M"`
 	Sort       int                   `json:"sort" d:"0" dc:"Display sorting (the smaller the number, the higher it is)" eg:"1"`
 	Visible    statusflag.Visibility `json:"visible" d:"1" v:"in:0,1" dc:"Whether to display: 1=show 0=hide" eg:"1"`

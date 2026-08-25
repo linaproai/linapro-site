@@ -19,7 +19,7 @@ server:
     apiDocPath: "/custom-api.json"
 `)
 
-	cfg := New().GetServerExtensions(context.Background())
+	cfg := New(nil).GetServerExtensions(context.Background())
 
 	if cfg.ApiDocPath != "/custom-api.json" {
 		t.Fatalf("expected hosted api doc path to be loaded, got %q", cfg.ApiDocPath)
@@ -34,7 +34,7 @@ server:
   address: ":9120"
 `)
 
-	cfg := New().GetServerExtensions(context.Background())
+	cfg := New(nil).GetServerExtensions(context.Background())
 
 	if cfg.ApiDocPath != defaultServerApiDocPath {
 		t.Fatalf("expected default hosted api doc path %q, got %q", defaultServerApiDocPath, cfg.ApiDocPath)

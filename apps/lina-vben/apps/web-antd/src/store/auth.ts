@@ -19,41 +19,6 @@ import { $t } from '#/locales';
 import { resolvePostLoginLandingPath } from '#/router/post-login-landing';
 import { useTenantStore } from '#/store/tenant';
 
-type UserMenuNode = {
-  children?: UserMenuNode[];
-  name?: string;
-  path?: string;
-};
-
-function normalizeMenuPath(path: string) {
-  return path.replace(/^\/+/u, '').replace(/\/+$/u, '');
-}
-
-function isMultiTenantMenuNode(item: UserMenuNode): boolean {
-  const path = normalizeMenuPath(item.path || '');
-  const name = item.name || '';
-
-  // The host platform group is always present; only concrete tenant pages
-  // should enable tenant-aware frontend behavior.
-  return (
-    path === 'platform/tenants' ||
-    path.startsWith('platform/tenants/') ||
-    path === 'tenant' ||
-    path.startsWith('tenant/') ||
-    name.startsWith('PlatformTenant') ||
-    name.startsWith('Tenant')
-  );
-}
-
-function hasMultiTenantMenu(items: UserMenuNode[] = []): boolean {
-  return items.some((item) => {
-    return (
-      isMultiTenantMenuNode(item) ||
-      hasMultiTenantMenu(item.children)
-    );
-  });
-}
-
 function resolveTenantEnabled(
   tenants: LoginTenant[],
   userInfo: AppUserInfo | null,
@@ -62,7 +27,7 @@ function resolveTenantEnabled(
   return (
     tenants.length > 0 ||
     !!currentTenant ||
-    hasMultiTenantMenu((userInfo?.menus ?? []) as UserMenuNode[])
+    userInfo?.tenantEnabled === true
   );
 }
 

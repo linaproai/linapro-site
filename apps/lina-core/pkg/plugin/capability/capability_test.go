@@ -40,7 +40,19 @@ func TestServicesDoesNotExposeTenantFilter(t *testing.T) {
 // typed domain services.
 func TestServicesExposeUniqueDomainEntries(t *testing.T) {
 	servicesType := reflect.TypeOf((*Services)(nil)).Elem()
-	for _, removed := range []string{"Notify", "Session", "RuntimeConfig", "Config", "PluginConfig", "PluginLifecycle", "PluginState"} {
+	for _, removed := range []string{
+		"Notify",
+		"Session",
+		"RuntimeConfig",
+		"Config",
+		"PluginConfig",
+		"PluginLifecycle",
+		"PluginState",
+		"Runtime",
+		"Network",
+		"RecordStore",
+		"Data",
+	} {
 		if _, ok := servicesType.MethodByName(removed); ok {
 			t.Fatalf("capability.Services must not expose removed %s entry", removed)
 		}

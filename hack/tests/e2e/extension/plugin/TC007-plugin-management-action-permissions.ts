@@ -19,11 +19,18 @@ const apiBaseURL = config.apiBaseURL;
 
 const pluginID = "plugin-dev-management-permission-e2e";
 const pluginVersion = "v0.1.0";
-const testRoleName = "插件管理查询角色";
-const testRoleKey = "plugin_management_query_role";
-const testUsername = "plugin_management_query_user";
+let testRoleName = "";
+let testRoleKey = "";
+let testUsername = "";
 const testPassword = "runtime123";
 const testNickname = "插件管理查询用户";
+
+function allocateQueryOnlyIdentity() {
+  const uniqueSuffix = `${Date.now()}`.slice(-8);
+  testRoleName = `插件查询角色${uniqueSuffix}`;
+  testRoleKey = `pqk${uniqueSuffix}`;
+  testUsername = `pqu${uniqueSuffix}`;
+}
 
 type PluginListItem = {
   enabled?: number;
@@ -120,19 +127,21 @@ function cleanupPluginRows() {
 }
 
 function cleanupUserAndRoleRows() {
-  const escapedUsername = pgEscapeLiteral(testUsername);
-  const escapedRoleKey = pgEscapeLiteral(testRoleKey);
   execPgSQLStatements([
-    `DELETE FROM sys_user_role WHERE user_id IN (SELECT id FROM sys_user WHERE username = '${escapedUsername}');`,
-    `DELETE FROM sys_user WHERE username = '${escapedUsername}';`,
-    `DELETE FROM sys_role_menu WHERE role_id IN (SELECT id FROM sys_role WHERE "key" = '${escapedRoleKey}');`,
-    `DELETE FROM sys_role WHERE "key" = '${escapedRoleKey}';`,
+    `DELETE FROM sys_user_role WHERE user_id IN (SELECT id FROM sys_user WHERE username LIKE 'plugin_management_query_user%' OR username LIKE 'pmq_user_%' OR username LIKE 'pqu%');`,
+    `DELETE FROM sys_user WHERE username LIKE 'plugin_management_query_user%' OR username LIKE 'pmq_user_%' OR username LIKE 'pqu%';`,
+    `DELETE FROM sys_role_menu WHERE role_id IN (SELECT id FROM sys_role WHERE "key" LIKE 'plugin_management_query_role%' OR "key" LIKE 'pmq_%' OR "key" LIKE 'pqk%');`,
+    `DELETE FROM sys_role WHERE "key" LIKE 'plugin_management_query_role%' OR "key" LIKE 'pmq_%' OR "key" LIKE 'pqk%' OR name = '插件管理查询角色' OR name LIKE '插件管理查询角色 %' OR name LIKE '插件查询角色%';`,
   ]);
 }
 
 function cleanupWorkspace() {
   rmSync(artifactPath(), { force: true });
   rmSync(runtimeStorageArtifactPath(), { force: true });
+  rmSync(path.join(repoRoot(), "temp", "output", "releases", pluginID), {
+    force: true,
+    recursive: true,
+  });
 }
 
 function writeULEB128(buffer: number[], value: number) {
@@ -403,7 +412,9 @@ test.describe("TC-3 插件管理动作权限校验", () => {
   });
 
   test.beforeEach(async () => {
+    await adminApi.delete(`plugins/${pluginID}`);
     cleanupUserAndRoleRows();
+    allocateQueryOnlyIdentity();
     cleanupPluginRows();
     cleanupWorkspace();
     writeRuntimeArtifact();

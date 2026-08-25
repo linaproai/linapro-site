@@ -632,7 +632,7 @@ test.describe("TC001 菜单管理 CRUD", () => {
     }
   });
 
-  test("TC001q: 菜单图标重复时不允许保存", async ({ authenticatedPage: adminPage }) => {
+  test("TC001q: 菜单图标重复时允许保存", async ({ authenticatedPage: adminPage }) => {
     const menuPage = new MenuPage(adminPage);
     const duplicateMenuName = `e2e-duplicate-icon-${Date.now()}`;
 
@@ -664,12 +664,11 @@ test.describe("TC001 菜单管理 CRUD", () => {
 
     await drawer.getByRole("button", { name: /确\s*认/ }).click();
 
+    await drawer.waitFor({ state: "hidden", timeout: 15000 });
     await expect(
       adminPage.getByText(/菜单图标.*已被其他目录或菜单使用/),
-    ).toBeVisible({ timeout: 5000 });
-    await expect(drawer).toBeVisible();
+    ).toHaveCount(0);
 
-    await drawer.getByRole("button", { name: /取\s*消/ }).click();
-    await drawer.waitFor({ state: "hidden", timeout: 5000 });
+    await menuPage.deleteMenuByName(duplicateMenuName);
   });
 });

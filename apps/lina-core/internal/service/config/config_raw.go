@@ -461,9 +461,11 @@ type clusterRuntimeParamRevisionController struct {
 
 // newCacheCoordRuntimeParamRevisionController selects the deployment-specific
 // revision strategy backed by cachecoord in cluster mode.
-func newCacheCoordRuntimeParamRevisionController(clusterEnabled bool) runtimeParamRevisionController {
-	if clusterEnabled {
-		cacheCoordSvc := cachecoord.Default(cachecoord.NewStaticTopology(true))
+func newCacheCoordRuntimeParamRevisionController(
+	clusterEnabled bool,
+	cacheCoordSvc cachecoord.Service,
+) runtimeParamRevisionController {
+	if clusterEnabled && cacheCoordSvc != nil {
 		configureRuntimeParamCacheDomain(cacheCoordSvc)
 		return &clusterRuntimeParamRevisionController{
 			cacheCoordSvc: cacheCoordSvc,
@@ -483,7 +485,7 @@ func configureRuntimeParamCacheDomain(cacheCoordSvc cachecoord.Service) {
 		AuthoritySource:  "sys_config runtime configuration",
 		ConsistencyModel: cachecoord.ConsistencySharedRevision,
 		MaxStale:         runtimeParamCacheMaxStale,
-		SyncMechanism:    "persistent sys_cache_revision plus request or watcher refresh",
+		SyncMechanism:    "coordination revision store plus request or watcher refresh",
 		FailureStrategy:  cachecoord.FailureStrategyReturnVisibleError,
 	}); err != nil {
 		panic(err)

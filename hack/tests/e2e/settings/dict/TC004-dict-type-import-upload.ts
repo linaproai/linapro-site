@@ -27,7 +27,7 @@ test.describe('TC004 字典管理导入完整流程', () => {
   function createDictExcel(
     filePath: string,
     types: Array<{ name: string; type: string; status?: string; remark?: string }>,
-    dataList: Array<{ typeName: string; label: string; value: string; sort?: number; tagStyle?: string; cssClass?: string; status?: string; remark?: string }> = [],
+    dataList: Array<{ typeName: string; label: string; value: string; sort?: number; status?: string; remark?: string }> = [],
   ) {
     const workbook = xlsxUtils.book_new();
 
@@ -39,8 +39,8 @@ test.describe('TC004 字典管理导入完整流程', () => {
 
     // Create dict data sheet if provided
     if (dataList.length > 0) {
-      const dataHeaders = ['所属类型', '字典标签', '字典值', '排序', 'Tag样式', 'CSS类', '状态', '备注'];
-      const dataRows = [dataHeaders, ...dataList.map((d) => [d.typeName, d.label, d.value, d.sort || 0, d.tagStyle || '', d.cssClass || '', d.status || '正常', d.remark || ''])];
+      const dataHeaders = ['所属类型', '字典标签', '字典值', '排序', '状态', '备注'];
+      const dataRows = [dataHeaders, ...dataList.map((d) => [d.typeName, d.label, d.value, d.sort || 0, d.status || '正常', d.remark || ''])];
       const dataSheet = xlsxUtils.aoa_to_sheet(dataRows);
       xlsxUtils.book_append_sheet(workbook, dataSheet, '字典数据');
     }
@@ -131,6 +131,8 @@ test.describe('TC004 字典管理导入完整流程', () => {
     expect(dataHeaderRow).toContain('所属类型');
     expect(dataHeaderRow).toContain('字典标签');
     expect(dataHeaderRow).toContain('字典值');
+    expect(dataHeaderRow).not.toContain('Tag样式');
+    expect(dataHeaderRow).not.toContain('CSS类');
   });
 
   test('TC004b: 导入弹窗UI组件完整性', async ({ authenticatedPage: adminPage }) => {
@@ -266,7 +268,7 @@ test.describe('TC004 字典管理导入完整流程', () => {
     createDictExcel(
       importFilePath,
       [{ name: '已覆盖字典', type: testType, remark: '覆盖后备注' }],
-      [{ typeName: testType, label: '新选项', value: 'original', sort: 2, tagStyle: 'primary' }],
+      [{ typeName: testType, label: '新选项', value: 'original', sort: 2 }],
     );
 
     // Open import modal

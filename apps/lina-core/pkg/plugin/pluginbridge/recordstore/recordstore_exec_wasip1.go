@@ -279,70 +279,49 @@ func decodeMutationResult(result *protocol.HostServiceDataMutationResponse) (*Mu
 }
 
 // invokeDataHostServiceList dispatches one governed record store list request
-// through the structured data host-service protocol.
+// through the structured data host-service JSON envelope.
 func invokeDataHostServiceList(
 	invoker HostServiceInvoker,
 	table string,
 	request *protocol.HostServiceDataListRequest,
 ) (*protocol.HostServiceDataListResponse, error) {
-	payload, err := invokeRecordStoreHostService(
-		invoker,
-		protocol.HostServiceData,
-		protocol.HostServiceMethodDataList,
-		"",
-		table,
-		protocol.MarshalHostServiceDataListRequest(request),
-	)
-	if err != nil {
+	response := &protocol.HostServiceDataListResponse{}
+	if err := invokeDataHostServiceJSON(invoker, protocol.HostServiceMethodDataList, table, request, response); err != nil {
 		return nil, err
 	}
-	return protocol.UnmarshalHostServiceDataListResponse(payload)
+	return response, nil
 }
 
 // invokeDataHostServiceGet dispatches one governed record store detail request
-// through the structured data host-service protocol.
+// through the structured data host-service JSON envelope.
 func invokeDataHostServiceGet(
 	invoker HostServiceInvoker,
 	table string,
 	request *protocol.HostServiceDataGetRequest,
 ) (*protocol.HostServiceDataGetResponse, error) {
-	payload, err := invokeRecordStoreHostService(
-		invoker,
-		protocol.HostServiceData,
-		protocol.HostServiceMethodDataGet,
-		"",
-		table,
-		protocol.MarshalHostServiceDataGetRequest(request),
-	)
-	if err != nil {
+	response := &protocol.HostServiceDataGetResponse{}
+	if err := invokeDataHostServiceJSON(invoker, protocol.HostServiceMethodDataGet, table, request, response); err != nil {
 		return nil, err
 	}
-	return protocol.UnmarshalHostServiceDataGetResponse(payload)
+	return response, nil
 }
 
 // invokeDataHostServiceBatchGet dispatches one governed record store batch_get
-// request through the structured data host-service protocol.
+// request through the structured data host-service JSON envelope.
 func invokeDataHostServiceBatchGet(
 	invoker HostServiceInvoker,
 	table string,
 	request *protocol.HostServiceDataBatchGetRequest,
 ) (*protocol.HostServiceDataBatchGetResponse, error) {
-	payload, err := invokeRecordStoreHostService(
-		invoker,
-		protocol.HostServiceData,
-		protocol.HostServiceMethodDataBatchGet,
-		"",
-		table,
-		protocol.MarshalHostServiceDataBatchGetRequest(request),
-	)
-	if err != nil {
+	response := &protocol.HostServiceDataBatchGetResponse{}
+	if err := invokeDataHostServiceJSON(invoker, protocol.HostServiceMethodDataBatchGet, table, request, response); err != nil {
 		return nil, err
 	}
-	return protocol.UnmarshalHostServiceDataBatchGetResponse(payload)
+	return response, nil
 }
 
 // invokeDataHostServiceMutation dispatches one governed record store mutation
-// request through the structured data host-service protocol.
+// request through the structured data host-service JSON envelope.
 func invokeDataHostServiceMutation(
 	invoker HostServiceInvoker,
 	table string,
@@ -358,42 +337,69 @@ func invokeDataHostServiceMutation(
 	if err != nil {
 		return nil, err
 	}
-	payload, err := invokeRecordStoreHostService(
+	response := &protocol.HostServiceDataMutationResponse{}
+	if err := invokeDataHostServiceJSON(
 		invoker,
-		protocol.HostServiceData,
 		method,
-		"",
 		table,
-		protocol.MarshalHostServiceDataMutationRequest(&protocol.HostServiceDataMutationRequest{
-			KeyJSON:    keyJSON,
-			RecordJSON: recordJSON,
-		}),
-	)
-	if err != nil {
+		&protocol.HostServiceDataMutationRequest{KeyJSON: keyJSON, RecordJSON: recordJSON},
+		response,
+	); err != nil {
 		return nil, err
 	}
-	return protocol.UnmarshalHostServiceDataMutationResponse(payload)
+	return response, nil
 }
 
 // invokeDataHostServiceTransaction dispatches one governed record store
-// transaction request through the structured data host-service protocol.
+// transaction request through the structured data host-service JSON envelope.
 func invokeDataHostServiceTransaction(
 	invoker HostServiceInvoker,
 	table string,
 	request *protocol.HostServiceDataTransactionRequest,
 ) (*protocol.HostServiceDataTransactionResponse, error) {
-	payload, err := invokeRecordStoreHostService(
-		invoker,
-		protocol.HostServiceData,
-		protocol.HostServiceMethodDataTransaction,
-		"",
-		table,
-		protocol.MarshalHostServiceDataTransactionRequest(request),
-	)
-	if err != nil {
+	response := &protocol.HostServiceDataTransactionResponse{}
+	if err := invokeDataHostServiceJSON(invoker, protocol.HostServiceMethodDataTransaction, table, request, response); err != nil {
 		return nil, err
 	}
-	return protocol.UnmarshalHostServiceDataTransactionResponse(payload)
+	return response, nil
+}
+
+// invokeDataHostServiceJSON encodes one JSON input envelope and decodes the
+// JSON response envelope for a record store host-service method.
+func invokeDataHostServiceJSON(
+	invoker HostServiceInvoker,
+	method string,
+	table string,
+	input any,
+	out any,
+) error {
+	var payload []byte
+	if input != nil {
+		content, err := json.Marshal(input)
+		if err != nil {
+			return err
+		}
+		payload = protocol.MarshalHostServiceJSONRequest(&protocol.HostServiceJSONRequest{Value: content})
+	}
+	responsePayload, err := invokeRecordStoreHostService(
+		invoker,
+		protocol.HostServiceData,
+		method,
+		"",
+		table,
+		payload,
+	)
+	if err != nil || out == nil {
+		return err
+	}
+	response, err := protocol.UnmarshalHostServiceJSONResponse(responsePayload)
+	if err != nil {
+		return err
+	}
+	if response == nil || len(response.Value) == 0 {
+		return nil
+	}
+	return json.Unmarshal(response.Value, out)
 }
 
 // invokeRecordStoreHostService dispatches one record store host-service call

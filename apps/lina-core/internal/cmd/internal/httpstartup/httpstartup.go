@@ -15,7 +15,7 @@ import (
 // embedded frontend asset serving.
 func Run(ctx context.Context) error {
 	server := g.Server()
-	configSvc := config.New()
+	configSvc := config.New(nil)
 	if err := configureHTTPServer(ctx, server, configSvc); err != nil {
 		return err
 	}

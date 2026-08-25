@@ -14,47 +14,6 @@ import (
 	"lina-core/pkg/plugin/capability/tenantcap/tenantspi"
 )
 
-// sourcePluginAssets is the asset-registration facade bound to one source
-// plugin definition.
-type sourcePluginAssets struct {
-	plugin *sourcePlugin
-}
-
-// sourcePluginLifecycle is the lifecycle-registration facade bound to one
-// source plugin definition.
-type sourcePluginLifecycle struct {
-	plugin *sourcePlugin
-}
-
-// sourcePluginHooks is the hook-registration facade bound to one source plugin
-// definition.
-type sourcePluginHooks struct {
-	plugin *sourcePlugin
-}
-
-// sourcePluginHTTP is the HTTP-registration facade bound to one source plugin
-// definition.
-type sourcePluginHTTP struct {
-	plugin *sourcePlugin
-}
-
-// sourcePluginJobs is the scheduled-job registration facade bound to one source plugin
-// definition.
-type sourcePluginJobs struct {
-	plugin *sourcePlugin
-}
-
-// sourcePluginProviders is the framework provider declaration facade bound to one source plugin definition.
-type sourcePluginProviders struct {
-	plugin *sourcePlugin
-}
-
-// sourcePluginAccess is the access-control registration facade bound to one
-// source plugin definition.
-type sourcePluginAccess struct {
-	plugin *sourcePlugin
-}
-
 // ID returns the stable plugin identifier declared by the source plugin.
 func (p *sourcePlugin) ID() string {
 	if p == nil {
@@ -68,7 +27,7 @@ func (p *sourcePlugin) Assets() AssetDeclarations {
 	if p == nil {
 		return nil
 	}
-	return p.assets
+	return p
 }
 
 // Lifecycle returns the plugin lifecycle callback registration facade.
@@ -76,7 +35,7 @@ func (p *sourcePlugin) Lifecycle() LifecycleDeclarations {
 	if p == nil {
 		return nil
 	}
-	return p.lifecycle
+	return p
 }
 
 // Hooks returns the event-hook registration facade.
@@ -84,7 +43,7 @@ func (p *sourcePlugin) Hooks() HookDeclarations {
 	if p == nil {
 		return nil
 	}
-	return p.hooks
+	return p
 }
 
 // HTTP returns the HTTP registration facade.
@@ -92,7 +51,7 @@ func (p *sourcePlugin) HTTP() HTTPDeclarations {
 	if p == nil {
 		return nil
 	}
-	return p.http
+	return p
 }
 
 // Jobs returns the scheduled-job registration facade.
@@ -100,7 +59,7 @@ func (p *sourcePlugin) Jobs() JobDeclarations {
 	if p == nil {
 		return nil
 	}
-	return p.jobs
+	return p
 }
 
 // Providers returns the framework capability provider declaration facade.
@@ -108,7 +67,7 @@ func (p *sourcePlugin) Providers() ProviderDeclarations {
 	if p == nil {
 		return nil
 	}
-	return p.providers
+	return p
 }
 
 // Access returns the menu and permission access-control registration facade.
@@ -116,292 +75,292 @@ func (p *sourcePlugin) Access() AccessDeclarations {
 	if p == nil {
 		return nil
 	}
-	return p.access
+	return p
 }
 
 // ProvideTenant declares one source-plugin tenant provider factory.
-func (r *sourcePluginProviders) ProvideTenant(factory tenantspi.ProviderFactory) error {
-	if r == nil || r.plugin == nil {
+func (p *sourcePlugin) ProvideTenant(factory tenantspi.ProviderFactory) error {
+	if p == nil {
 		return gerror.New("pluginhost: source plugin provider facade is nil")
 	}
-	return r.plugin.registerTenantProvider(factory)
+	return p.registerTenantProvider(factory)
 }
 
 // ProvideOrg declares one source-plugin organization provider factory.
-func (r *sourcePluginProviders) ProvideOrg(factory orgspi.ProviderFactory) error {
-	if r == nil || r.plugin == nil {
+func (p *sourcePlugin) ProvideOrg(factory orgspi.ProviderFactory) error {
+	if p == nil {
 		return gerror.New("pluginhost: source plugin provider facade is nil")
 	}
-	return r.plugin.registerOrgProvider(factory)
+	return p.registerOrgProvider(factory)
 }
 
 // ProvideCapability declares one plugin-owned capability descriptor.
-func (r *sourcePluginProviders) ProvideCapability(descriptor capregistry.Descriptor) error {
-	if r == nil || r.plugin == nil {
+func (p *sourcePlugin) ProvideCapability(descriptor capregistry.Descriptor) error {
+	if p == nil {
 		return gerror.New("pluginhost: source plugin provider facade is nil")
 	}
-	return r.plugin.registerCapabilityDescriptor(descriptor)
+	return p.registerCapabilityDescriptor(descriptor)
 }
 
 // ProvideExternalIdentity declares one source-plugin external-identity provider ID.
-func (r *sourcePluginProviders) ProvideExternalIdentity(providerID string) error {
-	if r == nil || r.plugin == nil {
+func (p *sourcePlugin) ProvideExternalIdentity(providerID string) error {
+	if p == nil {
 		return gerror.New("pluginhost: source plugin provider facade is nil")
 	}
-	return r.plugin.registerExternalIdentityProvider(providerID)
+	return p.registerExternalIdentityProvider(providerID)
 }
 
 // ProvideExternalIdentityProvider declares this source plugin's external-identity
 // provider engine factory (linapro-extlogin-core). It is distinct from
 // ProvideExternalIdentity, which stamps provider-ID ownership for calling
 // plugins. A plugin that supplies the engine need not own any provider ID.
-func (r *sourcePluginProviders) ProvideExternalIdentityProvider(factory extidspi.ProviderFactory) error {
-	if r == nil || r.plugin == nil {
+func (p *sourcePlugin) ProvideExternalIdentityProvider(factory extidspi.ProviderFactory) error {
+	if p == nil {
 		return gerror.New("pluginhost: source plugin provider facade is nil")
 	}
-	return r.plugin.registerExternalIdentityProviderFactory(factory)
+	return p.registerExternalIdentityProviderFactory(factory)
 }
 
 // UseEmbeddedFiles binds one plugin-owned embedded filesystem.
-func (r *sourcePluginAssets) UseEmbeddedFiles(fileSystem fs.FS) {
-	if r == nil || r.plugin == nil {
+func (p *sourcePlugin) UseEmbeddedFiles(fileSystem fs.FS) {
+	if p == nil {
 		return
 	}
-	r.plugin.useEmbeddedFiles(fileSystem)
+	p.useEmbeddedFiles(fileSystem)
 }
 
 // RegisterUninstallHandler registers one uninstall cleanup callback.
-func (r *sourcePluginLifecycle) RegisterUninstallHandler(handler SourcePluginUninstallHandler) error {
-	if r == nil || r.plugin == nil {
+func (p *sourcePlugin) RegisterUninstallHandler(handler SourcePluginUninstallHandler) error {
+	if p == nil {
 		return gerror.New("pluginhost: source plugin lifecycle facade is nil")
 	}
-	return r.plugin.registerUninstallHandler(handler)
+	return p.registerUninstallHandler(handler)
 }
 
 // RegisterBeforeInstallHandler registers one pre-install veto callback.
-func (r *sourcePluginLifecycle) RegisterBeforeInstallHandler(handler SourcePluginBeforeLifecycleHandler) error {
-	if r == nil || r.plugin == nil {
+func (p *sourcePlugin) RegisterBeforeInstallHandler(handler SourcePluginBeforeLifecycleHandler) error {
+	if p == nil {
 		return gerror.New("pluginhost: source plugin lifecycle facade is nil")
 	}
-	return r.plugin.registerBeforeInstallHandler(handler)
+	return p.registerBeforeInstallHandler(handler)
 }
 
 // RegisterAfterInstallHandler registers one post-install callback.
-func (r *sourcePluginLifecycle) RegisterAfterInstallHandler(handler SourcePluginAfterLifecycleHandler) error {
-	if r == nil || r.plugin == nil {
+func (p *sourcePlugin) RegisterAfterInstallHandler(handler SourcePluginAfterLifecycleHandler) error {
+	if p == nil {
 		return gerror.New("pluginhost: source plugin lifecycle facade is nil")
 	}
-	return r.plugin.registerAfterInstallHandler(handler)
+	return p.registerAfterInstallHandler(handler)
 }
 
 // RegisterBeforeEnableHandler registers one pre-enable veto callback.
-func (r *sourcePluginLifecycle) RegisterBeforeEnableHandler(handler SourcePluginBeforeLifecycleHandler) error {
-	if r == nil || r.plugin == nil {
+func (p *sourcePlugin) RegisterBeforeEnableHandler(handler SourcePluginBeforeLifecycleHandler) error {
+	if p == nil {
 		return gerror.New("pluginhost: source plugin lifecycle facade is nil")
 	}
-	return r.plugin.registerBeforeEnableHandler(handler)
+	return p.registerBeforeEnableHandler(handler)
 }
 
 // RegisterAfterEnableHandler registers one post-enable callback.
-func (r *sourcePluginLifecycle) RegisterAfterEnableHandler(handler SourcePluginAfterLifecycleHandler) error {
-	if r == nil || r.plugin == nil {
+func (p *sourcePlugin) RegisterAfterEnableHandler(handler SourcePluginAfterLifecycleHandler) error {
+	if p == nil {
 		return gerror.New("pluginhost: source plugin lifecycle facade is nil")
 	}
-	return r.plugin.registerAfterEnableHandler(handler)
+	return p.registerAfterEnableHandler(handler)
 }
 
 // RegisterGlobalBeforeInstallHandler registers one global pre-install veto callback.
-func (r *sourcePluginLifecycle) RegisterGlobalBeforeInstallHandler(handler SourcePluginGlobalLifecycleHandler) error {
-	if r == nil || r.plugin == nil {
+func (p *sourcePlugin) RegisterGlobalBeforeInstallHandler(handler SourcePluginGlobalLifecycleHandler) error {
+	if p == nil {
 		return gerror.New("pluginhost: source plugin lifecycle facade is nil")
 	}
-	return r.plugin.registerGlobalBeforeInstallHandler(handler)
+	return p.registerGlobalBeforeInstallHandler(handler)
 }
 
 // RegisterGlobalBeforeEnableHandler registers one global pre-enable veto callback.
-func (r *sourcePluginLifecycle) RegisterGlobalBeforeEnableHandler(handler SourcePluginGlobalLifecycleHandler) error {
-	if r == nil || r.plugin == nil {
+func (p *sourcePlugin) RegisterGlobalBeforeEnableHandler(handler SourcePluginGlobalLifecycleHandler) error {
+	if p == nil {
 		return gerror.New("pluginhost: source plugin lifecycle facade is nil")
 	}
-	return r.plugin.registerGlobalBeforeEnableHandler(handler)
+	return p.registerGlobalBeforeEnableHandler(handler)
 }
 
 // RegisterGlobalBeforeDisableHandler registers one global pre-disable veto callback.
-func (r *sourcePluginLifecycle) RegisterGlobalBeforeDisableHandler(handler SourcePluginGlobalLifecycleHandler) error {
-	if r == nil || r.plugin == nil {
+func (p *sourcePlugin) RegisterGlobalBeforeDisableHandler(handler SourcePluginGlobalLifecycleHandler) error {
+	if p == nil {
 		return gerror.New("pluginhost: source plugin lifecycle facade is nil")
 	}
-	return r.plugin.registerGlobalBeforeDisableHandler(handler)
+	return p.registerGlobalBeforeDisableHandler(handler)
 }
 
 // RegisterGlobalBeforeUninstallHandler registers one global pre-uninstall veto callback.
-func (r *sourcePluginLifecycle) RegisterGlobalBeforeUninstallHandler(handler SourcePluginGlobalLifecycleHandler) error {
-	if r == nil || r.plugin == nil {
+func (p *sourcePlugin) RegisterGlobalBeforeUninstallHandler(handler SourcePluginGlobalLifecycleHandler) error {
+	if p == nil {
 		return gerror.New("pluginhost: source plugin lifecycle facade is nil")
 	}
-	return r.plugin.registerGlobalBeforeUninstallHandler(handler)
+	return p.registerGlobalBeforeUninstallHandler(handler)
 }
 
 // RegisterBeforeUpgradeHandler registers one pre-upgrade veto callback.
-func (r *sourcePluginLifecycle) RegisterBeforeUpgradeHandler(handler SourcePluginBeforeUpgradeHandler) error {
-	if r == nil || r.plugin == nil {
+func (p *sourcePlugin) RegisterBeforeUpgradeHandler(handler SourcePluginBeforeUpgradeHandler) error {
+	if p == nil {
 		return gerror.New("pluginhost: source plugin lifecycle facade is nil")
 	}
-	return r.plugin.registerBeforeUpgradeHandler(handler)
+	return p.registerBeforeUpgradeHandler(handler)
 }
 
 // RegisterUpgradeHandler registers one source-plugin custom upgrade callback.
-func (r *sourcePluginLifecycle) RegisterUpgradeHandler(handler SourcePluginUpgradeHandler) error {
-	if r == nil || r.plugin == nil {
+func (p *sourcePlugin) RegisterUpgradeHandler(handler SourcePluginUpgradeHandler) error {
+	if p == nil {
 		return gerror.New("pluginhost: source plugin lifecycle facade is nil")
 	}
-	return r.plugin.registerUpgradeHandler(handler)
+	return p.registerUpgradeHandler(handler)
 }
 
 // RegisterAfterUpgradeHandler registers one post-upgrade event callback.
-func (r *sourcePluginLifecycle) RegisterAfterUpgradeHandler(handler SourcePluginUpgradeHandler) error {
-	if r == nil || r.plugin == nil {
+func (p *sourcePlugin) RegisterAfterUpgradeHandler(handler SourcePluginUpgradeHandler) error {
+	if p == nil {
 		return gerror.New("pluginhost: source plugin lifecycle facade is nil")
 	}
-	return r.plugin.registerAfterUpgradeHandler(handler)
+	return p.registerAfterUpgradeHandler(handler)
 }
 
 // RegisterBeforeDisableHandler registers one pre-disable veto callback.
-func (r *sourcePluginLifecycle) RegisterBeforeDisableHandler(handler SourcePluginBeforeLifecycleHandler) error {
-	if r == nil || r.plugin == nil {
+func (p *sourcePlugin) RegisterBeforeDisableHandler(handler SourcePluginBeforeLifecycleHandler) error {
+	if p == nil {
 		return gerror.New("pluginhost: source plugin lifecycle facade is nil")
 	}
-	return r.plugin.registerBeforeDisableHandler(handler)
+	return p.registerBeforeDisableHandler(handler)
 }
 
 // RegisterAfterDisableHandler registers one post-disable callback.
-func (r *sourcePluginLifecycle) RegisterAfterDisableHandler(handler SourcePluginAfterLifecycleHandler) error {
-	if r == nil || r.plugin == nil {
+func (p *sourcePlugin) RegisterAfterDisableHandler(handler SourcePluginAfterLifecycleHandler) error {
+	if p == nil {
 		return gerror.New("pluginhost: source plugin lifecycle facade is nil")
 	}
-	return r.plugin.registerAfterDisableHandler(handler)
+	return p.registerAfterDisableHandler(handler)
 }
 
 // RegisterBeforeUninstallHandler registers one pre-uninstall veto callback.
-func (r *sourcePluginLifecycle) RegisterBeforeUninstallHandler(handler SourcePluginBeforeLifecycleHandler) error {
-	if r == nil || r.plugin == nil {
+func (p *sourcePlugin) RegisterBeforeUninstallHandler(handler SourcePluginBeforeLifecycleHandler) error {
+	if p == nil {
 		return gerror.New("pluginhost: source plugin lifecycle facade is nil")
 	}
-	return r.plugin.registerBeforeUninstallHandler(handler)
+	return p.registerBeforeUninstallHandler(handler)
 }
 
 // RegisterAfterUninstallHandler registers one post-uninstall callback.
-func (r *sourcePluginLifecycle) RegisterAfterUninstallHandler(handler SourcePluginAfterLifecycleHandler) error {
-	if r == nil || r.plugin == nil {
+func (p *sourcePlugin) RegisterAfterUninstallHandler(handler SourcePluginAfterLifecycleHandler) error {
+	if p == nil {
 		return gerror.New("pluginhost: source plugin lifecycle facade is nil")
 	}
-	return r.plugin.registerAfterUninstallHandler(handler)
+	return p.registerAfterUninstallHandler(handler)
 }
 
 // RegisterBeforeTenantDisableHandler registers one tenant-disable precondition callback.
-func (r *sourcePluginLifecycle) RegisterBeforeTenantDisableHandler(handler SourcePluginBeforeTenantLifecycleHandler) error {
-	if r == nil || r.plugin == nil {
+func (p *sourcePlugin) RegisterBeforeTenantDisableHandler(handler SourcePluginBeforeTenantLifecycleHandler) error {
+	if p == nil {
 		return gerror.New("pluginhost: source plugin lifecycle facade is nil")
 	}
-	return r.plugin.registerBeforeTenantDisableHandler(handler)
+	return p.registerBeforeTenantDisableHandler(handler)
 }
 
 // RegisterAfterTenantDisableHandler registers one tenant-disable post callback.
-func (r *sourcePluginLifecycle) RegisterAfterTenantDisableHandler(handler SourcePluginAfterTenantLifecycleHandler) error {
-	if r == nil || r.plugin == nil {
+func (p *sourcePlugin) RegisterAfterTenantDisableHandler(handler SourcePluginAfterTenantLifecycleHandler) error {
+	if p == nil {
 		return gerror.New("pluginhost: source plugin lifecycle facade is nil")
 	}
-	return r.plugin.registerAfterTenantDisableHandler(handler)
+	return p.registerAfterTenantDisableHandler(handler)
 }
 
 // RegisterBeforeTenantDeleteHandler registers one tenant-delete precondition callback.
-func (r *sourcePluginLifecycle) RegisterBeforeTenantDeleteHandler(handler SourcePluginBeforeTenantLifecycleHandler) error {
-	if r == nil || r.plugin == nil {
+func (p *sourcePlugin) RegisterBeforeTenantDeleteHandler(handler SourcePluginBeforeTenantLifecycleHandler) error {
+	if p == nil {
 		return gerror.New("pluginhost: source plugin lifecycle facade is nil")
 	}
-	return r.plugin.registerBeforeTenantDeleteHandler(handler)
+	return p.registerBeforeTenantDeleteHandler(handler)
 }
 
 // RegisterAfterTenantDeleteHandler registers one tenant-delete post callback.
-func (r *sourcePluginLifecycle) RegisterAfterTenantDeleteHandler(handler SourcePluginAfterTenantLifecycleHandler) error {
-	if r == nil || r.plugin == nil {
+func (p *sourcePlugin) RegisterAfterTenantDeleteHandler(handler SourcePluginAfterTenantLifecycleHandler) error {
+	if p == nil {
 		return gerror.New("pluginhost: source plugin lifecycle facade is nil")
 	}
-	return r.plugin.registerAfterTenantDeleteHandler(handler)
+	return p.registerAfterTenantDeleteHandler(handler)
 }
 
 // RegisterBeforeInstallModeChangeHandler registers one install-mode change precondition callback.
-func (r *sourcePluginLifecycle) RegisterBeforeInstallModeChangeHandler(handler SourcePluginBeforeInstallModeChangeHandler) error {
-	if r == nil || r.plugin == nil {
+func (p *sourcePlugin) RegisterBeforeInstallModeChangeHandler(handler SourcePluginBeforeInstallModeChangeHandler) error {
+	if p == nil {
 		return gerror.New("pluginhost: source plugin lifecycle facade is nil")
 	}
-	return r.plugin.registerBeforeInstallModeChangeHandler(handler)
+	return p.registerBeforeInstallModeChangeHandler(handler)
 }
 
 // RegisterAfterInstallModeChangeHandler registers one install-mode change post callback.
-func (r *sourcePluginLifecycle) RegisterAfterInstallModeChangeHandler(handler SourcePluginAfterInstallModeChangeHandler) error {
-	if r == nil || r.plugin == nil {
+func (p *sourcePlugin) RegisterAfterInstallModeChangeHandler(handler SourcePluginAfterInstallModeChangeHandler) error {
+	if p == nil {
 		return gerror.New("pluginhost: source plugin lifecycle facade is nil")
 	}
-	return r.plugin.registerAfterInstallModeChangeHandler(handler)
+	return p.registerAfterInstallModeChangeHandler(handler)
 }
 
 // RegisterHook registers one callback-style host hook handler.
-func (r *sourcePluginHooks) RegisterHook(
+func (p *sourcePlugin) RegisterHook(
 	point ExtensionPoint,
 	mode CallbackExecutionMode,
 	handler HookHandler,
 ) error {
-	if r == nil || r.plugin == nil {
+	if p == nil {
 		return gerror.New("pluginhost: source plugin hook facade is nil")
 	}
-	return r.plugin.registerHook(point, mode, handler)
+	return p.registerHook(point, mode, handler)
 }
 
 // RegisterRoutes registers one callback that contributes plugin-owned HTTP routes.
-func (r *sourcePluginHTTP) RegisterRoutes(
+func (p *sourcePlugin) RegisterRoutes(
 	point ExtensionPoint,
 	mode CallbackExecutionMode,
 	handler RouteRegisterHandler,
 ) error {
-	if r == nil || r.plugin == nil {
+	if p == nil {
 		return gerror.New("pluginhost: source plugin http facade is nil")
 	}
-	return r.plugin.registerRoutes(point, mode, handler)
+	return p.registerRoutes(point, mode, handler)
 }
 
 // RegisterJobs registers one callback that contributes plugin-owned scheduled jobs.
-func (r *sourcePluginJobs) RegisterJobs(
+func (p *sourcePlugin) RegisterJobs(
 	point ExtensionPoint,
 	mode CallbackExecutionMode,
 	handler JobRegisterHandler,
 ) error {
-	if r == nil || r.plugin == nil {
+	if p == nil {
 		return gerror.New("pluginhost: source plugin jobs facade is nil")
 	}
-	return r.plugin.registerJobs(point, mode, handler)
+	return p.registerJobs(point, mode, handler)
 }
 
 // RegisterMenuFilter registers one callback that filters host menus.
-func (r *sourcePluginAccess) RegisterMenuFilter(
+func (p *sourcePlugin) RegisterMenuFilter(
 	point ExtensionPoint,
 	mode CallbackExecutionMode,
 	handler MenuFilterHandler,
 ) error {
-	if r == nil || r.plugin == nil {
+	if p == nil {
 		return gerror.New("pluginhost: source plugin access facade is nil")
 	}
-	return r.plugin.registerMenuFilter(point, mode, handler)
+	return p.registerMenuFilter(point, mode, handler)
 }
 
 // RegisterPermissionFilter registers one callback that filters host permissions.
-func (r *sourcePluginAccess) RegisterPermissionFilter(
+func (p *sourcePlugin) RegisterPermissionFilter(
 	point ExtensionPoint,
 	mode CallbackExecutionMode,
 	handler PermissionFilterHandler,
 ) error {
-	if r == nil || r.plugin == nil {
+	if p == nil {
 		return gerror.New("pluginhost: source plugin access facade is nil")
 	}
-	return r.plugin.registerPermissionFilter(point, mode, handler)
+	return p.registerPermissionFilter(point, mode, handler)
 }

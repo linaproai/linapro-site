@@ -60,7 +60,7 @@ func TestBindHostedOpenAPIDocsDisablesBuiltInEndpointsAndBindsConfiguredPath(t *
 	server.SetOpenApiPath("/builtin-api.json")
 	server.SetSwaggerPath("/swagger")
 
-	testI18nSvc := i18nsvc.New(bizctx.New(), config.New(), cachecoord.Default(cluster.New(config.New().GetCluster(context.Background()))))
+	testI18nSvc := i18nsvc.New(bizctx.New(), config.New(nil), cachecoord.New(cluster.New(config.New(nil).GetCluster(context.Background()), nil), nil))
 	bindHostedOpenAPIDocs(
 		context.Background(),
 		server,
@@ -119,7 +119,7 @@ func TestBindHostedOpenAPIDocsUsesRequestOrigin(t *testing.T) {
 		},
 	}
 
-	testI18nSvc := i18nsvc.New(bizctx.New(), config.New(), cachecoord.Default(cluster.New(config.New().GetCluster(context.Background()))))
+	testI18nSvc := i18nsvc.New(bizctx.New(), config.New(nil), cachecoord.New(cluster.New(config.New(nil).GetCluster(context.Background()), nil), nil))
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			server := ghttp.GetServer("cmd-http-openapi-origin-" + guid.S())

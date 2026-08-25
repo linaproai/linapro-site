@@ -15,7 +15,7 @@ server:
   address: ":9120"
 `)
 
-	cfg := New().GetWorkspace(context.Background())
+	cfg := New(nil).GetWorkspace(context.Background())
 	if cfg.BasePath != defaultWorkspaceBasePath {
 		t.Fatalf("expected default workspace base path %q, got %q", defaultWorkspaceBasePath, cfg.BasePath)
 	}
@@ -29,7 +29,7 @@ workspace:
   basePath: "/console/"
 `)
 
-	basePath := New().GetWorkspaceBasePath(context.Background())
+	basePath := New(nil).GetWorkspaceBasePath(context.Background())
 	if basePath != "/console" {
 		t.Fatalf("expected normalized workspace base path /console, got %q", basePath)
 	}
@@ -43,7 +43,7 @@ workspace:
   basePath: "/"
 `)
 
-	basePath := New().GetWorkspaceBasePath(context.Background())
+	basePath := New(nil).GetWorkspaceBasePath(context.Background())
 	if basePath != "/" {
 		t.Fatalf("expected root workspace base path, got %q", basePath)
 	}
@@ -71,7 +71,7 @@ func TestGetWorkspaceBasePathRejectsInvalidValues(t *testing.T) {
 					t.Fatal("expected workspace base path validation to panic")
 				}
 			}()
-			_ = New().GetWorkspaceBasePath(context.Background())
+			_ = New(nil).GetWorkspaceBasePath(context.Background())
 		})
 	}
 }

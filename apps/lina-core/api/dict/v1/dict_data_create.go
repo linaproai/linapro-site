@@ -13,8 +13,6 @@ type DataCreateReq struct {
 	Label    string `json:"label" v:"required#validation.dict.data.create.label.required" dc:"dictionary tag (display name)" eg:"male"`
 	Value    string `json:"value" v:"required#validation.dict.data.create.value.required" dc:"Dictionary value (stored value)" eg:"1"`
 	Sort     *int   `json:"sort" d:"0" dc:"Sorting number, the smaller the value, the higher the sorting is." eg:"1"`
-	TagStyle string `json:"tagStyle" dc:"Label style, used to display labels of different colors on the front end" eg:"success"`
-	CssClass string `json:"cssClass" dc:"CSS class name, used for frontend custom styles" eg:"text-green"`
 	Status   *int   `json:"status" d:"1" dc:"Status: 1=normal 0=disabled" eg:"1"`
 	Remark   string `json:"remark" dc:"Remarks" eg:"Gender male"`
 }

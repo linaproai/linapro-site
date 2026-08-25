@@ -105,13 +105,9 @@ export type MenuNode = {
 };
 
 export type AccessibleMenuNode = {
-  component?: string;
-  name?: string;
-  path?: string;
-  meta?: {
-    title?: string;
-  };
   children?: AccessibleMenuNode[];
+  path?: string;
+  title?: string;
 };
 
 function flattenMenus(list: MenuNode[]): MenuNode[] {

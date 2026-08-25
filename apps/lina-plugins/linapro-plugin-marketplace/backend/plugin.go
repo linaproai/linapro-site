@@ -25,10 +25,12 @@ func init() {
 	declarations.Assets().UseEmbeddedFiles(marketplace.EmbeddedFiles())
 
 	if err := Register(declarations); err != nil {
-		panic(gerror.Wrap(err, "register marketplace source plugin backend"))
+		err = gerror.Wrap(err, "register marketplace source plugin backend")
+		panic(err)
 	}
 	if err := pluginhost.RegisterSourcePlugin(declarations); err != nil {
-		panic(gerror.Wrap(err, "register marketplace source plugin"))
+		err = gerror.Wrap(err, "register marketplace source plugin")
+		panic(err)
 	}
 }
 

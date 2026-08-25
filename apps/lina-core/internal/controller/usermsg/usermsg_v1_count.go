@@ -1,3 +1,6 @@
+// This file implements the unread inbox count endpoint used by the workbench
+// message badge.
+
 package usermsg
 
 import (
@@ -8,7 +11,7 @@ import (
 
 // Count returns unread message count
 func (c *ControllerV1) Count(ctx context.Context, req *v1.CountReq) (res *v1.CountRes, err error) {
-	count, err := c.usermsgSvc.UnreadCount(ctx)
+	count, err := c.notifySvc.InboxUnreadCount(ctx, c.currentUserID(ctx))
 	if err != nil {
 		return nil, err
 	}

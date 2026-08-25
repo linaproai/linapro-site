@@ -1,3 +1,5 @@
+// This file implements the current-user inbox clear endpoint.
+
 package usermsg
 
 import (
@@ -8,8 +10,7 @@ import (
 
 // Clear clears user messages
 func (c *ControllerV1) Clear(ctx context.Context, req *v1.ClearReq) (res *v1.ClearRes, err error) {
-	err = c.usermsgSvc.Clear(ctx)
-	if err != nil {
+	if err = c.notifySvc.InboxClear(ctx, c.currentUserID(ctx)); err != nil {
 		return nil, err
 	}
 	return &v1.ClearRes{}, nil

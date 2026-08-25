@@ -20,7 +20,7 @@ database:
 `)
 	withRuntimeParamAbsent(t, RuntimeParamKeyJWTExpire)
 
-	cfg, err := New().GetJwt(context.Background())
+	cfg, err := New(nil).GetJwt(context.Background())
 	if err != nil {
 		t.Fatalf("get jwt config: %v", err)
 	}
@@ -43,7 +43,7 @@ jwt:
 `)
 	withRuntimeParamAbsent(t, RuntimeParamKeyJWTExpire)
 
-	svc := New()
+	svc := New(nil)
 	cfg, err := svc.GetJwt(context.Background())
 	if err != nil {
 		t.Fatalf("get jwt config: %v", err)
@@ -72,7 +72,7 @@ jwt:
 func TestGetJwtPrefersRuntimeParamOverride(t *testing.T) {
 	withRuntimeParamValue(t, RuntimeParamKeyJWTExpire, "12h")
 
-	svc := New()
+	svc := New(nil)
 	cfg, err := svc.GetJwt(context.Background())
 	if err != nil {
 		t.Fatalf("get jwt config: %v", err)
@@ -95,7 +95,7 @@ func TestGetJwtPrefersRuntimeParamOverride(t *testing.T) {
 func TestRuntimeParamParseErrorsReturnError(t *testing.T) {
 	withCachedRuntimeParamParseError(t, RuntimeParamKeyJWTExpire, gerror.New("bad runtime duration"))
 
-	if _, err := New().GetJwtExpire(context.Background()); err == nil {
+	if _, err := New(nil).GetJwtExpire(context.Background()); err == nil {
 		t.Fatal("expected invalid runtime JWT override to return an error")
 	}
 }

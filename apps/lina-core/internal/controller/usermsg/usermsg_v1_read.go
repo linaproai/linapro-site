@@ -1,3 +1,5 @@
+// This file implements the current-user mark-one-read inbox endpoint.
+
 package usermsg
 
 import (
@@ -8,8 +10,7 @@ import (
 
 // Read marks a message as read
 func (c *ControllerV1) Read(ctx context.Context, req *v1.ReadReq) (res *v1.ReadRes, err error) {
-	err = c.usermsgSvc.MarkRead(ctx, req.Id)
-	if err != nil {
+	if err = c.notifySvc.InboxMarkRead(ctx, c.currentUserID(ctx), req.Id); err != nil {
 		return nil, err
 	}
 	return &v1.ReadRes{}, nil

@@ -13,8 +13,6 @@ type DictDataItem struct {
 	Label          string                `json:"label" dc:"Dictionary label" eg:"Male"`
 	Value          string                `json:"value" dc:"Dictionary value" eg:"1"`
 	Sort           int                   `json:"sort" dc:"Display order" eg:"1"`
-	TagStyle       string                `json:"tagStyle" dc:"Tag style" eg:"primary"`
-	CssClass       string                `json:"cssClass" dc:"CSS class name" eg:""`
 	Status         statusflag.Enabled    `json:"status" dc:"Status: 0=disabled 1=enabled" eg:"1"`
 	IsBuiltin      statusflag.YesNo      `json:"isBuiltin" dc:"Built-in record flag: 1=yes 0=no" eg:"1"`
 	Remark         string                `json:"remark" dc:"Remark" eg:"Default option"`

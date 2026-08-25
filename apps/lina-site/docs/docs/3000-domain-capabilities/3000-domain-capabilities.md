@@ -137,7 +137,7 @@ graph TB
 | 已发布领域能力 | 例如`AI`、`Auth`、`Cache`、`Storage`等能力，通过`host-call`桥接访问；`I18n()`不发布为动态`hostServices` |
 | `Runtime()` | 专属能力：日志写入、插件状态读写、时间获取、`UUID`生成、节点身份读取 |
 | `Network()` | 专属能力：受治理的出站`HTTP`请求，需在`plugin.yaml`中声明授权目标地址 |
-| `RecordStore()` | 专属能力：`data`服务的类`ORM`封装层，只能访问声明的插件自有表 |
+| `RecordStore()` | 实验能力，不是主路径：`data`服务的类`ORM`封装层，只能访问声明的插件自有表 |
 
 #### 源码插件与动态插件的能力差异
 

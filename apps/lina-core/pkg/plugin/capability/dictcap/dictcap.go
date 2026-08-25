@@ -218,10 +218,6 @@ type CreateValueInput struct {
 	Label string
 	// Sort controls display ordering.
 	Sort int
-	// TagStyle stores optional UI tag style metadata.
-	TagStyle string
-	// CssClass stores optional UI CSS class metadata.
-	CssClass string
 	// Status is the lifecycle status.
 	Status statusflag.Enabled
 	// Remark stores optional operator notes.
@@ -240,10 +236,6 @@ type UpdateValueInput struct {
 	Label *string
 	// Sort optionally updates display ordering.
 	Sort *int
-	// TagStyle optionally updates UI tag style metadata.
-	TagStyle *string
-	// CssClass optionally updates UI CSS class metadata.
-	CssClass *string
 	// Status optionally updates lifecycle status.
 	Status *statusflag.Enabled
 	// Remark optionally updates operator notes.

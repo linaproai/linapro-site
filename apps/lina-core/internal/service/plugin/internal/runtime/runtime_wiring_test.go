@@ -6,11 +6,11 @@ import (
 	"context"
 	"testing"
 
-	"lina-core/internal/model/entity"
 	"lina-core/internal/service/bizctx"
 	configsvc "lina-core/internal/service/config"
 	"lina-core/internal/service/datascope"
 	"lina-core/internal/service/locker"
+	menusvc "lina-core/internal/service/menu"
 	"lina-core/internal/service/plugin/internal/catalog"
 	"lina-core/internal/service/plugin/internal/migration"
 	"lina-core/internal/service/plugin/internal/store"
@@ -41,8 +41,8 @@ func newRuntimeWiringValidationService(t *testing.T) *serviceImpl {
 	t.Helper()
 
 	var (
-		catalogSvc   = catalog.New(configsvc.New())
-		configSvc    = configsvc.New()
+		catalogSvc   = catalog.New(configsvc.New(nil))
+		configSvc    = configsvc.New(nil)
 		topology     = runtimeWiringTopology{}
 		storeSvc     = store.New(catalogSvc, topology)
 		migrationSvc = migration.New(catalogSvc, storeSvc)
@@ -53,8 +53,9 @@ func newRuntimeWiringValidationService(t *testing.T) *serviceImpl {
 		migrationSvc,
 		nil,
 		nil,
-		locker.New(),
+		locker.New(locker.NewSQLStore()),
 		topology,
+		nil,
 		runtimeWiringIntegration{},
 		configSvc,
 		bizctx.New(),
@@ -118,7 +119,7 @@ func (runtimeWiringIntegration) DispatchPluginHookEvent(
 }
 
 // FilterPermissionMenus returns menus unchanged for wiring validation.
-func (runtimeWiringIntegration) FilterPermissionMenus(_ context.Context, menus []*entity.SysMenu) []*entity.SysMenu {
+func (runtimeWiringIntegration) FilterPermissionMenus(_ context.Context, menus []menusvc.FilterItem) []menusvc.FilterItem {
 	return menus
 }
 

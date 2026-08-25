@@ -6,7 +6,9 @@ import { requestClient } from '#/api/request';
  * 当前项目 `/user/info` 接口返回的完整用户信息。
  */
 export interface AppUserInfo extends UserInfo, BasicUserInfo {
+  organizationEnabled?: boolean;
   roles?: string[];
+  tenantEnabled?: boolean;
 }
 
 /**

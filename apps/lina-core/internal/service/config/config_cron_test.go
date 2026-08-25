@@ -15,7 +15,7 @@ func TestGetCronUsesProtectedRuntimeValues(t *testing.T) {
 	withRuntimeParamValue(t, RuntimeParamKeyCronShellEnabled, "true")
 	withRuntimeParamValue(t, RuntimeParamKeyCronLogRetention, `{"mode":"count","value":500}`)
 
-	svc := New()
+	svc := New(nil)
 	cfg, err := svc.GetCron(context.Background())
 	if err != nil {
 		t.Fatalf("get cron config: %v", err)
@@ -54,7 +54,7 @@ func TestGetCronUsesDefaultsWhenRuntimeParamsMissing(t *testing.T) {
 	withRuntimeParamAbsent(t, RuntimeParamKeyCronShellEnabled)
 	withRuntimeParamAbsent(t, RuntimeParamKeyCronLogRetention)
 
-	cfg, err := New().GetCron(context.Background())
+	cfg, err := New(nil).GetCron(context.Background())
 	if err != nil {
 		t.Fatalf("get cron config: %v", err)
 	}
@@ -81,7 +81,7 @@ sys:
       retention: '{"mode":"count","value":200}'
 `)
 
-	retention, err := New().GetCronLogRetention(context.Background())
+	retention, err := New(nil).GetCronLogRetention(context.Background())
 	if err != nil {
 		t.Fatalf("get static cron log retention: %v", err)
 	}
@@ -95,7 +95,7 @@ sys:
 func TestGetCronLogRetentionReturnsInvalidRuntimeValue(t *testing.T) {
 	withCachedRuntimeParamValue(t, RuntimeParamKeyCronLogRetention, `{"mode":"days","value":0}`)
 
-	if _, err := New().GetCronLogRetention(context.Background()); err == nil {
+	if _, err := New(nil).GetCronLogRetention(context.Background()); err == nil {
 		t.Fatal("expected invalid cron retention override to return an error")
 	}
 }

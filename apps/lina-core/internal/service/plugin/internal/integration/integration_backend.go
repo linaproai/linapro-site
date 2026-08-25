@@ -22,9 +22,6 @@ import (
 	"lina-core/pkg/statusflag"
 )
 
-// pluginHookEventFieldExprPrefix is the prefix for event-field expressions in hook specs.
-const pluginHookEventFieldExprPrefix = "event."
-
 // ResourceListInput defines input for querying a plugin-owned backend resource.
 type ResourceListInput struct {
 	// PluginID is the plugin identifier.
@@ -333,82 +330,4 @@ func normalizePluginResourceValue(value interface{}) interface{} {
 // resource does not declare one explicitly.
 func buildDefaultResourcePermission(pluginID string, resourceID string) string {
 	return strings.TrimSpace(pluginID) + ":" + strings.TrimSpace(resourceID) + ":list"
-}
-
-// executePluginInsertHook executes a generic insert hook declared by a source plugin.
-func (s *serviceImpl) executePluginInsertHook(ctx context.Context, pluginID string, hook *catalog.HookSpec, payload map[string]interface{}) error {
-	columns := make([]string, 0, len(hook.Fields))
-	for column := range hook.Fields {
-		columns = append(columns, column)
-	}
-	// Sort for deterministic SQL generation.
-	sortStrings(columns)
-
-	values := make([]interface{}, 0, len(columns))
-	placeholders := make([]string, 0, len(columns))
-	for _, column := range columns {
-		expr := hook.Fields[column]
-		value, err := resolvePluginHookValue(expr, payload)
-		if err != nil {
-			return gerror.Wrapf(err, "resolve plugin %s hook field failed: %s", pluginID, column)
-		}
-		values = append(values, value)
-		placeholders = append(placeholders, "?")
-	}
-
-	sql := fmt.Sprintf(
-		"INSERT INTO %s (%s) VALUES (%s)",
-		hook.Table,
-		strings.Join(columns, ", "),
-		strings.Join(placeholders, ", "),
-	)
-	_, err := g.DB().Exec(ctx, sql, values...)
-	return err
-}
-
-// executePluginSleepHook sleeps for the duration specified in the hook spec.
-func executePluginSleepHook(ctx context.Context, hook *catalog.HookSpec) error {
-	if hook == nil || hook.SleepMs <= 0 {
-		return nil
-	}
-	timer := time.NewTimer(time.Duration(hook.SleepMs) * time.Millisecond)
-	defer timer.Stop()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-timer.C:
-		return nil
-	}
-}
-
-// executePluginErrorHook returns the configured error message.
-func executePluginErrorHook(hook *catalog.HookSpec) error {
-	if hook == nil {
-		return nil
-	}
-	return gerror.New(strings.TrimSpace(hook.ErrorMessage))
-}
-
-// resolvePluginHookValue evaluates one hook field expression against the hook payload.
-func resolvePluginHookValue(expr string, payload map[string]interface{}) (interface{}, error) {
-	if expr == "now" {
-		return time.Now(), nil
-	}
-	if strings.HasPrefix(expr, pluginHookEventFieldExprPrefix) {
-		fieldName := strings.TrimPrefix(expr, pluginHookEventFieldExprPrefix)
-		if value, ok := payload[fieldName]; ok {
-			return value, nil
-		}
-		return nil, gerror.Newf("hook event field does not exist: %s", fieldName)
-	}
-	return nil, gerror.Newf("unsupported hook field expression: %s", expr)
-}
-
-// sortStrings sorts a string slice in place.
-func sortStrings(items []string) {
-	for i := 1; i < len(items); i++ {
-		for j := i; j > 0 && items[j] < items[j-1]; j-- {
-			items[j], items[j-1] = items[j-1], items[j]
-		}
-	}
 }

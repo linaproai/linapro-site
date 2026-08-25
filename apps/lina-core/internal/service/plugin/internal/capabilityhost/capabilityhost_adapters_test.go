@@ -446,7 +446,7 @@ func (f *fakeRuntimeI18nService) Translate(_ context.Context, key string, _ stri
 // TestNewWiresCompleteUnifiedDirectory verifies source plugins receive the
 // unified domain services directly from capability.Services.
 func TestNewWiresCompleteUnifiedDirectory(t *testing.T) {
-	lockSvc, err := hostlock.New(locker.New())
+	lockSvc, err := hostlock.New(locker.New(locker.NewSQLStore()))
 	if err != nil {
 		t.Fatalf("create lock service: %v", err)
 	}
@@ -457,7 +457,7 @@ func TestNewWiresCompleteUnifiedDirectory(t *testing.T) {
 		nil,
 		testHostConfigService{},
 		nil,
-		cachecoord.New(cachecoord.NewStaticTopology(false)),
+		cachecoord.New(cachecoord.NewStaticTopology(false), nil),
 		nil,
 		nil,
 		nil,
@@ -524,7 +524,7 @@ func TestNewWiresCompleteUnifiedDirectory(t *testing.T) {
 // TestNewReusesTenantServiceFilterContract verifies capabilityhost reuses the
 // tenant service filter contract instead of constructing a local duplicate.
 func TestNewReusesTenantServiceFilterContract(t *testing.T) {
-	lockSvc, err := hostlock.New(locker.New())
+	lockSvc, err := hostlock.New(locker.New(locker.NewSQLStore()))
 	if err != nil {
 		t.Fatalf("create lock service: %v", err)
 	}
@@ -540,7 +540,7 @@ func TestNewReusesTenantServiceFilterContract(t *testing.T) {
 		nil,
 		testHostConfigService{},
 		nil,
-		cachecoord.New(cachecoord.NewStaticTopology(false)),
+		cachecoord.New(cachecoord.NewStaticTopology(false), nil),
 		nil,
 		nil,
 		nil,
@@ -571,7 +571,7 @@ func TestNewReusesTenantServiceFilterContract(t *testing.T) {
 // TestNewRequiresHostConfigService verifies missing host config dependency is
 // rejected during source-plugin host service construction.
 func TestNewRequiresHostConfigService(t *testing.T) {
-	lockSvc, err := hostlock.New(locker.New())
+	lockSvc, err := hostlock.New(locker.New(locker.NewSQLStore()))
 	if err != nil {
 		t.Fatalf("create lock service: %v", err)
 	}
@@ -606,7 +606,7 @@ func TestNewRequiresHostConfigService(t *testing.T) {
 // TestNewRequiresTenantService verifies tenant filtering is supplied by the
 // startup-owned tenant service rather than created inside capabilityhost.
 func TestNewRequiresTenantService(t *testing.T) {
-	lockSvc, err := hostlock.New(locker.New())
+	lockSvc, err := hostlock.New(locker.New(locker.NewSQLStore()))
 	if err != nil {
 		t.Fatalf("create lock service: %v", err)
 	}
@@ -617,7 +617,7 @@ func TestNewRequiresTenantService(t *testing.T) {
 		nil,
 		testHostConfigService{},
 		nil,
-		cachecoord.New(cachecoord.NewStaticTopology(false)),
+		cachecoord.New(cachecoord.NewStaticTopology(false), nil),
 		nil,
 		nil,
 		nil,

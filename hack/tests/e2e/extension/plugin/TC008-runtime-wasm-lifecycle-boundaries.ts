@@ -145,6 +145,14 @@ function cleanupWorkspace() {
   rmSync(artifactPath(badABIPluginID, baseVersion), { force: true });
   rmSync(runtimeStorageArtifactPath(primaryPluginID), { force: true });
   rmSync(runtimeStorageArtifactPath(badABIPluginID), { force: true });
+  rmSync(path.join(tempDir(), "output", "releases", primaryPluginID), {
+    force: true,
+    recursive: true,
+  });
+  rmSync(path.join(tempDir(), "output", "releases", badABIPluginID), {
+    force: true,
+    recursive: true,
+  });
 }
 
 function writeULEB128(buffer: number[], value: number) {
@@ -198,6 +206,7 @@ function buildRuntimeArtifact(options: {
     ? [
         {
           key: pageMenuKey,
+          parent_key: "extension",
           name: "生命周期边界示例",
           path: assetPathForVersion(options.version),
           perms: `${primaryPluginID}:page:view`,
@@ -462,6 +471,8 @@ test.describe("TC-4 Runtime Wasm Lifecycle Boundaries", () => {
   });
 
   test.beforeEach(async () => {
+    await adminApi.delete(`plugins/${primaryPluginID}`);
+    await adminApi.delete(`plugins/${badABIPluginID}`);
     cleanupPluginRows([primaryPluginID, badABIPluginID]);
     cleanupWorkspace();
   });
@@ -505,16 +516,25 @@ test.describe("TC-4 Runtime Wasm Lifecycle Boundaries", () => {
       true,
       authorization,
     );
+    await expectApiSuccess(await adminApi.post("plugins/sync"), "同步插件治理资源失败");
 
     await expect
       .poll(async () => (await findPlugin(adminApi, primaryPluginID))?.enabled ?? 0)
       .toBe(1);
 
     const menuKeys = [pageMenuKey, buttonMenuKey];
+    await expect
+      .poll(
+        () =>
+          queryPgRows(
+            `SELECT id FROM sys_menu WHERE menu_key IN ('${pgEscapeLiteral(pageMenuKey)}', '${pgEscapeLiteral(buttonMenuKey)}') ORDER BY menu_key ASC;`,
+          ).length,
+        { message: "安装后应生成插件菜单和按钮权限" },
+      )
+      .toBe(2);
     const menuIDs = queryPgRows(
       `SELECT id FROM sys_menu WHERE menu_key IN ('${pgEscapeLiteral(pageMenuKey)}', '${pgEscapeLiteral(buttonMenuKey)}') ORDER BY menu_key ASC;`,
     );
-    expect(menuIDs.length, "安装后应生成插件菜单和按钮权限").toBe(2);
 
     const roleMenuCount = queryPgInt(
       `SELECT COUNT(*) FROM sys_role_menu WHERE menu_id IN (${menuIDs.join(",")});`,

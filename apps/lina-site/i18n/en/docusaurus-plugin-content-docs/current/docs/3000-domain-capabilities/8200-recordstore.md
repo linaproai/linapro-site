@@ -2,7 +2,7 @@
 slug: '/docs/domain-capability-recordstore'
 title: 'RecordStore'
 hide_title: true
-description: 'RecordStore is the governed entry point for dynamic plugins to access their own tables through `hostServices.data` and `pluginbridge.Default().RecordStore()`, covering single-table queries, key-based reads, creation, updates, deletion, and structured transactions. Source plugins do not have a standard `Services.Data()` entry; they typically access plugin-owned tables through the host `dao` package and use `TenantFilter()` when tenant isolation is needed.'
+description: 'RecordStore is an experimental capability for dynamic plugins to access their own tables through `hostServices.data` and `pluginbridge.Default().RecordStore()`. It is not a main-path data API and no first-party plugin is required to use it. Source plugins do not have a standard `Services.Data()` entry; they typically access plugin-owned tables through the host `dao` package and use `TenantFilter()` when tenant isolation is needed.'
 keywords:
   - RecordStore
   - data service
@@ -23,7 +23,9 @@ keywords:
 
 ## Overview
 
-Dynamic plugins declare `service: data` in `plugin.yaml` and then use `pluginbridge.Default().RecordStore()` to access authorized tables. This capability targets plugin-owned tables rather than host core tables.
+`RecordStore` is experimental and is not a main-path capability. No first-party plugin currently has to use it, and the query planner should not keep growing until an official dynamic plugin actually reads tables this way.
+
+Dynamic plugins may declare `service: data` in `plugin.yaml` and then use `pluginbridge.Default().RecordStore()` to access authorized tables. This capability targets plugin-owned tables rather than host core tables.
 
 Source plugins do not have a standard `Services.Data()` entry. Since source plugins run in the same process as the host, they typically access plugin-owned tables through the host `dao` package within their own domain services. When plugin-owned tables carry a `tenant_id` column, they should use `TenantFilter()` from the tenant capability.
 

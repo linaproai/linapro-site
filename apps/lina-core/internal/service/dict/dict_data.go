@@ -79,8 +79,6 @@ type DataCreateInput struct {
 	Label    string
 	Value    string
 	Sort     int
-	TagStyle string
-	CssClass string
 	Status   int
 	Remark   string
 }
@@ -96,8 +94,6 @@ func (s *serviceImpl) DataCreate(ctx context.Context, in DataCreateInput) (int, 
 	data.Label = in.Label
 	data.Value = in.Value
 	data.Sort = in.Sort
-	data.TagStyle = in.TagStyle
-	data.CssClass = in.CssClass
 	data.Status = in.Status
 	data.Remark = in.Remark
 
@@ -131,8 +127,6 @@ type DataUpdateInput struct {
 	Label    *string
 	Value    *string
 	Sort     *int
-	TagStyle *string
-	CssClass *string
 	Status   *int
 	Remark   *string
 }
@@ -165,12 +159,6 @@ func (s *serviceImpl) DataUpdate(ctx context.Context, in DataUpdateInput) error 
 	}
 	if in.Sort != nil {
 		data.Sort = *in.Sort
-	}
-	if in.TagStyle != nil {
-		data.TagStyle = *in.TagStyle
-	}
-	if in.CssClass != nil {
-		data.CssClass = *in.CssClass
 	}
 	if in.Status != nil {
 		data.Status = *in.Status
@@ -245,8 +233,6 @@ func (s *serviceImpl) DataExport(ctx context.Context, in DataExportInput) (data 
 		{Key: "artifact.dict.data.header.label", Fallback: "Dictionary Label"},
 		{Key: "artifact.dict.data.header.value", Fallback: "Dictionary Value"},
 		{Key: "artifact.dict.data.header.sort", Fallback: "Sort"},
-		{Key: "artifact.dict.data.header.tagStyle", Fallback: "Tag Style"},
-		{Key: "artifact.dict.data.header.cssClass", Fallback: "CSS Class"},
 		{Key: "artifact.dict.data.header.status", Fallback: "Status"},
 		{Key: "artifact.dict.data.header.remark", Fallback: "Remark"},
 		{Key: "artifact.dict.data.header.createdAt", Fallback: "Created At"},
@@ -268,21 +254,15 @@ func (s *serviceImpl) DataExport(ctx context.Context, in DataExportInput) (data 
 		if err = setCellValue(f, sheet, 3, row, dd.Sort); err != nil {
 			return nil, err
 		}
-		if err = setCellValue(f, sheet, 4, row, dd.TagStyle); err != nil {
-			return nil, err
-		}
-		if err = setCellValue(f, sheet, 5, row, dd.CssClass); err != nil {
-			return nil, err
-		}
 		statusText := s.dictStatusText(ctx, dd.Status)
-		if err = setCellValue(f, sheet, 6, row, statusText); err != nil {
+		if err = setCellValue(f, sheet, 4, row, statusText); err != nil {
 			return nil, err
 		}
-		if err = setCellValue(f, sheet, 7, row, dd.Remark); err != nil {
+		if err = setCellValue(f, sheet, 5, row, dd.Remark); err != nil {
 			return nil, err
 		}
 		if dd.CreatedAt != nil {
-			if err = setCellValue(f, sheet, 8, row, dd.CreatedAt.String()); err != nil {
+			if err = setCellValue(f, sheet, 6, row, dd.CreatedAt.String()); err != nil {
 				return nil, err
 			}
 		}

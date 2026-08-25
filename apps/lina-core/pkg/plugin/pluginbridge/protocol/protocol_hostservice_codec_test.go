@@ -13,8 +13,8 @@ func TestHostServiceRequestEnvelopeRoundTrip(t *testing.T) {
 		Version: "v1",
 		Method:  HostServiceMethodDataGet,
 		Table:   "sys_plugin_node_state",
-		Payload: MarshalHostServiceDataGetRequest(&HostServiceDataGetRequest{
-			PlanJSON: []byte(`{"table":"sys_plugin_node_state","action":"get","keyJson":"MQ=="}`),
+		Payload: MarshalHostServiceJSONRequest(&HostServiceJSONRequest{
+			Value: []byte(`{"planJson":"eyJ0YWJsZSI6InN5c19wbHVnaW5fbm9kZV9zdGF0ZSIsImFjdGlvbiI6ImdldCJ9"}`),
 		}),
 	}
 	data := MarshalHostServiceRequestEnvelope(original)

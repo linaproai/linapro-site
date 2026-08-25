@@ -382,7 +382,7 @@ func newStorageAdapterTestDirectory(
 		nil,
 		testHostConfigService{},
 		nil,
-		cachecoord.New(cachecoord.NewStaticTopology(false)),
+		cachecoord.New(cachecoord.NewStaticTopology(false), nil),
 		nil,
 		nil,
 		nil,
@@ -406,7 +406,7 @@ func newStorageAdapterTestDirectory(
 
 func newStorageAdapterTestLockService(t *testing.T) hostlock.Service {
 	t.Helper()
-	service, err := hostlock.New(locker.New())
+	service, err := hostlock.New(locker.New(locker.NewSQLStore()))
 	if err != nil {
 		t.Fatalf("create storage adapter test lock service: %v", err)
 	}

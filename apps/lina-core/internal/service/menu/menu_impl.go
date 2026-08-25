@@ -39,7 +39,7 @@ func (s *serviceImpl) List(ctx context.Context, in ListInput) (*ListOutput, erro
 	if err != nil {
 		return nil, err
 	}
-	list = s.menuFilter.FilterMenus(ctx, list)
+	list = applyMenuFilter(ctx, s.menuFilter, list)
 	if in.Localized {
 		localizedList := make([]*entity.SysMenu, 0, len(list))
 		for _, menu := range list {
@@ -52,6 +52,42 @@ func (s *serviceImpl) List(ctx context.Context, in ListInput) (*ListOutput, erro
 		list = localizedList
 	}
 	return &ListOutput{List: list}, nil
+}
+
+// applyMenuFilter projects entities to FilterItem, runs the plugin filter, then
+// restores the original entity order for kept IDs.
+func applyMenuFilter(ctx context.Context, menuFilter menuFilter, list []*entity.SysMenu) []*entity.SysMenu {
+	if menuFilter == nil || len(list) == 0 {
+		return list
+	}
+	items := make([]FilterItem, 0, len(list))
+	index := make(map[int]*entity.SysMenu, len(list))
+	for _, menu := range list {
+		if menu == nil {
+			continue
+		}
+		items = append(items, FilterItem{
+			Id:        menu.Id,
+			ParentId:  menu.ParentId,
+			Name:      menu.Name,
+			Path:      menu.Path,
+			Component: menu.Component,
+			Perms:     menu.Perms,
+			MenuKey:   menu.MenuKey,
+			Type:      menu.Type,
+			Visible:   menu.Visible,
+			Status:    menu.Status,
+		})
+		index[menu.Id] = menu
+	}
+	kept := menuFilter.FilterMenus(ctx, items)
+	filtered := make([]*entity.SysMenu, 0, len(kept))
+	for _, item := range kept {
+		if menu := index[item.Id]; menu != nil {
+			filtered = append(filtered, menu)
+		}
+	}
+	return filtered
 }
 
 // BuildTree builds tree structure from flat menu list.
@@ -126,9 +162,6 @@ func (s *serviceImpl) Create(ctx context.Context, in CreateInput) (int, error) {
 	if err := s.checkNameUnique(ctx, in.Name, in.ParentId, 0); err != nil {
 		return 0, err
 	}
-	if err := s.checkIconUnique(ctx, in.Type, in.Icon, 0); err != nil {
-		return 0, err
-	}
 	id, err := dao.SysMenu.Ctx(ctx).Data(do.SysMenu{
 		ParentId:   in.ParentId,
 		Name:       in.Name,
@@ -181,17 +214,6 @@ func (s *serviceImpl) Update(ctx context.Context, in UpdateInput) error {
 		if s.isDescendant(ctx, in.Id, *in.ParentId) {
 			return bizerr.NewCode(CodeMenuMoveToDescendantDenied)
 		}
-	}
-	menuType := menu.Type
-	if in.Type != nil {
-		menuType = *in.Type
-	}
-	menuIcon := menu.Icon
-	if in.Icon != nil {
-		menuIcon = *in.Icon
-	}
-	if err := s.checkIconUnique(ctx, menuType, menuIcon, in.Id); err != nil {
-		return err
 	}
 	data := buildMenuUpdateData(in)
 	if err := s.updateMenuWithCascade(ctx, in.Id, data, in.Status, in.Visible); err != nil {

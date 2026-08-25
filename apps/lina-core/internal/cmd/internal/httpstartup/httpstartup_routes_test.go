@@ -24,7 +24,6 @@ import (
 	filesvc "lina-core/internal/service/file"
 	"lina-core/internal/service/hostlock"
 	i18nsvc "lina-core/internal/service/i18n"
-	jobhandlersvc "lina-core/internal/service/jobhandler"
 	jobmgmtsvc "lina-core/internal/service/jobmgmt"
 	"lina-core/internal/service/kvcache"
 	"lina-core/internal/service/locker"
@@ -38,7 +37,6 @@ import (
 	"lina-core/internal/service/sysconfig"
 	sysinfosvc "lina-core/internal/service/sysinfo"
 	"lina-core/internal/service/user"
-	"lina-core/internal/service/usermsg"
 	"lina-core/pkg/plugin/capability/orgcap/orgspi"
 	"lina-core/pkg/plugin/capability/tenantcap/tenantspi"
 )
@@ -186,17 +184,17 @@ func TestDynamicPluginRootRoutesPrecedeSPAFallback(t *testing.T) {
 // route-binding tests without starting cluster, plugin, or cron lifecycles.
 func newRouteBindingTestRuntime(ctx context.Context) *httpRuntime {
 	var (
-		configSvc     = config.New()
-		clusterSvc    = cluster.New(configSvc.GetCluster(ctx))
+		configSvc     = config.New(nil)
+		clusterSvc    = cluster.New(configSvc.GetCluster(ctx), nil)
 		bizCtxSvc     = bizctx.New()
 		sessionStore  = session.NewDBStore()
-		cacheCoordSvc = cachecoord.Default(clusterSvc)
+		cacheCoordSvc = cachecoord.New(clusterSvc, nil)
 		i18nService   = i18nsvc.New(bizCtxSvc, configSvc, cacheCoordSvc)
-		lockerSvc     = locker.New()
+		lockerSvc     = locker.New(locker.NewSQLStore())
 		pluginRuntime = pluginsvc.NewRuntimeDelegate()
 		orgCapSvc     = orgspi.New(orgspi.NewManager(), pluginRuntime, pluginRuntime.OrgProviderEnv)
 		tenantSvc     = tenantspi.New(tenantspi.NewManager(), pluginRuntime, pluginRuntime.TenantProviderEnv, bizCtxSvc)
-		roleSvc       = role.New(pluginRuntime, bizCtxSvc, configSvc, i18nService, orgCapSvc, tenantSvc)
+		roleSvc       = role.New(pluginRuntime, bizCtxSvc, configSvc, i18nService, orgCapSvc, tenantSvc, cacheCoordSvc)
 		kvCacheSvc    = kvcache.New()
 		dictSvc       = dict.New(i18nService)
 		scopeSvc      = datascope.New(bizCtxSvc, roleSvc, orgCapSvc.Scope())
@@ -224,8 +222,7 @@ func newRouteBindingTestRuntime(ctx context.Context) *httpRuntime {
 	}
 	var (
 		userSvc             = user.New(authSvc, bizCtxSvc, i18nService, orgCapSvc, roleSvc, scopeSvc, tenantSvc)
-		userMsgSvc          = usermsg.New(bizCtxSvc, notifySvc, i18nService)
-		jobRegistry         = jobhandlersvc.New()
+		jobRegistry         = jobmgmtsvc.NewRegistry()
 		jobMgmtSvc          = jobmgmtsvc.New(bizCtxSvc, configSvc, i18nService, jobRegistry, nil, scopeSvc)
 		hostConfigSvc       = pluginsvc.NewHostConfigService(configSvc)
 		pluginConfigFactory = pluginsvc.NewPluginConfigFactoryWithHostStaticConfig("", "", configSvc)
@@ -290,6 +287,7 @@ func newRouteBindingTestRuntime(ctx context.Context) *httpRuntime {
 		bizCtxSvc:     bizCtxSvc,
 		i18nSvc:       i18nService,
 		orgSvc:        orgCapSvc,
+		tenantSvc:     tenantSvc,
 		roleSvc:       roleSvc,
 		dictSvc:       dictSvc,
 		fileSvc:       fileSvc,
@@ -297,7 +295,7 @@ func newRouteBindingTestRuntime(ctx context.Context) *httpRuntime {
 		sysConfigSvc:  sysConfigSvc,
 		sysInfoSvc:    sysInfoSvc,
 		userSvc:       userSvc,
-		userMsgSvc:    userMsgSvc,
+		notifySvc:     notifySvc,
 		jobRegistry:   jobRegistry,
 		jobMgmtSvc:    jobMgmtSvc,
 		middlewareSvc: middleware.New(authSvc, bizCtxSvc, configSvc, i18nService, roleSvc, tenantSvc),

@@ -14,8 +14,6 @@ func (c *ControllerV1) DataCreate(ctx context.Context, req *v1.DataCreateReq) (r
 		Label:    req.Label,
 		Value:    req.Value,
 		Sort:     *req.Sort,
-		TagStyle: req.TagStyle,
-		CssClass: req.CssClass,
 		Status:   *req.Status,
 		Remark:   req.Remark,
 	})

@@ -3,10 +3,8 @@ package session
 
 import (
 	"context"
-	"sync"
 	"time"
 
-	"lina-core/internal/service/coordination"
 	"lina-core/internal/service/datascope"
 	"lina-core/pkg/plugin/capability/tenantcap/tenantspi"
 )
@@ -55,12 +53,29 @@ type UserOnlineStatus struct {
 }
 
 // Store defines the session storage interface for persistent online-session
-// records.
+// records used by authentication and timeout paths.
 type Store interface {
 	// Set persists one online session record.
 	Set(ctx context.Context, session *Session) error
 	// Get returns one online session by its globally unique token ID.
 	Get(ctx context.Context, tokenId string) (*Session, error)
+	// Delete removes one online session by its globally unique token ID.
+	Delete(ctx context.Context, tokenId string) error
+	// DeleteByUserId removes all online sessions that belong to one user in one tenant.
+	DeleteByUserId(ctx context.Context, tenantId int, userId int) error
+	// TouchOrValidate validates tenant ownership and session timeout, then
+	// refreshes last_active_time outside the short write-throttle window for the
+	// given tokenId. It returns true when the session remains valid.
+	TouchOrValidate(ctx context.Context, tenantId int, tokenId string, timeout time.Duration) (bool, error)
+}
+
+// Directory is the online-user management projection over stored sessions.
+type Directory interface {
+	Store
+	// Count returns the total number of active online sessions.
+	Count(ctx context.Context) (int, error)
+	// CleanupInactive deletes sessions whose last_active_time exceeds the given timeout duration.
+	CleanupInactive(ctx context.Context, timeout time.Duration) (int64, error)
 	// BatchGetScoped returns online sessions for the requested token IDs after
 	// applying tenant ownership and data-scope constraints.
 	BatchGetScoped(
@@ -77,10 +92,6 @@ type Store interface {
 		scopeSvc datascope.Service,
 		tenantSvc tenantspi.ScopeService,
 	) ([]*UserOnlineStatus, error)
-	// Delete removes one online session by its globally unique token ID.
-	Delete(ctx context.Context, tokenId string) error
-	// DeleteByUserId removes all online sessions that belong to one user in one tenant.
-	DeleteByUserId(ctx context.Context, tenantId int, userId int) error
 	// List returns all online sessions that match the optional filter.
 	List(ctx context.Context, filter *ListFilter) ([]*Session, error)
 	// ListPage returns one paginated online-session list for the optional filter.
@@ -94,15 +105,12 @@ type Store interface {
 		scopeSvc datascope.Service,
 		tenantSvc tenantspi.ScopeService,
 	) (*ListResult, error)
-	// Count returns the total number of active online sessions.
-	Count(ctx context.Context) (int, error)
-	// TouchOrValidate validates tenant ownership and session timeout, then
-	// refreshes last_active_time outside the short write-throttle window for the
-	// given tokenId. It returns true when the session remains valid.
-	TouchOrValidate(ctx context.Context, tenantId int, tokenId string, timeout time.Duration) (bool, error)
-	// CleanupInactive deletes sessions whose last_active_time exceeds the given timeout duration.
-	CleanupInactive(ctx context.Context, timeout time.Duration) (int64, error)
 }
+
+var (
+	_ Store     = (*DBStore)(nil)
+	_ Directory = (*DBStore)(nil)
+)
 
 // DBStore implements Store using the persistent online-session table.
 type DBStore struct{}
@@ -115,35 +123,9 @@ type sessionConfigurableStore interface {
 	SetDefaultTTL(ttl time.Duration)
 }
 
-// processCoordinationSessionStore stores the deployment-selected coordination
-// backend used by session stores created after HTTP startup configuration.
-var processCoordinationSessionStore = struct {
-	sync.RWMutex
-	service coordination.Service
-}{}
-
-// NewDBStore creates a new DBStore instance.
-func NewDBStore() Store {
-	dbStore := &DBStore{}
-	if coordinationSvc := currentCoordinationService(); coordinationSvc != nil {
-		return NewCoordinationStore(coordinationSvc, dbStore)
-	}
-	return dbStore
-}
-
-// ConfigureCoordination switches new session stores to a coordination-backed
-// hot-state implementation. Passing nil restores the DB-only implementation
-// used by single-node deployments and tests.
-func ConfigureCoordination(coordinationSvc coordination.Service) {
-	processCoordinationSessionStore.Lock()
-	processCoordinationSessionStore.service = coordinationSvc
-	processCoordinationSessionStore.Unlock()
-}
-
-// currentCoordinationService returns the process-selected coordination service.
-func currentCoordinationService() coordination.Service {
-	processCoordinationSessionStore.RLock()
-	coordinationSvc := processCoordinationSessionStore.service
-	processCoordinationSessionStore.RUnlock()
-	return coordinationSvc
+// NewDBStore creates a PostgreSQL-backed session store. Clustered deployments
+// must wrap this projection with NewCoordinationStore at construction time;
+// this constructor never reads process-global coordination state.
+func NewDBStore() Directory {
+	return &DBStore{}
 }

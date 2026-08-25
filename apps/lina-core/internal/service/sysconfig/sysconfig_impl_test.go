@@ -27,7 +27,7 @@ func TestDeleteRejectsProtectedRuntimeParam(t *testing.T) {
 	ctx := context.Background()
 	runtimeParam := ensureRuntimeParamRecord(t, ctx, hostconfig.RuntimeParamKeyJWTExpire, "24h")
 
-	err := New(hostconfig.New(), nil).Delete(ctx, runtimeParam.Id)
+	err := New(hostconfig.New(nil), nil).Delete(ctx, runtimeParam.Id)
 	if err == nil {
 		t.Fatal("expected deleting protected runtime param to fail")
 	}
@@ -39,7 +39,7 @@ func TestDeleteRejectsProtectedPublicFrontendSetting(t *testing.T) {
 	ctx := context.Background()
 	publicSetting := ensureRuntimeParamRecord(t, ctx, hostconfig.PublicFrontendSettingKeyAppName, "LinaPro")
 
-	err := New(hostconfig.New(), nil).Delete(ctx, publicSetting.Id)
+	err := New(hostconfig.New(nil), nil).Delete(ctx, publicSetting.Id)
 	if err == nil {
 		t.Fatal("expected deleting protected public frontend setting to fail")
 	}
@@ -51,7 +51,7 @@ func TestDeleteRejectsBuiltInFlaggedSystemParameter(t *testing.T) {
 	ctx := context.Background()
 	record := insertConfigForBuiltInGuard(t, ctx, true)
 
-	err := New(hostconfig.New(), nil).Delete(ctx, record.Id)
+	err := New(hostconfig.New(nil), nil).Delete(ctx, record.Id)
 	if !bizerr.Is(err, CodeSysConfigBuiltinDeleteDenied) {
 		t.Fatalf("expected %s, got %v", CodeSysConfigBuiltinDeleteDenied.RuntimeCode(), err)
 	}
@@ -68,7 +68,7 @@ func TestUpdateAllowsBuiltInFlaggedSystemParameter(t *testing.T) {
 		updatedValue = "updated builtin value"
 	)
 
-	err := New(hostconfig.New(), nil).Update(ctx, UpdateInput{
+	err := New(hostconfig.New(nil), nil).Update(ctx, UpdateInput{
 		Id:    record.Id,
 		Value: &updatedValue,
 	})
@@ -98,7 +98,7 @@ func TestCustomSysConfigMutationsRefreshHostConfigSnapshot(t *testing.T) {
 	var (
 		ctx          = context.Background()
 		key          = fmt.Sprintf("test.custom.snapshot.%d", time.Now().UnixNano())
-		configSvc    = hostconfig.New()
+		configSvc    = hostconfig.New(nil)
 		sysconfigSvc = New(configSvc, nil)
 	)
 	rawReader := configSvc.(interface {
@@ -181,7 +181,7 @@ func TestUpdateRejectsProtectedRuntimeParamRename(t *testing.T) {
 		newKey       = "sys.jwt.expire.renamed"
 	)
 
-	err := New(hostconfig.New(), nil).Update(ctx, UpdateInput{
+	err := New(hostconfig.New(nil), nil).Update(ctx, UpdateInput{
 		Id:  runtimeParam.Id,
 		Key: &newKey,
 	})
@@ -199,7 +199,7 @@ func TestUpdateRejectsProtectedPublicFrontendSettingRename(t *testing.T) {
 		newKey        = "sys.app.name.renamed"
 	)
 
-	err := New(hostconfig.New(), nil).Update(ctx, UpdateInput{
+	err := New(hostconfig.New(nil), nil).Update(ctx, UpdateInput{
 		Id:  publicSetting.Id,
 		Key: &newKey,
 	})
@@ -222,8 +222,6 @@ func TestValidateManagedConfigValueRejectsInvalidValues(t *testing.T) {
 		{key: hostconfig.RuntimeParamKeyCronShellEnabled, value: "yes"},
 		{key: hostconfig.RuntimeParamKeyCronLogRetention, value: `{"mode":"days","value":0}`},
 		{key: hostconfig.PublicFrontendSettingKeyUIThemeMode, value: "night"},
-		{key: hostconfig.PublicFrontendSettingKeyAuthLoginPanelLayout, value: "panel-bottom"},
-		{key: hostconfig.PublicFrontendSettingKeyUILayout, value: "invalid-layout"},
 		{key: hostconfig.PublicFrontendSettingKeyUIWatermarkEnabled, value: "yes"},
 		{key: hostconfig.PublicFrontendSettingKeyUserDefaultAvatar, value: ""},
 	}
@@ -241,7 +239,7 @@ func TestUpdateProtectedRuntimeParamRefreshesConfigSnapshot(t *testing.T) {
 	ctx := context.Background()
 	runtimeParam := ensureRuntimeParamRecord(t, ctx, hostconfig.RuntimeParamKeyJWTExpire, "24h")
 
-	cfgSvc := hostconfig.New()
+	cfgSvc := hostconfig.New(nil)
 	cfg, err := cfgSvc.GetJwt(ctx)
 	if err != nil {
 		t.Fatalf("get initial jwt config: %v", err)
@@ -251,7 +249,7 @@ func TestUpdateProtectedRuntimeParamRefreshesConfigSnapshot(t *testing.T) {
 	}
 
 	updatedValue := "8h"
-	err = New(hostconfig.New(), nil).Update(ctx, UpdateInput{
+	err = New(hostconfig.New(nil), nil).Update(ctx, UpdateInput{
 		Id:    runtimeParam.Id,
 		Value: &updatedValue,
 	})
@@ -274,12 +272,12 @@ func TestCreateProtectedRuntimeParamRefreshesConfigSnapshot(t *testing.T) {
 	ctx := context.Background()
 	withRuntimeParamRemoved(t, ctx, hostconfig.RuntimeParamKeyUploadMaxSize)
 
-	cfgSvc := hostconfig.New()
+	cfgSvc := hostconfig.New(nil)
 	if _, err := cfgSvc.GetUpload(ctx); err != nil {
 		t.Fatalf("get initial upload config: %v", err)
 	}
 
-	createdID, err := New(hostconfig.New(), nil).Create(ctx, CreateInput{
+	createdID, err := New(hostconfig.New(nil), nil).Create(ctx, CreateInput{
 		Name:   "文件管理-上传大小上限",
 		Key:    hostconfig.RuntimeParamKeyUploadMaxSize,
 		Value:  "3",
@@ -312,7 +310,7 @@ func TestUpdateProtectedPublicFrontendSettingRefreshesConfigSnapshot(t *testing.
 		"LinaPro",
 	)
 
-	cfgSvc := hostconfig.New()
+	cfgSvc := hostconfig.New(nil)
 	cfg, err := cfgSvc.GetPublicFrontend(ctx)
 	if err != nil {
 		t.Fatalf("get initial public frontend config: %v", err)
@@ -322,7 +320,7 @@ func TestUpdateProtectedPublicFrontendSettingRefreshesConfigSnapshot(t *testing.
 	}
 
 	updatedValue := "LinaPro Console"
-	err = New(hostconfig.New(), nil).Update(ctx, UpdateInput{
+	err = New(hostconfig.New(nil), nil).Update(ctx, UpdateInput{
 		Id:    publicSetting.Id,
 		Value: &updatedValue,
 	})
@@ -345,7 +343,7 @@ func TestImportProtectedRuntimeParamRefreshesConfigSnapshot(t *testing.T) {
 	ctx := context.Background()
 	ensureRuntimeParamRecord(t, ctx, hostconfig.RuntimeParamKeyJWTExpire, "24h")
 
-	cfgSvc := hostconfig.New()
+	cfgSvc := hostconfig.New(nil)
 	cfg, err := cfgSvc.GetJwt(ctx)
 	if err != nil {
 		t.Fatalf("get initial jwt config: %v", err)
@@ -363,7 +361,7 @@ func TestImportProtectedRuntimeParamRefreshesConfigSnapshot(t *testing.T) {
 		"test import update",
 	})
 
-	result, err := New(hostconfig.New(), nil).Import(ctx, bytes.NewReader(importData), true)
+	result, err := New(hostconfig.New(nil), nil).Import(ctx, bytes.NewReader(importData), true)
 	if err != nil {
 		t.Fatalf("import protected runtime param: %v", err)
 	}
@@ -584,7 +582,7 @@ func buildConfigImportFile(t *testing.T, row []string) []byte {
 func markRuntimeParamChanged(t *testing.T, ctx context.Context) {
 	t.Helper()
 
-	if err := hostconfig.New().MarkRuntimeParamsChanged(ctx); err != nil {
+	if err := hostconfig.New(nil).MarkRuntimeParamsChanged(ctx); err != nil {
 		t.Fatalf("mark runtime params changed: %v", err)
 	}
 }

@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"lina-core/internal/model/entity"
-	jobhandlersvc "lina-core/internal/service/jobhandler"
 	jobmgmtsvc "lina-core/internal/service/jobmgmt"
 	pluginsvc "lina-core/internal/service/plugin"
 	"lina-core/pkg/bizerr"
@@ -78,7 +77,7 @@ func (s *serviceImpl) ensureManagedHandlersRegistered() error {
 
 // registerManagedHandlers publishes the host-owned built-in scheduled-job callbacks.
 func (s *serviceImpl) registerManagedHandlers() error {
-	handlers := []jobhandlersvc.HandlerDef{
+	handlers := []jobmgmtsvc.HandlerDef{
 		{
 			Ref:          "host:session-cleanup",
 			DisplayName:  "Online Session Cleanup",
@@ -91,7 +90,7 @@ func (s *serviceImpl) registerManagedHandlers() error {
 
 	if s.clusterSvc != nil && s.clusterSvc.IsEnabled() {
 		handlers = append(handlers,
-			jobhandlersvc.HandlerDef{
+			jobmgmtsvc.HandlerDef{
 				Ref:          "host:access-topology-sync",
 				DisplayName:  "Access Topology Sync",
 				Description:  "Synchronizes permission-topology revision snapshots across the cluster so authorization caches stay consistent on every node.",
@@ -99,7 +98,7 @@ func (s *serviceImpl) registerManagedHandlers() error {
 				Source:       jobhandlerv1.SourceHost,
 				Invoke:       s.invokeAccessTopologySync,
 			},
-			jobhandlersvc.HandlerDef{
+			jobmgmtsvc.HandlerDef{
 				Ref:          "host:runtime-param-sync",
 				DisplayName:  "Runtime Parameter Sync",
 				Description:  "Synchronizes protected runtime parameter snapshots across the cluster so each node keeps a fresh local cache.",
@@ -349,7 +348,7 @@ func (s *serviceImpl) invokeRuntimeParamSync(ctx context.Context, _ json.RawMess
 // isDuplicateHandlerError reports whether handler registration failed because
 // the same built-in ref was already registered by an earlier startup path.
 func isDuplicateHandlerError(err error) bool {
-	return bizerr.Is(err, jobhandlersvc.CodeJobHandlerExists)
+	return bizerr.Is(err, jobmgmtsvc.CodeJobHandlerExists)
 }
 
 // formatEveryPattern converts one duration to the stable `@every` form stored

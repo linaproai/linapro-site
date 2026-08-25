@@ -23,9 +23,7 @@ export type SourcePluginLifecycleCase = {
 
 type AccessibleRouteNode = {
   children?: AccessibleRouteNode[];
-  meta?: {
-    title?: string;
-  };
+  title?: string;
 };
 
 type RuntimePluginState = {
@@ -56,7 +54,7 @@ async function fetchCurrentUserRoutes(
 
 function hasRouteTitle(list: AccessibleRouteNode[], title: string): boolean {
   return list.some((item) => {
-    if (item?.meta?.title === title) {
+    if (item?.title === title) {
       return true;
     }
     return hasRouteTitle(item?.children ?? [], title);

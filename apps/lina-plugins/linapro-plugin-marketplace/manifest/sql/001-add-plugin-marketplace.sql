@@ -4,6 +4,8 @@
 -- ============================================================
 -- 发布者资料与归属锚点
 -- ============================================================
+-- Purpose: Marketplace persistence for plugin_marketplace_publisher.
+-- 用途：插件市场表 plugin_marketplace_publisher 的持久化存储。
 CREATE TABLE IF NOT EXISTS plugin_marketplace_publisher (
     "id"              INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     "publisher_key"   VARCHAR(64) NOT NULL DEFAULT '',
@@ -44,6 +46,8 @@ CREATE INDEX IF NOT EXISTS idx_plugin_marketplace_publisher_status ON plugin_mar
 -- ============================================================
 -- 市场插件身份、归属、发布来源与异步处理状态
 -- ============================================================
+-- Purpose: Marketplace persistence for plugin_marketplace_plugin.
+-- 用途：插件市场表 plugin_marketplace_plugin 的持久化存储。
 CREATE TABLE IF NOT EXISTS plugin_marketplace_plugin (
     "id"                INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     "publisher_id"      INT NOT NULL DEFAULT 0,
@@ -119,6 +123,8 @@ CREATE INDEX IF NOT EXISTS idx_plugin_marketplace_plugin_process_status ON plugi
 -- ============================================================
 -- 市场发布版本、审核状态、不可变版本身份与审核摘要
 -- ============================================================
+-- Purpose: Marketplace persistence for plugin_marketplace_release.
+-- 用途：插件市场表 plugin_marketplace_release 的持久化存储。
 CREATE TABLE IF NOT EXISTS plugin_marketplace_release (
     "id"                   INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     "plugin_record_id"     INT NOT NULL DEFAULT 0,
@@ -199,6 +205,8 @@ CREATE INDEX IF NOT EXISTS idx_plugin_marketplace_release_review_queue
 -- ============================================================
 -- 市场产物与校验和元数据
 -- ============================================================
+-- Purpose: Marketplace persistence for plugin_marketplace_artifact.
+-- 用途：插件市场表 plugin_marketplace_artifact 的持久化存储。
 CREATE TABLE IF NOT EXISTS plugin_marketplace_artifact (
     "id"                 INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     "release_id"         INT NOT NULL DEFAULT 0,
@@ -241,6 +249,8 @@ CREATE INDEX IF NOT EXISTS idx_plugin_marketplace_artifact_sha256 ON plugin_mark
 -- ============================================================
 -- 私有 Git 凭证密文存储（API 永不返回密文）
 -- ============================================================
+-- Purpose: Marketplace persistence for plugin_marketplace_credential.
+-- 用途：插件市场表 plugin_marketplace_credential 的持久化存储。
 CREATE TABLE IF NOT EXISTS plugin_marketplace_credential (
     "id"              INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     "credential_ref"  VARCHAR(64) NOT NULL DEFAULT '',
@@ -268,6 +278,8 @@ CREATE INDEX IF NOT EXISTS idx_plugin_marketplace_credential_owner ON plugin_mar
 -- ============================================================
 -- 版本展示元数据（名称/摘要多语言）；文档正文与图片不入库，权威在制品磁盘
 -- ============================================================
+-- Purpose: Marketplace persistence for plugin_marketplace_display_i18n.
+-- 用途：插件市场表 plugin_marketplace_display_i18n 的持久化存储。
 CREATE TABLE IF NOT EXISTS plugin_marketplace_display_i18n (
     "id"              INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     "release_id"      INT NOT NULL DEFAULT 0,
@@ -304,6 +316,8 @@ CREATE INDEX IF NOT EXISTS idx_plugin_marketplace_display_i18n_plugin_version
 -- ============================================================
 -- 版本详情与审核页使用的风险发现
 -- ============================================================
+-- Purpose: Marketplace persistence for plugin_marketplace_risk.
+-- 用途：插件市场表 plugin_marketplace_risk 的持久化存储。
 CREATE TABLE IF NOT EXISTS plugin_marketplace_risk (
     "id"              INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     "release_id"      INT NOT NULL DEFAULT 0,
@@ -339,6 +353,8 @@ CREATE INDEX IF NOT EXISTS idx_plugin_marketplace_risk_plugin ON plugin_marketpl
 -- ============================================================
 -- 市场分类与标签定义
 -- ============================================================
+-- Purpose: Marketplace persistence for plugin_marketplace_tag.
+-- 用途：插件市场表 plugin_marketplace_tag 的持久化存储。
 CREATE TABLE IF NOT EXISTS plugin_marketplace_tag (
     "id"          INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     "tag_code"    VARCHAR(64) NOT NULL DEFAULT '',
@@ -365,6 +381,8 @@ COMMENT ON COLUMN plugin_marketplace_tag."deleted_at" IS '删除时间';
 CREATE UNIQUE INDEX IF NOT EXISTS uk_plugin_marketplace_tag_code ON plugin_marketplace_tag ("tag_code");
 CREATE INDEX IF NOT EXISTS idx_plugin_marketplace_tag_type_status ON plugin_marketplace_tag ("tag_type", "status", "sort");
 
+-- Purpose: Marketplace persistence for plugin_marketplace_plugin_tag.
+-- 用途：插件市场表 plugin_marketplace_plugin_tag 的持久化存储。
 CREATE TABLE IF NOT EXISTS plugin_marketplace_plugin_tag (
     "id"               INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     "plugin_record_id" INT NOT NULL DEFAULT 0,
@@ -391,6 +409,8 @@ CREATE INDEX IF NOT EXISTS idx_plugin_marketplace_plugin_tag_plugin ON plugin_ma
 -- ============================================================
 -- 私有插件与预留授权插件的可见性授权
 -- ============================================================
+-- Purpose: Marketplace persistence for plugin_marketplace_visibility_grant.
+-- 用途：插件市场表 plugin_marketplace_visibility_grant 的持久化存储。
 CREATE TABLE IF NOT EXISTS plugin_marketplace_visibility_grant (
     "id"               INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     "plugin_record_id" INT NOT NULL DEFAULT 0,
@@ -425,6 +445,8 @@ CREATE INDEX IF NOT EXISTS idx_plugin_marketplace_visibility_plugin ON plugin_ma
 -- ============================================================
 -- 短期下载会话与授权快照
 -- ============================================================
+-- Purpose: Marketplace persistence for plugin_marketplace_download_session.
+-- 用途：插件市场表 plugin_marketplace_download_session 的持久化存储。
 CREATE TABLE IF NOT EXISTS plugin_marketplace_download_session (
     "id"                         INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     "session_id"                 VARCHAR(64) NOT NULL DEFAULT '',
@@ -472,6 +494,8 @@ CREATE INDEX IF NOT EXISTS idx_plugin_marketplace_download_session_release ON pl
 -- ============================================================
 -- 下载事件（异步聚合到读模型计数）
 -- ============================================================
+-- Purpose: Marketplace persistence for plugin_marketplace_download_event.
+-- 用途：插件市场表 plugin_marketplace_download_event 的持久化存储。
 CREATE TABLE IF NOT EXISTS plugin_marketplace_download_event (
     "id"                INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     "session_id"        VARCHAR(64) NOT NULL DEFAULT '',
@@ -506,6 +530,8 @@ CREATE INDEX IF NOT EXISTS idx_plugin_marketplace_download_event_session ON plug
 -- ============================================================
 -- 市场分页目录接口使用的列表投影
 -- ============================================================
+-- Purpose: Marketplace persistence for plugin_marketplace_plugin_read_model.
+-- 用途：插件市场表 plugin_marketplace_plugin_read_model 的持久化存储。
 CREATE TABLE IF NOT EXISTS plugin_marketplace_plugin_read_model (
     "id"                 INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     "plugin_record_id"   INT NOT NULL DEFAULT 0,

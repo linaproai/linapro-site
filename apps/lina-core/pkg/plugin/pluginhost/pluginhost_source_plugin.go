@@ -17,20 +17,6 @@ import (
 type sourcePlugin struct {
 	// id is the stable plugin id and must match `plugin.yaml`.
 	id string
-	// assets exposes grouped asset registration helpers.
-	assets AssetDeclarations
-	// lifecycle exposes grouped lifecycle registration helpers.
-	lifecycle LifecycleDeclarations
-	// hooks exposes grouped hook registration helpers.
-	hooks HookDeclarations
-	// http exposes grouped HTTP registration helpers.
-	http HTTPDeclarations
-	// jobs exposes grouped scheduled-job registration helpers.
-	jobs JobDeclarations
-	// providers exposes grouped framework provider declaration helpers.
-	providers ProviderDeclarations
-	// access exposes grouped menu and permission access-control helpers.
-	access AccessDeclarations
 
 	embeddedFiles          fs.FS
 	tenantProvider         tenantspi.ProviderFactory
@@ -67,7 +53,18 @@ type sourcePlugin struct {
 	permissionFilters      []*PermissionFilterHandlerRegistration
 }
 
-// NewDeclarations creates and returns a new grouped source-plugin declarations facade.
+var (
+	_ Declarations          = (*sourcePlugin)(nil)
+	_ AssetDeclarations     = (*sourcePlugin)(nil)
+	_ LifecycleDeclarations = (*sourcePlugin)(nil)
+	_ HookDeclarations      = (*sourcePlugin)(nil)
+	_ HTTPDeclarations      = (*sourcePlugin)(nil)
+	_ JobDeclarations       = (*sourcePlugin)(nil)
+	_ ProviderDeclarations  = (*sourcePlugin)(nil)
+	_ AccessDeclarations    = (*sourcePlugin)(nil)
+)
+
+// NewDeclarations creates and returns a grouped source-plugin declarations facade.
 func NewDeclarations(id string) Declarations {
 	plugin := &sourcePlugin{
 		id:                id,
@@ -78,13 +75,6 @@ func NewDeclarations(id string) Declarations {
 		menuFilters:       make([]*MenuFilterHandlerRegistration, 0),
 		permissionFilters: make([]*PermissionFilterHandlerRegistration, 0),
 	}
-	plugin.assets = &sourcePluginAssets{plugin: plugin}
-	plugin.lifecycle = &sourcePluginLifecycle{plugin: plugin}
-	plugin.hooks = &sourcePluginHooks{plugin: plugin}
-	plugin.http = &sourcePluginHTTP{plugin: plugin}
-	plugin.jobs = &sourcePluginJobs{plugin: plugin}
-	plugin.providers = &sourcePluginProviders{plugin: plugin}
-	plugin.access = &sourcePluginAccess{plugin: plugin}
 	return plugin
 }
 

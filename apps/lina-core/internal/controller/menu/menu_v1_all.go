@@ -1,27 +1,29 @@
+// This file returns generic navigation resources for the current user.
+// Workbenches compile the payload into shell-specific routes.
+
 package menu
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
-	"unicode"
 
 	v1 "lina-core/api/menu/v1"
 	"lina-core/internal/model/entity"
 	menusvc "lina-core/internal/service/menu"
 	"lina-core/pkg/apitime"
+	"lina-core/pkg/menuopen"
 	"lina-core/pkg/menutype"
-	"lina-core/pkg/plugin/pluginhost"
+	"lina-core/pkg/statusflag"
 )
 
-// GetAll returns all menus for the current user in Vben route format
+// GetAll returns generic navigation resources for the current user.
 func (c *ControllerV1) GetAll(ctx context.Context, req *v1.GetAllReq) (res *v1.GetAllRes, err error) {
 	// Get user ID from business context (set by auth middleware)
 	bizCtx := c.bizCtxSvc.Get(ctx)
 	if bizCtx == nil {
-		return &v1.GetAllRes{List: []*v1.MenuRouteItem{}}, nil
+		return &v1.GetAllRes{List: []*v1.NavResourceItem{}}, nil
 	}
 	userId := bizCtx.UserId
 
@@ -59,10 +61,7 @@ func (c *ControllerV1) GetAll(ctx context.Context, req *v1.GetAllReq) (res *v1.G
 		}
 	}
 
-	// Convert to Vben route format
-	routes := convertToRouteItems(menuTree)
-
-	return &v1.GetAllRes{List: routes}, nil
+	return &v1.GetAllRes{List: convertToNavResources(menuTree)}, nil
 }
 
 // buildFilteredTree builds a tree from one flat menu list and automatically
@@ -154,85 +153,43 @@ func cloneMenuItem(item *entity.SysMenu) *menusvc.MenuItem {
 	}
 }
 
-// convertToRouteItems converts menu items to Vben route format
-func convertToRouteItems(items []*menusvc.MenuItem) []*v1.MenuRouteItem {
-	result := make([]*v1.MenuRouteItem, 0, len(items))
+// convertToNavResources projects menu items into generic navigation resources.
+func convertToNavResources(items []*menusvc.MenuItem) []*v1.NavResourceItem {
+	result := make([]*v1.NavResourceItem, 0, len(items))
 	for _, item := range items {
 		if item.Type == menutype.Button.String() {
 			continue
 		}
 
-		var (
-			routeName = generateRouteName(item)
-			routePath = generateRoutePath(item)
-			route     = &v1.MenuRouteItem{
-				Id:       item.Id,
-				ParentId: item.ParentId,
-				Name:     routeName,
-				Path:     routePath,
-				Meta: &v1.MenuRouteMeta{
-					Title:            item.Name,
-					Icon:             item.Icon,
-					I18nKey:          buildRouteTitleI18nKey(item.MenuKey, item.Name),
-					HideInMenu:       item.Visible == 0,
-					KeepAlive:        item.IsCache == 1,
-					Order:            item.Sort,
-					Authority:        item.Perms,
-					IgnoreAccess:     false,
-					HideInBreadcrumb: false,
-					HideInTab:        false,
-					ActiveIcon:       "",
-				},
-			}
-			menuQuery = parseMenuQueryParams(item.QueryParam)
-		)
-		if len(menuQuery) > 0 {
-			route.Meta.Query = menuQuery
+		rawQuery := parseMenuQueryParams(item.QueryParam)
+		openMode, target := menuopen.Resolve(item.Path, item.IsFrame)
+		node := &v1.NavResourceItem{
+			Id:       item.Id,
+			ParentId: item.ParentId,
+			MenuKey:  item.MenuKey,
+			Title:    item.Name,
+			I18nKey:  buildRouteTitleI18nKey(item.MenuKey, item.Name),
+			Path:     item.Path,
+			Resource: menuopen.StripWorkbenchResource(item.Component),
+			Type:     menutype.Code(item.Type),
+			Icon:     item.Icon,
+			Perms:    item.Perms,
+			Sort:     item.Sort,
+			Visible:  statusflag.Visibility(item.Visible),
+			Status:   statusflag.Enabled(item.Status),
+			Cache:    statusflag.YesNo(item.IsCache),
+			OpenMode: openMode,
+			Target:   target,
+			Query:    menuopen.SanitizeQuery(rawQuery),
+		}
+		if openMode != menuopen.Page {
+			node.Resource = ""
 		}
 
-		// Runtime hosted assets and generic external links must be converted into
-		// router-level iframe/new-window semantics before normal view resolution.
-		if menuLinkTarget := normalizeMenuLinkTarget(item.Path); item.Type == menutype.Menu.String() && menuLinkTarget != "" {
-			route.Name = buildMenuLinkRouteName(item)
-			route.Path = buildMenuLinkRoutePath(item)
-			if isRuntimeEmbeddedMountMenu(item, menuQuery) {
-				// Embedded mount keeps the host runtime shell component while the
-				// actual asset URL is forwarded through route query parameters.
-				route.Component = generateComponentPath(item.Component)
-				route.Meta.Query = mergeMenuQueryParams(menuQuery, map[string]string{
-					pluginhost.DynamicEmbeddedSourceQueryKey: menuLinkTarget,
-					pluginhost.DynamicAccessModeQueryKey:     pluginhost.DynamicAccessModeEmbeddedMount.String(),
-				})
-			} else if item.IsFrame == 1 {
-				route.Component = "BasicLayout"
-				route.Meta.Link = menuLinkTarget
-				route.Meta.OpenInNewWindow = true
-			} else {
-				route.Component = "IFrameView"
-				route.Meta.IframeSrc = menuLinkTarget
-			}
-		} else if item.Type == menutype.Menu.String() {
-			// Set component for menu type (M) - actual pages.
-			route.Component = generateComponentPath(item.Component)
-		}
-
-		// Convert children recursively, excluding button-type nodes.
 		if len(item.Children) > 0 {
-			route.Children = convertToRouteItems(item.Children)
+			node.Children = convertToNavResources(item.Children)
 		}
-
-		// Hide empty directory menus so stable host catalogs do not leave empty
-		// shells in navigation when all child menus are unavailable.
-		if item.Type == menutype.Directory.String() && len(route.Children) == 0 {
-			continue
-		}
-
-		// Set redirect for directory type (D) with children.
-		if item.Type == menutype.Directory.String() && len(route.Children) > 0 {
-			route.Redirect = route.Children[0].Path
-		}
-
-		result = append(result, route)
+		result = append(result, node)
 	}
 	return result
 }
@@ -252,99 +209,8 @@ func buildRouteTitleI18nKey(menuKey string, name string) string {
 	return ""
 }
 
-// generateRouteName generates route name from menu
-func generateRouteName(item *menusvc.MenuItem) string {
-	if normalizeMenuLinkTarget(item.Path) != "" {
-		return buildMenuLinkRouteName(item)
-	}
-	if item.Path != "" {
-		// Convert path to PascalCase name
-		return toPascalCase(item.Path)
-	}
-	return toPascalCase(item.Name)
-}
-
-// generateRoutePath generates route path
-func generateRoutePath(item *menusvc.MenuItem) string {
-	if normalizeMenuLinkTarget(item.Path) != "" {
-		return buildMenuLinkRoutePath(item)
-	}
-	if item.Path == "" {
-		return ""
-	}
-	// Child routes normally use relative paths so Vue Router appends them to the
-	// parent path. When the menu explicitly stores an absolute path, keep it so
-	// grouped directory menus can preserve existing stable URLs.
-	if item.ParentId != 0 {
-		if item.Path[0] == '/' {
-			return item.Path
-		}
-		return item.Path
-	}
-	// For root routes, ensure path starts with /
-	if item.Path[0] != '/' {
-		return "/" + item.Path
-	}
-	return item.Path
-}
-
-// generateComponentPath generates component path for Vben
-func generateComponentPath(component string) string {
-	if component == "" {
-		return ""
-	}
-	// Vben expects component path like #/views/xxx/index.vue
-	if component[0] == '#' {
-		return component
-	}
-	return "#/views/" + component
-}
-
-// toPascalCase converts a string to PascalCase
-func toPascalCase(s string) string {
-	if s == "" {
-		return ""
-	}
-	result := make([]byte, 0, len(s))
-	upperNext := true
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		if c == '-' || c == '_' || c == '/' || c == ' ' {
-			upperNext = true
-			continue
-		}
-		if upperNext {
-			if c >= 'a' && c <= 'z' {
-				c = c - 32
-			}
-			upperNext = false
-		}
-		result = append(result, c)
-	}
-	return string(result)
-}
-
-// normalizeMenuLinkTarget returns the real target URL for iframe/new-window menus.
-func normalizeMenuLinkTarget(path string) string {
-	trimmedPath := strings.TrimSpace(path)
-	if trimmedPath == "" {
-		return ""
-	}
-
-	lowerPath := strings.ToLower(trimmedPath)
-	if strings.HasPrefix(lowerPath, "http://") || strings.HasPrefix(lowerPath, "https://") {
-		return trimmedPath
-	}
-
-	normalizedHostedPath := "/" + strings.TrimLeft(trimmedPath, "/")
-	if strings.HasPrefix(normalizedHostedPath, pluginhost.HostedAssetURLPrefix) {
-		return normalizedHostedPath
-	}
-	return ""
-}
-
 // parseMenuQueryParams decodes the persisted JSON query payload into trimmed
-// string pairs used by route metadata.
+// string pairs used by navigation resources.
 func parseMenuQueryParams(queryParam string) map[string]string {
 	trimmedQuery := strings.TrimSpace(queryParam)
 	if trimmedQuery == "" {
@@ -368,113 +234,4 @@ func parseMenuQueryParams(queryParam string) map[string]string {
 		return nil
 	}
 	return query
-}
-
-// mergeMenuQueryParams overlays non-empty query parameters onto an existing map
-// and returns nil when the merged result is empty.
-func mergeMenuQueryParams(base map[string]string, overrides map[string]string) map[string]string {
-	if len(base) == 0 && len(overrides) == 0 {
-		return nil
-	}
-
-	merged := make(map[string]string, len(base)+len(overrides))
-	for key, value := range base {
-		if strings.TrimSpace(key) == "" || strings.TrimSpace(value) == "" {
-			continue
-		}
-		merged[key] = value
-	}
-	for key, value := range overrides {
-		if strings.TrimSpace(key) == "" || strings.TrimSpace(value) == "" {
-			continue
-		}
-		merged[key] = value
-	}
-	if len(merged) == 0 {
-		return nil
-	}
-	return merged
-}
-
-// isRuntimeEmbeddedMountMenu reports whether the menu entry points at the
-// hosted runtime page component using embedded-mount semantics.
-func isRuntimeEmbeddedMountMenu(item *menusvc.MenuItem, menuQuery map[string]string) bool {
-	if normalizeMenuComponentPath(item.Component) != pluginhost.DynamicPageComponentPath {
-		return false
-	}
-	return pluginhost.DynamicAccessMode(strings.TrimSpace(menuQuery[pluginhost.DynamicAccessModeQueryKey])) ==
-		pluginhost.DynamicAccessModeEmbeddedMount
-}
-
-// normalizeMenuComponentPath normalizes one stored component path into the
-// canonical relative path used by runtime menu comparisons.
-func normalizeMenuComponentPath(component string) string {
-	normalizedComponent := strings.TrimSpace(component)
-	normalizedComponent = strings.TrimPrefix(normalizedComponent, "#")
-	normalizedComponent = strings.TrimPrefix(normalizedComponent, "/")
-	normalizedComponent = strings.TrimPrefix(normalizedComponent, "views/")
-	normalizedComponent = strings.TrimPrefix(normalizedComponent, "views\\")
-	normalizedComponent = strings.TrimSuffix(normalizedComponent, ".vue")
-	return strings.ReplaceAll(normalizedComponent, "\\", "/")
-}
-
-// buildMenuLinkRoutePath creates one internal router path for a menu that actually targets a hosted asset URL.
-func buildMenuLinkRoutePath(item *menusvc.MenuItem) string {
-	slug := buildMenuLinkRouteSlug(item)
-	if item.ParentId == 0 {
-		return "/" + slug
-	}
-	return slug
-}
-
-// buildMenuLinkRouteName creates a stable route name for hosted-link menus.
-func buildMenuLinkRouteName(item *menusvc.MenuItem) string {
-	return toPascalCase(buildMenuLinkRouteSlug(item))
-}
-
-// buildMenuLinkRouteSlug derives one stable router slug for menus that point
-// to hosted assets or external links.
-func buildMenuLinkRouteSlug(item *menusvc.MenuItem) string {
-	var builder strings.Builder
-	builder.WriteString("link-")
-	builder.WriteString(strconv.Itoa(item.Id))
-	builder.WriteString("-")
-
-	for _, currentRune := range strings.ToLower(strings.TrimSpace(item.Path)) {
-		if unicode.IsLetter(currentRune) || unicode.IsDigit(currentRune) {
-			builder.WriteRune(currentRune)
-			continue
-		}
-		builder.WriteRune('-')
-	}
-
-	slug := strings.Trim(builder.String(), "-")
-	slug = collapseHyphen(slug)
-	if slug == "" {
-		return "link-" + strconv.Itoa(item.Id)
-	}
-	return slug
-}
-
-// collapseHyphen removes repeated hyphen runs while preserving single
-// separators in generated route slugs.
-func collapseHyphen(value string) string {
-	var (
-		builder      strings.Builder
-		previousDash bool
-	)
-
-	for _, currentRune := range value {
-		if currentRune == '-' {
-			if previousDash {
-				continue
-			}
-			previousDash = true
-			builder.WriteRune(currentRune)
-			continue
-		}
-		previousDash = false
-		builder.WriteRune(currentRune)
-	}
-	return builder.String()
 }

@@ -1,7 +1,8 @@
 // Package hostservices defines the public host-service catalog used by
 // protocol governance, guest SDK coverage checks, and host dispatcher coverage
-// checks. Runtime validation can derive private lookup tables from this catalog,
-// but service and method metadata must be maintained here first.
+// checks. Runtime validation, WASM dispatch registration, and guest method
+// sets are derived from this catalog. Service and method metadata must be
+// maintained here first.
 //
 // Host service/method wire Go constants live in this package (wire_constants.go).
 // Catalog entries must reference those constants for service and method wire values.
@@ -63,6 +64,9 @@ type ServiceDescriptor struct {
 	Version string
 	// ResourceKind describes the manifest resource declaration shape.
 	ResourceKind ResourceKind
+	// DynamicOnly reports whether this service is published only to dynamic
+	// plugins. Source-plugin capability.Services must not expose these entries.
+	DynamicOnly bool
 	// SourceContract names the public Go source-plugin contract package when
 	// the service comes from a plugin-owned capability descriptor.
 	SourceContract string
@@ -112,6 +116,7 @@ var catalog = []ServiceDescriptor{
 	{
 		Service:      HostServiceRuntime,
 		ResourceKind: ResourceKindNone,
+		DynamicOnly:  true,
 		Methods: []MethodDescriptor{
 			hostMethod(HostServiceMethodRuntimeLogWrite, "HostServiceMethodRuntimeLogWrite", "host:runtime", "HostCallLogRequest", ""),
 			hostMethod(HostServiceMethodRuntimeStateGet, "HostServiceMethodRuntimeStateGet", "host:runtime", "HostCallStateGetRequest", "HostCallStateGetResponse"),
@@ -146,6 +151,7 @@ var catalog = []ServiceDescriptor{
 	{
 		Service:      HostServiceNetwork,
 		ResourceKind: ResourceKindRef,
+		DynamicOnly:  true,
 		Methods: []MethodDescriptor{
 			hostMethod(HostServiceMethodNetworkRequest, "HostServiceMethodNetworkRequest", "host:http:request", "HostServiceNetworkRequest", "HostServiceNetworkResponse"),
 		},
@@ -153,6 +159,7 @@ var catalog = []ServiceDescriptor{
 	{
 		Service:      HostServiceData,
 		ResourceKind: ResourceKindTable,
+		DynamicOnly:  true,
 		Methods: []MethodDescriptor{
 			hostMethod(HostServiceMethodDataList, "HostServiceMethodDataList", "host:data:read", "HostServiceDataListRequest", "HostServiceDataListResponse"),
 			hostMethod(HostServiceMethodDataGet, "HostServiceMethodDataGet", "host:data:read", "HostServiceDataGetRequest", "HostServiceDataGetResponse"),
@@ -558,11 +565,34 @@ func projectOwnerDescriptor(descriptor capregistry.Descriptor) (ServiceDescripto
 
 // Methods returns all governed host-service method descriptors.
 func Methods() []MethodDescriptor {
-	methods := make([]MethodDescriptor, 0)
-	for _, service := range Catalog() {
-		methods = append(methods, service.Methods...)
+	return methodsFromCatalog(Catalog())
+}
+
+// PublishedDispatcherMethods returns catalog methods that the WASM dispatcher
+// must handle.
+func PublishedDispatcherMethods() []MethodDescriptor {
+	return filterMethods(func(method MethodDescriptor) bool {
+		return method.Published && method.Dispatcher
+	})
+}
+
+// PublishedGuestMethods returns catalog methods that a dynamic guest client
+// must be able to call.
+func PublishedGuestMethods() []MethodDescriptor {
+	return filterMethods(func(method MethodDescriptor) bool {
+		return method.Published && method.GuestClient
+	})
+}
+
+func filterMethods(match func(MethodDescriptor) bool) []MethodDescriptor {
+	methods := Methods()
+	result := make([]MethodDescriptor, 0, len(methods))
+	for _, method := range methods {
+		if match(method) {
+			result = append(result, method)
+		}
 	}
-	return methods
+	return result
 }
 
 // MethodsWithDescriptors returns all core-owned and plugin-owned method
@@ -627,14 +657,14 @@ func ownerDescriptorResourceKind(methods []capregistry.MethodDescriptor) Resourc
 }
 
 func ownerResourceKind(kind capregistry.ResourceKind) ResourceKind {
-	switch kind {
-	case capregistry.ResourceKindPath:
+	switch ResourceKind(kind) {
+	case ResourceKindPath:
 		return ResourceKindPath
-	case capregistry.ResourceKindTable:
+	case ResourceKindTable:
 		return ResourceKindTable
-	case capregistry.ResourceKindKey:
+	case ResourceKindKey:
 		return ResourceKindKey
-	case capregistry.ResourceKindRef:
+	case ResourceKindRef:
 		return ResourceKindRef
 	default:
 		return ResourceKindNone
@@ -667,13 +697,42 @@ func hostMethodWithResource(
 	return descriptor
 }
 
+// inferPayloadKind classifies one catalog method's codec family. Ordinary
+// named request/response structs, including cache/lock/storage/data payloads,
+// use JSON envelopes. Only the remaining dedicated binary payload type names
+// stay on PayloadKindDedicated.
 func inferPayloadKind(requestPayload string, responsePayload string) PayloadKind {
 	if requestPayload == "" && responsePayload == "" {
 		return PayloadKindNone
 	}
-	if (requestPayload == "" || requestPayload == "HostServiceJSONRequest") &&
-		(responsePayload == "" || responsePayload == "HostServiceJSONResponse") {
-		return PayloadKindJSON
+	if dedicatedPayloadType(requestPayload) || dedicatedPayloadType(responsePayload) {
+		return PayloadKindDedicated
 	}
-	return PayloadKindDedicated
+	return PayloadKindJSON
+}
+
+// dedicatedPayloadType reports whether a catalog payload type name still uses a
+// dedicated binary codec. New methods must not add names here.
+func dedicatedPayloadType(payloadType string) bool {
+	switch payloadType {
+	case
+		"HostCallLogRequest",
+		"HostCallStateDeleteRequest",
+		"HostCallStateGetRequest",
+		"HostCallStateGetResponse",
+		"HostCallStateSetRequest",
+		"HostServiceConfigKeyRequest",
+		"HostServiceConfigValueResponse",
+		"HostServiceJobsRegisterRequest",
+		"HostServiceManifestGetRequest",
+		"HostServiceManifestGetResponse",
+		"HostServiceNetworkRequest",
+		"HostServiceNetworkResponse",
+		"HostServiceNotificationsSendRequest",
+		"HostServiceNotificationsSendResponse",
+		"HostServiceValueResponse":
+		return true
+	default:
+		return false
+	}
 }

@@ -5,9 +5,9 @@ package scheduler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	jobv1 "lina-core/api/job/v1"
-	jobhandlerv1 "lina-core/api/jobhandler/v1"
 	joblogv1 "lina-core/api/joblog/v1"
 	"strings"
 	"sync"
@@ -21,7 +21,6 @@ import (
 	"lina-core/internal/dao"
 	"lina-core/internal/model/do"
 	"lina-core/internal/model/entity"
-	"lina-core/internal/service/jobhandler"
 	"lina-core/internal/service/jobmeta"
 	"lina-core/internal/service/jobmgmt/internal/shellexec"
 )
@@ -53,11 +52,77 @@ func (f fakeClusterService) NodeID() string {
 	return f.nodeID
 }
 
-// schedulerTestCleaner satisfies host-handler registration for tests.
-type schedulerTestCleaner struct{}
+const emptyHandlerSchema = `{"type":"object","properties":{}}`
 
-// CleanupDueLogs is a no-op for scheduler tests.
-func (schedulerTestCleaner) CleanupDueLogs(ctx context.Context) (int64, error) { return 0, nil }
+// testHandlerEntry stores one in-memory handler used by scheduler tests.
+type testHandlerEntry struct {
+	invoke func(ctx context.Context, params json.RawMessage) (any, error)
+	schema string
+}
+
+// testHandlerRuntime is a local handler registry so scheduler tests do not
+// import the parent jobmgmt package and create a cycle.
+type testHandlerRuntime struct {
+	mu       sync.Mutex
+	handlers map[string]testHandlerEntry
+}
+
+// newTestRegistry creates one empty in-memory handler registry for tests.
+func newTestRegistry() *testHandlerRuntime {
+	return &testHandlerRuntime{handlers: make(map[string]testHandlerEntry)}
+}
+
+// register stores one handler definition for scheduler tests.
+func (r *testHandlerRuntime) register(
+	ref string,
+	schema string,
+	invoke func(ctx context.Context, params json.RawMessage) (any, error),
+) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.handlers == nil {
+		r.handlers = make(map[string]testHandlerEntry)
+	}
+	r.handlers[strings.TrimSpace(ref)] = testHandlerEntry{invoke: invoke, schema: schema}
+}
+
+// Lookup returns the invocation callback and parameter schema for one ref.
+func (r *testHandlerRuntime) Lookup(
+	ref string,
+) (invoke func(ctx context.Context, params json.RawMessage) (any, error), paramsSchema string, ok bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	entry, found := r.handlers[strings.TrimSpace(ref)]
+	if !found {
+		return nil, "", false
+	}
+	return entry.invoke, entry.schema, true
+}
+
+// ValidateHandlerParams accepts the empty-object payloads used by scheduler tests.
+func (r *testHandlerRuntime) ValidateHandlerParams(_ string, paramsJSON json.RawMessage) error {
+	trimmed := strings.TrimSpace(string(paramsJSON))
+	if trimmed == "" || trimmed == "{}" {
+		return nil
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(paramsJSON, &payload); err != nil {
+		return err
+	}
+	return nil
+}
+
+// HandlerNotFoundError returns a missing-handler error for scheduler tests.
+func (r *testHandlerRuntime) HandlerNotFoundError() error {
+	return errors.New("scheduled job handler does not exist")
+}
+
+// registerHostNoops installs no-op callbacks for built-in host handler refs.
+func registerHostNoops(registry *testHandlerRuntime) {
+	noop := func(ctx context.Context, params json.RawMessage) (any, error) { return nil, nil }
+	registry.register("host:cleanup-job-logs", emptyHandlerSchema, noop)
+	registry.register("host:wait", emptyHandlerSchema, noop)
+}
 
 // fakeShellExecutor provides deterministic shell-execution behavior for scheduler tests.
 type fakeShellExecutor struct {
@@ -93,22 +158,12 @@ func newRegistryWithHandler(
 	t *testing.T,
 	ref string,
 	callback func(ctx context.Context, params json.RawMessage) (any, error),
-) jobhandler.Registry {
+) *testHandlerRuntime {
 	t.Helper()
 
-	registry := jobhandler.New()
-	if err := jobhandler.RegisterHostHandlers(registry, schedulerTestCleaner{}); err != nil {
-		t.Fatalf("expected host handler registration to succeed, got error: %v", err)
-	}
-	if err := registry.Register(jobhandler.HandlerDef{
-		Ref:          ref,
-		DisplayName:  "Scheduler Test Handler",
-		ParamsSchema: `{"type":"object","properties":{}}`,
-		Source:       jobhandlerv1.SourceHost,
-		Invoke:       callback,
-	}); err != nil {
-		t.Fatalf("expected test handler registration to succeed, got error: %v", err)
-	}
+	registry := newTestRegistry()
+	registerHostNoops(registry)
+	registry.register(ref, emptyHandlerSchema, callback)
 	return registry
 }
 
@@ -118,7 +173,7 @@ func newRegistryWithHandler(
 func registerEnabledHostHandlersAsNoop(
 	t *testing.T,
 	ctx context.Context,
-	registry jobhandler.Registry,
+	registry *testHandlerRuntime,
 ) {
 	t.Helper()
 
@@ -140,22 +195,12 @@ func registerEnabledHostHandlersAsNoop(
 		if !strings.HasPrefix(handlerRef, "host:") {
 			continue
 		}
-		if _, exists := registry.Lookup(handlerRef); exists {
+		if _, _, exists := registry.Lookup(handlerRef); exists {
 			continue
 		}
-		err = registry.Register(jobhandler.HandlerDef{
-			Ref:          handlerRef,
-			DisplayName:  handlerRef,
-			Description:  "scheduler test no-op host handler",
-			ParamsSchema: `{"type":"object","properties":{}}`,
-			Source:       jobhandlerv1.SourceHost,
-			Invoke: func(ctx context.Context, params json.RawMessage) (any, error) {
-				return nil, nil
-			},
+		registry.register(handlerRef, emptyHandlerSchema, func(ctx context.Context, params json.RawMessage) (any, error) {
+			return nil, nil
 		})
-		if err != nil {
-			t.Fatalf("expected no-op host handler registration to succeed for %s, got error: %v", handlerRef, err)
-		}
 	}
 }
 
@@ -492,12 +537,10 @@ func TestRunCronJobSkipsOnNonPrimaryNode(t *testing.T) {
 func TestLoadAndRegisterPausesMissingCustomPluginHandlerJobs(t *testing.T) {
 	var (
 		ctx      = context.Background()
-		registry = jobhandler.New()
+		registry = newTestRegistry()
 		svc      *serviceImpl
 	)
-	if err := jobhandler.RegisterHostHandlers(registry, schedulerTestCleaner{}); err != nil {
-		t.Fatalf("expected host handler registration to succeed, got error: %v", err)
-	}
+	registerHostNoops(registry)
 	registerEnabledHostHandlersAsNoop(t, ctx, registry)
 	svc = New(fakeClusterService{primary: true}, registry, fakeShellExecutor{
 		execute: func(ctx context.Context, in shellexec.ExecuteInput) (*shellexec.ExecuteOutput, error) {
@@ -745,7 +788,7 @@ func TestRunJobHandlerTimeoutMarksLogTimeout(t *testing.T) {
 func TestCancelLogCancelsRunningShellExecution(t *testing.T) {
 	var (
 		ctx      = context.Background()
-		registry = jobhandler.New()
+		registry = newTestRegistry()
 		svc      = New(
 			fakeClusterService{primary: true},
 			registry,
@@ -920,7 +963,7 @@ func TestExecuteJobPanicMarksLogFailed(t *testing.T) {
 func TestLoadAndRegisterReclaimsOrphanRunningLogs(t *testing.T) {
 	var (
 		ctx      = context.Background()
-		registry = jobhandler.New()
+		registry = newTestRegistry()
 		svc      = New(fakeClusterService{primary: true, nodeID: "reclaim-node-a"}, registry, nil).(*serviceImpl)
 		jobID    = insertTestJob(t, ctx, "host:scheduler-reclaim", jobv1.ScopeMasterOnly, jobv1.ConcurrencySingleton, 1, 0)
 	)

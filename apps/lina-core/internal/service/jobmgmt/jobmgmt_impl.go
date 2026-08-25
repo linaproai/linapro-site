@@ -17,7 +17,6 @@ import (
 	"lina-core/internal/model/do"
 	"lina-core/internal/model/entity"
 	"lina-core/internal/service/datascope"
-	"lina-core/internal/service/jobhandler"
 	"lina-core/internal/service/jobmeta"
 	"lina-core/pkg/bizerr"
 	"lina-core/pkg/gdbutil"
@@ -128,9 +127,9 @@ func (s *serviceImpl) validateExecutableJob(ctx context.Context, job *entity.Sys
 	case jobv1.TaskTypeHandler:
 		def, ok := s.registry.Lookup(job.HandlerRef)
 		if !ok {
-			return bizerr.NewCode(jobhandler.CodeJobHandlerNotFound)
+			return bizerr.NewCode(CodeJobHandlerNotFound)
 		}
-		return jobhandler.ValidateParams(def.ParamsSchema, json.RawMessage(job.Params))
+		return ValidateParams(def.ParamsSchema, json.RawMessage(job.Params))
 	case jobv1.TaskTypeShell:
 		enabled, err := s.configSvc.IsCronShellEnabled(ctx)
 		if err != nil {

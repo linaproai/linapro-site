@@ -13,7 +13,6 @@ import (
 	"lina-core/internal/dao"
 	"lina-core/internal/model/do"
 	"lina-core/internal/model/entity"
-	"lina-core/internal/service/jobhandler"
 	"lina-core/internal/service/jobmeta"
 )
 
@@ -22,9 +21,9 @@ import (
 func TestHandlerUnregisterPausesEnabledJobs(t *testing.T) {
 	var (
 		ctx       = context.Background()
-		registry  = jobhandler.New()
+		registry  = NewRegistry()
 		scheduler = &trackingScheduler{}
-		handler   = jobhandler.HandlerDef{
+		handler   = HandlerDef{
 			Ref:          "plugin:test-job-handler/jobs:wait",
 			DisplayName:  "Plugin Test Wait Handler",
 			Description:  "Used to verify registry cascade behavior.",
@@ -35,7 +34,7 @@ func TestHandlerUnregisterPausesEnabledJobs(t *testing.T) {
 				return map[string]any{"ok": true}, nil
 			},
 		}
-		disabledHandler = jobhandler.HandlerDef{
+		disabledHandler = HandlerDef{
 			Ref:          "plugin:test-job-handler/jobs:wait-disabled",
 			DisplayName:  "Plugin Disabled Test Handler",
 			Description:  "Used to verify disabled builtin jobs stay untouched.",
@@ -89,9 +88,9 @@ func TestHandlerUnregisterPausesEnabledJobs(t *testing.T) {
 func TestHandlerRegisterRestoresPausedJobs(t *testing.T) {
 	var (
 		ctx       = context.Background()
-		registry  = jobhandler.New()
+		registry  = NewRegistry()
 		scheduler = &trackingScheduler{}
-		handler   = jobhandler.HandlerDef{
+		handler   = HandlerDef{
 			Ref:          "plugin:test-job-handler/jobs:restore",
 			DisplayName:  "Plugin Restore Handler",
 			Description:  "Used to verify paused job restoration.",
